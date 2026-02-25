@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ManyToOne, getManyToOneRelations } from "../../decorators/relations.js";
+import { ManyToOne, getManyToOneRelations, OneToMany, getOneToManyRelations } from "../../decorators/relations.js";
 import { Table } from "../../decorators/table.js";
 import { Column } from "../../decorators/column.js";
 import { Id } from "../../decorators/id.js";
@@ -205,5 +205,152 @@ describe("DdlGenerator with @ManyToOne", () => {
     const sql = generator.generateCreateTable(DdlMultiFk);
     expect(sql).toContain("dept_id INTEGER REFERENCES departments(id)");
     expect(sql).toContain("parent_dept_id INTEGER REFERENCES departments(id)");
+  });
+});
+
+describe("@OneToMany decorator", () => {
+  it("stores relation metadata with mappedBy", () => {
+    @Table("otm_departments")
+    class OtmDepartment {
+      @Id @Column() id: number = 0;
+      @Column() name: string = "";
+      @OneToMany({ target: () => OtmEmployee, mappedBy: "department" })
+      employees!: OtmEmployee[];
+    }
+
+    @Table("otm_employees")
+    class OtmEmployee {
+      @Id @Column() id: number = 0;
+      @ManyToOne({ target: () => OtmDepartment })
+      department!: OtmDepartment;
+    }
+    new OtmDepartment();
+    new OtmEmployee();
+
+    const relations = getOneToManyRelations(OtmDepartment);
+    expect(relations).toHaveLength(1);
+    expect(relations[0].fieldName).toBe("employees");
+    expect(relations[0].mappedBy).toBe("department");
+    expect(relations[0].target()).toBe(OtmEmployee);
+  });
+
+  it("returns empty array for class without @OneToMany", () => {
+    const relations = getOneToManyRelations(Department);
+    expect(relations).toEqual([]);
+  });
+
+  it("handles multiple @OneToMany on same class", () => {
+    @Table("otm_org")
+    class OtmOrg {
+      @Id @Column() id: number = 0;
+      @OneToMany({ target: () => Department, mappedBy: "org" })
+      departments!: Department[];
+      @OneToMany({ target: () => Department, mappedBy: "parentOrg" })
+      subOrgs!: Department[];
+    }
+    new OtmOrg();
+
+    const relations = getOneToManyRelations(OtmOrg);
+    expect(relations).toHaveLength(2);
+    const mappedBys = relations.map((r) => r.mappedBy);
+    expect(mappedBys).toContain("org");
+    expect(mappedBys).toContain("parentOrg");
+  });
+
+  it("isolates metadata between classes", () => {
+    @Table("otm_parent")
+    class OtmParent {
+      @Id @Column() id: number = 0;
+      @OneToMany({ target: () => Department, mappedBy: "parent" })
+      children!: Department[];
+    }
+    new OtmParent();
+
+    expect(getOneToManyRelations(OtmParent)).toHaveLength(1);
+    expect(getOneToManyRelations(Department)).toHaveLength(0);
+  });
+});
+
+describe("EntityMetadata with @OneToMany", () => {
+  it("includes oneToManyRelations in entity metadata", () => {
+    @Table("otm_meta_dept")
+    class OtmMetaDept {
+      @Id @Column() id: number = 0;
+      @OneToMany({ target: () => Department, mappedBy: "dept" })
+      children!: Department[];
+    }
+    new OtmMetaDept();
+
+    const metadata = getEntityMetadata(OtmMetaDept);
+    expect(metadata.oneToManyRelations).toHaveLength(1);
+    expect(metadata.oneToManyRelations[0].mappedBy).toBe("dept");
+  });
+
+  it("returns empty oneToManyRelations for entity without @OneToMany", () => {
+    const metadata = getEntityMetadata(Department);
+    expect(metadata.oneToManyRelations).toEqual([]);
+  });
+});
+
+describe("@OneToMany does not affect DDL", () => {
+  it("does not generate additional columns for @OneToMany", () => {
+    @Table("ddl_otm_dept")
+    class DdlOtmDept {
+      @Id @Column() id: number = 0;
+      @Column() name: string = "";
+      @OneToMany({ target: () => Department, mappedBy: "dept" })
+      children!: Department[];
+    }
+    new DdlOtmDept();
+
+    const sql = generator.generateCreateTable(DdlOtmDept);
+    // Should only have id and name columns, no FK for @OneToMany
+    expect(sql).toContain("id INTEGER PRIMARY KEY");
+    expect(sql).toContain("name TEXT");
+    expect(sql).not.toContain("children");
+    expect(sql).not.toContain("REFERENCES");
+  });
+});
+
+describe("@ManyToOne + @OneToMany bidirectional", () => {
+  it("both sides store correct metadata for a pair of entities", () => {
+    @Table("bi_dept")
+    class BiDept {
+      @Id @Column() id: number = 0;
+      @Column() name: string = "";
+      @OneToMany({ target: () => BiEmp, mappedBy: "department" })
+      employees!: BiEmp[];
+    }
+
+    @Table("bi_emp")
+    class BiEmp {
+      @Id @Column() id: number = 0;
+      @Column() name: string = "";
+      @ManyToOne({ target: () => BiDept, joinColumn: "department_id" })
+      department!: BiDept;
+    }
+    new BiDept();
+    new BiEmp();
+
+    // Check @OneToMany side (Department)
+    const otmRelations = getOneToManyRelations(BiDept);
+    expect(otmRelations).toHaveLength(1);
+    expect(otmRelations[0].fieldName).toBe("employees");
+    expect(otmRelations[0].target()).toBe(BiEmp);
+    expect(otmRelations[0].mappedBy).toBe("department");
+
+    // Check @ManyToOne side (Employee)
+    const mtoRelations = getManyToOneRelations(BiEmp);
+    expect(mtoRelations).toHaveLength(1);
+    expect(mtoRelations[0].fieldName).toBe("department");
+    expect(mtoRelations[0].target()).toBe(BiDept);
+    expect(mtoRelations[0].joinColumn).toBe("department_id");
+
+    // DDL should have FK only on Employee side
+    const deptSql = generator.generateCreateTable(BiDept);
+    expect(deptSql).not.toContain("REFERENCES");
+
+    const empSql = generator.generateCreateTable(BiEmp);
+    expect(empSql).toContain("department_id INTEGER REFERENCES bi_dept(id)");
   });
 });

@@ -37,6 +37,7 @@ describe("createRowMapper", () => {
         { fieldName: "name", columnName: "name" },
       ],
       manyToOneRelations: [],
+      oneToManyRelations: [],
     };
 
     const mapper = createRowMapper(User, metadata);
@@ -66,6 +67,7 @@ describe("createRowMapper", () => {
       createdDateField: "createdAt",
       lastModifiedDateField: "updatedAt",
       manyToOneRelations: [],
+      oneToManyRelations: [],
     };
 
     const mapper = createRowMapper(Post, metadata);
@@ -95,6 +97,7 @@ describe("createRowMapper", () => {
       idField: "id",
       fields: [{ fieldName: "id", columnName: "id" }],
       manyToOneRelations: [],
+      oneToManyRelations: [],
     };
 
     const mapper = createRowMapper(Order, metadata);
@@ -119,6 +122,7 @@ describe("createRowMapper", () => {
         { fieldName: "name", columnName: "item_name" },
       ],
       manyToOneRelations: [],
+      oneToManyRelations: [],
     };
 
     const mapper = createRowMapper(Item, metadata);
