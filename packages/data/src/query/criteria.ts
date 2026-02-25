@@ -54,6 +54,9 @@ export class InCriteria implements Criteria {
   ) {}
 
   toSql(paramOffset: number): { sql: string; params: SqlValue[] } {
+    if (this.values.length === 0) {
+      return { sql: "1 = 0", params: [] };
+    }
     const placeholders = this.values.map((_, i) => `$${paramOffset + i}`);
     return {
       sql: `${this.column} IN (${placeholders.join(", ")})`,

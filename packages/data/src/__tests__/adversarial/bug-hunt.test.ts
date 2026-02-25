@@ -423,12 +423,12 @@ describe("Derived query executor adversarial tests", () => {
     expect(query.params[1]).toBeUndefined(); // will be sent as NULL to DB
   });
 
-  it("In with empty array", () => {
+  it("In with empty array generates always-false condition", () => {
     const descriptor = parseDerivedQueryMethod("findByNameIn");
     const query = buildDerivedQuery(descriptor, userMetadata, [[]]);
-    // IN () with empty array -- what SQL does it generate?
-    // Some DBs reject "WHERE name IN ()" as syntax error
-    expect(query.sql).toContain("IN");
+    // Empty IN() is invalid SQL; should produce 1 = 0 (always false)
+    expect(query.sql).toContain("1 = 0");
+    expect(query.sql).not.toContain("IN ()");
   });
 
   it("query with no args when args are expected", () => {
@@ -453,12 +453,13 @@ describe("Specification adversarial tests", () => {
     expect(result.sql).toBe("name = $1");
   });
 
-  it("isIn with empty array generates IN () which is invalid SQL", () => {
+  it("isIn with empty array generates always-false condition", () => {
     const spec = isIn<User>("name", []);
     const criteria = spec.toPredicate(userMetadata as EntityMetadata);
     const result = criteria.toSql(1);
-    // IN () is invalid in most SQL databases
-    expect(result.sql).toContain("IN ()");
+    // Empty IN() is invalid; should produce 1 = 0 (always false)
+    expect(result.sql).toBe("1 = 0");
+    expect(result.params).toEqual([]);
   });
 
   it("like with SQL wildcards passes through", () => {
