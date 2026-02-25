@@ -10,3 +10,7 @@ export interface ResultSet extends AsyncIterable<Record<string, unknown>> {
   getMetadata(): ColumnMetadata[];
   close(): Promise<void>;
 }
+
+export interface StreamingResultSet extends ResultSet {
+  setCursorSize(size: number): void;
+}

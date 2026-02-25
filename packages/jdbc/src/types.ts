@@ -11,3 +11,8 @@ export interface ColumnMetadata {
   nullable: boolean;
   primaryKey: boolean;
 }
+
+export interface NamedSqlParameter {
+  name: string;
+  value: SqlValue;
+}

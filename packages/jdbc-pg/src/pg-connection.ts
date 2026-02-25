@@ -1,5 +1,5 @@
 import type { PoolClient } from "pg";
-import type { Connection, PreparedStatement, Statement } from "espalier-jdbc";
+import type { Connection, PreparedStatement, NamedPreparedStatement, BatchStatement, Statement } from "espalier-jdbc";
 import {
   type Transaction,
   type IsolationLevel,
@@ -8,6 +8,8 @@ import {
   DatabaseErrorCode,
 } from "espalier-jdbc";
 import { PgStatement, PgPreparedStatement } from "./pg-statement.js";
+import { PgNamedPreparedStatement } from "./pg-named-statement.js";
+import { PgBatchStatement } from "./pg-batch-statement.js";
 
 export class PgConnection implements Connection {
   private closed = false;
@@ -22,6 +24,16 @@ export class PgConnection implements Connection {
   prepareStatement(sql: string): PreparedStatement {
     this.ensureOpen();
     return new PgPreparedStatement(this.client, sql);
+  }
+
+  prepareNamedStatement(sql: string): NamedPreparedStatement {
+    this.ensureOpen();
+    return new PgNamedPreparedStatement(this.client, sql);
+  }
+
+  prepareBatchStatement(sql: string): BatchStatement {
+    this.ensureOpen();
+    return new PgBatchStatement(this.client, sql);
   }
 
   async beginTransaction(isolation?: IsolationLevel): Promise<Transaction> {

@@ -1,12 +1,15 @@
 import type { PoolClient } from "pg";
+import Cursor from "pg-cursor";
 import type {
   Statement,
   PreparedStatement,
   ResultSet,
+  StreamingResultSet,
   SqlValue,
 } from "espalier-jdbc";
 import { QueryError, DatabaseErrorCode } from "espalier-jdbc";
 import { PgResultSet } from "./pg-result-set.js";
+import { PgCursorResultSet } from "./pg-cursor-result-set.js";
 
 function mapPgErrorCode(err: unknown): DatabaseErrorCode {
   const code = (err as { code?: string }).code;
@@ -49,6 +52,20 @@ export class PgStatement implements Statement {
     } catch (err) {
       throw new QueryError(
         `Failed to execute update: ${(err as Error).message}`,
+        sql,
+        err as Error,
+        mapPgErrorCode(err),
+      );
+    }
+  }
+
+  async executeStreamingQuery(sql: string): Promise<StreamingResultSet> {
+    try {
+      const cursor = this.client.query(new Cursor(sql));
+      return new PgCursorResultSet(cursor);
+    } catch (err) {
+      throw new QueryError(
+        `Failed to execute streaming query: ${(err as Error).message}`,
         sql,
         err as Error,
         mapPgErrorCode(err),

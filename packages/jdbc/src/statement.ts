@@ -12,3 +12,9 @@ export interface PreparedStatement extends Statement {
   executeQuery(): Promise<ResultSet>;
   executeUpdate(): Promise<number>;
 }
+
+export interface NamedPreparedStatement extends Statement {
+  setNamedParameter(name: string, value: SqlValue): void;
+  executeQuery(): Promise<ResultSet>;
+  executeUpdate(): Promise<number>;
+}

@@ -4,7 +4,9 @@ import type { Page, Pageable } from "./paging.js";
 export interface CrudRepository<T, ID> extends Repository<T, ID> {
   findAll(): Promise<T[]>;
   save(entity: T): Promise<T>;
+  saveAll(entities: T[]): Promise<T[]>;
   delete(entity: T): Promise<void>;
+  deleteAll(entities: T[]): Promise<void>;
   deleteById(id: ID): Promise<void>;
   count(): Promise<number>;
 }
