@@ -1,11 +1,12 @@
 import { Pool, type PoolConfig as PgPoolConfig } from "pg";
-import type { Connection, PoolConfig, PoolStats, PooledDataSource } from "espalier-jdbc";
+import type { Connection, PoolConfig, PoolStats, PooledDataSource, TypeConverterRegistry } from "espalier-jdbc";
 import { ConnectionError, DatabaseErrorCode } from "espalier-jdbc";
 import { PgConnection } from "./pg-connection.js";
 
 export interface PgDataSourceConfig {
   pg?: PgPoolConfig;
   pool?: PoolConfig;
+  typeConverters?: TypeConverterRegistry;
 }
 
 function mapPoolConfig(config: PgDataSourceConfig): PgPoolConfig {
@@ -31,11 +32,13 @@ function isPgDataSourceConfig(config: unknown): config is PgDataSourceConfig {
 
 export class PgDataSource implements PooledDataSource {
   private readonly pool: Pool;
+  private readonly typeConverters?: TypeConverterRegistry;
   private closed = false;
 
   constructor(config: PgDataSourceConfig | PgPoolConfig) {
     if (isPgDataSourceConfig(config)) {
       this.pool = new Pool(mapPoolConfig(config));
+      this.typeConverters = config.typeConverters;
     } else {
       this.pool = new Pool(config);
     }
@@ -51,7 +54,7 @@ export class PgDataSource implements PooledDataSource {
     }
     try {
       const client = await this.pool.connect();
-      return new PgConnection(client);
+      return new PgConnection(client, this.typeConverters);
     } catch (err) {
       const code = (err as { code?: string }).code === "ETIMEDOUT"
         ? DatabaseErrorCode.CONNECTION_TIMEOUT

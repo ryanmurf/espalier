@@ -1,12 +1,13 @@
 import mysql from "mysql2/promise";
 import type { Pool, PoolOptions } from "mysql2/promise";
-import type { Connection, PoolConfig, PoolStats, PooledDataSource } from "espalier-jdbc";
+import type { Connection, PoolConfig, PoolStats, PooledDataSource, TypeConverterRegistry } from "espalier-jdbc";
 import { ConnectionError, DatabaseErrorCode } from "espalier-jdbc";
 import { MysqlConnection } from "./mysql-connection.js";
 
 export interface MysqlDataSourceConfig {
   mysql?: PoolOptions;
   pool?: PoolConfig;
+  typeConverters?: TypeConverterRegistry;
 }
 
 function mapPoolConfig(config: MysqlDataSourceConfig): PoolOptions {
@@ -34,11 +35,13 @@ function isMysqlDataSourceConfig(config: unknown): config is MysqlDataSourceConf
 
 export class MysqlDataSource implements PooledDataSource {
   private readonly pool: Pool;
+  private readonly typeConverters?: TypeConverterRegistry;
   private closed = false;
 
   constructor(config: MysqlDataSourceConfig | PoolOptions) {
     if (isMysqlDataSourceConfig(config)) {
       this.pool = mysql.createPool(mapPoolConfig(config));
+      this.typeConverters = config.typeConverters;
     } else {
       this.pool = mysql.createPool(config);
     }
@@ -54,7 +57,7 @@ export class MysqlDataSource implements PooledDataSource {
     }
     try {
       const conn = await this.pool.getConnection();
-      return new MysqlConnection(conn);
+      return new MysqlConnection(conn, this.typeConverters);
     } catch (err) {
       const code = (err as { code?: string }).code === "ECONNREFUSED"
         ? DatabaseErrorCode.CONNECTION_FAILED

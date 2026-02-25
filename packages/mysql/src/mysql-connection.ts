@@ -1,5 +1,5 @@
 import type { PoolConnection as MysqlPoolConnection } from "mysql2/promise";
-import type { Connection, PreparedStatement, NamedPreparedStatement, BatchStatement, Statement } from "espalier-jdbc";
+import type { Connection, TypeAwareConnection, PreparedStatement, NamedPreparedStatement, BatchStatement, Statement, TypeConverterRegistry } from "espalier-jdbc";
 import {
   type Transaction,
   type IsolationLevel,
@@ -11,10 +11,17 @@ import { MysqlStatement, MysqlPreparedStatement } from "./mysql-statement.js";
 import { MysqlNamedPreparedStatement } from "./mysql-named-statement.js";
 import { MysqlBatchStatement } from "./mysql-batch-statement.js";
 
-export class MysqlConnection implements Connection {
+export class MysqlConnection implements TypeAwareConnection {
   private closed = false;
 
-  constructor(private readonly connection: MysqlPoolConnection) {}
+  constructor(
+    private readonly connection: MysqlPoolConnection,
+    private readonly typeConverters?: TypeConverterRegistry,
+  ) {}
+
+  getTypeConverterRegistry(): TypeConverterRegistry | undefined {
+    return this.typeConverters;
+  }
 
   createStatement(): Statement {
     this.ensureOpen();

@@ -1,5 +1,5 @@
 import type Database from "better-sqlite3";
-import type { Connection, PreparedStatement, NamedPreparedStatement, BatchStatement, Statement } from "espalier-jdbc";
+import type { Connection, TypeAwareConnection, PreparedStatement, NamedPreparedStatement, BatchStatement, Statement, TypeConverterRegistry } from "espalier-jdbc";
 import {
   type Transaction,
   type IsolationLevel,
@@ -11,10 +11,17 @@ import { SqliteStatement, SqlitePreparedStatement } from "./sqlite-statement.js"
 import { SqliteNamedPreparedStatement } from "./sqlite-named-statement.js";
 import { SqliteBatchStatement } from "./sqlite-batch-statement.js";
 
-export class SqliteConnection implements Connection {
+export class SqliteConnection implements TypeAwareConnection {
   private closed = false;
 
-  constructor(private readonly db: Database.Database) {}
+  constructor(
+    private readonly db: Database.Database,
+    private readonly typeConverters?: TypeConverterRegistry,
+  ) {}
+
+  getTypeConverterRegistry(): TypeConverterRegistry | undefined {
+    return this.typeConverters;
+  }
 
   createStatement(): Statement {
     this.ensureOpen();

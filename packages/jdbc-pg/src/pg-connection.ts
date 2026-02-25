@@ -1,5 +1,5 @@
 import type { PoolClient } from "pg";
-import type { Connection, PreparedStatement, NamedPreparedStatement, BatchStatement, Statement } from "espalier-jdbc";
+import type { Connection, TypeAwareConnection, PreparedStatement, NamedPreparedStatement, BatchStatement, Statement, TypeConverterRegistry } from "espalier-jdbc";
 import {
   type Transaction,
   type IsolationLevel,
@@ -11,10 +11,17 @@ import { PgStatement, PgPreparedStatement } from "./pg-statement.js";
 import { PgNamedPreparedStatement } from "./pg-named-statement.js";
 import { PgBatchStatement } from "./pg-batch-statement.js";
 
-export class PgConnection implements Connection {
+export class PgConnection implements TypeAwareConnection {
   private closed = false;
 
-  constructor(private readonly client: PoolClient) {}
+  constructor(
+    private readonly client: PoolClient,
+    private readonly typeConverters?: TypeConverterRegistry,
+  ) {}
+
+  getTypeConverterRegistry(): TypeConverterRegistry | undefined {
+    return this.typeConverters;
+  }
 
   createStatement(): Statement {
     this.ensureOpen();
