@@ -21,3 +21,11 @@ export {
   UpdateBuilder,
   DeleteBuilder,
 } from "./query-builder.js";
+
+export type {
+  QueryOperator,
+  PropertyExpression,
+  OrderByExpression,
+  DerivedQueryDescriptor,
+} from "./derived-query-parser.js";
+export { parseDerivedQueryMethod } from "./derived-query-parser.js";
