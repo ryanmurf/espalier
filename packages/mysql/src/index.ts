@@ -6,4 +6,6 @@ export { MysqlNamedPreparedStatement } from "./mysql-named-statement.js";
 export { MysqlBatchStatement } from "./mysql-batch-statement.js";
 export { MysqlResultSet } from "./mysql-result-set.js";
 export { MysqlCursorResultSet } from "./mysql-cursor-result-set.js";
+export { MysqlSchemaIntrospector } from "./mysql-schema-introspector.js";
+export { MysqlMigrationRunner, computeChecksum } from "./mysql-migration-runner.js";
 export { mapMysqlErrorCode } from "./error-codes.js";
