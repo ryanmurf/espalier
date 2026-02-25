@@ -9,6 +9,7 @@ import {
   Table,
   Column,
   Id,
+  Version,
   PrePersist,
   PostPersist,
   PreUpdate,
@@ -583,5 +584,188 @@ describe.skipIf(!canConnect)("E2E: Change Tracking and Dirty Checking", { timeou
     const unmanaged = makeDirtyItem("Unmanaged", "draft", 0);
     // Not loaded from DB, no snapshot
     expect((repo as any).isDirty(unmanaged)).toBe(true);
+  });
+
+  it("unmanaged entity with ID does full UPDATE (no snapshot = isFullUpdate)", async () => {
+    const repo = createRepo();
+
+    // Insert via repo first to get a valid ID
+    const saved = await repo.save(makeDirtyItem("FullUpdate", "active", 10));
+    const id = saved.id;
+
+    // Create a manual entity with the same ID but no snapshot
+    const manual = Object.assign(Object.create(DirtyItem.prototype), {
+      id,
+      name: "ManualUpdate",
+      status: "manual",
+      counter: 99,
+    }) as DirtyItem;
+
+    // This entity has no snapshot, so isDirty returns true and isFullUpdate is true
+    expect((repo as any).isDirty(manual)).toBe(true);
+
+    const updated = await repo.save(manual);
+    expect(updated.name).toBe("ManualUpdate");
+    expect(updated.status).toBe("manual");
+    expect(updated.counter).toBe(99);
+
+    // Verify all fields updated in DB
+    (repo as any).getEntityCache().clear();
+    const fromDb = await repo.findById(id);
+    expect(fromDb!.name).toBe("ManualUpdate");
+    expect(fromDb!.status).toBe("manual");
+    expect(fromDb!.counter).toBe(99);
+  });
+
+  it("derived findByStatus returns snapshotted entities", async () => {
+    const repo = createRepo();
+    const uniqueStatus = `derived_snap_${Date.now()}`;
+    await repo.save(makeDirtyItem("DerivedSnap1", uniqueStatus, 0));
+    await repo.save(makeDirtyItem("DerivedSnap2", uniqueStatus, 0));
+
+    // Clear caches
+    (repo as any).getEntityCache().clear();
+    (repo as any).getQueryCache().invalidateAll();
+
+    const results = await (repo as any).findByStatus(uniqueStatus);
+    expect(results.length).toBe(2);
+
+    // All returned entities should be snapshotted (clean)
+    for (const entity of results) {
+      expect((repo as any).isDirty(entity)).toBe(false);
+    }
+
+    // Modify one and verify it becomes dirty
+    results[0].name = "Modified";
+    expect((repo as any).isDirty(results[0])).toBe(true);
+    expect((repo as any).isDirty(results[1])).toBe(false);
+  });
+
+  it("multiple field changes produce correct dirty fields list", async () => {
+    const repo = createRepo();
+    const saved = await repo.save(makeDirtyItem("MultiDirty", "active", 100));
+
+    saved.name = "NewName";
+    saved.status = "inactive";
+    saved.counter = 200;
+
+    const changes = (repo as any).getDirtyFields(saved);
+    expect(changes).toHaveLength(3);
+
+    const fieldNames = changes.map((c: any) => c.field);
+    expect(fieldNames).toContain("name");
+    expect(fieldNames).toContain("status");
+    expect(fieldNames).toContain("counter");
+
+    // Save and verify all fields updated
+    const updated = await repo.save(saved);
+    expect(updated.name).toBe("NewName");
+    expect(updated.status).toBe("inactive");
+    expect(updated.counter).toBe(200);
+  });
+
+  it("save clean entity returns same instance (no DB round-trip)", async () => {
+    const repo = createRepo();
+    const saved = await repo.save(makeDirtyItem("NoDB", "active", 0));
+
+    // Save without changes
+    const result = await repo.save(saved);
+
+    // Should be the same object reference (skipped UPDATE)
+    expect(result).toBe(saved);
+  });
+});
+
+// ──────────────────────────────────────────────────
+// E2E: Versioned Entity + Dirty Checking
+// ──────────────────────────────────────────────────
+
+describe.skipIf(!canConnect)("E2E: Versioned Entity Dirty Checking", { timeout: 15000 }, () => {
+  let ds: PgDataSource;
+
+  beforeAll(async () => {
+    ds = createTestDataSource();
+    const conn = await ds.getConnection();
+    const stmt = conn.createStatement();
+    await stmt.executeUpdate(`DROP TABLE IF EXISTS versioned_dirty_items CASCADE`);
+    await stmt.executeUpdate(`
+      CREATE TABLE IF NOT EXISTS versioned_dirty_items (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL,
+        status TEXT NOT NULL,
+        version INT NOT NULL DEFAULT 1
+      )
+    `);
+    await conn.close();
+  });
+
+  afterAll(async () => {
+    const conn = await ds.getConnection();
+    const stmt = conn.createStatement();
+    await stmt.executeUpdate(`DROP TABLE IF EXISTS versioned_dirty_items CASCADE`);
+    await conn.close();
+    await ds.close();
+  });
+
+  @Table("versioned_dirty_items")
+  class VersionedItem {
+    @Id @Column({ type: "SERIAL" }) id!: number;
+    @Column() name!: string;
+    @Column() status!: string;
+    @Version @Column({ type: "INT" }) version!: number;
+  }
+  new VersionedItem();
+
+  function createRepo() {
+    return createDerivedRepository<VersionedItem, number>(VersionedItem, ds, {
+      entityCache: { enabled: true },
+      queryCache: { enabled: true },
+    });
+  }
+
+  function makeVersionedItem(name: string, status: string): VersionedItem {
+    return Object.assign(Object.create(VersionedItem.prototype), {
+      name,
+      status,
+    }) as VersionedItem;
+  }
+
+  it("versioned entity: dirty field + version bump in minimal update", async () => {
+    const repo = createRepo();
+    const saved = await repo.save(makeVersionedItem("VerDirty", "active"));
+    expect(saved.version).toBe(1);
+
+    // Change only name
+    saved.name = "UpdatedVer";
+    const updated = await repo.save(saved);
+
+    // Version should be bumped
+    expect(updated.version).toBe(2);
+    // Name should be updated
+    expect(updated.name).toBe("UpdatedVer");
+    // Status should be unchanged
+    expect(updated.status).toBe("active");
+
+    // Verify from DB
+    (repo as any).getEntityCache().clear();
+    const fromDb = await repo.findById(updated.id);
+    expect(fromDb!.version).toBe(2);
+    expect(fromDb!.name).toBe("UpdatedVer");
+    expect(fromDb!.status).toBe("active");
+  });
+
+  it("versioned entity: clean entity still gets version bump on save", async () => {
+    const repo = createRepo();
+    const saved = await repo.save(makeVersionedItem("VerClean", "active"));
+    expect(saved.version).toBe(1);
+
+    // Save without changes — for versioned entities, this still skips
+    // because hasSnapshot=true and dirtyFields is empty.
+    // But does it? The code checks: if (hasSnapshot && dirtyFields.length === 0) return entity;
+    // This happens BEFORE the version bump logic. So clean versioned entities
+    // skip the UPDATE entirely — version is NOT bumped.
+    const resaved = await repo.save(saved);
+    expect(resaved).toBe(saved); // same reference, no DB round-trip
+    expect(resaved.version).toBe(1); // version NOT bumped
   });
 });

@@ -374,3 +374,126 @@ describe("EntityChangeTracker: isDirty vs getDirtyFields inconsistency", () => {
     // getDirtyFields entirely. But the API contract is inconsistent.
   });
 });
+
+// ──────────────────────────────────────────────────
+// Custom column name mapping
+// ──────────────────────────────────────────────────
+
+describe("EntityChangeTracker: custom column name mapping", () => {
+  it("getDirtyFields returns correct columnName for custom-mapped fields", () => {
+    const customMetadata: EntityMetadata = {
+      tableName: "products",
+      idField: "id",
+      fields: [
+        { fieldName: "id", columnName: "id" },
+        { fieldName: "productName", columnName: "product_name" },
+        { fieldName: "unitPrice", columnName: "unit_price" },
+      ],
+      manyToOneRelations: [],
+      oneToManyRelations: [],
+      manyToManyRelations: [],
+      lifecycleCallbacks: new Map(),
+    };
+
+    const tracker = new EntityChangeTracker(customMetadata);
+    const entity = { id: 1, productName: "Widget", unitPrice: 9.99 };
+    tracker.snapshot(entity);
+
+    entity.productName = "Gadget";
+
+    const changes = tracker.getDirtyFields(entity);
+    expect(changes).toHaveLength(1);
+    expect(changes[0].field).toBe("productName");
+    expect(changes[0].columnName).toBe("product_name"); // custom column name
+    expect(changes[0].oldValue).toBe("Widget");
+    expect(changes[0].newValue).toBe("Gadget");
+  });
+});
+
+// ──────────────────────────────────────────────────
+// Boolean field tracking
+// ──────────────────────────────────────────────────
+
+describe("EntityChangeTracker: boolean fields", () => {
+  it("boolean field change is detected", () => {
+    const boolMetadata: EntityMetadata = {
+      tableName: "flags",
+      idField: "id",
+      fields: [
+        { fieldName: "id", columnName: "id" },
+        { fieldName: "active", columnName: "active" },
+      ],
+      manyToOneRelations: [],
+      oneToManyRelations: [],
+      manyToManyRelations: [],
+      lifecycleCallbacks: new Map(),
+    };
+
+    const tracker = new EntityChangeTracker(boolMetadata);
+    const entity = { id: 1, active: true };
+    tracker.snapshot(entity);
+
+    entity.active = false;
+    expect(tracker.isDirty(entity)).toBe(true);
+
+    const changes = tracker.getDirtyFields(entity);
+    expect(changes).toHaveLength(1);
+    expect(changes[0].oldValue).toBe(true);
+    expect(changes[0].newValue).toBe(false);
+  });
+
+  it("boolean field unchanged stays clean", () => {
+    const boolMetadata: EntityMetadata = {
+      tableName: "flags",
+      idField: "id",
+      fields: [
+        { fieldName: "id", columnName: "id" },
+        { fieldName: "active", columnName: "active" },
+      ],
+      manyToOneRelations: [],
+      oneToManyRelations: [],
+      manyToManyRelations: [],
+      lifecycleCallbacks: new Map(),
+    };
+
+    const tracker = new EntityChangeTracker(boolMetadata);
+    const entity = { id: 1, active: false };
+    tracker.snapshot(entity);
+    expect(tracker.isDirty(entity)).toBe(false);
+  });
+});
+
+// ──────────────────────────────────────────────────
+// Multiple entity tracking
+// ──────────────────────────────────────────────────
+
+describe("EntityChangeTracker: multiple entities", () => {
+  it("tracks multiple entities independently", () => {
+    const tracker = new EntityChangeTracker(userMetadata);
+    const entity1 = makeEntity(1, "Alice", "alice@test.com", 30);
+    const entity2 = makeEntity(2, "Bob", "bob@test.com", 25);
+
+    tracker.snapshot(entity1);
+    tracker.snapshot(entity2);
+
+    entity1.name = "Alicia";
+    // entity2 untouched
+
+    expect(tracker.isDirty(entity1)).toBe(true);
+    expect(tracker.isDirty(entity2)).toBe(false);
+  });
+
+  it("clearSnapshot on one entity doesn't affect another", () => {
+    const tracker = new EntityChangeTracker(userMetadata);
+    const entity1 = makeEntity(1, "Alice", "alice@test.com", 30);
+    const entity2 = makeEntity(2, "Bob", "bob@test.com", 25);
+
+    tracker.snapshot(entity1);
+    tracker.snapshot(entity2);
+
+    tracker.clearSnapshot(entity1);
+
+    expect(tracker.getSnapshot(entity1)).toBeUndefined();
+    expect(tracker.getSnapshot(entity2)).toBeDefined();
+  });
+});
