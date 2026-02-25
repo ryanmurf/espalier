@@ -50,7 +50,9 @@ export type {
   OrderByExpression,
   DerivedQueryDescriptor,
 } from "./query/index.js";
-export { parseDerivedQueryMethod } from "./query/index.js";
+export { parseDerivedQueryMethod, buildDerivedQuery } from "./query/index.js";
+
+export { createDerivedRepository } from "./repository/derived-repository.js";
 
 export type { DdlOptions, DropTableOptions } from "./schema/ddl-generator.js";
 export { DdlGenerator } from "./schema/ddl-generator.js";

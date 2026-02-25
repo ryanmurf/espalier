@@ -29,3 +29,5 @@ export type {
   DerivedQueryDescriptor,
 } from "./derived-query-parser.js";
 export { parseDerivedQueryMethod } from "./derived-query-parser.js";
+
+export { buildDerivedQuery } from "./derived-query-executor.js";
