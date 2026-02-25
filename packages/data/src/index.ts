@@ -13,6 +13,7 @@ export type { ManyToOneOptions, ManyToOneRelation, OneToManyOptions, OneToManyRe
 export { Projection, getProjectionMetadata } from "./decorators/projection.js";
 export type { ProjectionOptions } from "./decorators/projection.js";
 export { Version, getVersionField } from "./decorators/version.js";
+export { Cacheable, getCacheableMetadata, registerCacheable } from "./decorators/cacheable.js";
 
 export type { Repository } from "./repository/repository.js";
 export type {
@@ -70,11 +71,15 @@ export {
   isNotNull,
 } from "./query/index.js";
 
+export type { DerivedRepositoryOptions } from "./repository/derived-repository.js";
 export { createDerivedRepository } from "./repository/derived-repository.js";
 export { OptimisticLockException } from "./repository/optimistic-lock.js";
 
 export type { EntityCacheConfig, EntityCacheStats } from "./cache/index.js";
 export { EntityCache } from "./cache/index.js";
+
+export type { QueryCacheConfig, QueryCacheKey, QueryCacheStats } from "./cache/index.js";
+export { QueryCache } from "./cache/index.js";
 
 export type { DdlOptions, DropTableOptions } from "./schema/ddl-generator.js";
 export { DdlGenerator } from "./schema/ddl-generator.js";

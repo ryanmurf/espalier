@@ -15,21 +15,40 @@ import type { Specification } from "../query/specification.js";
 import { OptimisticLockException } from "./optimistic-lock.js";
 import { EntityCache } from "../cache/entity-cache.js";
 import type { EntityCacheConfig } from "../cache/entity-cache.js";
+import { QueryCache } from "../cache/query-cache.js";
+import type { QueryCacheConfig } from "../cache/query-cache.js";
 
 function isProjectionClass(arg: unknown): arg is new (...args: any[]) => any {
   return typeof arg === "function" && getProjectionMetadata(arg) !== undefined;
 }
 
+export interface DerivedRepositoryOptions {
+  entityCache?: EntityCacheConfig;
+  queryCache?: QueryCacheConfig;
+}
+
 export function createDerivedRepository<T, ID>(
   entityClass: new (...args: any[]) => T,
   dataSource: DataSource,
-  cacheConfig?: EntityCacheConfig,
+  cacheConfig?: EntityCacheConfig | DerivedRepositoryOptions,
 ): CrudRepository<T, ID> & Record<string, (...args: any[]) => Promise<any>> {
+  // Support both legacy EntityCacheConfig and new DerivedRepositoryOptions
+  let entityCacheConfig: EntityCacheConfig | undefined;
+  let queryCacheConfig: QueryCacheConfig | undefined;
+  if (cacheConfig && ("entityCache" in cacheConfig || "queryCache" in cacheConfig)) {
+    const opts = cacheConfig as DerivedRepositoryOptions;
+    entityCacheConfig = opts.entityCache;
+    queryCacheConfig = opts.queryCache;
+  } else {
+    entityCacheConfig = cacheConfig as EntityCacheConfig | undefined;
+  }
+
   const metadata = getEntityMetadata(entityClass);
   const rowMapper = createRowMapper(entityClass, metadata);
   const descriptorCache = new Map<string, DerivedQueryDescriptor>();
   const projectionMapperCache = new Map<new (...args: any[]) => any, ProjectionMapper<any>>();
-  const entityCache = new EntityCache(cacheConfig);
+  const entityCache = new EntityCache(entityCacheConfig);
+  const queryCache = new QueryCache(queryCacheConfig);
 
   function getCachedDescriptor(methodName: string): DerivedQueryDescriptor {
     let descriptor = descriptorCache.get(methodName);
@@ -178,6 +197,14 @@ export function createDerivedRepository<T, ID>(
       }
 
       const query = builder.build();
+      const cacheKey = { sql: query.sql, params: query.params as unknown[] };
+
+      // Check query cache
+      const cachedResults = queryCache.get(cacheKey);
+      if (cachedResults !== undefined) {
+        return cachedResults as T[];
+      }
+
       const conn = await dataSource.getConnection();
       try {
         const stmt = conn.prepareStatement(query.sql);
@@ -191,6 +218,7 @@ export function createDerivedRepository<T, ID>(
           entityCache.put(entityClass, getEntityId(entity), entity);
           results.push(entity);
         }
+        queryCache.put(cacheKey, results, entityClass);
         return results;
       } finally {
         await conn.close();
@@ -251,6 +279,7 @@ export function createDerivedRepository<T, ID>(
           if (await rs.next()) {
             const saved = rowMapper.mapRow(rs);
             entityCache.put(entityClass, getEntityId(saved), saved);
+            queryCache.invalidate(entityClass);
             return saved;
           }
           // No rows returned — if versioned, this is an optimistic lock conflict
@@ -294,6 +323,7 @@ export function createDerivedRepository<T, ID>(
           if (await rs.next()) {
             const saved = rowMapper.mapRow(rs);
             entityCache.put(entityClass, getEntityId(saved), saved);
+            queryCache.invalidate(entityClass);
             return saved;
           }
           return entity;
@@ -351,6 +381,7 @@ export function createDerivedRepository<T, ID>(
           );
         }
         entityCache.evict(entityClass, idValue);
+        queryCache.invalidate(entityClass);
       } finally {
         await conn.close();
       }
@@ -376,6 +407,7 @@ export function createDerivedRepository<T, ID>(
         }
         await stmt.executeUpdate();
         entityCache.evict(entityClass, id);
+        queryCache.invalidate(entityClass);
       } finally {
         await conn.close();
       }
@@ -419,9 +451,11 @@ export function createDerivedRepository<T, ID>(
     "deleteById",
     "count",
     "getEntityCache",
+    "getQueryCache",
   ]);
 
   (crudMethods as any).getEntityCache = () => entityCache;
+  (crudMethods as any).getQueryCache = () => queryCache;
 
   return new Proxy(crudMethods as CrudRepository<T, ID> & Record<string, (...args: any[]) => Promise<any>>, {
     get(target, prop, receiver) {
@@ -448,6 +482,40 @@ export function createDerivedRepository<T, ID>(
 
         const query = buildDerivedQuery(descriptor, metadata, queryArgs);
 
+        if (descriptor.action === "delete") {
+          const conn = await dataSource.getConnection();
+          try {
+            const stmt = conn.prepareStatement(query.sql);
+            for (let i = 0; i < query.params.length; i++) {
+              stmt.setParameter(i + 1, query.params[i]);
+            }
+            await stmt.executeUpdate();
+            entityCache.evictAll(entityClass);
+            queryCache.invalidate(entityClass);
+            return;
+          } finally {
+            await conn.close();
+          }
+        }
+
+        // For read queries (find/count/exists), check query cache first
+        const cacheKey = { sql: query.sql, params: query.params as unknown[] };
+        const cachedResult = queryCache.get(cacheKey);
+        if (cachedResult !== undefined) {
+          // count queries are cached as [number], exists as [boolean]
+          if (descriptor.action === "count") {
+            return cachedResult[0];
+          }
+          if (descriptor.action === "exists") {
+            return cachedResult[0];
+          }
+          // find action
+          if (descriptor.limit === 1) {
+            return (cachedResult as any[])[0] ?? null;
+          }
+          return cachedResult;
+        }
+
         const conn = await dataSource.getConnection();
         try {
           const stmt = conn.prepareStatement(query.sql);
@@ -455,25 +523,24 @@ export function createDerivedRepository<T, ID>(
             stmt.setParameter(i + 1, query.params[i]);
           }
 
-          if (descriptor.action === "delete") {
-            await stmt.executeUpdate();
-            entityCache.evictAll(entityClass);
-            return;
-          }
-
           if (descriptor.action === "count") {
             const rs = await stmt.executeQuery();
             if (await rs.next()) {
               const row = rs.getRow();
               const val = Object.values(row)[0];
-              return typeof val === "number" ? val : Number(val);
+              const result = typeof val === "number" ? val : Number(val);
+              queryCache.put(cacheKey, [result], entityClass);
+              return result;
             }
+            queryCache.put(cacheKey, [0], entityClass);
             return 0;
           }
 
           if (descriptor.action === "exists") {
             const rs = await stmt.executeQuery();
-            return await rs.next();
+            const result = await rs.next();
+            queryCache.put(cacheKey, [result], entityClass);
+            return result;
           }
 
           // find action
@@ -486,6 +553,8 @@ export function createDerivedRepository<T, ID>(
               results.push(rowMapper.mapRow(rs));
             }
           }
+
+          queryCache.put(cacheKey, results, entityClass);
 
           // If limit=1, return single entity or null
           if (descriptor.limit === 1) {

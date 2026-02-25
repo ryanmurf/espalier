@@ -33,6 +33,8 @@ export class SelectBuilder {
   private _having: Criteria | undefined;
   private _limit: number | undefined;
   private _offset: number | undefined;
+  private _cacheable = false;
+  private _cacheTtlMs: number | undefined;
 
   constructor(from: string) {
     this._from = from;
@@ -94,6 +96,20 @@ export class SelectBuilder {
   offset(n: number): SelectBuilder {
     this._offset = n;
     return this;
+  }
+
+  cacheable(ttlMs?: number): SelectBuilder {
+    this._cacheable = true;
+    this._cacheTtlMs = ttlMs;
+    return this;
+  }
+
+  isCacheable(): boolean {
+    return this._cacheable;
+  }
+
+  getCacheTtlMs(): number | undefined {
+    return this._cacheTtlMs;
   }
 
   build(): BuiltQuery {

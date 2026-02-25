@@ -1,0 +1,215 @@
+export interface QueryCacheConfig {
+  enabled?: boolean;
+  maxSize?: number;
+  defaultTtlMs?: number;
+}
+
+export interface QueryCacheKey {
+  sql: string;
+  params: unknown[];
+}
+
+export interface QueryCacheStats {
+  hits: number;
+  misses: number;
+  puts: number;
+  invalidations: number;
+  expirations: number;
+  hitRate: number;
+}
+
+const DEFAULT_MAX_SIZE = 500;
+const DEFAULT_TTL_MS = 60_000;
+
+interface CacheEntry {
+  key: string;
+  results: unknown[];
+  entityClass: new (...args: any[]) => any;
+  expiresAt: number;
+  prev: CacheEntry | null;
+  next: CacheEntry | null;
+}
+
+/**
+ * LRU query result cache with TTL-based expiration and entity-type-aware invalidation.
+ */
+export class QueryCache {
+  private readonly enabled: boolean;
+  private readonly maxSize: number;
+  private readonly defaultTtlMs: number;
+  private readonly map = new Map<string, CacheEntry>();
+  private head: CacheEntry | null = null;
+  private tail: CacheEntry | null = null;
+
+  private _hits = 0;
+  private _misses = 0;
+  private _puts = 0;
+  private _invalidations = 0;
+  private _expirations = 0;
+
+  constructor(config?: QueryCacheConfig) {
+    this.enabled = config?.enabled ?? true;
+    this.maxSize = config?.maxSize ?? DEFAULT_MAX_SIZE;
+    this.defaultTtlMs = config?.defaultTtlMs ?? DEFAULT_TTL_MS;
+  }
+
+  private static cacheKey(key: QueryCacheKey): string {
+    return key.sql + "\0" + JSON.stringify(key.params);
+  }
+
+  get(key: QueryCacheKey): unknown[] | undefined {
+    if (!this.enabled) {
+      this._misses++;
+      return undefined;
+    }
+
+    const strKey = QueryCache.cacheKey(key);
+    const entry = this.map.get(strKey);
+
+    if (!entry) {
+      this._misses++;
+      return undefined;
+    }
+
+    if (Date.now() > entry.expiresAt) {
+      this.removeEntry(entry);
+      this._expirations++;
+      this._misses++;
+      return undefined;
+    }
+
+    this.moveToHead(entry);
+    this._hits++;
+    return entry.results;
+  }
+
+  put(
+    key: QueryCacheKey,
+    results: unknown[],
+    entityClass: new (...args: any[]) => any,
+    ttlMs?: number,
+  ): void {
+    if (!this.enabled) return;
+
+    const strKey = QueryCache.cacheKey(key);
+    const ttl = ttlMs ?? this.defaultTtlMs;
+    const expiresAt = Date.now() + ttl;
+
+    const existing = this.map.get(strKey);
+    if (existing) {
+      existing.results = results;
+      existing.entityClass = entityClass;
+      existing.expiresAt = expiresAt;
+      this.moveToHead(existing);
+      this._puts++;
+      return;
+    }
+
+    const entry: CacheEntry = {
+      key: strKey,
+      results,
+      entityClass,
+      expiresAt,
+      prev: null,
+      next: null,
+    };
+    this.map.set(strKey, entry);
+    this.addToHead(entry);
+    this._puts++;
+
+    if (this.map.size > this.maxSize) {
+      const evicted = this.removeTail();
+      if (evicted) {
+        this.map.delete(evicted.key);
+      }
+    }
+  }
+
+  invalidate(entityClass: new (...args: any[]) => any): void {
+    const toRemove: CacheEntry[] = [];
+    for (const entry of this.map.values()) {
+      if (entry.entityClass === entityClass) {
+        toRemove.push(entry);
+      }
+    }
+    for (const entry of toRemove) {
+      this.removeEntry(entry);
+      this._invalidations++;
+    }
+  }
+
+  invalidateAll(): void {
+    const count = this.map.size;
+    this.map.clear();
+    this.head = null;
+    this.tail = null;
+    this._invalidations += count;
+  }
+
+  clear(): void {
+    this.map.clear();
+    this.head = null;
+    this.tail = null;
+  }
+
+  size(): number {
+    return this.map.size;
+  }
+
+  getStats(): QueryCacheStats {
+    const total = this._hits + this._misses;
+    return {
+      hits: this._hits,
+      misses: this._misses,
+      puts: this._puts,
+      invalidations: this._invalidations,
+      expirations: this._expirations,
+      hitRate: total === 0 ? 0 : this._hits / total,
+    };
+  }
+
+  private addToHead(entry: CacheEntry): void {
+    entry.prev = null;
+    entry.next = this.head;
+    if (this.head) {
+      this.head.prev = entry;
+    }
+    this.head = entry;
+    if (!this.tail) {
+      this.tail = entry;
+    }
+  }
+
+  private removeNode(entry: CacheEntry): void {
+    if (entry.prev) {
+      entry.prev.next = entry.next;
+    } else {
+      this.head = entry.next;
+    }
+    if (entry.next) {
+      entry.next.prev = entry.prev;
+    } else {
+      this.tail = entry.prev;
+    }
+    entry.prev = null;
+    entry.next = null;
+  }
+
+  private moveToHead(entry: CacheEntry): void {
+    if (this.head === entry) return;
+    this.removeNode(entry);
+    this.addToHead(entry);
+  }
+
+  private removeTail(): CacheEntry | null {
+    if (!this.tail) return null;
+    const entry = this.tail;
+    this.removeNode(entry);
+    return entry;
+  }
+
+  private removeEntry(entry: CacheEntry): void {
+    this.removeNode(entry);
+    this.map.delete(entry.key);
+  }
+}
