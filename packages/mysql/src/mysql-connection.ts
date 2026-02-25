@@ -85,6 +85,13 @@ export class MysqlConnection implements TypeAwareConnection {
         }
       },
       async setSavepoint(name: string): Promise<void> {
+        if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name)) {
+          throw new TransactionError(
+            `Invalid savepoint name: "${name}". Must be a valid SQL identifier (alphanumeric and underscores, starting with a letter or underscore).`,
+            undefined,
+            DatabaseErrorCode.TX_SAVEPOINT_FAILED,
+          );
+        }
         try {
           await conn.query(`SAVEPOINT ${name}`);
         } catch (err) {
@@ -96,6 +103,13 @@ export class MysqlConnection implements TypeAwareConnection {
         }
       },
       async rollbackTo(name: string): Promise<void> {
+        if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name)) {
+          throw new TransactionError(
+            `Invalid savepoint name: "${name}". Must be a valid SQL identifier (alphanumeric and underscores, starting with a letter or underscore).`,
+            undefined,
+            DatabaseErrorCode.TX_ROLLBACK_FAILED,
+          );
+        }
         try {
           await conn.query(`ROLLBACK TO SAVEPOINT ${name}`);
         } catch (err) {
