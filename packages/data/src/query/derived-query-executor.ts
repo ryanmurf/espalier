@@ -145,13 +145,15 @@ export function buildDerivedQuery(
   }
 
   // find action
-  const columns = descriptor.distinct
-    ? metadata.fields.map((f: FieldMapping) => `DISTINCT ${f.columnName}`)
-    : metadata.fields.map((f: FieldMapping) => f.columnName);
+  const columns = metadata.fields.map((f: FieldMapping) => f.columnName);
 
   const builder = new SelectBuilder(metadata.tableName)
     .columns(...columns)
     .where(where);
+
+  if (descriptor.distinct) {
+    builder.distinct();
+  }
 
   if (descriptor.orderBy) {
     for (const ob of descriptor.orderBy) {

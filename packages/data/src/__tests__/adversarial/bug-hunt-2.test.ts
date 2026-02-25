@@ -52,17 +52,16 @@ describe("BUG #51: parsePrefix findDistinct guard issues", () => {
 // BUG #49: DISTINCT per-column in executor
 // ══════════════════════════════════════════════════
 
-describe("BUG #49: DISTINCT SQL generation per-column", () => {
-  it("buildDerivedQuery with distinct generates DISTINCT prefix on ALL columns", () => {
+describe("FIXED #49: DISTINCT SQL generation", () => {
+  it("buildDerivedQuery with distinct generates single DISTINCT after SELECT", () => {
     const desc = parseDerivedQueryMethod("findDistinctByName");
     const query = buildDerivedQuery(desc, userMetadata, ["Alice"]);
 
     const selectPart = query.sql.split(" FROM ")[0];
     const distinctCount = (selectPart.match(/DISTINCT/g) || []).length;
 
-    // BUG: DISTINCT appears once per column instead of once after SELECT
-    // Expected: 1, Actual: 5 (one for each column in userMetadata)
-    expect(distinctCount).toBeGreaterThan(1); // confirms bug
+    expect(distinctCount).toBe(1);
+    expect(selectPart).toMatch(/^SELECT DISTINCT \w/);
   });
 });
 

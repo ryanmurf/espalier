@@ -33,11 +33,17 @@ export class SelectBuilder {
   private _having: Criteria | undefined;
   private _limit: number | undefined;
   private _offset: number | undefined;
+  private _distinct = false;
   private _cacheable = false;
   private _cacheTtlMs: number | undefined;
 
   constructor(from: string) {
     this._from = from;
+  }
+
+  distinct(): SelectBuilder {
+    this._distinct = true;
+    return this;
   }
 
   columns(...columns: string[]): SelectBuilder {
@@ -117,7 +123,7 @@ export class SelectBuilder {
     let paramIdx = 1;
     const parts: string[] = [];
 
-    parts.push(`SELECT ${this._columns.join(", ")}`);
+    parts.push(`SELECT ${this._distinct ? "DISTINCT " : ""}${this._columns.join(", ")}`);
     parts.push(`FROM ${this._from}`);
 
     for (const join of this._joins) {

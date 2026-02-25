@@ -395,18 +395,13 @@ describe("Derived query parser adversarial tests", () => {
 // ══════════════════════════════════════════════════
 
 describe("Derived query executor adversarial tests", () => {
-  it("DISTINCT query generates DISTINCT per-column (BUG)", () => {
+  it("DISTINCT query generates single DISTINCT keyword after SELECT", () => {
     const descriptor = parseDerivedQueryMethod("findDistinctByName");
     const query = buildDerivedQuery(descriptor, userMetadata, ["Alice"]);
 
-    // BUG: generates "SELECT DISTINCT id, DISTINCT name, DISTINCT email, ..."
-    // Correct SQL should be: "SELECT DISTINCT id, name, email, ..."
     const distinctCount = (query.sql.match(/DISTINCT/g) || []).length;
-
-    // If this assertion fails, the bug has been fixed
-    // If it passes, DISTINCT appears multiple times (bug confirmed)
-    expect(distinctCount).toBeGreaterThan(1);
-    // ^ This test CONFIRMS the bug. There should be exactly 1 DISTINCT keyword.
+    expect(distinctCount).toBe(1);
+    expect(query.sql).toMatch(/^SELECT DISTINCT \w/);
   });
 
   it("SQL injection via property name is prevented by metadata lookup", () => {
