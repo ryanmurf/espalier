@@ -134,6 +134,7 @@ export class EntityCache {
   private _hits = 0;
   private _misses = 0;
   private _puts = 0;
+  private _evictions = 0;
 
   constructor(config?: EntityCacheConfig) {
     this.enabled = config?.enabled ?? true;
@@ -175,7 +176,8 @@ export class EntityCache {
   put<T>(entityClass: new (...args: any[]) => T, id: unknown, entity: T): void {
     if (!this.enabled) return;
     const cache = this.getOrCreateCache(entityClass);
-    cache.put(this.idKey(id), entity);
+    const evicted = cache.put(this.idKey(id), entity);
+    if (evicted) this._evictions++;
     this._puts++;
   }
 
@@ -211,15 +213,11 @@ export class EntityCache {
 
   getStats(): EntityCacheStats {
     const total = this._hits + this._misses;
-    let totalEvictions = 0;
-    for (const cache of this.caches.values()) {
-      totalEvictions += cache.evictions;
-    }
     return {
       hits: this._hits,
       misses: this._misses,
       puts: this._puts,
-      evictions: totalEvictions,
+      evictions: this._evictions,
       hitRate: total === 0 ? 0 : this._hits / total,
     };
   }

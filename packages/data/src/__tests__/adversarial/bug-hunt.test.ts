@@ -196,10 +196,9 @@ describe("EntityCache adversarial tests", () => {
 
     cache.clear();
 
-    // After clear(), eviction count is lost because clear() removes the LruMap instances
+    // Eviction stats are now tracked at the EntityCache level, surviving clear()
     const statsAfter = cache.getStats();
-    // This might be 0 because clear() deletes the LruMaps that track evictions
-    expect(statsAfter.evictions).toBe(0); // eviction stats are lost after clear()!
+    expect(statsAfter.evictions).toBe(1);
   });
 });
 
