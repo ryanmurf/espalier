@@ -12,6 +12,7 @@ export { ManyToOne, getManyToOneRelations, OneToMany, getOneToManyRelations, Man
 export type { ManyToOneOptions, ManyToOneRelation, OneToManyOptions, OneToManyRelation, ManyToManyOptions, ManyToManyRelation, JoinTableConfig } from "./decorators/relations.js";
 export { Projection, getProjectionMetadata } from "./decorators/projection.js";
 export type { ProjectionOptions } from "./decorators/projection.js";
+export { Version, getVersionField } from "./decorators/version.js";
 
 export type { Repository } from "./repository/repository.js";
 export type {
@@ -70,6 +71,7 @@ export {
 } from "./query/index.js";
 
 export { createDerivedRepository } from "./repository/derived-repository.js";
+export { OptimisticLockException } from "./repository/optimistic-lock.js";
 
 export type { DdlOptions, DropTableOptions } from "./schema/ddl-generator.js";
 export { DdlGenerator } from "./schema/ddl-generator.js";

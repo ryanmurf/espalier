@@ -10,8 +10,9 @@ import { parseDerivedQueryMethod } from "../query/derived-query-parser.js";
 import type { DerivedQueryDescriptor } from "../query/derived-query-parser.js";
 import { buildDerivedQuery } from "../query/derived-query-executor.js";
 import { SelectBuilder, InsertBuilder, UpdateBuilder, DeleteBuilder } from "../query/query-builder.js";
-import { ComparisonCriteria } from "../query/criteria.js";
+import { ComparisonCriteria, LogicalCriteria } from "../query/criteria.js";
 import type { Specification } from "../query/specification.js";
+import { OptimisticLockException } from "./optimistic-lock.js";
 
 function isProjectionClass(arg: unknown): arg is new (...args: any[]) => any {
   return typeof arg === "function" && getProjectionMetadata(arg) !== undefined;
@@ -49,6 +50,14 @@ export function createDerivedRepository<T, ID>(
       (f: FieldMapping) => f.fieldName === metadata.idField,
     );
     return field ? field.columnName : String(metadata.idField);
+  }
+
+  function getVersionColumn(): string | undefined {
+    if (!metadata.versionField) return undefined;
+    const field = metadata.fields.find(
+      (f: FieldMapping) => f.fieldName === metadata.versionField,
+    );
+    return field ? field.columnName : undefined;
   }
 
   const crudMethods: CrudRepository<T, ID> = {
@@ -173,16 +182,42 @@ export function createDerivedRepository<T, ID>(
       const idField = metadata.idField;
       const idValue = (entity as Record<string | symbol, unknown>)[idField] as SqlValue;
       const idCol = getIdColumn();
+      const versionCol = getVersionColumn();
+      const versionField = metadata.versionField;
 
       if (idValue != null) {
         // Update
-        const updateBuilder = new UpdateBuilder(metadata.tableName)
-          .where(new ComparisonCriteria("eq", idCol, idValue));
+        const updateBuilder = new UpdateBuilder(metadata.tableName);
 
-        for (const field of metadata.fields) {
-          if (field.fieldName === idField) continue;
-          const value = (entity as Record<string | symbol, unknown>)[field.fieldName] as SqlValue;
-          updateBuilder.set(field.columnName, value);
+        // Build WHERE clause: id = ? (and optionally version = ?)
+        let currentVersion: number | undefined;
+        if (versionField && versionCol) {
+          currentVersion = (entity as Record<string | symbol, unknown>)[versionField] as number;
+          const newVersion = (currentVersion ?? 0) + 1;
+          updateBuilder.where(
+            new LogicalCriteria(
+              "and",
+              new ComparisonCriteria("eq", idCol, idValue),
+              new ComparisonCriteria("eq", versionCol, currentVersion as SqlValue),
+            ),
+          );
+          // Set all fields, but override version with incremented value
+          for (const field of metadata.fields) {
+            if (field.fieldName === idField) continue;
+            if (field.fieldName === versionField) {
+              updateBuilder.set(field.columnName, newVersion as SqlValue);
+            } else {
+              const value = (entity as Record<string | symbol, unknown>)[field.fieldName] as SqlValue;
+              updateBuilder.set(field.columnName, value);
+            }
+          }
+        } else {
+          updateBuilder.where(new ComparisonCriteria("eq", idCol, idValue));
+          for (const field of metadata.fields) {
+            if (field.fieldName === idField) continue;
+            const value = (entity as Record<string | symbol, unknown>)[field.fieldName] as SqlValue;
+            updateBuilder.set(field.columnName, value);
+          }
         }
         updateBuilder.returning("*");
 
@@ -197,6 +232,15 @@ export function createDerivedRepository<T, ID>(
           if (await rs.next()) {
             return rowMapper.mapRow(rs);
           }
+          // No rows returned — if versioned, this is an optimistic lock conflict
+          if (versionField && currentVersion !== undefined) {
+            throw new OptimisticLockException(
+              entityClass.name,
+              idValue,
+              currentVersion,
+              null,
+            );
+          }
           return entity;
         } finally {
           await conn.close();
@@ -207,8 +251,13 @@ export function createDerivedRepository<T, ID>(
 
         for (const field of metadata.fields) {
           if (field.fieldName === idField) continue;
-          const value = (entity as Record<string | symbol, unknown>)[field.fieldName] as SqlValue;
-          insertBuilder.set(field.columnName, value);
+          if (versionField && field.fieldName === versionField) {
+            // Set initial version to 1
+            insertBuilder.set(field.columnName, 1 as SqlValue);
+          } else {
+            const value = (entity as Record<string | symbol, unknown>)[field.fieldName] as SqlValue;
+            insertBuilder.set(field.columnName, value);
+          }
         }
         insertBuilder.returning("*");
 
@@ -242,9 +291,24 @@ export function createDerivedRepository<T, ID>(
       const idField = metadata.idField;
       const idValue = (entity as Record<string | symbol, unknown>)[idField] as SqlValue;
       const idCol = getIdColumn();
+      const versionCol = getVersionColumn();
+      const versionField = metadata.versionField;
 
-      const builder = new DeleteBuilder(metadata.tableName)
-        .where(new ComparisonCriteria("eq", idCol, idValue));
+      const builder = new DeleteBuilder(metadata.tableName);
+
+      let currentVersion: number | undefined;
+      if (versionField && versionCol) {
+        currentVersion = (entity as Record<string | symbol, unknown>)[versionField] as number;
+        builder.where(
+          new LogicalCriteria(
+            "and",
+            new ComparisonCriteria("eq", idCol, idValue),
+            new ComparisonCriteria("eq", versionCol, currentVersion as SqlValue),
+          ),
+        );
+      } else {
+        builder.where(new ComparisonCriteria("eq", idCol, idValue));
+      }
 
       const query = builder.build();
       const conn = await dataSource.getConnection();
@@ -253,7 +317,15 @@ export function createDerivedRepository<T, ID>(
         for (let i = 0; i < query.params.length; i++) {
           stmt.setParameter(i + 1, query.params[i]);
         }
-        await stmt.executeUpdate();
+        const affected = await stmt.executeUpdate();
+        if (versionField && currentVersion !== undefined && affected === 0) {
+          throw new OptimisticLockException(
+            entityClass.name,
+            idValue,
+            currentVersion,
+            null,
+          );
+        }
       } finally {
         await conn.close();
       }

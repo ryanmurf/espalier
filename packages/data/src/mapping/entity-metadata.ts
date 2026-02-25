@@ -7,6 +7,7 @@ import {
 } from "../decorators/auditing.js";
 import { getManyToOneRelations, getOneToManyRelations, getManyToManyRelations } from "../decorators/relations.js";
 import type { ManyToOneRelation, OneToManyRelation, ManyToManyRelation } from "../decorators/relations.js";
+import { getVersionField } from "../decorators/version.js";
 
 export interface FieldMapping {
   fieldName: string | symbol;
@@ -19,6 +20,7 @@ export interface EntityMetadata {
   fields: FieldMapping[];
   createdDateField?: string | symbol;
   lastModifiedDateField?: string | symbol;
+  versionField?: string | symbol;
   manyToOneRelations: ManyToOneRelation[];
   oneToManyRelations: OneToManyRelation[];
   manyToManyRelations: ManyToManyRelation[];
@@ -55,6 +57,7 @@ export function getEntityMetadata(
     fields,
     createdDateField: getCreatedDateField(entityClass),
     lastModifiedDateField: getLastModifiedDateField(entityClass),
+    versionField: getVersionField(entityClass),
     manyToOneRelations: getManyToOneRelations(entityClass),
     oneToManyRelations: getOneToManyRelations(entityClass),
     manyToManyRelations: getManyToManyRelations(entityClass),
