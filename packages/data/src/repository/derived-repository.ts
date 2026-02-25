@@ -20,6 +20,9 @@ import type { QueryCacheConfig } from "../cache/query-cache.js";
 import type { LifecycleEvent } from "../decorators/lifecycle.js";
 import { EntityChangeTracker } from "../mapping/change-tracker.js";
 import type { StreamOptions } from "./streaming.js";
+import type { EventBus } from "../events/event-bus.js";
+import type { EntityPersistedEvent, EntityUpdatedEvent, EntityRemovedEvent, EntityLoadedEvent } from "../events/entity-events.js";
+import { ENTITY_EVENTS } from "../events/entity-events.js";
 
 function isProjectionClass(arg: unknown): arg is new (...args: any[]) => any {
   return typeof arg === "function" && getProjectionMetadata(arg) !== undefined;
@@ -28,6 +31,7 @@ function isProjectionClass(arg: unknown): arg is new (...args: any[]) => any {
 export interface DerivedRepositoryOptions {
   entityCache?: EntityCacheConfig;
   queryCache?: QueryCacheConfig;
+  eventBus?: EventBus;
 }
 
 export function createDerivedRepository<T, ID>(
@@ -38,10 +42,12 @@ export function createDerivedRepository<T, ID>(
   // Support both legacy EntityCacheConfig and new DerivedRepositoryOptions
   let entityCacheConfig: EntityCacheConfig | undefined;
   let queryCacheConfig: QueryCacheConfig | undefined;
-  if (cacheConfig && ("entityCache" in cacheConfig || "queryCache" in cacheConfig)) {
+  let eventBus: EventBus | undefined;
+  if (cacheConfig && ("entityCache" in cacheConfig || "queryCache" in cacheConfig || "eventBus" in cacheConfig)) {
     const opts = cacheConfig as DerivedRepositoryOptions;
     entityCacheConfig = opts.entityCache;
     queryCacheConfig = opts.queryCache;
+    eventBus = opts.eventBus;
   } else {
     entityCacheConfig = cacheConfig as EntityCacheConfig | undefined;
   }
@@ -53,6 +59,13 @@ export function createDerivedRepository<T, ID>(
   const entityCache = new EntityCache(entityCacheConfig);
   const queryCache = new QueryCache(queryCacheConfig);
   const changeTracker = new EntityChangeTracker<T>(metadata);
+  const entityName = entityClass.name;
+
+  async function emitEntityEvent(genericEvent: string, specificEvent: string, payload: unknown): Promise<void> {
+    if (!eventBus) return;
+    await eventBus.emit(genericEvent, payload);
+    await eventBus.emit(specificEvent, payload);
+  }
 
   function getCachedDescriptor(methodName: string): DerivedQueryDescriptor {
     let descriptor = descriptorCache.get(methodName);
@@ -155,6 +168,14 @@ export function createDerivedRepository<T, ID>(
           await invokeLifecycleCallbacks(result, "PostLoad");
           changeTracker.snapshot(result);
           entityCache.put(entityClass, id, result);
+          await emitEntityEvent(ENTITY_EVENTS.LOADED, `${ENTITY_EVENTS.LOADED}:${entityName}`, {
+            type: "loaded",
+            entityClass,
+            entityName,
+            entity: result,
+            id,
+            timestamp: new Date(),
+          } satisfies EntityLoadedEvent<T>);
           return result;
         }
         return null;
@@ -235,6 +256,14 @@ export function createDerivedRepository<T, ID>(
           await invokeLifecycleCallbacks(entity, "PostLoad");
           changeTracker.snapshot(entity);
           entityCache.put(entityClass, getEntityId(entity), entity);
+          await emitEntityEvent(ENTITY_EVENTS.LOADED, `${ENTITY_EVENTS.LOADED}:${entityName}`, {
+            type: "loaded",
+            entityClass,
+            entityName,
+            entity,
+            id: getEntityId(entity),
+            timestamp: new Date(),
+          } satisfies EntityLoadedEvent<T>);
           results.push(entity);
         }
         queryCache.put(cacheKey, results, entityClass);
@@ -332,6 +361,15 @@ export function createDerivedRepository<T, ID>(
             changeTracker.snapshot(saved);
             entityCache.put(entityClass, getEntityId(saved), saved);
             queryCache.invalidate(entityClass);
+            await emitEntityEvent(ENTITY_EVENTS.UPDATED, `${ENTITY_EVENTS.UPDATED}:${entityName}`, {
+              type: "updated",
+              entityClass,
+              entityName,
+              entity: saved,
+              id: getEntityId(saved),
+              changes: hasSnapshot ? dirtyFields : undefined,
+              timestamp: new Date(),
+            } satisfies EntityUpdatedEvent<T>);
             return saved;
           }
           // No rows returned — if versioned, this is an optimistic lock conflict
@@ -379,6 +417,14 @@ export function createDerivedRepository<T, ID>(
             changeTracker.snapshot(saved);
             entityCache.put(entityClass, getEntityId(saved), saved);
             queryCache.invalidate(entityClass);
+            await emitEntityEvent(ENTITY_EVENTS.PERSISTED, `${ENTITY_EVENTS.PERSISTED}:${entityName}`, {
+              type: "persisted",
+              entityClass,
+              entityName,
+              entity: saved,
+              id: getEntityId(saved),
+              timestamp: new Date(),
+            } satisfies EntityPersistedEvent<T>);
             return saved;
           }
           return entity;
@@ -437,6 +483,14 @@ export function createDerivedRepository<T, ID>(
           );
         }
         await invokeLifecycleCallbacks(entity, "PostRemove");
+        await emitEntityEvent(ENTITY_EVENTS.REMOVED, `${ENTITY_EVENTS.REMOVED}:${entityName}`, {
+          type: "removed",
+          entityClass,
+          entityName,
+          entity,
+          id: idValue,
+          timestamp: new Date(),
+        } satisfies EntityRemovedEvent<T>);
         changeTracker.clearSnapshot(entity);
         entityCache.evict(entityClass, idValue);
         queryCache.invalidate(entityClass);
@@ -516,6 +570,14 @@ export function createDerivedRepository<T, ID>(
                 const entity = rowMapper.mapRow(rs!);
                 await invokeLifecycleCallbacks(entity, "PostLoad");
                 changeTracker.snapshot(entity);
+                await emitEntityEvent(ENTITY_EVENTS.LOADED, `${ENTITY_EVENTS.LOADED}:${entityName}`, {
+                  type: "loaded",
+                  entityClass,
+                  entityName,
+                  entity,
+                  id: getEntityId(entity),
+                  timestamp: new Date(),
+                } satisfies EntityLoadedEvent<T>);
                 return { value: entity, done: false };
               }
               await cleanup();
@@ -637,6 +699,14 @@ export function createDerivedRepository<T, ID>(
                     const entity = rowMapper.mapRow(rs!);
                     await invokeLifecycleCallbacks(entity, "PostLoad");
                     changeTracker.snapshot(entity);
+                    await emitEntityEvent(ENTITY_EVENTS.LOADED, `${ENTITY_EVENTS.LOADED}:${entityName}`, {
+                      type: "loaded",
+                      entityClass,
+                      entityName,
+                      entity,
+                      id: getEntityId(entity),
+                      timestamp: new Date(),
+                    } satisfies EntityLoadedEvent<T>);
                     return { value: entity, done: false };
                   }
                   await cleanup();
@@ -742,6 +812,14 @@ export function createDerivedRepository<T, ID>(
               const mapped = rowMapper.mapRow(rs);
               await invokeLifecycleCallbacks(mapped, "PostLoad");
               changeTracker.snapshot(mapped);
+              await emitEntityEvent(ENTITY_EVENTS.LOADED, `${ENTITY_EVENTS.LOADED}:${entityName}`, {
+                type: "loaded",
+                entityClass,
+                entityName,
+                entity: mapped,
+                id: getEntityId(mapped),
+                timestamp: new Date(),
+              } satisfies EntityLoadedEvent<T>);
               results.push(mapped);
             }
           }

@@ -98,6 +98,16 @@ export { QueryCache } from "./cache/index.js";
 export type { DdlOptions, DropTableOptions } from "./schema/ddl-generator.js";
 export { DdlGenerator } from "./schema/ddl-generator.js";
 
+export { EventBus, getGlobalEventBus } from "./events/index.js";
+export type {
+  EntityEvent,
+  EntityPersistedEvent,
+  EntityUpdatedEvent,
+  EntityRemovedEvent,
+  EntityLoadedEvent,
+} from "./events/index.js";
+export { ENTITY_EVENTS } from "./events/index.js";
+
 export type {
   Migration,
   MigrationRecord,
