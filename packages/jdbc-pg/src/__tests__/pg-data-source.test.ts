@@ -10,6 +10,7 @@ vi.mock("pg", () => {
     Pool: vi.fn().mockImplementation(() => ({
       connect: mockConnect,
       end: mockEnd,
+      on: vi.fn(),
     })),
     __mockConnect: mockConnect,
     __mockEnd: mockEnd,

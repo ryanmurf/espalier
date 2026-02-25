@@ -18,3 +18,8 @@ export interface PooledDataSource extends DataSource {
   getPoolStats(): PoolStats;
   close(force?: boolean): Promise<void>;
 }
+
+export interface MonitoredPooledDataSource extends PooledDataSource {
+  getPoolMonitor(): import("./pool-monitor.js").PoolMonitor;
+  getPoolMetrics(): import("./pool-metrics.js").PoolMetricsSnapshot;
+}

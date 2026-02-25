@@ -1,6 +1,14 @@
 import { Pool, type PoolConfig as PgPoolConfig } from "pg";
-import type { Connection, PoolConfig, PoolStats, PooledDataSource, TypeConverterRegistry } from "espalier-jdbc";
-import { ConnectionError, DatabaseErrorCode } from "espalier-jdbc";
+import type {
+  Connection,
+  PoolConfig,
+  PoolStats,
+  MonitoredPooledDataSource,
+  TypeConverterRegistry,
+  PoolMonitor,
+  PoolMetricsSnapshot,
+} from "espalier-jdbc";
+import { ConnectionError, DatabaseErrorCode, DefaultPoolMetricsCollector } from "espalier-jdbc";
 import { PgConnection } from "./pg-connection.js";
 
 export interface PgDataSourceConfig {
@@ -30,18 +38,31 @@ function isPgDataSourceConfig(config: unknown): config is PgDataSourceConfig {
   );
 }
 
-export class PgDataSource implements PooledDataSource {
+export class PgDataSource implements MonitoredPooledDataSource {
   private readonly pool: Pool;
   private readonly typeConverters?: TypeConverterRegistry;
+  private readonly metrics: DefaultPoolMetricsCollector;
   private closed = false;
 
   constructor(config: PgDataSourceConfig | PgPoolConfig) {
+    this.metrics = new DefaultPoolMetricsCollector();
+
     if (isPgDataSourceConfig(config)) {
       this.pool = new Pool(mapPoolConfig(config));
       this.typeConverters = config.typeConverters;
     } else {
       this.pool = new Pool(config);
     }
+
+    // Hook into pg Pool error events
+    this.pool.on("error", (err: Error) => {
+      this.metrics.emitError({
+        timestamp: new Date(),
+        poolStats: this.getPoolStats(),
+        error: err,
+        context: "idle",
+      });
+    });
   }
 
   async getConnection(): Promise<Connection> {
@@ -52,13 +73,56 @@ export class PgDataSource implements PooledDataSource {
         DatabaseErrorCode.CONNECTION_CLOSED,
       );
     }
+
+    const startTime = Date.now();
     try {
       const client = await this.pool.connect();
-      return new PgConnection(client, this.typeConverters);
+      const acquireTimeMs = Date.now() - startTime;
+
+      this.metrics.emitAcquire({
+        timestamp: new Date(),
+        poolStats: this.getPoolStats(),
+        acquireTimeMs,
+      });
+
+      const conn = new PgConnection(client, this.typeConverters);
+
+      // Wrap close to emit release event
+      const originalClose = conn.close.bind(conn);
+      const acquiredAt = Date.now();
+      const metrics = this.metrics;
+      const getStats = () => this.getPoolStats();
+      conn.close = async function () {
+        await originalClose();
+        metrics.emitRelease({
+          timestamp: new Date(),
+          poolStats: getStats(),
+          heldTimeMs: Date.now() - acquiredAt,
+        });
+      };
+
+      return conn;
     } catch (err) {
+      const waitTimeMs = Date.now() - startTime;
       const code = (err as { code?: string }).code === "ETIMEDOUT"
         ? DatabaseErrorCode.CONNECTION_TIMEOUT
         : DatabaseErrorCode.CONNECTION_FAILED;
+
+      if (code === DatabaseErrorCode.CONNECTION_TIMEOUT) {
+        this.metrics.emitTimeout({
+          timestamp: new Date(),
+          poolStats: this.getPoolStats(),
+          waitTimeMs,
+        });
+      } else {
+        this.metrics.emitError({
+          timestamp: new Date(),
+          poolStats: this.getPoolStats(),
+          error: err as Error,
+          context: "acquire",
+        });
+      }
+
       throw new ConnectionError(
         `Failed to get connection: ${(err as Error).message}`,
         err as Error,
@@ -75,11 +139,18 @@ export class PgDataSource implements PooledDataSource {
     };
   }
 
+  getPoolMonitor(): PoolMonitor {
+    return this.metrics;
+  }
+
+  getPoolMetrics(): PoolMetricsSnapshot {
+    return this.metrics.getMetrics();
+  }
+
   async close(force?: boolean): Promise<void> {
     if (this.closed) return;
     this.closed = true;
     if (force) {
-      // Force-end terminates active clients immediately
       await this.pool.end();
     } else {
       await this.pool.end();

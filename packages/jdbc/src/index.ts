@@ -8,7 +8,18 @@ export { IsolationLevel } from "./transaction.js";
 export type { SqlValue, SqlParameter, NamedSqlParameter, ColumnMetadata } from "./types.js";
 export type { ParsedNamedQuery } from "./named-params.js";
 export { parseNamedParams } from "./named-params.js";
-export type { PoolConfig, PoolStats, PooledDataSource } from "./pool.js";
+export type { PoolConfig, PoolStats, PooledDataSource, MonitoredPooledDataSource } from "./pool.js";
+export type {
+  PoolEvent,
+  AcquireEvent,
+  ReleaseEvent,
+  TimeoutEvent,
+  ErrorEvent,
+  PoolEventListener,
+  PoolMonitor,
+} from "./pool-monitor.js";
+export type { PoolMetricsSnapshot, PoolMetricsCollector } from "./pool-metrics.js";
+export { DefaultPoolMetricsCollector } from "./pool-metrics.js";
 export type { TableInfo, ColumnInfo, SchemaIntrospector } from "./schema-introspector.js";
 export {
   DatabaseErrorCode,

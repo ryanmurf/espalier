@@ -8,6 +8,7 @@ const mockPoolConnect = vi.fn();
 const mockPoolInstance = {
   connect: mockPoolConnect,
   end: mockPoolEnd,
+  on: vi.fn(),
   totalCount: 5,
   idleCount: 3,
   waitingCount: 1,
