@@ -1,5 +1,60 @@
 # Changelog
 
+## 0.3.0 — Y1 Q3
+
+### espalier-data
+
+#### Schema DDL Generation
+- Added `DdlGenerator` class with `generateCreateTable()`, `generateDropTable()`, and `generateJoinTables()` methods
+- Automatic SQL type inference from field defaults (`string` -> `TEXT`, `number` -> `INTEGER`, `boolean` -> `BOOLEAN`, `Date` -> `TIMESTAMPTZ`, `Uint8Array` -> `BYTEA`)
+- Explicit type override via `@Column({ type: "..." })` option
+- `VARCHAR(n)` support via `@Column({ length: n })`
+- `IF NOT EXISTS` / `IF EXISTS` / `CASCADE` options for create and drop
+
+#### Column Constraint Support
+- Added `nullable`, `unique`, `defaultValue`, and `length` options to `@Column` decorator
+- `@Id` fields automatically get `PRIMARY KEY` constraint
+- `NOT NULL` generated for `nullable: false` columns
+- `UNIQUE` constraint support
+- `DEFAULT` clause support with explicit values or automatic `DEFAULT NOW()` for `@CreatedDate` fields
+- New `ColumnMetadataEntry` interface and `getColumnMetadataEntries()` accessor
+
+#### Migration Framework
+- Added `Migration` interface with `version`, `description`, `up()`, and `down()` methods
+- Added `MigrationRunner` interface with `initialize()`, `run()`, `rollback()`, `rollbackTo()`, `getCurrentVersion()`, `getAppliedMigrations()`, and `pending()` methods
+- Added `MigrationRecord` and `MigrationRunnerConfig` interfaces
+- Configurable migration tracking table name and schema
+
+#### Relationship Decorators
+- Added `@ManyToOne` decorator with `target`, `joinColumn`, and `nullable` options
+- Added `@OneToMany` decorator (inverse/non-owning side) with `target` and `mappedBy` options
+- Added `@ManyToMany` decorator with `joinTable` config (owning side) or `mappedBy` (inverse side)
+- Added `JoinTableConfig` interface for join table name and column configuration
+- `@ManyToOne` generates FK column with `REFERENCES` constraint in DDL
+- `@ManyToMany` generates join table with composite primary key and FK constraints
+- Relationship metadata integrated into `EntityMetadata`
+
+### espalier-jdbc
+
+#### Schema Introspection
+- Added `SchemaIntrospector` interface with `getTables()`, `getColumns()`, `getPrimaryKeys()`, and `tableExists()` methods
+- Added `TableInfo` interface (`tableName`, `schema`)
+- Added `ColumnInfo` interface (`columnName`, `dataType`, `nullable`, `defaultValue`, `primaryKey`, `unique`, `maxLength`)
+
+### espalier-jdbc-pg
+
+#### Schema Introspection
+- Added `PgSchemaIntrospector` implementing `SchemaIntrospector` using `information_schema` queries
+- Reads table, column, primary key, and unique constraint metadata from PostgreSQL catalog
+- All queries use parameterized SQL
+
+#### Migration Runner
+- Added `PgMigrationRunner` implementing `MigrationRunner` with full PostgreSQL support
+- Each migration runs in its own transaction (auto-rollback on failure)
+- SHA-256 checksum validation prevents modification of already-applied migrations
+- Lexicographic version ordering for deterministic migration sequencing
+- Added `computeChecksum()` utility function
+
 ## 0.2.0 — Y1 Q2
 
 ### espalier-data

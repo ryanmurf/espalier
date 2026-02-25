@@ -120,8 +120,10 @@ pnpm test
 - [ ] MySQL/MariaDB adapter (`espalier-jdbc-mysql`)
 - [ ] SQLite adapter (`espalier-jdbc-sqlite`)
 - [ ] Connection pooling configuration
-- [ ] Query builder / criteria API
-- [ ] Automatic schema migration support
-- [ ] Streaming ResultSet for large datasets
+- [x] Query builder / criteria API *(Q2)*
+- [x] Automatic schema migration support *(Q3)*
+- [x] Streaming ResultSet for large datasets *(Q2)*
 - [ ] Custom type converters
-- [ ] Relationship mapping (`@OneToMany`, `@ManyToOne`)
+- [x] Relationship mapping (`@OneToMany`, `@ManyToOne`, `@ManyToMany`) *(Q3)*
+- [x] Schema introspection *(Q3)*
+- [x] DDL generation with constraints *(Q3)*
