@@ -73,6 +73,9 @@ export {
 export { createDerivedRepository } from "./repository/derived-repository.js";
 export { OptimisticLockException } from "./repository/optimistic-lock.js";
 
+export type { EntityCacheConfig, EntityCacheStats } from "./cache/index.js";
+export { EntityCache } from "./cache/index.js";
+
 export type { DdlOptions, DropTableOptions } from "./schema/ddl-generator.js";
 export { DdlGenerator } from "./schema/ddl-generator.js";
 

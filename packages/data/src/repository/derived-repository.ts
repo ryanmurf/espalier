@@ -13,6 +13,8 @@ import { SelectBuilder, InsertBuilder, UpdateBuilder, DeleteBuilder } from "../q
 import { ComparisonCriteria, LogicalCriteria } from "../query/criteria.js";
 import type { Specification } from "../query/specification.js";
 import { OptimisticLockException } from "./optimistic-lock.js";
+import { EntityCache } from "../cache/entity-cache.js";
+import type { EntityCacheConfig } from "../cache/entity-cache.js";
 
 function isProjectionClass(arg: unknown): arg is new (...args: any[]) => any {
   return typeof arg === "function" && getProjectionMetadata(arg) !== undefined;
@@ -21,11 +23,13 @@ function isProjectionClass(arg: unknown): arg is new (...args: any[]) => any {
 export function createDerivedRepository<T, ID>(
   entityClass: new (...args: any[]) => T,
   dataSource: DataSource,
+  cacheConfig?: EntityCacheConfig,
 ): CrudRepository<T, ID> & Record<string, (...args: any[]) => Promise<any>> {
   const metadata = getEntityMetadata(entityClass);
   const rowMapper = createRowMapper(entityClass, metadata);
   const descriptorCache = new Map<string, DerivedQueryDescriptor>();
   const projectionMapperCache = new Map<new (...args: any[]) => any, ProjectionMapper<any>>();
+  const entityCache = new EntityCache(cacheConfig);
 
   function getCachedDescriptor(methodName: string): DerivedQueryDescriptor {
     let descriptor = descriptorCache.get(methodName);
@@ -52,6 +56,10 @@ export function createDerivedRepository<T, ID>(
     return field ? field.columnName : String(metadata.idField);
   }
 
+  function getEntityId(entity: T): unknown {
+    return (entity as Record<string | symbol, unknown>)[metadata.idField];
+  }
+
   function getVersionColumn(): string | undefined {
     if (!metadata.versionField) return undefined;
     const field = metadata.fields.find(
@@ -65,6 +73,7 @@ export function createDerivedRepository<T, ID>(
       const idCol = getIdColumn();
 
       if (projectionClass && isProjectionClass(projectionClass)) {
+        // Projections bypass cache (different column set)
         const projMapper = getCachedProjectionMapper(projectionClass);
         const builder = new SelectBuilder(metadata.tableName)
           .columns(...projMapper.columns)
@@ -88,6 +97,12 @@ export function createDerivedRepository<T, ID>(
         }
       }
 
+      // Check cache first
+      const cached = entityCache.get(entityClass, id);
+      if (cached !== undefined) {
+        return cached;
+      }
+
       const builder = new SelectBuilder(metadata.tableName)
         .columns(...metadata.fields.map((f: FieldMapping) => f.columnName))
         .where(new ComparisonCriteria("eq", idCol, id as SqlValue))
@@ -102,7 +117,9 @@ export function createDerivedRepository<T, ID>(
         }
         const rs = await stmt.executeQuery();
         if (await rs.next()) {
-          return rowMapper.mapRow(rs);
+          const result = rowMapper.mapRow(rs);
+          entityCache.put(entityClass, id, result);
+          return result;
         }
         return null;
       } finally {
@@ -170,7 +187,9 @@ export function createDerivedRepository<T, ID>(
         const rs = await stmt.executeQuery();
         const results: T[] = [];
         while (await rs.next()) {
-          results.push(rowMapper.mapRow(rs));
+          const entity = rowMapper.mapRow(rs);
+          entityCache.put(entityClass, getEntityId(entity), entity);
+          results.push(entity);
         }
         return results;
       } finally {
@@ -230,10 +249,13 @@ export function createDerivedRepository<T, ID>(
           }
           const rs = await stmt.executeQuery();
           if (await rs.next()) {
-            return rowMapper.mapRow(rs);
+            const saved = rowMapper.mapRow(rs);
+            entityCache.put(entityClass, getEntityId(saved), saved);
+            return saved;
           }
           // No rows returned — if versioned, this is an optimistic lock conflict
           if (versionField && currentVersion !== undefined) {
+            entityCache.evict(entityClass, idValue);
             throw new OptimisticLockException(
               entityClass.name,
               idValue,
@@ -270,7 +292,9 @@ export function createDerivedRepository<T, ID>(
           }
           const rs = await stmt.executeQuery();
           if (await rs.next()) {
-            return rowMapper.mapRow(rs);
+            const saved = rowMapper.mapRow(rs);
+            entityCache.put(entityClass, getEntityId(saved), saved);
+            return saved;
           }
           return entity;
         } finally {
@@ -326,6 +350,7 @@ export function createDerivedRepository<T, ID>(
             null,
           );
         }
+        entityCache.evict(entityClass, idValue);
       } finally {
         await conn.close();
       }
@@ -350,6 +375,7 @@ export function createDerivedRepository<T, ID>(
           stmt.setParameter(i + 1, query.params[i]);
         }
         await stmt.executeUpdate();
+        entityCache.evict(entityClass, id);
       } finally {
         await conn.close();
       }
@@ -392,7 +418,10 @@ export function createDerivedRepository<T, ID>(
     "deleteAll",
     "deleteById",
     "count",
+    "getEntityCache",
   ]);
+
+  (crudMethods as any).getEntityCache = () => entityCache;
 
   return new Proxy(crudMethods as CrudRepository<T, ID> & Record<string, (...args: any[]) => Promise<any>>, {
     get(target, prop, receiver) {
@@ -428,6 +457,7 @@ export function createDerivedRepository<T, ID>(
 
           if (descriptor.action === "delete") {
             await stmt.executeUpdate();
+            entityCache.evictAll(entityClass);
             return;
           }
 
