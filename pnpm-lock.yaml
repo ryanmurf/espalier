@@ -102,6 +102,9 @@ importers:
       better-sqlite3:
         specifier: ^11.7.0
         version: 11.10.0
+      espalier-data:
+        specifier: workspace:*
+        version: link:../data
       tsup:
         specifier: ^8.4.0
         version: 8.5.1(postcss@8.5.6)(typescript@5.9.3)

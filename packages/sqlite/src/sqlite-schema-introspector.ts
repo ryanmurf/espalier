@@ -84,8 +84,8 @@ export class SqliteSchemaIntrospector implements SchemaIntrospector {
     const indexRs = await stmt.executeQuery(`PRAGMA index_list(${safeName})`);
     const uniqueIndexNames: string[] = [];
     while (await indexRs.next()) {
-      if (rs.getNumber("unique") === 1) {
-        uniqueIndexNames.push(rs.getString("name")!);
+      if (indexRs.getNumber("unique") === 1) {
+        uniqueIndexNames.push(indexRs.getString("name")!);
       }
     }
 

@@ -6,4 +6,6 @@ export { SqliteNamedPreparedStatement } from "./sqlite-named-statement.js";
 export { SqliteBatchStatement } from "./sqlite-batch-statement.js";
 export { SqliteResultSet } from "./sqlite-result-set.js";
 export { SqliteCursorResultSet } from "./sqlite-cursor-result-set.js";
+export { SqliteSchemaIntrospector } from "./sqlite-schema-introspector.js";
+export { SqliteMigrationRunner, computeChecksum } from "./sqlite-migration-runner.js";
 export { mapSqliteErrorCode } from "./error-codes.js";
