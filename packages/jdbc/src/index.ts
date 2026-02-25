@@ -17,3 +17,14 @@ export {
   QueryError,
   TransactionError,
 } from "./errors.js";
+export type { TypeConverter, TypeConverterRegistry } from "./type-converter.js";
+export { DefaultTypeConverterRegistry } from "./type-converter-registry.js";
+export {
+  JsonConverter,
+  JsonbConverter,
+  EnumConverter,
+  ArrayConverter,
+  PostgresArrayConverter,
+  BooleanConverter,
+  DateConverter,
+} from "./converters/index.js";
