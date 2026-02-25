@@ -2,6 +2,9 @@ import { getEntityMetadata } from "../mapping/entity-metadata.js";
 import { getColumnMetadataEntries } from "../decorators/column.js";
 import type { ColumnMetadataEntry } from "../decorators/column.js";
 import { getCreatedDateField } from "../decorators/auditing.js";
+import { getTableName } from "../decorators/table.js";
+import { getIdField } from "../decorators/id.js";
+import { getColumnMappings } from "../decorators/column.js";
 
 export interface DdlOptions {
   ifNotExists?: boolean;
@@ -93,6 +96,26 @@ export class DdlGenerator {
 
       return `  ${parts.join(" ")}`;
     });
+
+    // Generate FK columns from @ManyToOne relations
+    for (const relation of metadata.manyToOneRelations) {
+      const targetClass = relation.target();
+      const targetTableName = getTableName(targetClass);
+      const targetIdField = getIdField(targetClass);
+
+      if (!targetTableName || !targetIdField) continue;
+
+      // Resolve target's PK column name
+      const targetColumnMappings = getColumnMappings(targetClass);
+      const targetPkColumn = targetColumnMappings.get(targetIdField) ?? String(targetIdField);
+
+      const parts: string[] = [relation.joinColumn, "INTEGER"];
+      if (!relation.nullable) {
+        parts.push("NOT NULL");
+      }
+      parts.push(`REFERENCES ${targetTableName}(${targetPkColumn})`);
+      columns.push(`  ${parts.join(" ")}`);
+    }
 
     return `CREATE TABLE ${ifNotExists}${metadata.tableName} (\n${columns.join(",\n")}\n)`;
   }

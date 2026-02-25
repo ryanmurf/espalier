@@ -8,6 +8,8 @@ export {
   getCreatedDateField,
   getLastModifiedDateField,
 } from "./decorators/auditing.js";
+export { ManyToOne, getManyToOneRelations } from "./decorators/relations.js";
+export type { ManyToOneOptions, ManyToOneRelation } from "./decorators/relations.js";
 
 export type { Repository } from "./repository/repository.js";
 export type {
