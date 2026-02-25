@@ -75,11 +75,8 @@ describe("BUG: findDistinct generates invalid SQL", () => {
 // BUG #2: QueryCache key collision with null vs undefined
 // ══════════════════════════════════════════════════
 
-describe("BUG: QueryCache null/undefined param collision", () => {
-  it("JSON.stringify treats undefined and null as same value in arrays", () => {
-    // JSON.stringify([undefined]) produces "[null]"
-    // JSON.stringify([null]) also produces "[null]"
-    // This means different query params could produce the same cache key
+describe("FIXED: QueryCache null/undefined param collision", () => {
+  it("null and undefined produce distinct cache keys", () => {
     const cache = new QueryCache();
     const results1 = [{ id: 1, name: "from null" }];
     const results2 = [{ id: 2, name: "from undefined" }];
@@ -88,16 +85,11 @@ describe("BUG: QueryCache null/undefined param collision", () => {
     const key2: QueryCacheKey = { sql: "SELECT * FROM users WHERE name = $1", params: [undefined] };
 
     cache.put(key1, results1, User);
-    const cached = cache.get(key2);
+    cache.put(key2, results2, User);
 
-    // This is a cache collision -- key2 gets key1's results
-    // Whether this is a "bug" depends on whether null and undefined should be
-    // treated as different query parameters. In SQL they're both NULL.
-    // But it's worth documenting this behavior.
-    if (cached !== undefined) {
-      // Collision: key2 got key1's results
-      expect(cached).toBe(results1);
-    }
+    // No collision: null and undefined produce different cache keys
+    expect(cache.get(key1)).toBe(results1);
+    expect(cache.get(key2)).toBe(results2);
   });
 });
 
@@ -278,26 +270,26 @@ describe("QueryCache adversarial tests", () => {
     }).toThrow();
   });
 
-  it("NaN in params: JSON.stringify(NaN) produces null", () => {
+  it("NaN in params does not collide with null", () => {
     const cache = new QueryCache();
     const k1: QueryCacheKey = { sql: "SELECT 1", params: [NaN] };
     const k2: QueryCacheKey = { sql: "SELECT 1", params: [null] };
 
     cache.put(k1, [1], User);
-    const result = cache.get(k2);
-    // JSON.stringify(NaN) = "null", same as JSON.stringify(null)
-    // So these collide
-    expect(result).toEqual([1]); // collision!
+    // NaN and null should produce distinct cache keys
+    expect(cache.get(k2)).toBeUndefined();
+    expect(cache.get(k1)).toEqual([1]);
   });
 
-  it("Infinity in params: JSON.stringify(Infinity) produces null", () => {
+  it("Infinity in params does not collide with null", () => {
     const cache = new QueryCache();
     const k1: QueryCacheKey = { sql: "SELECT 1", params: [Infinity] };
     const k2: QueryCacheKey = { sql: "SELECT 1", params: [null] };
 
     cache.put(k1, [1], User);
-    // JSON.stringify(Infinity) = "null"
-    expect(cache.get(k2)).toEqual([1]); // collision!
+    // Infinity and null should produce distinct cache keys
+    expect(cache.get(k2)).toBeUndefined();
+    expect(cache.get(k1)).toEqual([1]);
   });
 
   it("invalidate with subclass does not match parent class", () => {

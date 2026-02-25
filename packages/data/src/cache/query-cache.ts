@@ -54,7 +54,15 @@ export class QueryCache {
   }
 
   private static cacheKey(key: QueryCacheKey): string {
-    return key.sql + "\0" + JSON.stringify(key.params);
+    return key.sql + "\0" + JSON.stringify(key.params, (_key, value) => {
+      if (typeof value === "number") {
+        if (Number.isNaN(value)) return "__NaN__";
+        if (value === Infinity) return "__Inf__";
+        if (value === -Infinity) return "__-Inf__";
+      }
+      if (value === undefined) return "__undefined__";
+      return value;
+    });
   }
 
   get(key: QueryCacheKey): unknown[] | undefined {
