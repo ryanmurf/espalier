@@ -95,11 +95,13 @@ export class SelectBuilder {
   }
 
   limit(n: number): SelectBuilder {
+    if (n < 0) throw new Error(`LIMIT must be non-negative, got ${n}`);
     this._limit = n;
     return this;
   }
 
   offset(n: number): SelectBuilder {
+    if (n < 0) throw new Error(`OFFSET must be non-negative, got ${n}`);
     this._offset = n;
     return this;
   }

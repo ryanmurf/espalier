@@ -98,25 +98,28 @@ describe("FIXED: QueryCache null/undefined param collision", () => {
 // ══════════════════════════════════════════════════
 
 describe("EntityCache adversarial tests", () => {
-  it("idKey collision: numeric 0 and string '0' map to same key", () => {
+  it("numeric 0 and string '0' produce distinct cache keys", () => {
     const cache = new EntityCache();
     const user0 = new User(0, "Zero");
+    const userStr = new User(0, "ZeroStr");
     cache.put(User, 0, user0);
+    cache.put(User, "0", userStr);
 
-    // String "0" will also produce key "0" via String()
-    const result = cache.get(User, "0");
-    // This is a collision: numeric 0 and string "0" point to same cache entry
-    expect(result).toBe(user0);
+    // Type-prefixed keys: "number:0" vs "string:0" — no collision
+    expect(cache.get(User, 0)).toBe(user0);
+    expect(cache.get(User, "0")).toBe(userStr);
   });
 
-  it("idKey collision: numeric 1 and string '1' share cache entry", () => {
+  it("numeric 1 and string '1' produce distinct cache keys", () => {
     const cache = new EntityCache();
     const userNum = new User(1, "FromNumber");
     const userStr = new User(1, "FromString");
     cache.put(User, 1, userNum);
-    cache.put(User, "1", userStr); // overwrites!
+    cache.put(User, "1", userStr);
 
-    expect(cache.get(User, 1)).toBe(userStr); // got overwritten
+    // No overwrite — different type-prefixed keys
+    expect(cache.get(User, 1)).toBe(userNum);
+    expect(cache.get(User, "1")).toBe(userStr);
   });
 
   it("caching with null id creates entry with key 'null'", () => {
@@ -404,14 +407,10 @@ describe("Derived query executor adversarial tests", () => {
     }).toThrow(/Unknown property/);
   });
 
-  it("Between with missing second arg uses undefined", () => {
+  it("Between with missing second arg throws", () => {
     const descriptor = parseDerivedQueryMethod("findByAgeBetween");
     // Between needs 2 args but we only provide 1
-    const query = buildDerivedQuery(descriptor, userMetadata, [18]);
-    // The second param will be args[1] which is undefined
-    expect(query.params).toHaveLength(2);
-    expect(query.params[0]).toBe(18);
-    expect(query.params[1]).toBeUndefined(); // will be sent as NULL to DB
+    expect(() => buildDerivedQuery(descriptor, userMetadata, [18])).toThrow(/Between.*requires 2 arguments/);
   });
 
   it("In with empty array generates always-false condition", () => {
@@ -495,16 +494,11 @@ describe("SelectBuilder adversarial tests", () => {
     expect(query.params).toEqual([4, 5, 6]);
   });
 
-  it("limit with negative number", () => {
-    const builder = new SelectBuilder("users").columns("*").limit(-1);
-    const query = builder.build();
-    // Negative LIMIT is invalid in most SQL databases
-    expect(query.params).toContain(-1);
+  it("limit with negative number throws", () => {
+    expect(() => new SelectBuilder("users").columns("*").limit(-1)).toThrow(/LIMIT must be non-negative/);
   });
 
-  it("offset with negative number", () => {
-    const builder = new SelectBuilder("users").columns("*").offset(-5);
-    const query = builder.build();
-    expect(query.params).toContain(-5);
+  it("offset with negative number throws", () => {
+    expect(() => new SelectBuilder("users").columns("*").offset(-5)).toThrow(/OFFSET must be non-negative/);
   });
 });

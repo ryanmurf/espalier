@@ -151,7 +151,7 @@ export class EntityCache {
   }
 
   private idKey(id: unknown): string {
-    return String(id);
+    return `${typeof id}:${String(id)}`;
   }
 
   get<T>(entityClass: new (...args: any[]) => T, id: unknown): T | undefined {

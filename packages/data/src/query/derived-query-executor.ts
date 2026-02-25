@@ -63,6 +63,11 @@ function buildCriteriaForExpression(
     case "LessThanEqual":
       return new ComparisonCriteria("lte", columnName, args[argOffset] as SqlValue);
     case "Between":
+      if (args.length < argOffset + 2) {
+        throw new Error(
+          `Between operator requires 2 arguments for "${columnName}", but only ${args.length - argOffset} provided`,
+        );
+      }
       return new BetweenCriteria(
         columnName,
         args[argOffset] as SqlValue,

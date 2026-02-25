@@ -185,6 +185,10 @@ export function createDerivedRepository<T, ID>(
     },
 
     async existsById(id: ID): Promise<boolean> {
+      // Short-circuit: if entity is already in cache, it exists
+      const cached = entityCache.get(entityClass, id);
+      if (cached !== undefined) return true;
+
       const idCol = getIdColumn();
       const builder = new SelectBuilder(metadata.tableName)
         .columns("1")
@@ -604,6 +608,12 @@ export function createDerivedRepository<T, ID>(
       }
 
       const query = builder.build();
+      const cacheKey = { sql: query.sql, params: query.params as unknown[] };
+      const cachedResult = queryCache.get(cacheKey);
+      if (cachedResult !== undefined) {
+        return cachedResult[0] as number;
+      }
+
       const conn = await dataSource.getConnection();
       try {
         const stmt = conn.prepareStatement(query.sql);
@@ -614,8 +624,11 @@ export function createDerivedRepository<T, ID>(
         if (await rs.next()) {
           const row = rs.getRow();
           const val = Object.values(row)[0];
-          return typeof val === "number" ? val : Number(val);
+          const result = typeof val === "number" ? val : Number(val);
+          queryCache.put(cacheKey, [result], entityClass);
+          return result;
         }
+        queryCache.put(cacheKey, [0], entityClass);
         return 0;
       } finally {
         await conn.close();
