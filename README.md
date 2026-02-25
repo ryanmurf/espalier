@@ -8,16 +8,16 @@ A TypeScript monorepo providing two layered packages for database access:
 ## Architecture
 
 ```
-┌─────────────────────────────────────┐
-│          espalier-data              │
-│  Decorators, Repositories, Mapping  │
-├─────────────────────────────────────┤
-│          espalier-jdbc              │
-│  DataSource, Connection, Statement  │
-├──────────┬──────────┬───────────────┤
-│  jdbc-pg │ jdbc-mysql│  jdbc-...    │
-│ (pg)     │ (mysql2)  │              │
-└──────────┴──────────┴───────────────┘
+┌─────────────────────────────────────────┐
+│            espalier-data                │
+│  Decorators, Repositories, Mapping      │
+├─────────────────────────────────────────┤
+│            espalier-jdbc                │
+│  DataSource, Connection, Statement      │
+├──────────┬──────────┬───────────────────┤
+│  jdbc-pg │jdbc-mysql│  jdbc-sqlite      │
+│ (pg)     │ (mysql2) │ (better-sqlite3)  │
+└──────────┴──────────┴───────────────────┘
 ```
 
 **espalier-jdbc** defines dialect-agnostic interfaces (`DataSource`, `Connection`, `Statement`, `PreparedStatement`, `ResultSet`, `Transaction`) that driver adapters implement. **espalier-data** builds on top with entity decorators (`@Table`, `@Column`, `@Id`), repository abstractions (`CrudRepository`, `PagingAndSortingRepository`), and automatic row-to-entity mapping.
@@ -30,6 +30,12 @@ pnpm add espalier-jdbc
 
 # PostgreSQL adapter
 pnpm add espalier-jdbc-pg pg
+
+# MySQL adapter
+pnpm add espalier-jdbc-mysql mysql2
+
+# SQLite adapter
+pnpm add espalier-jdbc-sqlite better-sqlite3
 
 # Data layer (repositories & entity mapping)
 pnpm add espalier-data
@@ -117,13 +123,13 @@ pnpm test
 
 ## Roadmap
 
-- [ ] MySQL/MariaDB adapter (`espalier-jdbc-mysql`)
-- [ ] SQLite adapter (`espalier-jdbc-sqlite`)
-- [ ] Connection pooling configuration
+- [x] MySQL/MariaDB adapter (`espalier-jdbc-mysql`) *(Q4)*
+- [x] SQLite adapter (`espalier-jdbc-sqlite`) *(Q4)*
+- [x] Connection pool monitoring and metrics *(Q4)*
 - [x] Query builder / criteria API *(Q2)*
 - [x] Automatic schema migration support *(Q3)*
 - [x] Streaming ResultSet for large datasets *(Q2)*
-- [ ] Custom type converters
+- [x] Custom type converters *(Q4)*
 - [x] Relationship mapping (`@OneToMany`, `@ManyToOne`, `@ManyToMany`) *(Q3)*
 - [x] Schema introspection *(Q3)*
 - [x] DDL generation with constraints *(Q3)*

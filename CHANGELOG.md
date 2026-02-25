@@ -1,5 +1,78 @@
 # Changelog
 
+## 0.4.0 — Y1 Q4
+
+### espalier-jdbc
+
+#### Type Converter System
+- Added `TypeConverter<TApp, TDb>` interface for bidirectional value conversion between application and database types
+- Added `TypeConverterRegistry` interface with `register()`, `get()`, `getForDbType()`, and `getAll()` methods
+- Added `DefaultTypeConverterRegistry` implementation with lookup by name and by database type
+- Built-in converters: `JsonConverter`, `JsonbConverter`, `EnumConverter`, `ArrayConverter`, `PostgresArrayConverter`, `BooleanConverter`, `DateConverter`
+- `EnumConverter` validates values against an allowed set, throws on invalid input
+- `PostgresArrayConverter` handles PostgreSQL `{a,b,c}` array format
+
+#### TypeAwareConnection Interface
+- Added `TypeAwareConnection` extending `Connection` with `getTypeConverterRegistry()` method
+- Backward-compatible extension — existing `Connection` consumers are unaffected
+
+#### Pool Monitoring
+- Added `PoolMonitor` interface with `onAcquire()`, `onRelease()`, `onTimeout()`, `onError()` listener hooks and `removeAllListeners()`
+- Added `PoolEvent`, `AcquireEvent`, `ReleaseEvent`, `TimeoutEvent`, `ErrorEvent` interfaces
+- Added `PoolMetricsSnapshot` with total counts, averages, maximums, and live pool stats
+- Added `DefaultPoolMetricsCollector` implementing `PoolMetricsCollector` (extends `PoolMonitor`) with `getMetrics()` and `reset()`
+- Added `MonitoredPooledDataSource` extending `PooledDataSource` with `getPoolMonitor()` and `getPoolMetrics()`
+
+### espalier-jdbc-pg
+
+#### Pool Monitoring Integration
+- `PgDataSource` now implements `MonitoredPooledDataSource`
+- Acquire events track connection acquisition timing
+- Release events track connection held time via wrapped `close()` method
+- Pool error events forwarded from pg Pool error handler
+- Timeout detection based on `ETIMEDOUT` error codes
+- `getPoolMonitor()` and `getPoolMetrics()` accessors
+
+#### TypeConverter Integration
+- `PgDataSource` accepts optional `typeConverters` in `PgDataSourceConfig`
+- `PgConnection` implements `TypeAwareConnection`, passes registry through to connections
+
+### espalier-jdbc-mysql (new package)
+
+#### MySQL Adapter
+- Full implementation of all espalier-jdbc interfaces for MySQL via `mysql2/promise`
+- `MysqlDataSource` with `PooledDataSource` support, pool config mapping (`connectionLimit`, `connectTimeout`, `idleTimeout`)
+- `MysqlConnection` with `TypeAwareConnection` support, transaction isolation levels, savepoints
+- `MysqlStatement` and `MysqlPreparedStatement` with `?` positional parameter binding
+- `MysqlNamedPreparedStatement` with `:name` parameter parsing, converts to `?` placeholders
+- `MysqlBatchStatement` with multi-row INSERT optimization
+- `MysqlResultSet` and `MysqlCursorResultSet` for streaming large result sets
+- MySQL-specific error code mapping (`mapMysqlErrorCode()`)
+
+#### Schema Introspection and Migrations
+- `MysqlSchemaIntrospector` using `information_schema` queries, `DATABASE()` for default schema
+- `MysqlMigrationRunner` with SHA-256 checksum validation
+- Handles MySQL implicit DDL commit: DDL executed outside transactions, tracking table operations inside transactions
+- Supports `DATETIME` column type and `NOW()` default for applied_at
+
+### espalier-jdbc-sqlite (new package)
+
+#### SQLite Adapter
+- Full implementation of all espalier-jdbc interfaces for SQLite via `better-sqlite3`
+- `SqliteDataSource` with WAL mode and foreign key enforcement enabled by default
+- `SqliteConnection` with `TypeAwareConnection` support, maps isolation levels to SQLite BEGIN types (`DEFERRED`, `IMMEDIATE`, `EXCLUSIVE`)
+- `SqliteStatement` and `SqlitePreparedStatement` with `$N` to `?` parameter conversion
+- `SqliteNamedPreparedStatement` with `:name` parameter parsing
+- `SqliteBatchStatement` using `db.transaction()` for efficient batch execution
+- `SqliteResultSet` and `SqliteCursorResultSet` wrapping synchronous `better-sqlite3` API as async
+- SQLite-specific error code mapping (`mapSqliteErrorCode()`)
+
+#### Schema Introspection and Migrations
+- `SqliteSchemaIntrospector` using `PRAGMA table_info`, `PRAGMA index_list`, `PRAGMA index_info`
+- Identifier validation (`/^[a-zA-Z_][a-zA-Z0-9_]*$/`) prevents SQL injection in PRAGMA calls
+- `SqliteMigrationRunner` with fully transactional DDL (unlike MySQL, SQLite DDL is transactional)
+- Uses `TEXT` columns and `datetime('now')` for applied_at timestamps
+
 ## 0.3.0 — Y1 Q3
 
 ### espalier-data
