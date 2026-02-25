@@ -3,12 +3,19 @@ import type { CrudRepository } from "./crud-repository.js";
 import type { EntityMetadata, FieldMapping } from "../mapping/entity-metadata.js";
 import { getEntityMetadata } from "../mapping/entity-metadata.js";
 import { createRowMapper } from "../mapping/row-mapper.js";
+import { createProjectionMapper } from "../mapping/projection-mapper.js";
+import type { ProjectionMapper } from "../mapping/projection-mapper.js";
+import { getProjectionMetadata } from "../decorators/projection.js";
 import { parseDerivedQueryMethod } from "../query/derived-query-parser.js";
 import type { DerivedQueryDescriptor } from "../query/derived-query-parser.js";
 import { buildDerivedQuery } from "../query/derived-query-executor.js";
 import { SelectBuilder, InsertBuilder, UpdateBuilder, DeleteBuilder } from "../query/query-builder.js";
 import { ComparisonCriteria } from "../query/criteria.js";
 import type { Specification } from "../query/specification.js";
+
+function isProjectionClass(arg: unknown): arg is new (...args: any[]) => any {
+  return typeof arg === "function" && getProjectionMetadata(arg) !== undefined;
+}
 
 export function createDerivedRepository<T, ID>(
   entityClass: new (...args: any[]) => T,
@@ -17,6 +24,7 @@ export function createDerivedRepository<T, ID>(
   const metadata = getEntityMetadata(entityClass);
   const rowMapper = createRowMapper(entityClass, metadata);
   const descriptorCache = new Map<string, DerivedQueryDescriptor>();
+  const projectionMapperCache = new Map<new (...args: any[]) => any, ProjectionMapper<any>>();
 
   function getCachedDescriptor(methodName: string): DerivedQueryDescriptor {
     let descriptor = descriptorCache.get(methodName);
@@ -27,6 +35,15 @@ export function createDerivedRepository<T, ID>(
     return descriptor;
   }
 
+  function getCachedProjectionMapper<P>(projectionClass: new (...args: any[]) => P): ProjectionMapper<P> {
+    let mapper = projectionMapperCache.get(projectionClass);
+    if (!mapper) {
+      mapper = createProjectionMapper(projectionClass, metadata);
+      projectionMapperCache.set(projectionClass, mapper);
+    }
+    return mapper as ProjectionMapper<P>;
+  }
+
   function getIdColumn(): string {
     const field = metadata.fields.find(
       (f: FieldMapping) => f.fieldName === metadata.idField,
@@ -35,8 +52,33 @@ export function createDerivedRepository<T, ID>(
   }
 
   const crudMethods: CrudRepository<T, ID> = {
-    async findById(id: ID): Promise<T | null> {
+    async findById(id: ID, projectionClass?: new (...args: any[]) => any): Promise<any> {
       const idCol = getIdColumn();
+
+      if (projectionClass && isProjectionClass(projectionClass)) {
+        const projMapper = getCachedProjectionMapper(projectionClass);
+        const builder = new SelectBuilder(metadata.tableName)
+          .columns(...projMapper.columns)
+          .where(new ComparisonCriteria("eq", idCol, id as SqlValue))
+          .limit(1);
+
+        const query = builder.build();
+        const conn = await dataSource.getConnection();
+        try {
+          const stmt = conn.prepareStatement(query.sql);
+          for (let i = 0; i < query.params.length; i++) {
+            stmt.setParameter(i + 1, query.params[i]);
+          }
+          const rs = await stmt.executeQuery();
+          if (await rs.next()) {
+            return projMapper.mapRow(rs.getRow());
+          }
+          return null;
+        } finally {
+          await conn.close();
+        }
+      }
+
       const builder = new SelectBuilder(metadata.tableName)
         .columns(...metadata.fields.map((f: FieldMapping) => f.columnName))
         .where(new ComparisonCriteria("eq", idCol, id as SqlValue))
@@ -80,7 +122,28 @@ export function createDerivedRepository<T, ID>(
       }
     },
 
-    async findAll(spec?: Specification<T>): Promise<T[]> {
+    async findAll(specOrProjection?: Specification<T> | (new (...args: any[]) => any)): Promise<any[]> {
+      if (specOrProjection && isProjectionClass(specOrProjection)) {
+        const projMapper = getCachedProjectionMapper(specOrProjection);
+        const builder = new SelectBuilder(metadata.tableName)
+          .columns(...projMapper.columns);
+
+        const query = builder.build();
+        const conn = await dataSource.getConnection();
+        try {
+          const stmt = conn.prepareStatement(query.sql);
+          const rs = await stmt.executeQuery();
+          const results: any[] = [];
+          while (await rs.next()) {
+            results.push(projMapper.mapRow(rs.getRow()));
+          }
+          return results;
+        } finally {
+          await conn.close();
+        }
+      }
+
+      const spec = specOrProjection as Specification<T> | undefined;
       const builder = new SelectBuilder(metadata.tableName)
         .columns(...metadata.fields.map((f: FieldMapping) => f.columnName));
 
@@ -272,7 +335,17 @@ export function createDerivedRepository<T, ID>(
       // Derived query method
       return async (...args: unknown[]) => {
         const descriptor = getCachedDescriptor(prop);
-        const query = buildDerivedQuery(descriptor, metadata, args);
+
+        // Check if the last argument is a projection class
+        let projMapper: ProjectionMapper<any> | undefined;
+        let queryArgs = args;
+
+        if (args.length > 0 && isProjectionClass(args[args.length - 1])) {
+          projMapper = getCachedProjectionMapper(args[args.length - 1] as new (...a: any[]) => any);
+          queryArgs = args.slice(0, -1);
+        }
+
+        const query = buildDerivedQuery(descriptor, metadata, queryArgs);
 
         const conn = await dataSource.getConnection();
         try {
@@ -303,9 +376,13 @@ export function createDerivedRepository<T, ID>(
 
           // find action
           const rs = await stmt.executeQuery();
-          const results: T[] = [];
+          const results: any[] = [];
           while (await rs.next()) {
-            results.push(rowMapper.mapRow(rs));
+            if (projMapper) {
+              results.push(projMapper.mapRow(rs.getRow()));
+            } else {
+              results.push(rowMapper.mapRow(rs));
+            }
           }
 
           // If limit=1, return single entity or null

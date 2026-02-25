@@ -10,6 +10,8 @@ export {
 } from "./decorators/auditing.js";
 export { ManyToOne, getManyToOneRelations, OneToMany, getOneToManyRelations, ManyToMany, getManyToManyRelations } from "./decorators/relations.js";
 export type { ManyToOneOptions, ManyToOneRelation, OneToManyOptions, OneToManyRelation, ManyToManyOptions, ManyToManyRelation, JoinTableConfig } from "./decorators/relations.js";
+export { Projection, getProjectionMetadata } from "./decorators/projection.js";
+export type { ProjectionOptions } from "./decorators/projection.js";
 
 export type { Repository } from "./repository/repository.js";
 export type {
@@ -23,6 +25,8 @@ export type { EntityMetadata, FieldMapping } from "./mapping/entity-metadata.js"
 export { getEntityMetadata } from "./mapping/entity-metadata.js";
 export type { RowMapper } from "./mapping/row-mapper.js";
 export { createRowMapper } from "./mapping/row-mapper.js";
+export type { ProjectionMapper } from "./mapping/projection-mapper.js";
+export { createProjectionMapper } from "./mapping/projection-mapper.js";
 
 export type { Criteria, CriteriaType, BuiltQuery, JoinType, SortDirection } from "./query/index.js";
 export {
