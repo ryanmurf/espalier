@@ -19,7 +19,7 @@ export interface TimeoutEvent extends PoolEvent {
 
 export interface ErrorEvent extends PoolEvent {
   error: Error;
-  context: "acquire" | "release" | "idle" | "query";
+  context: "acquire" | "release" | "idle" | "query" | "prePing";
 }
 
 export type PoolEventListener<T extends PoolEvent> = (event: T) => void;

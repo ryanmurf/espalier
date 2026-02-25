@@ -30,6 +30,14 @@ export {
 } from "./errors.js";
 export type { StatementCacheConfig, StatementCacheStats } from "./statement-cache.js";
 export { StatementCache } from "./statement-cache.js";
+export type { WarmupResult, PrePingConfig } from "./pool-warmup.js";
+export {
+  warmupPool,
+  validateConnection,
+  DEFAULT_PRE_PING_QUERY,
+  DEFAULT_PRE_PING_INTERVAL_MS,
+  DEFAULT_MAX_PING_RETRIES,
+} from "./pool-warmup.js";
 export type { TypeConverter, TypeConverterRegistry } from "./type-converter.js";
 export { DefaultTypeConverterRegistry } from "./type-converter-registry.js";
 export {

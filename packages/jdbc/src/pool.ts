@@ -6,6 +6,11 @@ export interface PoolConfig {
   acquireTimeout?: number;
   idleTimeout?: number;
   maxLifetime?: number;
+  warmup?: boolean;
+  prePing?: boolean;
+  prePingQuery?: string;
+  prePingIntervalMs?: number;
+  evictOnFailedPing?: boolean;
 }
 
 export interface PoolStats {

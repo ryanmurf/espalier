@@ -19,6 +19,10 @@ export interface PoolMetricsSnapshot {
   activeConnections: number;
   idleConnections: number;
   waitingRequests: number;
+  warmupConnectionsCreated?: number;
+  prePingSuccesses?: number;
+  prePingFailures?: number;
+  deadConnectionsEvicted?: number;
 }
 
 export interface PoolMetricsCollector extends PoolMonitor {
