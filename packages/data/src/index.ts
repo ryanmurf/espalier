@@ -44,3 +44,11 @@ export {
 
 export type { DdlOptions, DropTableOptions } from "./schema/ddl-generator.js";
 export { DdlGenerator } from "./schema/ddl-generator.js";
+
+export type {
+  Migration,
+  MigrationRecord,
+  MigrationRunnerConfig,
+  MigrationRunner,
+} from "./migration/migration.js";
+export { DEFAULT_MIGRATION_TABLE, DEFAULT_SCHEMA } from "./migration/migration.js";

@@ -7,3 +7,4 @@ export { PgBatchStatement } from "./pg-batch-statement.js";
 export { PgResultSet } from "./pg-result-set.js";
 export { PgCursorResultSet } from "./pg-cursor-result-set.js";
 export { PgSchemaIntrospector } from "./pg-schema-introspector.js";
+export { PgMigrationRunner, computeChecksum } from "./pg-migration-runner.js";
