@@ -16,12 +16,26 @@ export class SqliteCursorResultSet implements StreamingResultSet {
     this.columnDefs = columns;
   }
 
+  private paused = false;
+
   setCursorSize(size: number): void {
     this._cursorSize = size;
   }
 
+  pause(): void {
+    this.paused = true;
+  }
+
+  resume(): void {
+    this.paused = false;
+  }
+
+  isPaused(): boolean {
+    return this.paused;
+  }
+
   async next(): Promise<boolean> {
-    if (this.done) return false;
+    if (this.done || this.paused) return false;
     const result = this.iterator.next();
     if (result.done) {
       this.done = true;

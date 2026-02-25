@@ -13,4 +13,7 @@ export interface ResultSet extends AsyncIterable<Record<string, unknown>> {
 
 export interface StreamingResultSet extends ResultSet {
   setCursorSize(size: number): void;
+  pause(): void;
+  resume(): void;
+  isPaused(): boolean;
 }

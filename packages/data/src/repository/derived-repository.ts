@@ -19,6 +19,7 @@ import { QueryCache } from "../cache/query-cache.js";
 import type { QueryCacheConfig } from "../cache/query-cache.js";
 import type { LifecycleEvent } from "../decorators/lifecycle.js";
 import { EntityChangeTracker } from "../mapping/change-tracker.js";
+import type { StreamOptions } from "./streaming.js";
 
 function isProjectionClass(arg: unknown): arg is new (...args: any[]) => any {
   return typeof arg === "function" && getProjectionMetadata(arg) !== undefined;
@@ -327,7 +328,6 @@ export function createDerivedRepository<T, ID>(
           const rs = await stmt.executeQuery();
           if (await rs.next()) {
             const saved = rowMapper.mapRow(rs);
-            await invokeLifecycleCallbacks(saved, "PostLoad");
             await invokeLifecycleCallbacks(saved, "PostUpdate");
             changeTracker.snapshot(saved);
             entityCache.put(entityClass, getEntityId(saved), saved);
@@ -375,7 +375,6 @@ export function createDerivedRepository<T, ID>(
           const rs = await stmt.executeQuery();
           if (await rs.next()) {
             const saved = rowMapper.mapRow(rs);
-            await invokeLifecycleCallbacks(saved, "PostLoad");
             await invokeLifecycleCallbacks(saved, "PostPersist");
             changeTracker.snapshot(saved);
             entityCache.put(entityClass, getEntityId(saved), saved);
@@ -472,6 +471,69 @@ export function createDerivedRepository<T, ID>(
       }
     },
 
+    findAllStream(options?: StreamOptions<T>): AsyncIterable<T> {
+      const builder = new SelectBuilder(metadata.tableName)
+        .columns(...metadata.fields.map((f: FieldMapping) => f.columnName));
+
+      if (options?.where) {
+        builder.where(options.where.toPredicate(metadata));
+      }
+
+      const query = builder.build();
+
+      return {
+        [Symbol.asyncIterator](): AsyncIterator<T> {
+          let conn: Awaited<ReturnType<DataSource["getConnection"]>> | null = null;
+          let rs: Awaited<ReturnType<import("espalier-jdbc").PreparedStatement["executeQuery"]>> | null = null;
+          let done = false;
+
+          async function init() {
+            conn = await dataSource.getConnection();
+            const stmt = conn.prepareStatement(query.sql);
+            for (let i = 0; i < query.params.length; i++) {
+              stmt.setParameter(i + 1, query.params[i]);
+            }
+            rs = await stmt.executeQuery();
+          }
+
+          async function cleanup() {
+            done = true;
+            if (rs) {
+              await rs.close().catch(() => {});
+              rs = null;
+            }
+            if (conn) {
+              await conn.close().catch(() => {});
+              conn = null;
+            }
+          }
+
+          return {
+            async next(): Promise<IteratorResult<T>> {
+              if (done) return { value: undefined as any, done: true };
+              if (!rs) await init();
+              if (await rs!.next()) {
+                const entity = rowMapper.mapRow(rs!);
+                await invokeLifecycleCallbacks(entity, "PostLoad");
+                changeTracker.snapshot(entity);
+                return { value: entity, done: false };
+              }
+              await cleanup();
+              return { value: undefined as any, done: true };
+            },
+            async return(): Promise<IteratorResult<T>> {
+              await cleanup();
+              return { value: undefined as any, done: true };
+            },
+            async throw(err?: unknown): Promise<IteratorResult<T>> {
+              await cleanup();
+              throw err;
+            },
+          };
+        },
+      };
+    },
+
     async count(spec?: Specification<T>): Promise<number> {
       const builder = new SelectBuilder(metadata.tableName).columns("COUNT(*)");
 
@@ -503,6 +565,7 @@ export function createDerivedRepository<T, ID>(
     "findById",
     "existsById",
     "findAll",
+    "findAllStream",
     "save",
     "saveAll",
     "delete",
@@ -530,6 +593,67 @@ export function createDerivedRepository<T, ID>(
 
       if (knownMethods.has(prop)) {
         return Reflect.get(target, prop, receiver);
+      }
+
+      // Derived streaming query: method name ends with "Stream"
+      if (prop.endsWith("Stream") && prop.startsWith("find")) {
+        const baseName = prop.slice(0, -"Stream".length);
+        return (...args: unknown[]) => {
+          const descriptor = getCachedDescriptor(baseName);
+          const builtQuery = buildDerivedQuery(descriptor, metadata, args);
+
+          return {
+            [Symbol.asyncIterator](): AsyncIterator<any> {
+              let conn: Awaited<ReturnType<DataSource["getConnection"]>> | null = null;
+              let rs: Awaited<ReturnType<import("espalier-jdbc").PreparedStatement["executeQuery"]>> | null = null;
+              let done = false;
+
+              async function init() {
+                conn = await dataSource.getConnection();
+                const stmt = conn.prepareStatement(builtQuery.sql);
+                for (let i = 0; i < builtQuery.params.length; i++) {
+                  stmt.setParameter(i + 1, builtQuery.params[i]);
+                }
+                rs = await stmt.executeQuery();
+              }
+
+              async function cleanup() {
+                done = true;
+                if (rs) {
+                  await rs.close().catch(() => {});
+                  rs = null;
+                }
+                if (conn) {
+                  await conn.close().catch(() => {});
+                  conn = null;
+                }
+              }
+
+              return {
+                async next(): Promise<IteratorResult<any>> {
+                  if (done) return { value: undefined as any, done: true };
+                  if (!rs) await init();
+                  if (await rs!.next()) {
+                    const entity = rowMapper.mapRow(rs!);
+                    await invokeLifecycleCallbacks(entity, "PostLoad");
+                    changeTracker.snapshot(entity);
+                    return { value: entity, done: false };
+                  }
+                  await cleanup();
+                  return { value: undefined as any, done: true };
+                },
+                async return(): Promise<IteratorResult<any>> {
+                  await cleanup();
+                  return { value: undefined as any, done: true };
+                },
+                async throw(err?: unknown): Promise<IteratorResult<any>> {
+                  await cleanup();
+                  throw err;
+                },
+              };
+            },
+          };
+        };
       }
 
       // Derived query method

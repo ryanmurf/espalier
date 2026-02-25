@@ -6,11 +6,24 @@ export class PgCursorResultSet implements StreamingResultSet {
   private buffer: Record<string, unknown>[] = [];
   private bufferIndex = -1;
   private exhausted = false;
+  private paused = false;
 
   constructor(private readonly cursor: Cursor<Record<string, unknown>>) {}
 
   setCursorSize(size: number): void {
     this.cursorSize = size;
+  }
+
+  pause(): void {
+    this.paused = true;
+  }
+
+  resume(): void {
+    this.paused = false;
+  }
+
+  isPaused(): boolean {
+    return this.paused;
   }
 
   async next(): Promise<boolean> {
@@ -20,7 +33,7 @@ export class PgCursorResultSet implements StreamingResultSet {
       return true;
     }
 
-    if (this.exhausted) {
+    if (this.exhausted || this.paused) {
       return false;
     }
 

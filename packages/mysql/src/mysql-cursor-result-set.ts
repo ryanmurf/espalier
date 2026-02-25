@@ -6,6 +6,7 @@ export class MysqlCursorResultSet implements StreamingResultSet {
   private buffer: Record<string, unknown>[] = [];
   private bufferIndex = -1;
   private exhausted = false;
+  private paused = false;
   private reader: AsyncIterator<Record<string, unknown>>;
 
   constructor(private readonly stream: Readable) {
@@ -16,6 +17,18 @@ export class MysqlCursorResultSet implements StreamingResultSet {
     this.cursorSize = size;
   }
 
+  pause(): void {
+    this.paused = true;
+  }
+
+  resume(): void {
+    this.paused = false;
+  }
+
+  isPaused(): boolean {
+    return this.paused;
+  }
+
   async next(): Promise<boolean> {
     this.bufferIndex++;
 
@@ -23,7 +36,7 @@ export class MysqlCursorResultSet implements StreamingResultSet {
       return true;
     }
 
-    if (this.exhausted) {
+    if (this.exhausted || this.paused) {
       return false;
     }
 

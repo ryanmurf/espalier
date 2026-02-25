@@ -38,6 +38,13 @@ export {
   DEFAULT_PRE_PING_INTERVAL_MS,
   DEFAULT_MAX_PING_RETRIES,
 } from "./pool-warmup.js";
+export {
+  toArray,
+  mapResultSet,
+  filterResultSet,
+  reduceResultSet,
+  forEachResultSet,
+} from "./result-set-utils.js";
 export type { TypeConverter, TypeConverterRegistry } from "./type-converter.js";
 export { DefaultTypeConverterRegistry } from "./type-converter-registry.js";
 export {
