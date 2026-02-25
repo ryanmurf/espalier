@@ -4,9 +4,9 @@ import { MysqlResultSet } from "../mysql-result-set.js";
 
 function createResultSet(
   rows: Record<string, unknown>[],
-  fields: Partial<FieldPacket>[],
+  fields: Array<{ name: string; type?: number }>,
 ): MysqlResultSet {
-  return new MysqlResultSet(rows, fields as FieldPacket[]);
+  return new MysqlResultSet(rows, fields as unknown as FieldPacket[]);
 }
 
 describe("MysqlResultSet", () => {
