@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ManyToOne, getManyToOneRelations, OneToMany, getOneToManyRelations } from "../../decorators/relations.js";
+import { ManyToOne, getManyToOneRelations, OneToMany, getOneToManyRelations, ManyToMany, getManyToManyRelations } from "../../decorators/relations.js";
 import { Table } from "../../decorators/table.js";
 import { Column } from "../../decorators/column.js";
 import { Id } from "../../decorators/id.js";
@@ -352,5 +352,211 @@ describe("@ManyToOne + @OneToMany bidirectional", () => {
 
     const empSql = generator.generateCreateTable(BiEmp);
     expect(empSql).toContain("department_id INTEGER REFERENCES bi_dept(id)");
+  });
+});
+
+describe("@ManyToMany decorator", () => {
+  it("stores owning side metadata with joinTable config", () => {
+    @Table("mtm_students")
+    class MtmStudent {
+      @Id @Column() id: number = 0;
+      @Column() name: string = "";
+      @ManyToMany({
+        target: () => MtmCourse,
+        joinTable: { name: "student_courses", joinColumn: "student_id", inverseJoinColumn: "course_id" },
+      })
+      courses!: MtmCourse[];
+    }
+
+    @Table("mtm_courses")
+    class MtmCourse {
+      @Id @Column() id: number = 0;
+      @Column() title: string = "";
+      @ManyToMany({ target: () => MtmStudent, mappedBy: "courses" })
+      students!: MtmStudent[];
+    }
+    new MtmStudent();
+    new MtmCourse();
+
+    const studentRelations = getManyToManyRelations(MtmStudent);
+    expect(studentRelations).toHaveLength(1);
+    expect(studentRelations[0].fieldName).toBe("courses");
+    expect(studentRelations[0].isOwning).toBe(true);
+    expect(studentRelations[0].joinTable).toEqual({
+      name: "student_courses",
+      joinColumn: "student_id",
+      inverseJoinColumn: "course_id",
+    });
+    expect(studentRelations[0].target()).toBe(MtmCourse);
+  });
+
+  it("stores inverse side metadata with mappedBy", () => {
+    @Table("mtm_inv_students")
+    class MtmInvStudent {
+      @Id @Column() id: number = 0;
+      @ManyToMany({
+        target: () => MtmInvCourse,
+        joinTable: { name: "inv_student_courses", joinColumn: "student_id", inverseJoinColumn: "course_id" },
+      })
+      courses!: MtmInvCourse[];
+    }
+
+    @Table("mtm_inv_courses")
+    class MtmInvCourse {
+      @Id @Column() id: number = 0;
+      @ManyToMany({ target: () => MtmInvStudent, mappedBy: "courses" })
+      students!: MtmInvStudent[];
+    }
+    new MtmInvStudent();
+    new MtmInvCourse();
+
+    const courseRelations = getManyToManyRelations(MtmInvCourse);
+    expect(courseRelations).toHaveLength(1);
+    expect(courseRelations[0].isOwning).toBe(false);
+    expect(courseRelations[0].mappedBy).toBe("courses");
+    expect(courseRelations[0].joinTable).toBeUndefined();
+  });
+
+  it("returns empty array for class without @ManyToMany", () => {
+    expect(getManyToManyRelations(Department)).toEqual([]);
+  });
+
+  it("isolates metadata between classes", () => {
+    @Table("mtm_a")
+    class MtmA {
+      @Id @Column() id: number = 0;
+      @ManyToMany({
+        target: () => Department,
+        joinTable: { name: "a_depts", joinColumn: "a_id", inverseJoinColumn: "dept_id" },
+      })
+      depts!: Department[];
+    }
+    new MtmA();
+
+    expect(getManyToManyRelations(MtmA)).toHaveLength(1);
+    expect(getManyToManyRelations(Department)).toHaveLength(0);
+  });
+});
+
+describe("EntityMetadata with @ManyToMany", () => {
+  it("includes manyToManyRelations in entity metadata", () => {
+    @Table("mtm_meta")
+    class MtmMeta {
+      @Id @Column() id: number = 0;
+      @ManyToMany({
+        target: () => Department,
+        joinTable: { name: "meta_depts", joinColumn: "meta_id", inverseJoinColumn: "dept_id" },
+      })
+      departments!: Department[];
+    }
+    new MtmMeta();
+
+    const metadata = getEntityMetadata(MtmMeta);
+    expect(metadata.manyToManyRelations).toHaveLength(1);
+    expect(metadata.manyToManyRelations[0].isOwning).toBe(true);
+  });
+
+  it("returns empty manyToManyRelations for entity without @ManyToMany", () => {
+    const metadata = getEntityMetadata(Department);
+    expect(metadata.manyToManyRelations).toEqual([]);
+  });
+});
+
+describe("DdlGenerator join table generation", () => {
+  it("generates join table DDL from owning side @ManyToMany", () => {
+    @Table("jt_students")
+    class JtStudent {
+      @Id @Column() id: number = 0;
+      @Column() name: string = "";
+      @ManyToMany({
+        target: () => JtCourse,
+        joinTable: { name: "student_courses_jt", joinColumn: "student_id", inverseJoinColumn: "course_id" },
+      })
+      courses!: JtCourse[];
+    }
+
+    @Table("jt_courses")
+    class JtCourse {
+      @Id @Column() id: number = 0;
+      @Column() title: string = "";
+      @ManyToMany({ target: () => JtStudent, mappedBy: "courses" })
+      students!: JtStudent[];
+    }
+    new JtStudent();
+    new JtCourse();
+
+    const joinTables = generator.generateJoinTables([JtStudent, JtCourse]);
+    expect(joinTables).toHaveLength(1);
+    expect(joinTables[0]).toContain("CREATE TABLE student_courses_jt");
+    expect(joinTables[0]).toContain("student_id INTEGER NOT NULL REFERENCES jt_students(id)");
+    expect(joinTables[0]).toContain("course_id INTEGER NOT NULL REFERENCES jt_courses(id)");
+    expect(joinTables[0]).toContain("PRIMARY KEY (student_id, course_id)");
+  });
+
+  it("does not generate duplicate join tables when both sides are in the input", () => {
+    @Table("dup_a")
+    class DupA {
+      @Id @Column() id: number = 0;
+      @ManyToMany({
+        target: () => DupB,
+        joinTable: { name: "dup_join", joinColumn: "a_id", inverseJoinColumn: "b_id" },
+      })
+      bs!: DupB[];
+    }
+
+    @Table("dup_b")
+    class DupB {
+      @Id @Column() id: number = 0;
+      @ManyToMany({ target: () => DupA, mappedBy: "bs" })
+      as!: DupA[];
+    }
+    new DupA();
+    new DupB();
+
+    // Pass both classes - should still only get 1 join table (from owning side)
+    const joinTables = generator.generateJoinTables([DupA, DupB]);
+    expect(joinTables).toHaveLength(1);
+  });
+
+  it("generates multiple join tables from multiple owning sides", () => {
+    @Table("multi_jt_a")
+    class MultiJtA {
+      @Id @Column() id: number = 0;
+      @ManyToMany({
+        target: () => Department,
+        joinTable: { name: "multi_jt_a_depts", joinColumn: "a_id", inverseJoinColumn: "dept_id" },
+      })
+      departments!: Department[];
+      @ManyToMany({
+        target: () => Department,
+        joinTable: { name: "multi_jt_a_tags", joinColumn: "a_id", inverseJoinColumn: "tag_id" },
+      })
+      tags!: Department[];
+    }
+    new MultiJtA();
+
+    const joinTables = generator.generateJoinTables([MultiJtA]);
+    expect(joinTables).toHaveLength(2);
+  });
+
+  it("returns empty array when no @ManyToMany owning sides", () => {
+    const joinTables = generator.generateJoinTables([Department]);
+    expect(joinTables).toEqual([]);
+  });
+
+  it("supports IF NOT EXISTS option", () => {
+    @Table("ine_a")
+    class IneA {
+      @Id @Column() id: number = 0;
+      @ManyToMany({
+        target: () => Department,
+        joinTable: { name: "ine_join", joinColumn: "a_id", inverseJoinColumn: "dept_id" },
+      })
+      departments!: Department[];
+    }
+    new IneA();
+
+    const joinTables = generator.generateJoinTables([IneA], { ifNotExists: true });
+    expect(joinTables[0]).toContain("CREATE TABLE IF NOT EXISTS ine_join");
   });
 });

@@ -120,6 +120,50 @@ export class DdlGenerator {
     return `CREATE TABLE ${ifNotExists}${metadata.tableName} (\n${columns.join(",\n")}\n)`;
   }
 
+  generateJoinTables(
+    entityClasses: (new (...args: any[]) => any)[],
+    options?: DdlOptions,
+  ): string[] {
+    const ifNotExists = options?.ifNotExists ? "IF NOT EXISTS " : "";
+    const results: string[] = [];
+    const seen = new Set<string>();
+
+    for (const entityClass of entityClasses) {
+      const metadata = getEntityMetadata(entityClass);
+      for (const relation of metadata.manyToManyRelations) {
+        if (!relation.isOwning || !relation.joinTable) continue;
+        if (seen.has(relation.joinTable.name)) continue;
+        seen.add(relation.joinTable.name);
+
+        const ownerTableName = metadata.tableName;
+        const ownerIdField = metadata.idField;
+        const ownerColumnMappings = getColumnMappings(entityClass);
+        const ownerPkColumn = ownerColumnMappings.get(ownerIdField) ?? String(ownerIdField);
+
+        const targetClass = relation.target();
+        const targetTableName = getTableName(targetClass);
+        const targetIdField = getIdField(targetClass);
+        if (!targetTableName || !targetIdField) continue;
+
+        const targetColumnMappings = getColumnMappings(targetClass);
+        const targetPkColumn = targetColumnMappings.get(targetIdField) ?? String(targetIdField);
+
+        const jt = relation.joinTable;
+        const columns = [
+          `  ${jt.joinColumn} INTEGER NOT NULL REFERENCES ${ownerTableName}(${ownerPkColumn})`,
+          `  ${jt.inverseJoinColumn} INTEGER NOT NULL REFERENCES ${targetTableName}(${targetPkColumn})`,
+          `  PRIMARY KEY (${jt.joinColumn}, ${jt.inverseJoinColumn})`,
+        ];
+
+        results.push(
+          `CREATE TABLE ${ifNotExists}${jt.name} (\n${columns.join(",\n")}\n)`,
+        );
+      }
+    }
+
+    return results;
+  }
+
   generateDropTable(
     entityClass: new (...args: any[]) => any,
     options?: DropTableOptions,

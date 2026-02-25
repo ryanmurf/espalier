@@ -82,3 +82,55 @@ export function getOneToManyRelations(target: object): OneToManyRelation[] {
   if (!map) return [];
   return Array.from(map.values());
 }
+
+export interface JoinTableConfig {
+  name: string;
+  joinColumn: string;
+  inverseJoinColumn: string;
+}
+
+export interface ManyToManyOptions {
+  target: () => new (...args: any[]) => any;
+  joinTable?: JoinTableConfig;
+  mappedBy?: string;
+}
+
+export interface ManyToManyRelation {
+  fieldName: string | symbol;
+  target: () => new (...args: any[]) => any;
+  joinTable?: JoinTableConfig;
+  mappedBy?: string;
+  isOwning: boolean;
+}
+
+const manyToManyMetadata = new WeakMap<object, Map<string | symbol, ManyToManyRelation>>();
+
+export function ManyToMany(options: ManyToManyOptions) {
+  return function <T>(
+    _target: undefined,
+    context: ClassFieldDecoratorContext<T>,
+  ): void {
+    const fieldName = context.name;
+    const isOwning = options.joinTable !== undefined;
+
+    context.addInitializer(function (this: T) {
+      const constructor = (this as object).constructor;
+      if (!manyToManyMetadata.has(constructor)) {
+        manyToManyMetadata.set(constructor, new Map());
+      }
+      manyToManyMetadata.get(constructor)!.set(fieldName, {
+        fieldName,
+        target: options.target,
+        joinTable: options.joinTable,
+        mappedBy: options.mappedBy,
+        isOwning,
+      });
+    });
+  };
+}
+
+export function getManyToManyRelations(target: object): ManyToManyRelation[] {
+  const map = manyToManyMetadata.get(target);
+  if (!map) return [];
+  return Array.from(map.values());
+}
