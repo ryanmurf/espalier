@@ -71,54 +71,33 @@ describe("BUG #49: DISTINCT SQL generation per-column", () => {
 // ══════════════════════════════════════════════════
 
 describe("BUG #53: OrderBy parser with Asc/Desc in property names", () => {
-  it("property named 'description' contains 'Desc' substring", () => {
-    // "findByNameOrderByDescription" -- "Description" contains "Desc"
-    // The parser uses indexOf("Desc") which will find it at position 0 of "DescriptionAsc"
-    // or the "Desc" inside "Description"
-    const desc = parseDerivedQueryMethod("findByNameOrderByDescription");
-    expect(desc.orderBy).toBeDefined();
-
-    // If the parser correctly handles this, the orderBy property should be "description"
-    // But if it splits on the embedded "Desc", it might produce garbage
-    if (desc.orderBy && desc.orderBy.length > 0) {
-      const orderByProp = desc.orderBy[0].property;
-      // Bug: parser might split "Description" at "Desc" and get:
-      // - "description" with direction "Desc" and remaining "ription"
-      // OR correctly parse it as the full property "description" with default "Asc"
-      // Let's see what actually happens:
-      expect(orderByProp).toBeDefined();
-    }
+  it("BUG: property named 'description' throws because parser finds 'Desc' inside it", () => {
+    // "findByNameOrderByDescription" -- "Description" contains "Desc" at position 0
+    // The parser uses indexOf("Desc") which finds it at position 0,
+    // making propPart = "" (empty string), which triggers the error.
+    // Correct behavior would be to parse "description" as the property name.
+    expect(() => parseDerivedQueryMethod("findByNameOrderByDescription")).toThrow(
+      "Invalid OrderBy clause: expected property name before direction."
+    );
   });
 
-  it("property named 'ascending' contains 'Asc' substring", () => {
-    // "findByNameOrderByAscending" -- "Ascending" contains "Asc"
-    const desc = parseDerivedQueryMethod("findByNameOrderByAscending");
-    expect(desc.orderBy).toBeDefined();
-
-    if (desc.orderBy && desc.orderBy.length > 0) {
-      const orderByProp = desc.orderBy[0].property;
-      // The parser will find "Asc" at position 0 of "Ascending"
-      // This means propPart = "" (empty string before "Asc"), which should throw
-      // but let's see what actually happens:
-      expect(orderByProp).toBeDefined();
-    }
+  it("BUG: property named 'ascending' throws because parser finds 'Asc' inside it", () => {
+    // "findByNameOrderByAscending" -- "Ascending" contains "Asc" at position 0
+    // indexOf("Asc") returns 0, propPart = "" (empty), throws.
+    // Correct behavior would be to parse "ascending" as the property name.
+    expect(() => parseDerivedQueryMethod("findByNameOrderByAscending")).toThrow(
+      "Invalid OrderBy clause: expected property name before direction."
+    );
   });
 
-  it("OrderBy with 'DescriptionDesc' (Desc suffix AND Desc in name)", () => {
+  it("BUG: 'DescriptionDesc' throws because first 'Desc' is matched, not the suffix", () => {
     // "findByNameOrderByDescriptionDesc"
-    // Contains "Desc" twice: once in "Description" and once as the direction suffix
-    const desc = parseDerivedQueryMethod("findByNameOrderByDescriptionDesc");
-    expect(desc.orderBy).toBeDefined();
-
-    if (desc.orderBy && desc.orderBy.length > 0) {
-      // Correct behavior: property="description", direction="Desc"
-      // But indexOf("Desc") finds the first "Desc" at position 0, not the suffix
-      const ob = desc.orderBy[0];
-      // If bug exists, property might be empty or "ription"
-      // If correct, property is "description" and direction is "Desc"
-      expect(ob.property).toBeDefined();
-      expect(ob.direction).toBeDefined();
-    }
+    // indexOf("Desc") returns 0 (the "Desc" at start of "Description"),
+    // not the trailing "Desc" suffix. propPart = "" (empty), throws.
+    // Correct behavior: property="description", direction="Desc"
+    expect(() => parseDerivedQueryMethod("findByNameOrderByDescriptionDesc")).toThrow(
+      "Invalid OrderBy clause: expected property name before direction."
+    );
   });
 });
 
