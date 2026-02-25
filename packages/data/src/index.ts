@@ -1,6 +1,6 @@
 export { Table, getTableName } from "./decorators/table.js";
-export { Column, getColumnMappings, getColumnTypeMappings } from "./decorators/column.js";
-export type { ColumnOptions } from "./decorators/column.js";
+export { Column, getColumnMappings, getColumnTypeMappings, getColumnMetadataEntries } from "./decorators/column.js";
+export type { ColumnOptions, ColumnMetadataEntry } from "./decorators/column.js";
 export { Id, getIdField } from "./decorators/id.js";
 export {
   CreatedDate,

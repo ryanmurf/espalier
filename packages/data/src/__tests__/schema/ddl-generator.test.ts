@@ -162,6 +162,202 @@ describe("DdlGenerator", () => {
     });
   });
 
+  describe("constraint support", () => {
+    it("generates NOT NULL for nullable: false", () => {
+      @Table("c1")
+      class C1 {
+        @Id @Column() id: number = 0;
+        @Column({ nullable: false }) name: string = "";
+      }
+      new C1();
+
+      const sql = generator.generateCreateTable(C1);
+      expect(sql).toContain("name TEXT NOT NULL");
+    });
+
+    it("does not add NOT NULL when nullable is unset", () => {
+      @Table("c2")
+      class C2 {
+        @Id @Column() id: number = 0;
+        @Column() name: string = "";
+      }
+      new C2();
+
+      const sql = generator.generateCreateTable(C2);
+      expect(sql).toContain("name TEXT");
+      expect(sql).not.toContain("name TEXT NOT NULL");
+    });
+
+    it("generates UNIQUE constraint", () => {
+      @Table("c3")
+      class C3 {
+        @Id @Column() id: number = 0;
+        @Column({ unique: true }) email: string = "";
+      }
+      new C3();
+
+      const sql = generator.generateCreateTable(C3);
+      expect(sql).toContain("email TEXT UNIQUE");
+    });
+
+    it("generates DEFAULT clause with raw SQL expression", () => {
+      @Table("c4")
+      class C4 {
+        @Id @Column() id: number = 0;
+        @Column({ defaultValue: "'active'" }) status: string = "";
+      }
+      new C4();
+
+      const sql = generator.generateCreateTable(C4);
+      expect(sql).toContain("status TEXT DEFAULT 'active'");
+    });
+
+    it("generates DEFAULT NOW() for numeric default", () => {
+      @Table("c5")
+      class C5 {
+        @Id @Column() id: number = 0;
+        @Column({ defaultValue: "0" }) count: number = 0;
+      }
+      new C5();
+
+      const sql = generator.generateCreateTable(C5);
+      expect(sql).toContain("count INTEGER DEFAULT 0");
+    });
+
+    it("generates VARCHAR(n) when length is specified", () => {
+      @Table("c6")
+      class C6 {
+        @Id @Column() id: number = 0;
+        @Column({ length: 255 }) name: string = "";
+      }
+      new C6();
+
+      const sql = generator.generateCreateTable(C6);
+      expect(sql).toContain("name VARCHAR(255)");
+    });
+
+    it("explicit type takes precedence over length", () => {
+      @Table("c7")
+      class C7 {
+        @Id @Column() id: number = 0;
+        @Column({ type: "CHAR(10)", length: 255 }) code: string = "";
+      }
+      new C7();
+
+      const sql = generator.generateCreateTable(C7);
+      expect(sql).toContain("code CHAR(10)");
+      expect(sql).not.toContain("VARCHAR(255)");
+    });
+
+    it("combines NOT NULL and UNIQUE constraints", () => {
+      @Table("c8")
+      class C8 {
+        @Id @Column() id: number = 0;
+        @Column({ nullable: false, unique: true }) email: string = "";
+      }
+      new C8();
+
+      const sql = generator.generateCreateTable(C8);
+      expect(sql).toContain("email TEXT NOT NULL UNIQUE");
+    });
+
+    it("combines NOT NULL, UNIQUE, and DEFAULT", () => {
+      @Table("c9")
+      class C9 {
+        @Id @Column() id: number = 0;
+        @Column({ nullable: false, unique: true, defaultValue: "'pending'" }) status: string = "";
+      }
+      new C9();
+
+      const sql = generator.generateCreateTable(C9);
+      expect(sql).toContain("status TEXT NOT NULL UNIQUE DEFAULT 'pending'");
+    });
+
+    it("combines length with NOT NULL", () => {
+      @Table("c10")
+      class C10 {
+        @Id @Column() id: number = 0;
+        @Column({ length: 100, nullable: false }) name: string = "";
+      }
+      new C10();
+
+      const sql = generator.generateCreateTable(C10);
+      expect(sql).toContain("name VARCHAR(100) NOT NULL");
+    });
+
+    it("@Id fields do not duplicate NOT NULL (PRIMARY KEY implies it)", () => {
+      @Table("c11")
+      class C11 {
+        @Id @Column() id: number = 0;
+        @Column() name: string = "";
+      }
+      new C11();
+
+      const sql = generator.generateCreateTable(C11);
+      expect(sql).toContain("id INTEGER PRIMARY KEY");
+      expect(sql).not.toContain("PRIMARY KEY NOT NULL");
+    });
+
+    it("@CreatedDate gets DEFAULT NOW() automatically", () => {
+      @Table("c12")
+      class C12 {
+        @Id @Column() id: number = 0;
+        @CreatedDate @Column("created_at") createdAt: Date = new Date();
+      }
+      new C12();
+
+      const sql = generator.generateCreateTable(C12);
+      expect(sql).toContain("created_at TIMESTAMPTZ DEFAULT NOW()");
+    });
+
+    it("explicit defaultValue on @CreatedDate overrides automatic DEFAULT NOW()", () => {
+      @Table("c13")
+      class C13 {
+        @Id @Column() id: number = 0;
+        @CreatedDate @Column({ name: "created_at", defaultValue: "CURRENT_TIMESTAMP" }) createdAt: Date = new Date();
+      }
+      new C13();
+
+      const sql = generator.generateCreateTable(C13);
+      expect(sql).toContain("created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP");
+      expect(sql).not.toContain("DEFAULT NOW()");
+    });
+
+    it("@LastModifiedDate does not get automatic DEFAULT", () => {
+      @Table("c14")
+      class C14 {
+        @Id @Column() id: number = 0;
+        @LastModifiedDate @Column("updated_at") updatedAt: Date = new Date();
+      }
+      new C14();
+
+      const sql = generator.generateCreateTable(C14);
+      expect(sql).toContain("updated_at TIMESTAMPTZ");
+      expect(sql).not.toContain("updated_at TIMESTAMPTZ DEFAULT");
+    });
+
+    it("generates full entity with mixed constraints", () => {
+      @Table("products")
+      class Product {
+        @Id @Column({ type: "SERIAL" }) id: number = 0;
+        @Column({ length: 200, nullable: false }) name: string = "";
+        @Column({ nullable: false, unique: true, length: 50 }) sku: string = "";
+        @Column({ type: "DECIMAL(10,2)", defaultValue: "0.00" }) price: number = 0;
+        @Column({ defaultValue: "true" }) active: boolean = true;
+        @CreatedDate @Column("created_at") createdAt: Date = new Date();
+      }
+      new Product();
+
+      const sql = generator.generateCreateTable(Product);
+      expect(sql).toContain("id SERIAL PRIMARY KEY");
+      expect(sql).toContain("name VARCHAR(200) NOT NULL");
+      expect(sql).toContain("sku VARCHAR(50) NOT NULL UNIQUE");
+      expect(sql).toContain("price DECIMAL(10,2) DEFAULT 0.00");
+      expect(sql).toContain("active BOOLEAN DEFAULT true");
+      expect(sql).toContain("created_at TIMESTAMPTZ DEFAULT NOW()");
+    });
+  });
+
   describe("generateDropTable()", () => {
     it("generates basic DROP TABLE", () => {
       @Table("drop_test")

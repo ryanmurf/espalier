@@ -1,6 +1,7 @@
 import { getEntityMetadata } from "../mapping/entity-metadata.js";
-import type { EntityMetadata } from "../mapping/entity-metadata.js";
-import { getColumnTypeMappings } from "../decorators/column.js";
+import { getColumnMetadataEntries } from "../decorators/column.js";
+import type { ColumnMetadataEntry } from "../decorators/column.js";
+import { getCreatedDateField } from "../decorators/auditing.js";
 
 export interface DdlOptions {
   ifNotExists?: boolean;
@@ -12,24 +13,18 @@ export interface DropTableOptions {
   cascade?: boolean;
 }
 
-const DEFAULT_TYPE_MAP: Record<string, string> = {
-  string: "TEXT",
-  number: "INTEGER",
-  boolean: "BOOLEAN",
-  date: "TIMESTAMPTZ",
-  uint8array: "BYTEA",
-};
-
 function resolveColumnType(
-  entityClass: new (...args: any[]) => any,
-  fieldName: string | symbol,
+  entry: ColumnMetadataEntry,
   defaultValue: unknown,
 ): string {
-  // Check for explicit type in @Column({ type: "..." })
-  const typeMappings = getColumnTypeMappings(entityClass);
-  const explicitType = typeMappings.get(fieldName);
-  if (explicitType) {
-    return explicitType;
+  // Explicit type from @Column({ type: "..." }) takes highest priority
+  if (entry.type) {
+    return entry.type;
+  }
+
+  // If length is set, use VARCHAR(length) for string fields
+  if (entry.length !== undefined) {
+    return `VARCHAR(${entry.length})`;
   }
 
   // Infer from default value
@@ -51,6 +46,8 @@ export class DdlGenerator {
     options?: DdlOptions,
   ): string {
     const metadata = getEntityMetadata(entityClass);
+    const entries = getColumnMetadataEntries(entityClass);
+    const createdDateField = getCreatedDateField(entityClass);
     const instance = Object.create(entityClass.prototype) as Record<string, unknown>;
 
     // Try to get default values by calling constructor
@@ -63,14 +60,38 @@ export class DdlGenerator {
 
     const ifNotExists = options?.ifNotExists ? "IF NOT EXISTS " : "";
     const columns = metadata.fields.map((field) => {
-      const sqlType = resolveColumnType(
-        entityClass,
-        field.fieldName,
-        instance[field.fieldName as string],
-      );
+      const entry = entries.get(field.fieldName) ?? { columnName: field.columnName };
+      const sqlType = resolveColumnType(entry, instance[field.fieldName as string]);
       const isPk = field.fieldName === metadata.idField;
-      const pkSuffix = isPk ? " PRIMARY KEY" : "";
-      return `  ${field.columnName} ${sqlType}${pkSuffix}`;
+      const isCreatedDate = field.fieldName === createdDateField;
+
+      const parts: string[] = [field.columnName, sqlType];
+
+      if (isPk) {
+        parts.push("PRIMARY KEY");
+      }
+
+      // NOT NULL: explicit nullable: false, or @Id fields are always NOT NULL
+      if (entry.nullable === false || (isPk && entry.nullable !== true)) {
+        // PRIMARY KEY implies NOT NULL in SQL, but we still append for @Id fields
+        // that already have PRIMARY KEY. For other fields, always append.
+        if (!isPk) {
+          parts.push("NOT NULL");
+        }
+      }
+
+      if (entry.unique) {
+        parts.push("UNIQUE");
+      }
+
+      // DEFAULT: explicit defaultValue, or @CreatedDate gets DEFAULT NOW()
+      if (entry.defaultValue !== undefined) {
+        parts.push(`DEFAULT ${entry.defaultValue}`);
+      } else if (isCreatedDate) {
+        parts.push("DEFAULT NOW()");
+      }
+
+      return `  ${parts.join(" ")}`;
     });
 
     return `CREATE TABLE ${ifNotExists}${metadata.tableName} (\n${columns.join(",\n")}\n)`;
