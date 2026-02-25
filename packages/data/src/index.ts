@@ -52,6 +52,19 @@ export type {
 } from "./query/index.js";
 export { parseDerivedQueryMethod, buildDerivedQuery } from "./query/index.js";
 
+export type { Specification } from "./query/index.js";
+export {
+  Specifications,
+  equal,
+  like,
+  greaterThan,
+  lessThan,
+  between,
+  isIn,
+  isNull,
+  isNotNull,
+} from "./query/index.js";
+
 export { createDerivedRepository } from "./repository/derived-repository.js";
 
 export type { DdlOptions, DropTableOptions } from "./schema/ddl-generator.js";

@@ -8,6 +8,7 @@ import type { DerivedQueryDescriptor } from "../query/derived-query-parser.js";
 import { buildDerivedQuery } from "../query/derived-query-executor.js";
 import { SelectBuilder, InsertBuilder, UpdateBuilder, DeleteBuilder } from "../query/query-builder.js";
 import { ComparisonCriteria } from "../query/criteria.js";
+import type { Specification } from "../query/specification.js";
 
 export function createDerivedRepository<T, ID>(
   entityClass: new (...args: any[]) => T,
@@ -79,14 +80,21 @@ export function createDerivedRepository<T, ID>(
       }
     },
 
-    async findAll(): Promise<T[]> {
+    async findAll(spec?: Specification<T>): Promise<T[]> {
       const builder = new SelectBuilder(metadata.tableName)
         .columns(...metadata.fields.map((f: FieldMapping) => f.columnName));
+
+      if (spec) {
+        builder.where(spec.toPredicate(metadata));
+      }
 
       const query = builder.build();
       const conn = await dataSource.getConnection();
       try {
         const stmt = conn.prepareStatement(query.sql);
+        for (let i = 0; i < query.params.length; i++) {
+          stmt.setParameter(i + 1, query.params[i]);
+        }
         const rs = await stmt.executeQuery();
         const results: T[] = [];
         while (await rs.next()) {
@@ -212,12 +220,20 @@ export function createDerivedRepository<T, ID>(
       }
     },
 
-    async count(): Promise<number> {
+    async count(spec?: Specification<T>): Promise<number> {
       const builder = new SelectBuilder(metadata.tableName).columns("COUNT(*)");
+
+      if (spec) {
+        builder.where(spec.toPredicate(metadata));
+      }
+
       const query = builder.build();
       const conn = await dataSource.getConnection();
       try {
         const stmt = conn.prepareStatement(query.sql);
+        for (let i = 0; i < query.params.length; i++) {
+          stmt.setParameter(i + 1, query.params[i]);
+        }
         const rs = await stmt.executeQuery();
         if (await rs.next()) {
           const row = rs.getRow();

@@ -31,3 +31,16 @@ export type {
 export { parseDerivedQueryMethod } from "./derived-query-parser.js";
 
 export { buildDerivedQuery } from "./derived-query-executor.js";
+
+export type { Specification } from "./specification.js";
+export {
+  Specifications,
+  equal,
+  like,
+  greaterThan,
+  lessThan,
+  between,
+  isIn,
+  isNull,
+  isNotNull,
+} from "./specification.js";
