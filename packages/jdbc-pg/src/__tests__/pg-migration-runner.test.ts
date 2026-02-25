@@ -466,6 +466,252 @@ describe("PgMigrationRunner", () => {
     });
   });
 
+  describe("rollback()", () => {
+    it("rolls back the last migration by default", async () => {
+      const m1 = createMigration("001", "Create users", "CREATE TABLE users (id INT)", "DROP TABLE users");
+      const m2 = createMigration("002", "Add email", "ALTER TABLE users ADD COLUMN email TEXT", "ALTER TABLE users DROP COLUMN email");
+
+      const appliedRs = createMockResultSet([
+        { version: "001", description: "Create users", applied_at: new Date(), checksum: computeChecksum(m1) },
+        { version: "002", description: "Add email", applied_at: new Date(), checksum: computeChecksum(m2) },
+      ]);
+      const appliedPs = createMockPreparedStatement(appliedRs);
+      const getAppliedConn = createMockConnection({ preparedStatements: [appliedPs] });
+
+      const tx = createMockTransaction();
+      const stmt = createMockStatement();
+      const deletePs = createMockPreparedStatement();
+      const rollbackConn = createMockConnection({
+        transactions: [tx],
+        statements: [stmt],
+        preparedStatements: [deletePs],
+      });
+
+      let connCall = 0;
+      const ds = createMockDataSource(() => {
+        connCall++;
+        return connCall === 1 ? getAppliedConn : rollbackConn;
+      });
+
+      const runner = new PgMigrationRunner(ds);
+      await runner.rollback([m1, m2]);
+
+      // Should execute m2's down SQL
+      expect(stmt.executeUpdate).toHaveBeenCalledWith("ALTER TABLE users DROP COLUMN email");
+      // Should delete m2's version from tracking table
+      expect(deletePs.setParameter).toHaveBeenCalledWith(1, "002");
+      expect(tx.commit).toHaveBeenCalledTimes(1);
+    });
+
+    it("rolls back multiple steps", async () => {
+      const m1 = createMigration("001", "Create users", "CREATE TABLE users (id INT)", "DROP TABLE users");
+      const m2 = createMigration("002", "Add email", "ALTER TABLE users ADD email TEXT", "ALTER TABLE users DROP COLUMN email");
+
+      const appliedRs = createMockResultSet([
+        { version: "001", description: "Create users", applied_at: new Date(), checksum: computeChecksum(m1) },
+        { version: "002", description: "Add email", applied_at: new Date(), checksum: computeChecksum(m2) },
+      ]);
+      const appliedPs = createMockPreparedStatement(appliedRs);
+      const getAppliedConn = createMockConnection({ preparedStatements: [appliedPs] });
+
+      const tx = createMockTransaction();
+      const stmt = createMockStatement();
+      const deletePs = createMockPreparedStatement();
+      const rollbackConn = createMockConnection({
+        transactions: [tx, tx],
+        statements: [stmt, stmt],
+        preparedStatements: [deletePs, deletePs],
+      });
+
+      let connCall = 0;
+      const ds = createMockDataSource(() => {
+        connCall++;
+        return connCall === 1 ? getAppliedConn : rollbackConn;
+      });
+
+      const runner = new PgMigrationRunner(ds);
+      await runner.rollback([m1, m2], 2);
+
+      // Should execute in reverse: m2 first, then m1
+      expect(stmt.executeUpdate).toHaveBeenCalledTimes(2);
+      expect(tx.commit).toHaveBeenCalledTimes(2);
+    });
+
+    it("does nothing when no migrations applied", async () => {
+      const appliedRs = createMockResultSet([]);
+      const appliedPs = createMockPreparedStatement(appliedRs);
+      const conn = createMockConnection({ preparedStatements: [appliedPs] });
+      const ds = createMockDataSource(() => conn);
+
+      const runner = new PgMigrationRunner(ds);
+      await runner.rollback([createMigration("001", "test", "SELECT 1", "SELECT 1")]);
+
+      // Only one getConnection call for getAppliedMigrations
+      expect(ds.getConnection).toHaveBeenCalledTimes(1);
+    });
+
+    it("throws when migration definition not found for rollback", async () => {
+      const appliedRs = createMockResultSet([
+        { version: "001", description: "Create users", applied_at: new Date(), checksum: "abc" },
+      ]);
+      const appliedPs = createMockPreparedStatement(appliedRs);
+      const getAppliedConn = createMockConnection({ preparedStatements: [appliedPs] });
+
+      const rollbackConn = createMockConnection();
+
+      let connCall = 0;
+      const ds = createMockDataSource(() => {
+        connCall++;
+        return connCall === 1 ? getAppliedConn : rollbackConn;
+      });
+
+      const runner = new PgMigrationRunner(ds);
+      // Pass empty migrations array - no definition for version "001"
+      await expect(runner.rollback([], 1)).rejects.toThrow("no matching migration definition found");
+    });
+
+    it("rolls back transaction on down() failure", async () => {
+      const m1 = createMigration("001", "Create users", "CREATE TABLE users (id INT)", "DROP TABLE users");
+
+      const appliedRs = createMockResultSet([
+        { version: "001", description: "Create users", applied_at: new Date(), checksum: computeChecksum(m1) },
+      ]);
+      const appliedPs = createMockPreparedStatement(appliedRs);
+      const getAppliedConn = createMockConnection({ preparedStatements: [appliedPs] });
+
+      const tx = createMockTransaction();
+      const stmt = createMockStatement();
+      stmt.executeUpdate.mockRejectedValueOnce(new Error("down failed"));
+      const rollbackConn = createMockConnection({
+        transactions: [tx],
+        statements: [stmt],
+      });
+
+      let connCall = 0;
+      const ds = createMockDataSource(() => {
+        connCall++;
+        return connCall === 1 ? getAppliedConn : rollbackConn;
+      });
+
+      const runner = new PgMigrationRunner(ds);
+      await expect(runner.rollback([m1])).rejects.toThrow("down failed");
+      expect(tx.rollback).toHaveBeenCalled();
+      expect(tx.commit).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("rollbackTo()", () => {
+    it("rolls back to a specific version", async () => {
+      const m1 = createMigration("001", "Create users", "CREATE TABLE users (id INT)", "DROP TABLE users");
+      const m2 = createMigration("002", "Add email", "ALTER TABLE users ADD email TEXT", "ALTER TABLE users DROP COLUMN email");
+      const m3 = createMigration("003", "Add age", "ALTER TABLE users ADD age INT", "ALTER TABLE users DROP COLUMN age");
+
+      const appliedRs = createMockResultSet([
+        { version: "001", description: "Create users", applied_at: new Date(), checksum: computeChecksum(m1) },
+        { version: "002", description: "Add email", applied_at: new Date(), checksum: computeChecksum(m2) },
+        { version: "003", description: "Add age", applied_at: new Date(), checksum: computeChecksum(m3) },
+      ]);
+      const appliedPs = createMockPreparedStatement(appliedRs);
+      const getAppliedConn = createMockConnection({ preparedStatements: [appliedPs] });
+
+      const tx = createMockTransaction();
+      const stmt = createMockStatement();
+      const deletePs = createMockPreparedStatement();
+      const rollbackConn = createMockConnection({
+        transactions: [tx, tx],
+        statements: [stmt, stmt],
+        preparedStatements: [deletePs, deletePs],
+      });
+
+      let connCall = 0;
+      const ds = createMockDataSource(() => {
+        connCall++;
+        return connCall === 1 ? getAppliedConn : rollbackConn;
+      });
+
+      const runner = new PgMigrationRunner(ds);
+      await runner.rollbackTo([m1, m2, m3], "001");
+
+      // Should rollback 003 and 002 (versions > "001"), in reverse order
+      expect(stmt.executeUpdate).toHaveBeenCalledTimes(2);
+      expect(tx.commit).toHaveBeenCalledTimes(2);
+    });
+
+    it("does nothing when already at target version", async () => {
+      const m1 = createMigration("001", "Create users", "CREATE TABLE users (id INT)", "DROP TABLE users");
+
+      const appliedRs = createMockResultSet([
+        { version: "001", description: "Create users", applied_at: new Date(), checksum: computeChecksum(m1) },
+      ]);
+      const appliedPs = createMockPreparedStatement(appliedRs);
+      const conn = createMockConnection({ preparedStatements: [appliedPs] });
+      const ds = createMockDataSource(() => conn);
+
+      const runner = new PgMigrationRunner(ds);
+      await runner.rollbackTo([m1], "001");
+
+      // Only one getConnection for getAppliedMigrations
+      expect(ds.getConnection).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("pending()", () => {
+    it("returns pending migrations sorted by version", async () => {
+      const m1 = createMigration("001", "Create users", "CREATE TABLE users (id INT)");
+      const m2 = createMigration("002", "Add email", "ALTER TABLE users ADD email TEXT");
+      const m3 = createMigration("003", "Add age", "ALTER TABLE users ADD age INT");
+
+      const checksum = computeChecksum(m1);
+      const appliedRs = createMockResultSet([
+        { version: "001", description: "Create users", applied_at: new Date(), checksum },
+      ]);
+      const appliedPs = createMockPreparedStatement(appliedRs);
+      const conn = createMockConnection({ preparedStatements: [appliedPs] });
+      const ds = createMockDataSource(() => conn);
+
+      const runner = new PgMigrationRunner(ds);
+      const result = await runner.pending([m3, m1, m2]); // pass out of order
+
+      expect(result).toHaveLength(2);
+      expect(result[0].version).toBe("002");
+      expect(result[1].version).toBe("003");
+    });
+
+    it("returns all migrations when none applied", async () => {
+      const m1 = createMigration("001", "First", "SELECT 1");
+      const m2 = createMigration("002", "Second", "SELECT 2");
+
+      const appliedRs = createMockResultSet([]);
+      const appliedPs = createMockPreparedStatement(appliedRs);
+      const conn = createMockConnection({ preparedStatements: [appliedPs] });
+      const ds = createMockDataSource(() => conn);
+
+      const runner = new PgMigrationRunner(ds);
+      const result = await runner.pending([m2, m1]);
+
+      expect(result).toHaveLength(2);
+      expect(result[0].version).toBe("001");
+      expect(result[1].version).toBe("002");
+    });
+
+    it("returns empty array when all applied", async () => {
+      const m1 = createMigration("001", "First", "SELECT 1");
+      const checksum = computeChecksum(m1);
+
+      const appliedRs = createMockResultSet([
+        { version: "001", description: "First", applied_at: new Date(), checksum },
+      ]);
+      const appliedPs = createMockPreparedStatement(appliedRs);
+      const conn = createMockConnection({ preparedStatements: [appliedPs] });
+      const ds = createMockDataSource(() => conn);
+
+      const runner = new PgMigrationRunner(ds);
+      const result = await runner.pending([m1]);
+
+      expect(result).toEqual([]);
+    });
+  });
+
   describe("computeChecksum()", () => {
     it("computes SHA-256 hash of up() SQL", () => {
       const m = createMigration("001", "test", "CREATE TABLE users (id INT)");

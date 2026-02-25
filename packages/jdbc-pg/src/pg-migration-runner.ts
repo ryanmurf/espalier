@@ -123,6 +123,100 @@ export class PgMigrationRunner implements MigrationRunner {
     }
   }
 
+  async rollback(migrations: Migration[], steps: number = 1): Promise<void> {
+    const applied = await this.getAppliedMigrations();
+    if (applied.length === 0) return;
+
+    // Take the last N applied versions in reverse order
+    const toRollback = applied.slice(-steps).reverse();
+
+    const migrationMap = new Map<string, Migration>();
+    for (const m of migrations) {
+      migrationMap.set(m.version, m);
+    }
+
+    const conn = await this.dataSource.getConnection();
+    try {
+      for (const record of toRollback) {
+        const migration = migrationMap.get(record.version);
+        if (!migration) {
+          throw new Error(
+            `Cannot rollback migration "${record.version}": ` +
+            `no matching migration definition found with a down() method.`,
+          );
+        }
+        await this.revertMigration(conn, migration);
+      }
+    } finally {
+      await conn.close();
+    }
+  }
+
+  async rollbackTo(migrations: Migration[], version: string): Promise<void> {
+    const applied = await this.getAppliedMigrations();
+    // Find migrations applied after the target version
+    const toRollback = applied
+      .filter((r) => r.version > version)
+      .reverse();
+
+    if (toRollback.length === 0) return;
+
+    const migrationMap = new Map<string, Migration>();
+    for (const m of migrations) {
+      migrationMap.set(m.version, m);
+    }
+
+    const conn = await this.dataSource.getConnection();
+    try {
+      for (const record of toRollback) {
+        const migration = migrationMap.get(record.version);
+        if (!migration) {
+          throw new Error(
+            `Cannot rollback migration "${record.version}": ` +
+            `no matching migration definition found with a down() method.`,
+          );
+        }
+        await this.revertMigration(conn, migration);
+      }
+    } finally {
+      await conn.close();
+    }
+  }
+
+  async pending(migrations: Migration[]): Promise<Migration[]> {
+    const applied = await this.getAppliedMigrations();
+    const appliedVersions = new Set(applied.map((r) => r.version));
+    return migrations
+      .filter((m) => !appliedVersions.has(m.version))
+      .sort((a, b) => a.version.localeCompare(b.version));
+  }
+
+  private async revertMigration(conn: Connection, migration: Migration): Promise<void> {
+    const downSql = migration.down();
+    const statements = Array.isArray(downSql) ? downSql : [downSql];
+
+    const tx = await conn.beginTransaction();
+    try {
+      const stmt = conn.createStatement();
+      for (const sql of statements) {
+        await stmt.executeUpdate(sql);
+      }
+
+      const ps = conn.prepareStatement(
+        `DELETE FROM ${this.qualifiedTable} WHERE version = $1`,
+      );
+      ps.setParameter(1, migration.version);
+      await ps.executeUpdate();
+      await ps.close();
+      await stmt.close();
+
+      await tx.commit();
+    } catch (err) {
+      await tx.rollback();
+      throw err;
+    }
+  }
+
   private async applyMigration(conn: Connection, migration: Migration): Promise<void> {
     const upSql = migration.up();
     const statements = Array.isArray(upSql) ? upSql : [upSql];

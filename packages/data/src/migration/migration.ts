@@ -22,6 +22,9 @@ export interface MigrationRunner {
   getAppliedMigrations(): Promise<MigrationRecord[]>;
   run(migrations: Migration[]): Promise<void>;
   getCurrentVersion(): Promise<string | null>;
+  rollback(migrations: Migration[], steps?: number): Promise<void>;
+  rollbackTo(migrations: Migration[], version: string): Promise<void>;
+  pending(migrations: Migration[]): Promise<Migration[]>;
 }
 
 export const DEFAULT_MIGRATION_TABLE = "_espalier_migrations";
