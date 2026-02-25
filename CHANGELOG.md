@@ -1,5 +1,63 @@
 # Changelog
 
+## 0.6.0 — Y2 Q2
+
+### espalier-data
+
+#### First-Level Entity Cache (Identity Map)
+- Added `EntityCache` class with per-entity-type LRU eviction using a doubly-linked list for O(1) access and eviction
+- Configurable via `EntityCacheConfig` (`enabled`, `maxSize` — default 1000 per entity type)
+- Integrated into `createDerivedRepository`: `findById` checks cache first (identity map), `save` updates cache, `delete`/`deleteById` evict, `findAll` populates cache, derived `deleteBy*` evict all
+- Cache stats: hits, misses, puts, evictions, hitRate via `getStats()`
+- Cache is per-repository-instance (session-scoped)
+- Accessible via `repo.getEntityCache()` for diagnostics
+- Cache evicted before `OptimisticLockException` throw to prevent stale reads
+
+#### Query Result Caching
+- Added `QueryCache` class with TTL-based expiration and entity-type-aware invalidation
+- LRU eviction when `maxSize` exceeded (default 500 entries, default TTL 60s)
+- Cache key: SQL + JSON-serialized parameters
+- `invalidate(entityClass)` clears all cached queries for that entity type
+- Integrated into `createDerivedRepository`: `findAll` and derived find/count/exists methods check cache, save/delete operations invalidate
+- Added `@Cacheable(ttlMs?)` method decorator (TC39 standard) for per-method TTL hints
+- Added `registerCacheable()` for programmatic TTL registration
+- Added `SelectBuilder.cacheable(ttlMs?)` for query-level cache hints
+- `DerivedRepositoryOptions` interface supports independent entity cache and query cache configuration
+- Cache stats: hits, misses, puts, invalidations, expirations, hitRate
+- Accessible via `repo.getQueryCache()` for diagnostics
+
+### espalier-jdbc
+
+#### Prepared Statement Caching
+- Added `StatementCache` class with LRU eviction that closes evicted statements to release resources
+- Configurable via `StatementCacheConfig` (`enabled`, `maxSize` — default 256 per connection)
+- Added `CacheableConnection` interface extending `Connection` with `getStatementCacheStats()` and `clearStatementCache()`
+- `PgPreparedStatement` gains `reset()` method to clear parameters between cached reuses
+- Cache stats: hits, misses, puts, evictions, hitRate
+
+#### Connection Pool Warmup & Pre-ping
+- `PoolConfig` extended with `warmup`, `prePing`, `prePingQuery`, `prePingIntervalMs`, `evictOnFailedPing`
+- Added `warmupPool()` utility: pre-creates connections in parallel, reports `WarmupResult` (created, failed, duration, errors)
+- Added `validateConnection()` utility: executes lightweight validation query, skips if recently validated within interval
+- `PoolMetricsSnapshot` extended with `warmupConnectionsCreated`, `prePingSuccesses`, `prePingFailures`, `deadConnectionsEvicted`
+- `ErrorEvent.context` union extended with `"prePing"` for pre-ping failure events
+
+### espalier-jdbc-pg
+
+#### Prepared Statement Caching Integration
+- `PgConnection` implements `CacheableConnection`, accepts optional `StatementCacheConfig`
+- `prepareStatement(sql)` checks cache first, resets parameters on hit, caches on miss
+- Statement cache cleared on `connection.close()`
+- `PgDataSourceConfig` gains `statementCache` option, passed through to all connections
+
+#### Pool Warmup & Pre-ping Integration
+- `PgDataSource.warmup(targetConnections?)` pre-creates minimum connections
+- `getConnection()` validates with `SELECT 1` pre-ping when configured, with retry (up to 3 attempts)
+- Per-connection last-ping tracking via WeakMap on PoolClient
+- Failed ping evicts dead connection (releases with destroy), retries with another
+- `getPoolMetrics()` includes warmup and pre-ping counters
+- `getWarmupResult()` accessor for warmup diagnostics
+
 ## 0.5.0 — Y2 Q1
 
 ### espalier-data

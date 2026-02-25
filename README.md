@@ -189,6 +189,104 @@ class Product {
 // throws OptimisticLockException if version is stale
 ```
 
+## Entity Caching
+
+Session-scoped identity map with per-entity-type LRU eviction:
+
+```typescript
+import { createDerivedRepository } from "espalier-data";
+
+const userRepo = createDerivedRepository<User, number>(User, dataSource, {
+  entityCache: { enabled: true, maxSize: 500 },
+});
+
+// First call hits the database
+const user = await userRepo.findById(1);
+
+// Second call returns from cache (identity map)
+const same = await userRepo.findById(1);
+
+// Cache stats
+const stats = userRepo.getEntityCache().getStats();
+console.log(stats.hitRate); // 0.5
+```
+
+## Query Result Caching
+
+TTL-based query result cache with entity-type-aware invalidation:
+
+```typescript
+const userRepo = createDerivedRepository<User, number>(User, dataSource, {
+  queryCache: { enabled: true, maxSize: 500, defaultTtlMs: 30_000 },
+});
+
+// First call executes SQL, caches result
+const active = await userRepo.findByStatus("active");
+
+// Second call returns cached result (within TTL)
+const cached = await userRepo.findByStatus("active");
+
+// Writes automatically invalidate cached queries for the entity type
+await userRepo.save(newUser); // clears all User query cache entries
+
+// Per-method TTL via @Cacheable decorator
+import { Cacheable } from "espalier-data";
+
+// Or query-level cache hints via SelectBuilder
+const query = QueryBuilder.select(User).where(eq("status", "active")).cacheable(10_000);
+```
+
+## Prepared Statement Caching
+
+LRU statement cache that reuses parsed prepared statements per connection:
+
+```typescript
+import { PgDataSource } from "espalier-jdbc-pg";
+
+const ds = new PgDataSource({
+  connectionString: "postgres://localhost/mydb",
+  statementCache: { enabled: true, maxSize: 256 },
+});
+
+const conn = await ds.getConnection();
+
+// First call parses and caches the statement
+const stmt1 = conn.prepareStatement("SELECT * FROM users WHERE id = $1");
+// Subsequent calls reuse the cached statement (parameters auto-reset)
+
+// Cache stats
+const stats = conn.getStatementCacheStats();
+console.log(stats.hitRate);
+```
+
+## Connection Pool Warmup & Pre-ping
+
+Pre-create connections at startup and validate before use:
+
+```typescript
+import { PgDataSource } from "espalier-jdbc-pg";
+
+const ds = new PgDataSource({
+  connectionString: "postgres://localhost/mydb",
+  pool: {
+    min: 5,
+    max: 20,
+    warmup: true,
+    prePing: true,
+    prePingIntervalMs: 30_000,
+    evictOnFailedPing: true,
+  },
+});
+
+// Pre-create minimum connections
+const result = await ds.warmup();
+console.log(result.connectionsCreated, result.durationMs);
+
+// getConnection() validates with SELECT 1 before returning
+// Dead connections are automatically evicted and retried
+const conn = await ds.getConnection();
+```
+
 ## Roadmap
 
 - [x] MySQL/MariaDB adapter (`espalier-jdbc-mysql`) *(Y1 Q4)*
@@ -205,9 +303,10 @@ class Product {
 - [x] Specification pattern (composable query predicates) *(Y2 Q1)*
 - [x] Projections & DTOs (`@Projection` decorator) *(Y2 Q1)*
 - [x] Optimistic locking (`@Version` decorator) *(Y2 Q1)*
-- [ ] First-level entity cache *(Y2 Q2)*
-- [ ] Query result caching *(Y2 Q2)*
-- [ ] Prepared statement caching *(Y2 Q2)*
+- [x] First-level entity cache *(Y2 Q2)*
+- [x] Query result caching *(Y2 Q2)*
+- [x] Prepared statement caching *(Y2 Q2)*
+- [x] Connection pool warmup & pre-ping *(Y2 Q2)*
 - [ ] Entity lifecycle events (`@PrePersist`, `@PostLoad`) *(Y2 Q3)*
 - [ ] Change tracking / dirty checking *(Y2 Q3)*
 - [ ] CLI for migrations *(Y2 Q4)*
