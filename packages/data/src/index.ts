@@ -40,6 +40,8 @@ export type { RowMapper } from "./mapping/row-mapper.js";
 export { createRowMapper } from "./mapping/row-mapper.js";
 export type { ProjectionMapper } from "./mapping/projection-mapper.js";
 export { createProjectionMapper } from "./mapping/projection-mapper.js";
+export type { FieldChange } from "./mapping/change-tracker.js";
+export { EntityChangeTracker } from "./mapping/change-tracker.js";
 
 export type { Criteria, CriteriaType, BuiltQuery, JoinType, SortDirection } from "./query/index.js";
 export {

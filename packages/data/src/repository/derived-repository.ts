@@ -18,6 +18,7 @@ import type { EntityCacheConfig } from "../cache/entity-cache.js";
 import { QueryCache } from "../cache/query-cache.js";
 import type { QueryCacheConfig } from "../cache/query-cache.js";
 import type { LifecycleEvent } from "../decorators/lifecycle.js";
+import { EntityChangeTracker } from "../mapping/change-tracker.js";
 
 function isProjectionClass(arg: unknown): arg is new (...args: any[]) => any {
   return typeof arg === "function" && getProjectionMetadata(arg) !== undefined;
@@ -50,6 +51,7 @@ export function createDerivedRepository<T, ID>(
   const projectionMapperCache = new Map<new (...args: any[]) => any, ProjectionMapper<any>>();
   const entityCache = new EntityCache(entityCacheConfig);
   const queryCache = new QueryCache(queryCacheConfig);
+  const changeTracker = new EntityChangeTracker<T>(metadata);
 
   function getCachedDescriptor(methodName: string): DerivedQueryDescriptor {
     let descriptor = descriptorCache.get(methodName);
@@ -150,6 +152,7 @@ export function createDerivedRepository<T, ID>(
         if (await rs.next()) {
           const result = rowMapper.mapRow(rs);
           await invokeLifecycleCallbacks(result, "PostLoad");
+          changeTracker.snapshot(result);
           entityCache.put(entityClass, id, result);
           return result;
         }
@@ -229,6 +232,7 @@ export function createDerivedRepository<T, ID>(
         while (await rs.next()) {
           const entity = rowMapper.mapRow(rs);
           await invokeLifecycleCallbacks(entity, "PostLoad");
+          changeTracker.snapshot(entity);
           entityCache.put(entityClass, getEntityId(entity), entity);
           results.push(entity);
         }
@@ -249,6 +253,17 @@ export function createDerivedRepository<T, ID>(
       if (idValue != null) {
         // Update
         await invokeLifecycleCallbacks(entity, "PreUpdate");
+
+        // Dirty checking: if entity has a snapshot, only update changed fields
+        const hasSnapshot = changeTracker.getSnapshot(entity) !== undefined;
+        const dirtyFields = hasSnapshot ? changeTracker.getDirtyFields(entity) : [];
+        const isFullUpdate = !hasSnapshot;
+
+        // If entity is clean (no dirty fields) and no version bumping needed, skip UPDATE
+        if (hasSnapshot && dirtyFields.length === 0) {
+          return entity;
+        }
+
         const updateBuilder = new UpdateBuilder(metadata.tableName);
 
         // Build WHERE clause: id = ? (and optionally version = ?)
@@ -263,22 +278,41 @@ export function createDerivedRepository<T, ID>(
               new ComparisonCriteria("eq", versionCol, currentVersion as SqlValue),
             ),
           );
-          // Set all fields, but override version with incremented value
-          for (const field of metadata.fields) {
-            if (field.fieldName === idField) continue;
-            if (field.fieldName === versionField) {
-              updateBuilder.set(field.columnName, newVersion as SqlValue);
-            } else {
-              const value = (entity as Record<string | symbol, unknown>)[field.fieldName] as SqlValue;
-              updateBuilder.set(field.columnName, value);
+
+          if (isFullUpdate) {
+            // No snapshot — full update (existing behavior)
+            for (const field of metadata.fields) {
+              if (field.fieldName === idField) continue;
+              if (field.fieldName === versionField) {
+                updateBuilder.set(field.columnName, newVersion as SqlValue);
+              } else {
+                const value = (entity as Record<string | symbol, unknown>)[field.fieldName] as SqlValue;
+                updateBuilder.set(field.columnName, value);
+              }
+            }
+          } else {
+            // Minimal update — only dirty fields + version
+            updateBuilder.set(versionCol, newVersion as SqlValue);
+            for (const change of dirtyFields) {
+              if (change.field === idField || change.field === versionField) continue;
+              updateBuilder.set(change.columnName, change.newValue as SqlValue);
             }
           }
         } else {
           updateBuilder.where(new ComparisonCriteria("eq", idCol, idValue));
-          for (const field of metadata.fields) {
-            if (field.fieldName === idField) continue;
-            const value = (entity as Record<string | symbol, unknown>)[field.fieldName] as SqlValue;
-            updateBuilder.set(field.columnName, value);
+
+          if (isFullUpdate) {
+            for (const field of metadata.fields) {
+              if (field.fieldName === idField) continue;
+              const value = (entity as Record<string | symbol, unknown>)[field.fieldName] as SqlValue;
+              updateBuilder.set(field.columnName, value);
+            }
+          } else {
+            // Minimal update — only dirty fields
+            for (const change of dirtyFields) {
+              if (change.field === idField) continue;
+              updateBuilder.set(change.columnName, change.newValue as SqlValue);
+            }
           }
         }
         updateBuilder.returning("*");
@@ -295,6 +329,7 @@ export function createDerivedRepository<T, ID>(
             const saved = rowMapper.mapRow(rs);
             await invokeLifecycleCallbacks(saved, "PostLoad");
             await invokeLifecycleCallbacks(saved, "PostUpdate");
+            changeTracker.snapshot(saved);
             entityCache.put(entityClass, getEntityId(saved), saved);
             queryCache.invalidate(entityClass);
             return saved;
@@ -342,6 +377,7 @@ export function createDerivedRepository<T, ID>(
             const saved = rowMapper.mapRow(rs);
             await invokeLifecycleCallbacks(saved, "PostLoad");
             await invokeLifecycleCallbacks(saved, "PostPersist");
+            changeTracker.snapshot(saved);
             entityCache.put(entityClass, getEntityId(saved), saved);
             queryCache.invalidate(entityClass);
             return saved;
@@ -402,6 +438,7 @@ export function createDerivedRepository<T, ID>(
           );
         }
         await invokeLifecycleCallbacks(entity, "PostRemove");
+        changeTracker.clearSnapshot(entity);
         entityCache.evict(entityClass, idValue);
         queryCache.invalidate(entityClass);
       } finally {
@@ -474,10 +511,16 @@ export function createDerivedRepository<T, ID>(
     "count",
     "getEntityCache",
     "getQueryCache",
+    "getChangeTracker",
+    "isDirty",
+    "getDirtyFields",
   ]);
 
   (crudMethods as any).getEntityCache = () => entityCache;
   (crudMethods as any).getQueryCache = () => queryCache;
+  (crudMethods as any).getChangeTracker = () => changeTracker;
+  (crudMethods as any).isDirty = (entity: T) => changeTracker.isDirty(entity);
+  (crudMethods as any).getDirtyFields = (entity: T) => changeTracker.getDirtyFields(entity);
 
   return new Proxy(crudMethods as CrudRepository<T, ID> & Record<string, (...args: any[]) => Promise<any>>, {
     get(target, prop, receiver) {
@@ -574,6 +617,7 @@ export function createDerivedRepository<T, ID>(
             } else {
               const mapped = rowMapper.mapRow(rs);
               await invokeLifecycleCallbacks(mapped, "PostLoad");
+              changeTracker.snapshot(mapped);
               results.push(mapped);
             }
           }
