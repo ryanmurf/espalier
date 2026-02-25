@@ -9,6 +9,7 @@ export type { SqlValue, SqlParameter, NamedSqlParameter, ColumnMetadata } from "
 export type { ParsedNamedQuery } from "./named-params.js";
 export { parseNamedParams } from "./named-params.js";
 export type { PoolConfig, PoolStats, PooledDataSource } from "./pool.js";
+export type { TableInfo, ColumnInfo, SchemaIntrospector } from "./schema-introspector.js";
 export {
   DatabaseErrorCode,
   DatabaseError,

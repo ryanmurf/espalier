@@ -6,3 +6,4 @@ export { PgNamedPreparedStatement } from "./pg-named-statement.js";
 export { PgBatchStatement } from "./pg-batch-statement.js";
 export { PgResultSet } from "./pg-result-set.js";
 export { PgCursorResultSet } from "./pg-cursor-result-set.js";
+export { PgSchemaIntrospector } from "./pg-schema-introspector.js";

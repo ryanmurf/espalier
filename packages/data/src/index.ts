@@ -1,5 +1,5 @@
 export { Table, getTableName } from "./decorators/table.js";
-export { Column, getColumnMappings } from "./decorators/column.js";
+export { Column, getColumnMappings, getColumnTypeMappings } from "./decorators/column.js";
 export type { ColumnOptions } from "./decorators/column.js";
 export { Id, getIdField } from "./decorators/id.js";
 export {
@@ -41,3 +41,6 @@ export {
   UpdateBuilder,
   DeleteBuilder,
 } from "./query/index.js";
+
+export type { DdlOptions, DropTableOptions } from "./schema/ddl-generator.js";
+export { DdlGenerator } from "./schema/ddl-generator.js";
