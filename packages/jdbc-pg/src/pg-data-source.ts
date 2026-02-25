@@ -7,6 +7,7 @@ import type {
   TypeConverterRegistry,
   PoolMonitor,
   PoolMetricsSnapshot,
+  StatementCacheConfig,
 } from "espalier-jdbc";
 import { ConnectionError, DatabaseErrorCode, DefaultPoolMetricsCollector } from "espalier-jdbc";
 import { PgConnection } from "./pg-connection.js";
@@ -15,6 +16,7 @@ export interface PgDataSourceConfig {
   pg?: PgPoolConfig;
   pool?: PoolConfig;
   typeConverters?: TypeConverterRegistry;
+  statementCache?: StatementCacheConfig;
 }
 
 function mapPoolConfig(config: PgDataSourceConfig): PgPoolConfig {
@@ -41,6 +43,7 @@ function isPgDataSourceConfig(config: unknown): config is PgDataSourceConfig {
 export class PgDataSource implements MonitoredPooledDataSource {
   private readonly pool: Pool;
   private readonly typeConverters?: TypeConverterRegistry;
+  private readonly statementCacheConfig?: StatementCacheConfig;
   private readonly metrics: DefaultPoolMetricsCollector;
   private closed = false;
 
@@ -50,6 +53,7 @@ export class PgDataSource implements MonitoredPooledDataSource {
     if (isPgDataSourceConfig(config)) {
       this.pool = new Pool(mapPoolConfig(config));
       this.typeConverters = config.typeConverters;
+      this.statementCacheConfig = config.statementCache;
     } else {
       this.pool = new Pool(config);
     }
@@ -85,7 +89,7 @@ export class PgDataSource implements MonitoredPooledDataSource {
         acquireTimeMs,
       });
 
-      const conn = new PgConnection(client, this.typeConverters);
+      const conn = new PgConnection(client, this.typeConverters, this.statementCacheConfig);
 
       // Wrap close to emit release event
       const originalClose = conn.close.bind(conn);

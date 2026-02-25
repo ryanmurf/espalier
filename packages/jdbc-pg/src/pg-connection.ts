@@ -1,23 +1,30 @@
 import type { PoolClient } from "pg";
-import type { Connection, TypeAwareConnection, PreparedStatement, NamedPreparedStatement, BatchStatement, Statement, TypeConverterRegistry } from "espalier-jdbc";
+import type { Connection, TypeAwareConnection, CacheableConnection, PreparedStatement, NamedPreparedStatement, BatchStatement, Statement, TypeConverterRegistry, StatementCacheConfig, StatementCacheStats } from "espalier-jdbc";
 import {
   type Transaction,
   type IsolationLevel,
   ConnectionError,
   TransactionError,
   DatabaseErrorCode,
+  StatementCache,
 } from "espalier-jdbc";
 import { PgStatement, PgPreparedStatement } from "./pg-statement.js";
 import { PgNamedPreparedStatement } from "./pg-named-statement.js";
 import { PgBatchStatement } from "./pg-batch-statement.js";
 
-export class PgConnection implements TypeAwareConnection {
+export class PgConnection implements TypeAwareConnection, CacheableConnection {
   private closed = false;
+  private readonly stmtCache: StatementCache | undefined;
 
   constructor(
     private readonly client: PoolClient,
     private readonly typeConverters?: TypeConverterRegistry,
-  ) {}
+    statementCacheConfig?: StatementCacheConfig,
+  ) {
+    if (statementCacheConfig && statementCacheConfig.enabled !== false) {
+      this.stmtCache = new StatementCache(statementCacheConfig);
+    }
+  }
 
   getTypeConverterRegistry(): TypeConverterRegistry | undefined {
     return this.typeConverters;
@@ -30,6 +37,19 @@ export class PgConnection implements TypeAwareConnection {
 
   prepareStatement(sql: string): PreparedStatement {
     this.ensureOpen();
+
+    if (this.stmtCache) {
+      const cached = this.stmtCache.get(sql);
+      if (cached) {
+        (cached as PgPreparedStatement).reset();
+        return cached;
+      }
+
+      const stmt = new PgPreparedStatement(this.client, sql);
+      this.stmtCache.put(sql, stmt);
+      return stmt;
+    }
+
     return new PgPreparedStatement(this.client, sql);
   }
 
@@ -112,12 +132,28 @@ export class PgConnection implements TypeAwareConnection {
   async close(): Promise<void> {
     if (!this.closed) {
       this.closed = true;
+      if (this.stmtCache) {
+        await this.stmtCache.clear();
+      }
       this.client.release();
     }
   }
 
   isClosed(): boolean {
     return this.closed;
+  }
+
+  getStatementCacheStats(): StatementCacheStats {
+    if (!this.stmtCache) {
+      return { hits: 0, misses: 0, puts: 0, evictions: 0, hitRate: 0 };
+    }
+    return this.stmtCache.getStats();
+  }
+
+  async clearStatementCache(): Promise<void> {
+    if (this.stmtCache) {
+      await this.stmtCache.clear();
+    }
   }
 
   private ensureOpen(): void {

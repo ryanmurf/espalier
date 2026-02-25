@@ -1,6 +1,7 @@
 import type { PreparedStatement, Statement } from "./statement.js";
 import type { IsolationLevel, Transaction } from "./transaction.js";
 import type { TypeConverterRegistry } from "./type-converter.js";
+import type { StatementCacheStats } from "./statement-cache.js";
 
 export interface Connection {
   createStatement(): Statement;
@@ -12,4 +13,9 @@ export interface Connection {
 
 export interface TypeAwareConnection extends Connection {
   getTypeConverterRegistry(): TypeConverterRegistry | undefined;
+}
+
+export interface CacheableConnection extends Connection {
+  getStatementCacheStats(): StatementCacheStats;
+  clearStatementCache(): Promise<void>;
 }

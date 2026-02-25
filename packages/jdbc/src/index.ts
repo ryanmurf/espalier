@@ -1,5 +1,5 @@
 export type { DataSource } from "./data-source.js";
-export type { Connection, TypeAwareConnection } from "./connection.js";
+export type { Connection, TypeAwareConnection, CacheableConnection } from "./connection.js";
 export type { Statement, PreparedStatement, NamedPreparedStatement } from "./statement.js";
 export type { BatchStatement } from "./batch.js";
 export type { ResultSet, StreamingResultSet } from "./result-set.js";
@@ -28,6 +28,8 @@ export {
   QueryError,
   TransactionError,
 } from "./errors.js";
+export type { StatementCacheConfig, StatementCacheStats } from "./statement-cache.js";
+export { StatementCache } from "./statement-cache.js";
 export type { TypeConverter, TypeConverterRegistry } from "./type-converter.js";
 export { DefaultTypeConverterRegistry } from "./type-converter-registry.js";
 export {

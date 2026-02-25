@@ -92,6 +92,10 @@ export class PgPreparedStatement extends PgStatement implements PreparedStatemen
     this.parameters.set(index, value);
   }
 
+  reset(): void {
+    this.parameters.clear();
+  }
+
   override async executeQuery(): Promise<ResultSet>;
   override async executeQuery(sql?: string): Promise<ResultSet> {
     const queryText = sql ?? this.sql;
