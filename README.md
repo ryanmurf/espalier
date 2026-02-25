@@ -121,15 +121,93 @@ pnpm -r typecheck
 pnpm test
 ```
 
+## Derived Query Methods
+
+Define repository methods by name convention — no SQL needed:
+
+```typescript
+import { createDerivedRepository } from "espalier-data";
+
+const userRepo = createDerivedRepository<User, number>(User, dataSource);
+
+// Auto-implemented from method name:
+const users = await userRepo.findByNameAndAgeGreaterThan("Alice", 25);
+const count = await userRepo.countByStatus("active");
+const exists = await userRepo.existsByEmail("alice@example.com");
+await userRepo.deleteByStatusIn(["inactive", "banned"]);
+const first = await userRepo.findFirstByNameOrderByAgeDesc("Bob");
+```
+
+## Specification Pattern
+
+Build composable, reusable query predicates:
+
+```typescript
+import { equal, greaterThan, Specifications } from "espalier-data";
+
+const activeSpec = equal<User>("status", "active");
+const adultSpec = greaterThan<User>("age", 18);
+const combined = Specifications.and(activeSpec, adultSpec);
+
+const users = await userRepo.findAll(combined);
+const count = await userRepo.count(activeSpec);
+```
+
+## Projections & DTOs
+
+Return only the columns you need:
+
+```typescript
+import { Projection, Column } from "espalier-data";
+
+@Projection({ entity: User })
+class UserSummary {
+  @Column() name!: string;
+  @Column() email!: string;
+}
+
+const summaries = await userRepo.findAll(UserSummary);
+const summary = await userRepo.findById(1, UserSummary);
+```
+
+## Optimistic Locking
+
+Prevent lost updates with automatic version checking:
+
+```typescript
+import { Table, Column, Id, Version } from "espalier-data";
+
+@Table("products")
+class Product {
+  @Id @Column() id!: number;
+  @Column() name!: string;
+  @Column() price!: number;
+  @Version @Column() version!: number;
+}
+
+// version auto-set to 1 on insert, auto-incremented on update
+// throws OptimisticLockException if version is stale
+```
+
 ## Roadmap
 
-- [x] MySQL/MariaDB adapter (`espalier-jdbc-mysql`) *(Q4)*
-- [x] SQLite adapter (`espalier-jdbc-sqlite`) *(Q4)*
-- [x] Connection pool monitoring and metrics *(Q4)*
-- [x] Query builder / criteria API *(Q2)*
-- [x] Automatic schema migration support *(Q3)*
-- [x] Streaming ResultSet for large datasets *(Q2)*
-- [x] Custom type converters *(Q4)*
-- [x] Relationship mapping (`@OneToMany`, `@ManyToOne`, `@ManyToMany`) *(Q3)*
-- [x] Schema introspection *(Q3)*
-- [x] DDL generation with constraints *(Q3)*
+- [x] MySQL/MariaDB adapter (`espalier-jdbc-mysql`) *(Y1 Q4)*
+- [x] SQLite adapter (`espalier-jdbc-sqlite`) *(Y1 Q4)*
+- [x] Connection pool monitoring and metrics *(Y1 Q4)*
+- [x] Query builder / criteria API *(Y1 Q2)*
+- [x] Automatic schema migration support *(Y1 Q3)*
+- [x] Streaming ResultSet for large datasets *(Y1 Q2)*
+- [x] Custom type converters *(Y1 Q4)*
+- [x] Relationship mapping (`@OneToMany`, `@ManyToOne`, `@ManyToMany`) *(Y1 Q3)*
+- [x] Schema introspection *(Y1 Q3)*
+- [x] DDL generation with constraints *(Y1 Q3)*
+- [x] Derived query methods (`findByNameAndAge`) *(Y2 Q1)*
+- [x] Specification pattern (composable query predicates) *(Y2 Q1)*
+- [x] Projections & DTOs (`@Projection` decorator) *(Y2 Q1)*
+- [x] Optimistic locking (`@Version` decorator) *(Y2 Q1)*
+- [ ] First-level entity cache *(Y2 Q2)*
+- [ ] Query result caching *(Y2 Q2)*
+- [ ] Prepared statement caching *(Y2 Q2)*
+- [ ] Entity lifecycle events (`@PrePersist`, `@PostLoad`) *(Y2 Q3)*
+- [ ] Change tracking / dirty checking *(Y2 Q3)*
+- [ ] CLI for migrations *(Y2 Q4)*

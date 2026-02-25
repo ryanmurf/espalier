@@ -1,5 +1,43 @@
 # Changelog
 
+## 0.5.0 — Y2 Q1
+
+### espalier-data
+
+#### Derived Query Methods
+- Added `parseDerivedQueryMethod()` parser that converts Spring Data-style method names (e.g., `findByNameAndAgeGreaterThan`) into structured `DerivedQueryDescriptor` objects
+- Supports `find`, `count`, `delete`, `exists` action prefixes, `findFirst`, `findFirstN`, `findDistinct`, `findAll` variants
+- 16 query operators: `Equals`, `Like`, `StartingWith`, `EndingWith`, `Containing`, `GreaterThan`, `GreaterThanEqual`, `LessThan`, `LessThanEqual`, `Between`, `In`, `NotIn`, `IsNull`, `IsNotNull`, `Not`, `True`, `False`
+- `And`/`Or` connectors, `OrderBy` with `Asc`/`Desc` direction
+- Added `buildDerivedQuery()` executor that converts parsed descriptors + entity metadata into parameterized SQL via the existing `SelectBuilder`/`DeleteBuilder`
+- Added `createDerivedRepository()` factory that returns a `Proxy`-based `CrudRepository` with auto-implemented derived query methods
+- Parsed method descriptors are cached per repository instance (parse once, reuse)
+
+#### Specification Pattern
+- Added `Specification<T>` interface with `toPredicate(metadata: EntityMetadata): Criteria` method
+- Added `Specifications` utility class with `and()`, `or()`, `not()`, `where()` static composition methods
+- Variadic `and(spec1, spec2, spec3)` and `or(spec1, spec2, spec3)` support
+- Added factory functions: `equal()`, `like()`, `greaterThan()`, `lessThan()`, `between()`, `isIn()`, `isNull()`, `isNotNull()`
+- Property names resolved to column names via entity metadata at predicate build time
+- `CrudRepository` gains `findAll(spec)` and `count(spec)` overloads
+
+#### Projections & DTOs
+- Added `@Projection({ entity: SourceEntity })` class decorator to link DTO classes to source entities
+- Added `createProjectionMapper()` that reads `@Column` fields from the projection class and produces a column-restricted mapper
+- Projection queries SELECT only the columns defined on the projection class
+- `CrudRepository` gains `findAll(projectionClass)` and `findById(id, projectionClass)` overloads
+- Derived query methods accept a projection class as the last argument for projected results
+
+#### Optimistic Locking
+- Added `@Version` field decorator for optimistic concurrency control via WeakMap metadata
+- Only one `@Version` field allowed per entity (throws on multiple)
+- `EntityMetadata` now includes `versionField`
+- INSERT: version automatically set to 1
+- UPDATE: `WHERE version = $currentVersion` added, version auto-incremented to `$currentVersion + 1`
+- DELETE: version-aware `WHERE version = $currentVersion` check on entity delete
+- Added `OptimisticLockException` with entity name, id, expected version, and actual version
+- Non-versioned entities are unaffected (no behavioral regression)
+
 ## 0.4.0 — Y1 Q4
 
 ### espalier-jdbc
