@@ -14,6 +14,17 @@ export { Projection, getProjectionMetadata } from "./decorators/projection.js";
 export type { ProjectionOptions } from "./decorators/projection.js";
 export { Version, getVersionField } from "./decorators/version.js";
 export { Cacheable, getCacheableMetadata, registerCacheable } from "./decorators/cacheable.js";
+export type { LifecycleEvent } from "./decorators/lifecycle.js";
+export {
+  PrePersist,
+  PostPersist,
+  PreUpdate,
+  PostUpdate,
+  PreRemove,
+  PostRemove,
+  PostLoad,
+  getLifecycleCallbacks,
+} from "./decorators/lifecycle.js";
 
 export type { Repository } from "./repository/repository.js";
 export type {

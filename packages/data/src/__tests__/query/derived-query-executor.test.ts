@@ -18,6 +18,7 @@ const metadata: EntityMetadata = {
   manyToOneRelations: [],
   oneToManyRelations: [],
   manyToManyRelations: [],
+  lifecycleCallbacks: new Map(),
 };
 
 function buildQuery(methodName: string, args: unknown[] = []) {
@@ -234,6 +235,7 @@ describe("buildDerivedQuery", () => {
         manyToOneRelations: [],
         oneToManyRelations: [],
         manyToManyRelations: [],
+        lifecycleCallbacks: new Map(),
       };
 
       const descriptor = parseDerivedQueryMethod("findByUserName");

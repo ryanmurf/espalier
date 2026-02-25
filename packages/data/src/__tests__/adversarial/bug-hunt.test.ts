@@ -14,7 +14,7 @@ import { SelectBuilder } from "../../query/query-builder.js";
 import { InCriteria } from "../../query/criteria.js";
 
 class User {
-  constructor(public id: number, public name: string) {}
+  constructor(public id: number, public name: string, public age?: number) {}
 }
 
 class Product {
@@ -31,6 +31,10 @@ const userMetadata: EntityMetadata = {
     { fieldName: "age", columnName: "age" },
     { fieldName: "active", columnName: "active" },
   ],
+  manyToOneRelations: [],
+  oneToManyRelations: [],
+  manyToManyRelations: [],
+  lifecycleCallbacks: new Map(),
 };
 
 afterEach(() => {

@@ -8,6 +8,8 @@ import {
 import { getManyToOneRelations, getOneToManyRelations, getManyToManyRelations } from "../decorators/relations.js";
 import type { ManyToOneRelation, OneToManyRelation, ManyToManyRelation } from "../decorators/relations.js";
 import { getVersionField } from "../decorators/version.js";
+import { getLifecycleCallbacks } from "../decorators/lifecycle.js";
+import type { LifecycleEvent } from "../decorators/lifecycle.js";
 
 export interface FieldMapping {
   fieldName: string | symbol;
@@ -24,6 +26,7 @@ export interface EntityMetadata {
   manyToOneRelations: ManyToOneRelation[];
   oneToManyRelations: OneToManyRelation[];
   manyToManyRelations: ManyToManyRelation[];
+  lifecycleCallbacks: Map<LifecycleEvent, (string | symbol)[]>;
 }
 
 export function getEntityMetadata(
@@ -61,5 +64,6 @@ export function getEntityMetadata(
     manyToOneRelations: getManyToOneRelations(entityClass),
     oneToManyRelations: getOneToManyRelations(entityClass),
     manyToManyRelations: getManyToManyRelations(entityClass),
+    lifecycleCallbacks: getLifecycleCallbacks(entityClass),
   };
 }

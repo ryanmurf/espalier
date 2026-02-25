@@ -39,6 +39,7 @@ describe("createRowMapper", () => {
       manyToOneRelations: [],
       oneToManyRelations: [],
       manyToManyRelations: [],
+      lifecycleCallbacks: new Map(),
     };
 
     const mapper = createRowMapper(User, metadata);
@@ -70,6 +71,7 @@ describe("createRowMapper", () => {
       manyToOneRelations: [],
       oneToManyRelations: [],
       manyToManyRelations: [],
+      lifecycleCallbacks: new Map(),
     };
 
     const mapper = createRowMapper(Post, metadata);
@@ -101,6 +103,7 @@ describe("createRowMapper", () => {
       manyToOneRelations: [],
       oneToManyRelations: [],
       manyToManyRelations: [],
+      lifecycleCallbacks: new Map(),
     };
 
     const mapper = createRowMapper(Order, metadata);
@@ -127,6 +130,7 @@ describe("createRowMapper", () => {
       manyToOneRelations: [],
       oneToManyRelations: [],
       manyToManyRelations: [],
+      lifecycleCallbacks: new Map(),
     };
 
     const mapper = createRowMapper(Item, metadata);

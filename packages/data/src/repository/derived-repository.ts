@@ -17,6 +17,7 @@ import { EntityCache } from "../cache/entity-cache.js";
 import type { EntityCacheConfig } from "../cache/entity-cache.js";
 import { QueryCache } from "../cache/query-cache.js";
 import type { QueryCacheConfig } from "../cache/query-cache.js";
+import type { LifecycleEvent } from "../decorators/lifecycle.js";
 
 function isProjectionClass(arg: unknown): arg is new (...args: any[]) => any {
   return typeof arg === "function" && getProjectionMetadata(arg) !== undefined;
@@ -79,6 +80,17 @@ export function createDerivedRepository<T, ID>(
     return (entity as Record<string | symbol, unknown>)[metadata.idField];
   }
 
+  async function invokeLifecycleCallbacks(entity: T, event: LifecycleEvent): Promise<void> {
+    const methods = metadata.lifecycleCallbacks.get(event);
+    if (!methods) return;
+    for (const methodName of methods) {
+      const result = (entity as Record<string | symbol, (...args: any[]) => any>)[methodName].call(entity);
+      if (result instanceof Promise) {
+        await result;
+      }
+    }
+  }
+
   function getVersionColumn(): string | undefined {
     if (!metadata.versionField) return undefined;
     const field = metadata.fields.find(
@@ -137,6 +149,7 @@ export function createDerivedRepository<T, ID>(
         const rs = await stmt.executeQuery();
         if (await rs.next()) {
           const result = rowMapper.mapRow(rs);
+          await invokeLifecycleCallbacks(result, "PostLoad");
           entityCache.put(entityClass, id, result);
           return result;
         }
@@ -215,6 +228,7 @@ export function createDerivedRepository<T, ID>(
         const results: T[] = [];
         while (await rs.next()) {
           const entity = rowMapper.mapRow(rs);
+          await invokeLifecycleCallbacks(entity, "PostLoad");
           entityCache.put(entityClass, getEntityId(entity), entity);
           results.push(entity);
         }
@@ -234,6 +248,7 @@ export function createDerivedRepository<T, ID>(
 
       if (idValue != null) {
         // Update
+        await invokeLifecycleCallbacks(entity, "PreUpdate");
         const updateBuilder = new UpdateBuilder(metadata.tableName);
 
         // Build WHERE clause: id = ? (and optionally version = ?)
@@ -278,6 +293,8 @@ export function createDerivedRepository<T, ID>(
           const rs = await stmt.executeQuery();
           if (await rs.next()) {
             const saved = rowMapper.mapRow(rs);
+            await invokeLifecycleCallbacks(saved, "PostLoad");
+            await invokeLifecycleCallbacks(saved, "PostUpdate");
             entityCache.put(entityClass, getEntityId(saved), saved);
             queryCache.invalidate(entityClass);
             return saved;
@@ -298,6 +315,7 @@ export function createDerivedRepository<T, ID>(
         }
       } else {
         // Insert
+        await invokeLifecycleCallbacks(entity, "PrePersist");
         const insertBuilder = new InsertBuilder(metadata.tableName);
 
         for (const field of metadata.fields) {
@@ -322,6 +340,8 @@ export function createDerivedRepository<T, ID>(
           const rs = await stmt.executeQuery();
           if (await rs.next()) {
             const saved = rowMapper.mapRow(rs);
+            await invokeLifecycleCallbacks(saved, "PostLoad");
+            await invokeLifecycleCallbacks(saved, "PostPersist");
             entityCache.put(entityClass, getEntityId(saved), saved);
             queryCache.invalidate(entityClass);
             return saved;
@@ -342,6 +362,7 @@ export function createDerivedRepository<T, ID>(
     },
 
     async delete(entity: T): Promise<void> {
+      await invokeLifecycleCallbacks(entity, "PreRemove");
       const idField = metadata.idField;
       const idValue = (entity as Record<string | symbol, unknown>)[idField] as SqlValue;
       const idCol = getIdColumn();
@@ -380,6 +401,7 @@ export function createDerivedRepository<T, ID>(
             null,
           );
         }
+        await invokeLifecycleCallbacks(entity, "PostRemove");
         entityCache.evict(entityClass, idValue);
         queryCache.invalidate(entityClass);
       } finally {
@@ -550,7 +572,9 @@ export function createDerivedRepository<T, ID>(
             if (projMapper) {
               results.push(projMapper.mapRow(rs.getRow()));
             } else {
-              results.push(rowMapper.mapRow(rs));
+              const mapped = rowMapper.mapRow(rs);
+              await invokeLifecycleCallbacks(mapped, "PostLoad");
+              results.push(mapped);
             }
           }
 
