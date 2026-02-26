@@ -38,6 +38,7 @@ export class QueryCache {
   private readonly maxSize: number;
   private readonly defaultTtlMs: number;
   private readonly map = new Map<string, CacheEntry>();
+  private readonly entityIndex = new Map<new (...args: any[]) => any, Set<CacheEntry>>();
   private head: CacheEntry | null = null;
   private tail: CacheEntry | null = null;
 
@@ -102,8 +103,13 @@ export class QueryCache {
 
     const existing = this.map.get(strKey);
     if (existing) {
+      // If entityClass changed, update the reverse index
+      if (existing.entityClass !== entityClass) {
+        this.removeFromEntityIndex(existing);
+        existing.entityClass = entityClass;
+        this.addToEntityIndex(existing);
+      }
       existing.results = results;
-      existing.entityClass = entityClass;
       existing.expiresAt = expiresAt;
       this.moveToHead(existing);
       this._puts++;
@@ -120,24 +126,23 @@ export class QueryCache {
     };
     this.map.set(strKey, entry);
     this.addToHead(entry);
+    this.addToEntityIndex(entry);
     this._puts++;
 
     if (this.map.size > this.maxSize) {
       const evicted = this.removeTail();
       if (evicted) {
         this.map.delete(evicted.key);
+        this.removeFromEntityIndex(evicted);
       }
     }
   }
 
   invalidate(entityClass: new (...args: any[]) => any): void {
-    const toRemove: CacheEntry[] = [];
-    for (const entry of this.map.values()) {
-      if (entry.entityClass === entityClass) {
-        toRemove.push(entry);
-      }
-    }
-    for (const entry of toRemove) {
+    const entries = this.entityIndex.get(entityClass);
+    if (!entries || entries.size === 0) return;
+    // Copy to array since removeEntry mutates the set
+    for (const entry of [...entries]) {
       this.removeEntry(entry);
       this._invalidations++;
     }
@@ -146,6 +151,7 @@ export class QueryCache {
   invalidateAll(): void {
     const count = this.map.size;
     this.map.clear();
+    this.entityIndex.clear();
     this.head = null;
     this.tail = null;
     this._invalidations += count;
@@ -153,6 +159,7 @@ export class QueryCache {
 
   clear(): void {
     this.map.clear();
+    this.entityIndex.clear();
     this.head = null;
     this.tail = null;
   }
@@ -216,5 +223,25 @@ export class QueryCache {
   private removeEntry(entry: CacheEntry): void {
     this.removeNode(entry);
     this.map.delete(entry.key);
+    this.removeFromEntityIndex(entry);
+  }
+
+  private addToEntityIndex(entry: CacheEntry): void {
+    let set = this.entityIndex.get(entry.entityClass);
+    if (!set) {
+      set = new Set();
+      this.entityIndex.set(entry.entityClass, set);
+    }
+    set.add(entry);
+  }
+
+  private removeFromEntityIndex(entry: CacheEntry): void {
+    const set = this.entityIndex.get(entry.entityClass);
+    if (set) {
+      set.delete(entry);
+      if (set.size === 0) {
+        this.entityIndex.delete(entry.entityClass);
+      }
+    }
   }
 }
