@@ -70,15 +70,15 @@ interface PrefixResult {
 
 function parsePrefix(methodName: string): { prefix: PrefixResult; rest: string } {
   // findDistinctBy...
-  if (methodName.startsWith("findDistinct")) {
+  if (methodName.startsWith("findDistinctBy")) {
     const rest = methodName.slice("findDistinctBy".length);
-    if (!methodName.startsWith("findDistinctBy") || rest === undefined) {
-      throw new Error(
-        `Invalid derived query method name "${methodName}": ` +
-          `expected "By" after "findDistinct".`,
-      );
-    }
     return { prefix: { action: "find", distinct: true }, rest };
+  }
+  if (methodName.startsWith("findDistinct")) {
+    throw new Error(
+      `Invalid derived query method name "${methodName}": ` +
+        `expected "By" after "findDistinct".`,
+    );
   }
 
   // findFirst<N>By... or findFirstBy...
