@@ -49,8 +49,27 @@ const DROP_NOTES = `DROP TABLE IF EXISTS lock_test_notes CASCADE`;
 
 describe.skipIf(!canConnect)("E2E: Optimistic Locking", { timeout: 15000 }, () => {
   let ds: PgDataSource;
-  let docRepo: ReturnType<typeof createDerivedRepository<LockTestDocument, number>>;
-  let noteRepo: ReturnType<typeof createDerivedRepository<LockTestNote, number>>;
+
+  function makeDoc(title: string, content: string): LockTestDocument {
+    return Object.assign(Object.create(LockTestDocument.prototype), {
+      title,
+      content,
+    }) as LockTestDocument;
+  }
+
+  function makeNote(text: string): LockTestNote {
+    return Object.assign(Object.create(LockTestNote.prototype), {
+      text,
+    }) as LockTestNote;
+  }
+
+  function createDocRepo() {
+    return createDerivedRepository<LockTestDocument, number>(LockTestDocument, ds);
+  }
+
+  function createNoteRepo() {
+    return createDerivedRepository<LockTestNote, number>(LockTestNote, ds);
+  }
 
   beforeAll(async () => {
     ds = createTestDataSource();
@@ -61,9 +80,6 @@ describe.skipIf(!canConnect)("E2E: Optimistic Locking", { timeout: 15000 }, () =
     await stmt.executeUpdate(CREATE_DOCS);
     await stmt.executeUpdate(CREATE_NOTES);
     await conn.close();
-
-    docRepo = createDerivedRepository<LockTestDocument, number>(LockTestDocument, ds);
-    noteRepo = createDerivedRepository<LockTestNote, number>(LockTestNote, ds);
   });
 
   afterAll(async () => {
@@ -80,16 +96,14 @@ describe.skipIf(!canConnect)("E2E: Optimistic Locking", { timeout: 15000 }, () =
   // ──────────────────────────────────────────────
 
   it("save new entity sets version to 1", async () => {
-    const doc = Object.assign(Object.create(LockTestDocument.prototype), {
-      title: "Doc A",
-      content: "Content A",
-    }) as LockTestDocument;
-    const saved = await docRepo.save(doc);
+    const docRepo = createDocRepo();
+    const saved = await docRepo.save(makeDoc("Doc A", "Content A"));
     expect(saved.version).toBe(1);
     expect(saved.id).toBeDefined();
   });
 
   it("save new entity with version=0 treats as new and sets version to 1", async () => {
+    const docRepo = createDocRepo();
     const doc = Object.assign(Object.create(LockTestDocument.prototype), {
       title: "Doc B",
       content: "Content B",
@@ -104,30 +118,42 @@ describe.skipIf(!canConnect)("E2E: Optimistic Locking", { timeout: 15000 }, () =
   // ──────────────────────────────────────────────
 
   it("save existing entity increments version from 1 to 2", async () => {
-    const all = await docRepo.findAll();
-    const doc = all[0];
-    expect(doc.version).toBe(1);
+    const docRepo = createDocRepo();
+    const saved = await docRepo.save(makeDoc("IncDoc", "Original"));
+    expect(saved.version).toBe(1);
 
-    doc.content = "Updated content v2";
-    const saved = await docRepo.save(doc);
-    expect(saved.version).toBe(2);
-    expect(saved.content).toBe("Updated content v2");
+    saved.content = "Updated content v2";
+    const updated = await docRepo.save(saved);
+    expect(updated.version).toBe(2);
+    expect(updated.content).toBe("Updated content v2");
   });
 
-  it("save again increments version from 2 to 3", async () => {
-    const all = await docRepo.findAll();
-    const doc = all.find((d) => d.version === 2)!;
+  it("save twice increments version from 1 to 2 to 3", async () => {
+    const docRepo = createDocRepo();
+    const saved = await docRepo.save(makeDoc("MultiIncDoc", "Original"));
+    expect(saved.version).toBe(1);
 
-    doc.content = "Updated content v3";
-    const saved = await docRepo.save(doc);
-    expect(saved.version).toBe(3);
+    saved.content = "Updated v2";
+    const v2 = await docRepo.save(saved);
+    expect(v2.version).toBe(2);
+
+    v2.content = "Updated v3";
+    const v3 = await docRepo.save(v2);
+    expect(v3.version).toBe(3);
   });
 
   it("verify row in DB has correct version after saves", async () => {
-    const all = await docRepo.findAll();
-    const doc = all.find((d) => d.version === 3);
-    expect(doc).toBeDefined();
-    expect(doc!.content).toBe("Updated content v3");
+    const docRepo = createDocRepo();
+    const saved = await docRepo.save(makeDoc("VerifyDoc", "Original"));
+    saved.content = "Updated";
+    const updated = await docRepo.save(saved);
+
+    // Clear entity cache and reload from DB
+    (docRepo as any).getEntityCache().clear();
+    const reloaded = await docRepo.findById(updated.id);
+    expect(reloaded).toBeDefined();
+    expect(reloaded!.version).toBe(2);
+    expect(reloaded!.content).toBe("Updated");
   });
 
   // ──────────────────────────────────────────────
@@ -135,12 +161,8 @@ describe.skipIf(!canConnect)("E2E: Optimistic Locking", { timeout: 15000 }, () =
   // ──────────────────────────────────────────────
 
   it("save with stale version throws OptimisticLockException", async () => {
-    // Create a fresh document
-    const fresh = Object.assign(Object.create(LockTestDocument.prototype), {
-      title: "Conflict Doc",
-      content: "Original",
-    }) as LockTestDocument;
-    const saved = await docRepo.save(fresh);
+    const docRepo = createDocRepo();
+    const saved = await docRepo.save(makeDoc("Conflict Doc", "Original"));
     expect(saved.version).toBe(1);
 
     // Load it (user1)
@@ -164,12 +186,8 @@ describe.skipIf(!canConnect)("E2E: Optimistic Locking", { timeout: 15000 }, () =
   });
 
   it("OptimisticLockException contains correct properties", async () => {
-    // Create a document and simulate a conflict
-    const doc = Object.assign(Object.create(LockTestDocument.prototype), {
-      title: "Props Doc",
-      content: "Original",
-    }) as LockTestDocument;
-    const saved = await docRepo.save(doc);
+    const docRepo = createDocRepo();
+    const saved = await docRepo.save(makeDoc("Props Doc", "Original"));
 
     // Bump version in DB
     const conn = await ds.getConnection();
@@ -195,11 +213,8 @@ describe.skipIf(!canConnect)("E2E: Optimistic Locking", { timeout: 15000 }, () =
   });
 
   it("after conflict, entity version is NOT modified", async () => {
-    const doc = Object.assign(Object.create(LockTestDocument.prototype), {
-      title: "NoMod Doc",
-      content: "Original",
-    }) as LockTestDocument;
-    const saved = await docRepo.save(doc);
+    const docRepo = createDocRepo();
+    const saved = await docRepo.save(makeDoc("NoMod Doc", "Original"));
     const originalVersion = saved.version;
 
     // Bump version in DB
@@ -224,11 +239,8 @@ describe.skipIf(!canConnect)("E2E: Optimistic Locking", { timeout: 15000 }, () =
   });
 
   it("after conflict, DB row is unchanged", async () => {
-    const doc = Object.assign(Object.create(LockTestDocument.prototype), {
-      title: "Unchanged Doc",
-      content: "Original content",
-    }) as LockTestDocument;
-    const saved = await docRepo.save(doc);
+    const docRepo = createDocRepo();
+    const saved = await docRepo.save(makeDoc("Unchanged Doc", "Original content"));
 
     // Bump version in DB with a specific content
     const conn = await ds.getConnection();
@@ -249,6 +261,7 @@ describe.skipIf(!canConnect)("E2E: Optimistic Locking", { timeout: 15000 }, () =
     }
 
     // Reload and verify DB row has the concurrent updater's content
+    (docRepo as any).getEntityCache().clear();
     const reloaded = await docRepo.findById(saved.id);
     expect(reloaded!.content).toBe("DB content");
     expect(reloaded!.version).toBe(2);
@@ -259,24 +272,19 @@ describe.skipIf(!canConnect)("E2E: Optimistic Locking", { timeout: 15000 }, () =
   // ──────────────────────────────────────────────
 
   it("delete entity with correct version succeeds", async () => {
-    const doc = Object.assign(Object.create(LockTestDocument.prototype), {
-      title: "Delete OK",
-      content: "To be deleted",
-    }) as LockTestDocument;
-    const saved = await docRepo.save(doc);
+    const docRepo = createDocRepo();
+    const saved = await docRepo.save(makeDoc("Delete OK", "To be deleted"));
 
     await docRepo.delete(saved);
 
+    (docRepo as any).getEntityCache().clear();
     const found = await docRepo.findById(saved.id);
     expect(found).toBeNull();
   });
 
   it("delete entity with stale version throws OptimisticLockException", async () => {
-    const doc = Object.assign(Object.create(LockTestDocument.prototype), {
-      title: "Delete Fail",
-      content: "Should not be deleted",
-    }) as LockTestDocument;
-    const saved = await docRepo.save(doc);
+    const docRepo = createDocRepo();
+    const saved = await docRepo.save(makeDoc("Delete Fail", "Should not be deleted"));
 
     // Bump version in DB
     const conn = await ds.getConnection();
@@ -291,6 +299,7 @@ describe.skipIf(!canConnect)("E2E: Optimistic Locking", { timeout: 15000 }, () =
     await expect(docRepo.delete(saved)).rejects.toThrow(OptimisticLockException);
 
     // Verify entity still exists in DB
+    (docRepo as any).getEntityCache().clear();
     const found = await docRepo.findById(saved.id);
     expect(found).not.toBeNull();
   });
@@ -300,28 +309,25 @@ describe.skipIf(!canConnect)("E2E: Optimistic Locking", { timeout: 15000 }, () =
   // ──────────────────────────────────────────────
 
   it("save non-versioned entity works normally", async () => {
-    const note = Object.assign(Object.create(LockTestNote.prototype), {
-      text: "A simple note",
-    }) as LockTestNote;
-    const saved = await noteRepo.save(note);
+    const noteRepo = createNoteRepo();
+    const saved = await noteRepo.save(makeNote("A simple note"));
     expect(saved.id).toBeDefined();
     expect(saved.text).toBe("A simple note");
   });
 
   it("update non-versioned entity works normally", async () => {
-    const all = await noteRepo.findAll();
-    const note = all[0];
-    note.text = "Updated note";
-    const saved = await noteRepo.save(note);
-    expect(saved.text).toBe("Updated note");
+    const noteRepo = createNoteRepo();
+    const saved = await noteRepo.save(makeNote("Original note"));
+    saved.text = "Updated note";
+    const updated = await noteRepo.save(saved);
+    expect(updated.text).toBe("Updated note");
   });
 
   it("delete non-versioned entity works normally", async () => {
-    const note = Object.assign(Object.create(LockTestNote.prototype), {
-      text: "To be deleted",
-    }) as LockTestNote;
-    const saved = await noteRepo.save(note);
+    const noteRepo = createNoteRepo();
+    const saved = await noteRepo.save(makeNote("To be deleted"));
     await noteRepo.delete(saved);
+    (noteRepo as any).getEntityCache().clear();
     const found = await noteRepo.findById(saved.id);
     expect(found).toBeNull();
   });
@@ -330,12 +336,9 @@ describe.skipIf(!canConnect)("E2E: Optimistic Locking", { timeout: 15000 }, () =
   // Concurrent simulation
   // ──────────────────────────────────────────────
 
-  it("two users: first save succeeds, second save throws", async () => {
-    const doc = Object.assign(Object.create(LockTestDocument.prototype), {
-      title: "Concurrent Doc",
-      content: "Original",
-    }) as LockTestDocument;
-    const saved = await docRepo.save(doc);
+  it("two users: first save succeeds, second save throws, reload shows first user's changes", async () => {
+    const docRepo = createDocRepo();
+    const saved = await docRepo.save(makeDoc("Concurrent Doc", "Original"));
 
     // Both users load the same entity
     const user1 = await docRepo.findById(saved.id);
@@ -349,14 +352,12 @@ describe.skipIf(!canConnect)("E2E: Optimistic Locking", { timeout: 15000 }, () =
     // User2 tries to save with stale version — throws
     user2!.content = "User2 changes";
     await expect(docRepo.save(user2!)).rejects.toThrow(OptimisticLockException);
-  });
 
-  it("after concurrent conflict, reload shows first user's changes", async () => {
-    // Find the concurrent doc
-    const all = await docRepo.findAll();
-    const doc = all.find((d) => d.title === "Concurrent Doc");
-    expect(doc).toBeDefined();
-    expect(doc!.content).toBe("User1 changes");
-    expect(doc!.version).toBe(2);
+    // Reload and verify first user's changes persisted
+    (docRepo as any).getEntityCache().clear();
+    const reloaded = await docRepo.findById(saved.id);
+    expect(reloaded).toBeDefined();
+    expect(reloaded!.content).toBe("User1 changes");
+    expect(reloaded!.version).toBe(2);
   });
 });

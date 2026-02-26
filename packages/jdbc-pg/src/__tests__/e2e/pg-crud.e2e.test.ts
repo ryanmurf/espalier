@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import type { Connection } from "espalier-jdbc";
 import type { PgDataSource } from "../../pg-data-source.js";
 import {
@@ -23,6 +23,19 @@ describe.skipIf(!canConnect)("E2E: CRUD operations", { timeout: 10000 }, () => {
     await stmt.executeUpdate(testTableDDL(TABLE));
   });
 
+  beforeEach(async () => {
+    const stmt = conn.createStatement();
+    await stmt.executeUpdate(`DELETE FROM ${TABLE}`);
+    // Seed a single row so each test starts with known state
+    const ps = conn.prepareStatement(
+      `INSERT INTO ${TABLE} (name, email, age) VALUES ($1, $2, $3)`,
+    );
+    ps.setParameter(1, "Alice");
+    ps.setParameter(2, "alice@example.com");
+    ps.setParameter(3, 30);
+    await ps.executeUpdate();
+  });
+
   afterAll(async () => {
     if (conn && !conn.isClosed()) {
       const stmt = conn.createStatement();
@@ -38,9 +51,9 @@ describe.skipIf(!canConnect)("E2E: CRUD operations", { timeout: 10000 }, () => {
     const ps = conn.prepareStatement(
       `INSERT INTO ${TABLE} (name, email, age) VALUES ($1, $2, $3)`,
     );
-    ps.setParameter(1, "Alice");
-    ps.setParameter(2, "alice@example.com");
-    ps.setParameter(3, 30);
+    ps.setParameter(1, "Bob");
+    ps.setParameter(2, "bob@example.com");
+    ps.setParameter(3, 25);
     const count = await ps.executeUpdate();
     expect(count).toBe(1);
   });

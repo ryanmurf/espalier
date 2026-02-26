@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import type { Connection } from "espalier-jdbc";
 import {
   QueryBuilder,
@@ -17,12 +17,35 @@ import {
 const TABLE = "e2e_query_builder";
 const canConnect = await isPostgresAvailable();
 
+const SEED_ROWS = [
+  { name: "Alice", email: "alice@example.com", age: 30, active: true },
+  { name: "Bob", email: "bob@example.com", age: 25, active: true },
+  { name: "Charlie", email: "charlie@example.com", age: 35, active: false },
+  { name: "Diana", email: "diana@example.com", age: 28, active: true },
+  { name: "Eve", email: null, age: 22, active: false },
+];
+
 describe.skipIf(!canConnect)(
   "E2E: QueryBuilder against Postgres",
   { timeout: 15000 },
   () => {
     let ds: PgDataSource;
     let conn: Connection;
+
+    async function reseed() {
+      const stmt = conn.createStatement();
+      await stmt.executeUpdate(`DELETE FROM ${TABLE}`);
+      for (const r of SEED_ROWS) {
+        const ps = conn.prepareStatement(
+          `INSERT INTO ${TABLE} (name, email, age, active) VALUES ($1, $2, $3, $4)`,
+        );
+        ps.setParameter(1, r.name);
+        ps.setParameter(2, r.email);
+        ps.setParameter(3, r.age);
+        ps.setParameter(4, r.active);
+        await ps.executeUpdate();
+      }
+    }
 
     beforeAll(async () => {
       ds = createTestDataSource();
@@ -39,25 +62,10 @@ describe.skipIf(!canConnect)(
           created_at TIMESTAMPTZ DEFAULT NOW()
         )
       `);
+    });
 
-      // Seed data
-      const rows = [
-        { name: "Alice", email: "alice@example.com", age: 30, active: true },
-        { name: "Bob", email: "bob@example.com", age: 25, active: true },
-        { name: "Charlie", email: "charlie@example.com", age: 35, active: false },
-        { name: "Diana", email: "diana@example.com", age: 28, active: true },
-        { name: "Eve", email: null, age: 22, active: false },
-      ];
-      for (const r of rows) {
-        const ps = conn.prepareStatement(
-          `INSERT INTO ${TABLE} (name, email, age, active) VALUES ($1, $2, $3, $4)`,
-        );
-        ps.setParameter(1, r.name);
-        ps.setParameter(2, r.email);
-        ps.setParameter(3, r.age);
-        ps.setParameter(4, r.active);
-        await ps.executeUpdate();
-      }
+    beforeEach(async () => {
+      await reseed();
     });
 
     afterAll(async () => {

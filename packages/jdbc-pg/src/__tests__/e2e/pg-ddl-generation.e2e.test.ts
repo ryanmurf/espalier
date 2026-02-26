@@ -143,6 +143,11 @@ describe.skipIf(!canConnect)("DdlGenerator E2E (round-trip)", () => {
 
   describe("UNIQUE constraint round-trip", () => {
     it("should create table and verify unique flags via introspection", async () => {
+      // Ensure the constrained table exists (don't depend on prior test order)
+      const sql = generator.generateCreateTable(ConstrainedEntity, { ifNotExists: true });
+      const stmt = conn.createStatement();
+      await stmt.executeUpdate(sql);
+
       const columns = await introspector.getColumns("e2e_ddl_constrained");
 
       const email = columns.find((c) => c.columnName === "email")!;
@@ -155,7 +160,11 @@ describe.skipIf(!canConnect)("DdlGenerator E2E (round-trip)", () => {
 
   describe("DEFAULT value round-trip", () => {
     it("should apply default when inserting without the column", async () => {
+      // Ensure the constrained table exists
+      const createSql = generator.generateCreateTable(ConstrainedEntity, { ifNotExists: true });
       const stmt = conn.createStatement();
+      await stmt.executeUpdate(createSql);
+
       // Insert a row without specifying status (has DEFAULT 'pending')
       await stmt.executeUpdate(
         "INSERT INTO e2e_ddl_constrained (name, email) VALUES ('Alice', 'alice@test.com')",
@@ -171,6 +180,11 @@ describe.skipIf(!canConnect)("DdlGenerator E2E (round-trip)", () => {
     });
 
     it("should introspect default value from column metadata", async () => {
+      // Ensure the constrained table exists
+      const sql = generator.generateCreateTable(ConstrainedEntity, { ifNotExists: true });
+      const stmt = conn.createStatement();
+      await stmt.executeUpdate(sql);
+
       const columns = await introspector.getColumns("e2e_ddl_constrained");
       const status = columns.find((c) => c.columnName === "status")!;
       expect(status.defaultValue).toContain("pending");
@@ -179,6 +193,11 @@ describe.skipIf(!canConnect)("DdlGenerator E2E (round-trip)", () => {
 
   describe("PRIMARY KEY round-trip", () => {
     it("should introspect primary key on @Id field", async () => {
+      // Ensure the basic table exists
+      const sql = generator.generateCreateTable(BasicEntity, { ifNotExists: true });
+      const stmt = conn.createStatement();
+      await stmt.executeUpdate(sql);
+
       const columns = await introspector.getColumns("e2e_ddl_basic");
       const id = columns.find((c) => c.columnName === "id")!;
       expect(id.primaryKey).toBe(true);
@@ -189,6 +208,11 @@ describe.skipIf(!canConnect)("DdlGenerator E2E (round-trip)", () => {
     });
 
     it("should return id from getPrimaryKeys", async () => {
+      // Ensure the basic table exists
+      const sql = generator.generateCreateTable(BasicEntity, { ifNotExists: true });
+      const stmt = conn.createStatement();
+      await stmt.executeUpdate(sql);
+
       const keys = await introspector.getPrimaryKeys("e2e_ddl_basic");
       expect(keys).toEqual(["id"]);
     });

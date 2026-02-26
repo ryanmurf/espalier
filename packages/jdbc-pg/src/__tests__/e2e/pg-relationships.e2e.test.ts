@@ -88,6 +88,16 @@ describe.skipIf(!canConnect)("Entity Relationships E2E", () => {
     "e2e_rel_departments",
   ];
 
+  // Data tables that hold rows (not the schema itself)
+  const DATA_TABLES = [
+    "e2e_rel_student_courses",
+    "e2e_rel_employees",
+    "e2e_rel_contractors",
+    "e2e_rel_students",
+    "e2e_rel_courses",
+    "e2e_rel_departments",
+  ];
+
   beforeAll(async () => {
     ds = createTestDataSource();
     conn = await ds.getConnection();
@@ -124,6 +134,14 @@ describe.skipIf(!canConnect)("Entity Relationships E2E", () => {
     }
   });
 
+  /** Delete all data rows (FK-safe order: children first) */
+  async function clearAllData() {
+    const stmt = conn.createStatement();
+    for (const table of DATA_TABLES) {
+      await stmt.executeUpdate(`DELETE FROM ${table}`);
+    }
+  }
+
   describe("@ManyToOne generates FK column", () => {
     it("should create department_id column with REFERENCES on employee table", async () => {
       const columns = await introspector.getColumns("e2e_rel_employees");
@@ -136,6 +154,7 @@ describe.skipIf(!canConnect)("Entity Relationships E2E", () => {
     });
 
     it("should enforce FK constraint — valid insert succeeds", async () => {
+      await clearAllData();
       const stmt = conn.createStatement();
       await stmt.executeUpdate(
         "INSERT INTO e2e_rel_departments (name) VALUES ('Engineering')",
@@ -158,6 +177,7 @@ describe.skipIf(!canConnect)("Entity Relationships E2E", () => {
     });
 
     it("should reject insert with non-existent FK value", async () => {
+      await clearAllData();
       const ps = conn.prepareStatement(
         "INSERT INTO e2e_rel_employees (name, department_id) VALUES ($1, $2)",
       );
@@ -183,6 +203,7 @@ describe.skipIf(!canConnect)("Entity Relationships E2E", () => {
     });
 
     it("should allow inserting contractor with NULL department", async () => {
+      await clearAllData();
       const stmt = conn.createStatement();
       await expect(
         stmt.executeUpdate(
@@ -200,6 +221,13 @@ describe.skipIf(!canConnect)("Entity Relationships E2E", () => {
     });
 
     it("should allow inserting contractor with valid department", async () => {
+      await clearAllData();
+      // Create the department first
+      const stmt = conn.createStatement();
+      await stmt.executeUpdate(
+        "INSERT INTO e2e_rel_departments (name) VALUES ('Engineering')",
+      );
+
       const ps = conn.prepareStatement(
         "SELECT id FROM e2e_rel_departments WHERE name = $1",
       );
@@ -245,6 +273,7 @@ describe.skipIf(!canConnect)("Entity Relationships E2E", () => {
     });
 
     it("should enforce FK constraints on join table", async () => {
+      await clearAllData();
       // Insert valid students and courses
       const stmt = conn.createStatement();
       await stmt.executeUpdate(
@@ -280,19 +309,39 @@ describe.skipIf(!canConnect)("Entity Relationships E2E", () => {
     });
 
     it("should reject join table insert with non-existent student FK", async () => {
+      await clearAllData();
+      // Need a valid course to test with
+      const stmt = conn.createStatement();
+      await stmt.executeUpdate(
+        "INSERT INTO e2e_rel_courses (title) VALUES ('ValidCourse')",
+      );
+      const coursePs = conn.prepareStatement(
+        "SELECT id FROM e2e_rel_courses WHERE title = $1",
+      );
+      coursePs.setParameter(1, "ValidCourse");
+      const courseRs = await coursePs.executeQuery();
+      await courseRs.next();
+      const courseId = courseRs.getNumber("id");
+
       const ps = conn.prepareStatement(
         "INSERT INTO e2e_rel_student_courses (student_id, course_id) VALUES ($1, $2)",
       );
       ps.setParameter(1, 99999);
-      ps.setParameter(2, 1);
+      ps.setParameter(2, courseId);
       await expect(ps.executeUpdate()).rejects.toThrow();
     });
 
     it("should reject join table insert with non-existent course FK", async () => {
+      await clearAllData();
+      // Need a valid student to test with
+      const stmt = conn.createStatement();
+      await stmt.executeUpdate(
+        "INSERT INTO e2e_rel_students (name) VALUES ('ValidStudent')",
+      );
       const studentPs = conn.prepareStatement(
         "SELECT id FROM e2e_rel_students WHERE name = $1",
       );
-      studentPs.setParameter(1, "StudentA");
+      studentPs.setParameter(1, "ValidStudent");
       const rs = await studentPs.executeQuery();
       await rs.next();
       const studentId = rs.getNumber("id");
@@ -306,7 +355,16 @@ describe.skipIf(!canConnect)("Entity Relationships E2E", () => {
     });
 
     it("should reject duplicate composite key in join table", async () => {
-      // The first entry was already inserted above; try a duplicate
+      await clearAllData();
+      // Set up student, course, and initial join entry
+      const stmt = conn.createStatement();
+      await stmt.executeUpdate(
+        "INSERT INTO e2e_rel_students (name) VALUES ('StudentA')",
+      );
+      await stmt.executeUpdate(
+        "INSERT INTO e2e_rel_courses (title) VALUES ('Math 101')",
+      );
+
       const studentPs = conn.prepareStatement(
         "SELECT id FROM e2e_rel_students WHERE name = $1",
       );
@@ -323,21 +381,34 @@ describe.skipIf(!canConnect)("Entity Relationships E2E", () => {
       await courseRs.next();
       const courseId = courseRs.getNumber("id");
 
-      const ps = conn.prepareStatement(
+      // First insert succeeds
+      const joinPs = conn.prepareStatement(
         "INSERT INTO e2e_rel_student_courses (student_id, course_id) VALUES ($1, $2)",
       );
-      ps.setParameter(1, studentId);
-      ps.setParameter(2, courseId);
-      await expect(ps.executeUpdate()).rejects.toThrow();
+      joinPs.setParameter(1, studentId);
+      joinPs.setParameter(2, courseId);
+      await joinPs.executeUpdate();
+
+      // Duplicate insert should fail
+      const dupPs = conn.prepareStatement(
+        "INSERT INTO e2e_rel_student_courses (student_id, course_id) VALUES ($1, $2)",
+      );
+      dupPs.setParameter(1, studentId);
+      dupPs.setParameter(2, courseId);
+      await expect(dupPs.executeUpdate()).rejects.toThrow();
     });
   });
 
   describe("full relationship round-trip", () => {
     it("should query across relationships using JOINs", async () => {
-      // Add another student and courses
+      await clearAllData();
       const stmt = conn.createStatement();
+      // Set up students and courses from scratch
       await stmt.executeUpdate(
         "INSERT INTO e2e_rel_students (name) VALUES ('StudentB')",
+      );
+      await stmt.executeUpdate(
+        "INSERT INTO e2e_rel_courses (title) VALUES ('Math 101')",
       );
       await stmt.executeUpdate(
         "INSERT INTO e2e_rel_courses (title) VALUES ('Physics 201')",
@@ -402,6 +473,27 @@ describe.skipIf(!canConnect)("Entity Relationships E2E", () => {
     });
 
     it("should query ManyToOne relationship via JOIN", async () => {
+      await clearAllData();
+      // Set up department and employee from scratch
+      const stmt = conn.createStatement();
+      await stmt.executeUpdate(
+        "INSERT INTO e2e_rel_departments (name) VALUES ('Engineering')",
+      );
+      const deptPs = conn.prepareStatement(
+        "SELECT id FROM e2e_rel_departments WHERE name = $1",
+      );
+      deptPs.setParameter(1, "Engineering");
+      const deptRs = await deptPs.executeQuery();
+      await deptRs.next();
+      const deptId = deptRs.getNumber("id");
+
+      const empPs = conn.prepareStatement(
+        "INSERT INTO e2e_rel_employees (name, department_id) VALUES ($1, $2)",
+      );
+      empPs.setParameter(1, "Alice");
+      empPs.setParameter(2, deptId);
+      await empPs.executeUpdate();
+
       // Query: find all employees in Engineering department
       const ps = conn.prepareStatement(
         `SELECT e.name FROM e2e_rel_employees e
