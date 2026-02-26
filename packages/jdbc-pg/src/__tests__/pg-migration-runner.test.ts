@@ -720,11 +720,18 @@ describe("PgMigrationRunner", () => {
       expect(checksum).toMatch(/^[a-f0-9]{64}$/);
     });
 
-    it("produces consistent checksum for same SQL", () => {
+    it("produces consistent checksum for identical migrations", () => {
+      const m1 = createMigration("001", "test", "SELECT 1");
+      const m2 = createMigration("001", "test", "SELECT 1");
+
+      expect(computeChecksum(m1)).toBe(computeChecksum(m2));
+    });
+
+    it("produces different checksum when version or description differs", () => {
       const m1 = createMigration("001", "test", "SELECT 1");
       const m2 = createMigration("002", "other", "SELECT 1");
 
-      expect(computeChecksum(m1)).toBe(computeChecksum(m2));
+      expect(computeChecksum(m1)).not.toBe(computeChecksum(m2));
     });
 
     it("produces different checksum for different SQL", () => {

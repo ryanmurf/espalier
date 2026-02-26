@@ -319,7 +319,7 @@ describe("SqliteSchemaIntrospector — resource cleanup (FIXED #89)", () => {
 // ─────────────────────────────────────────────────
 
 describe("SQLite migration runner edge cases", () => {
-  it("computeChecksum only uses up() SQL, ignoring down()/description/version", async () => {
+  it("computeChecksum includes version, description, up(), and down() (FIXED #69)", async () => {
     const { computeChecksum } = await import("../../sqlite-migration-runner.js");
 
     const migration1 = {
@@ -335,8 +335,8 @@ describe("SQLite migration runner edge cases", () => {
       down: () => "SOMETHING ELSE",
     };
 
-    // BUG #69: same checksum despite different version, description, and down()
-    expect(computeChecksum(migration1)).toBe(computeChecksum(migration2));
+    // FIXED: different checksums because version, description, and down() are included
+    expect(computeChecksum(migration1)).not.toBe(computeChecksum(migration2));
   });
 
   it("computeChecksum with empty string up() produces a valid hash", async () => {

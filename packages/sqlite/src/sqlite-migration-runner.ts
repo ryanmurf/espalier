@@ -246,6 +246,9 @@ export class SqliteMigrationRunner implements MigrationRunner {
 
 export function computeChecksum(migration: Migration): string {
   const upSql = migration.up();
-  const normalized = Array.isArray(upSql) ? upSql.join("\n") : upSql;
-  return createHash("sha256").update(normalized).digest("hex");
+  const downSql = migration.down();
+  const upNorm = Array.isArray(upSql) ? upSql.join("\n") : upSql;
+  const downNorm = Array.isArray(downSql) ? downSql.join("\n") : downSql;
+  const content = `version:${migration.version}\ndescription:${migration.description}\nup:${upNorm}\ndown:${downNorm}`;
+  return createHash("sha256").update(content).digest("hex");
 }

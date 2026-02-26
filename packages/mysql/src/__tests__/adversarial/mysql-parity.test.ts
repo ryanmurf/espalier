@@ -284,8 +284,7 @@ describe("MysqlSchemaIntrospector — resource cleanup (FIXED #89)", () => {
 // ─────────────────────────────────────────────────
 
 describe("MySQL migration runner edge cases", () => {
-  it("computeChecksum only uses up() SQL, ignoring down()/description/version", async () => {
-    // This is the same bug as #69 — checksum only covers up() SQL
+  it("computeChecksum includes version, description, up(), and down() (FIXED #69)", async () => {
     const { computeChecksum } = await import("../../mysql-migration-runner.js");
 
     const migration1 = {
@@ -301,8 +300,8 @@ describe("MySQL migration runner edge cases", () => {
       down: () => "SOMETHING COMPLETELY DIFFERENT",
     };
 
-    // BUG: same checksum despite different version, description, and down()
-    expect(computeChecksum(migration1)).toBe(computeChecksum(migration2));
+    // FIXED: different checksums because version, description, and down() are included
+    expect(computeChecksum(migration1)).not.toBe(computeChecksum(migration2));
   });
 
   it("computeChecksum with array up() joins with newline", async () => {
