@@ -5,6 +5,8 @@ export interface ParsedArgs {
   flags: Record<string, string | boolean>;
 }
 
+const VALUED_FLAGS = new Set(["config", "dir"]);
+
 export function parseArgs(argv: string[]): ParsedArgs {
   // Skip node and script path
   const args = argv.slice(2);
@@ -19,12 +21,17 @@ export function parseArgs(argv: string[]): ParsedArgs {
       if (eqIdx !== -1) {
         flags[arg.slice(2, eqIdx)] = arg.slice(eqIdx + 1);
       } else {
-        const next = args[i + 1];
-        if (next !== undefined && !next.startsWith("--")) {
-          flags[arg.slice(2)] = next;
-          i++;
+        const flagName = arg.slice(2);
+        if (VALUED_FLAGS.has(flagName)) {
+          const next = args[i + 1];
+          if (next !== undefined) {
+            flags[flagName] = next;
+            i++;
+          } else {
+            flags[flagName] = true;
+          }
         } else {
-          flags[arg.slice(2)] = true;
+          flags[flagName] = true;
         }
       }
     } else {
