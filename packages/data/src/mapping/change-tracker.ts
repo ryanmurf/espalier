@@ -19,6 +19,26 @@ function deepEqual(a: unknown, b: unknown): boolean {
     return a.getTime() === b.getTime();
   }
 
+  if (a instanceof RegExp && b instanceof RegExp) {
+    return a.source === b.source && a.flags === b.flags;
+  }
+
+  if (a instanceof Map && b instanceof Map) {
+    if (a.size !== b.size) return false;
+    for (const [key, val] of a) {
+      if (!b.has(key) || !deepEqual(val, b.get(key))) return false;
+    }
+    return true;
+  }
+
+  if (a instanceof Set && b instanceof Set) {
+    if (a.size !== b.size) return false;
+    for (const val of a) {
+      if (!b.has(val)) return false;
+    }
+    return true;
+  }
+
   if (Array.isArray(a) && Array.isArray(b)) {
     if (a.length !== b.length) return false;
     for (let i = 0; i < a.length; i++) {
