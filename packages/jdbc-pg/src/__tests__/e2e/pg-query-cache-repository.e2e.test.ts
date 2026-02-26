@@ -236,7 +236,8 @@ describe.skipIf(!canConnect)("E2E: Query Cache with Repository", { timeout: 1500
 
     expect(qc.size()).toBe(0);
     expect(qc.getStats().hits).toBe(0);
-    expect(qc.getStats().misses).toBeGreaterThanOrEqual(2);
+    // Disabled cache should NOT inflate miss stats (#68 fix)
+    expect(qc.getStats().misses).toBe(0);
   });
 
   // ──────────────────────────────────────────────
