@@ -65,9 +65,11 @@ export class StatementCache {
 
     const existing = this.map.get(sql);
     if (existing) {
+      const oldStatement = existing.statement;
       existing.statement = statement;
       this.moveToHead(existing);
       this._puts++;
+      oldStatement.close().catch(() => {});
       return;
     }
 
