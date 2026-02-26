@@ -27,30 +27,24 @@ export async function warmupPool(
   targetConnections: number,
 ): Promise<WarmupResult> {
   const startTime = Date.now();
+
+  const results = await Promise.allSettled(
+    Array.from({ length: targetConnections }, () =>
+      dataSource.getConnection().then((conn) => conn.close()),
+    ),
+  );
+
   const errors: Error[] = [];
-  let created = 0;
   let failed = 0;
-
-  const promises: Promise<void>[] = [];
-
-  for (let i = 0; i < targetConnections; i++) {
-    promises.push(
-      dataSource.getConnection()
-        .then(async (conn) => {
-          created++;
-          await conn.close();
-        })
-        .catch((err: Error) => {
-          failed++;
-          errors.push(err);
-        }),
-    );
+  for (const r of results) {
+    if (r.status === "rejected") {
+      failed++;
+      errors.push(r.reason as Error);
+    }
   }
 
-  await Promise.all(promises);
-
   return {
-    connectionsCreated: created,
+    connectionsCreated: results.length - failed,
     connectionsFailed: failed,
     durationMs: Date.now() - startTime,
     errors,
