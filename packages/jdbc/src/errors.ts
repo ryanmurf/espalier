@@ -47,6 +47,20 @@ export class QueryError extends DatabaseError {
     super(message, cause, code ?? DatabaseErrorCode.QUERY_FAILED);
     this.name = "QueryError";
   }
+
+  /** Returns a safe string without SQL or internal details, suitable for external responses. */
+  toSafeString(): string {
+    return `${this.name}: ${this.code}`;
+  }
+
+  /** Omits sql and cause from JSON serialization to prevent information disclosure. */
+  toJSON(): Record<string, unknown> {
+    return {
+      name: this.name,
+      message: this.message,
+      code: this.code,
+    };
+  }
 }
 
 export class TransactionError extends DatabaseError {
