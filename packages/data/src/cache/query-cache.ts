@@ -2,6 +2,8 @@ export interface QueryCacheConfig {
   enabled?: boolean;
   maxSize?: number;
   defaultTtlMs?: number;
+  maxResultSize?: number;
+  ttlJitterPercent?: number;
 }
 
 export interface QueryCacheKey {
@@ -20,6 +22,8 @@ export interface QueryCacheStats {
 
 const DEFAULT_MAX_SIZE = 500;
 const DEFAULT_TTL_MS = 60_000;
+const DEFAULT_MAX_RESULT_SIZE = 1000;
+const DEFAULT_TTL_JITTER_PERCENT = 10;
 
 interface CacheEntry {
   key: string;
@@ -48,10 +52,15 @@ export class QueryCache {
   private _invalidations = 0;
   private _expirations = 0;
 
+  private readonly maxResultSize: number;
+  private readonly ttlJitterPercent: number;
+
   constructor(config?: QueryCacheConfig) {
     this.enabled = config?.enabled ?? true;
     this.maxSize = config?.maxSize ?? DEFAULT_MAX_SIZE;
     this.defaultTtlMs = config?.defaultTtlMs ?? DEFAULT_TTL_MS;
+    this.maxResultSize = config?.maxResultSize ?? DEFAULT_MAX_RESULT_SIZE;
+    this.ttlJitterPercent = config?.ttlJitterPercent ?? DEFAULT_TTL_JITTER_PERCENT;
   }
 
   private static cacheKey(key: QueryCacheKey): string {
@@ -96,10 +105,14 @@ export class QueryCache {
     ttlMs?: number,
   ): void {
     if (!this.enabled) return;
+    if (results.length > this.maxResultSize) return;
 
     const strKey = QueryCache.cacheKey(key);
     const ttl = ttlMs ?? this.defaultTtlMs;
-    const expiresAt = Date.now() + ttl;
+    const jitter = this.ttlJitterPercent > 0
+      ? Math.floor(ttl * (this.ttlJitterPercent / 100) * (Math.random() * 2 - 1))
+      : 0;
+    const expiresAt = Date.now() + ttl + jitter;
 
     const existing = this.map.get(strKey);
     if (existing) {

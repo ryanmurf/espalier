@@ -1,6 +1,7 @@
 export interface EntityCacheConfig {
   enabled?: boolean;
   maxSize?: number;
+  maxTotalSize?: number;
 }
 
 export interface EntityCacheStats {
@@ -12,6 +13,7 @@ export interface EntityCacheStats {
 }
 
 const DEFAULT_MAX_SIZE = 1000;
+const DEFAULT_MAX_TOTAL_SIZE = 10_000;
 
 /**
  * Per-entity-type LRU cache node using a doubly-linked list for O(1) eviction.
@@ -60,6 +62,16 @@ class LruMap<T> {
         this._evictions++;
         return true; // eviction occurred
       }
+    }
+    return false;
+  }
+
+  evictTail(): boolean {
+    const evicted = this.removeTail();
+    if (evicted) {
+      this.map.delete(evicted.key);
+      this._evictions++;
+      return true;
     }
     return false;
   }
@@ -130,6 +142,7 @@ class LruMap<T> {
 export class EntityCache {
   private readonly enabled: boolean;
   private readonly maxSize: number;
+  private readonly maxTotalSize: number;
   private readonly caches = new Map<new (...args: any[]) => any, LruMap<any>>();
   private _hits = 0;
   private _misses = 0;
@@ -139,6 +152,7 @@ export class EntityCache {
   constructor(config?: EntityCacheConfig) {
     this.enabled = config?.enabled ?? true;
     this.maxSize = config?.maxSize ?? DEFAULT_MAX_SIZE;
+    this.maxTotalSize = config?.maxTotalSize ?? DEFAULT_MAX_TOTAL_SIZE;
   }
 
   private getOrCreateCache(entityClass: new (...args: any[]) => any): LruMap<any> {
@@ -176,6 +190,23 @@ export class EntityCache {
     const evicted = cache.put(this.idKey(id), entity);
     if (evicted) this._evictions++;
     this._puts++;
+    this.enforceGlobalLimit();
+  }
+
+  private enforceGlobalLimit(): void {
+    while (this.size() > this.maxTotalSize) {
+      // Find the largest sub-cache and evict from it
+      let largestCache: LruMap<any> | null = null;
+      let largestSize = 0;
+      for (const cache of this.caches.values()) {
+        if (cache.size > largestSize) {
+          largestSize = cache.size;
+          largestCache = cache;
+        }
+      }
+      if (!largestCache || !largestCache.evictTail()) break;
+      this._evictions++;
+    }
   }
 
   evict(entityClass: new (...args: any[]) => any, id: unknown): void {
