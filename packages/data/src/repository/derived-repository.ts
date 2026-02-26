@@ -399,13 +399,33 @@ export function createDerivedRepository<T, ID>(
               return saved;
             }
             // No rows returned — if versioned, this is an optimistic lock conflict
-            if (versionField && currentVersion !== undefined) {
+            if (versionField && versionCol && currentVersion !== undefined) {
               entityCache.evict(entityClass, idValue);
+              // Re-read to distinguish "deleted" from "version mismatch"
+              let actualVersion: number | null = null;
+              const checkStmt = conn.prepareStatement(
+                new SelectBuilder(metadata.tableName)
+                  .columns(versionCol)
+                  .where(new ComparisonCriteria("eq", idCol, idValue))
+                  .limit(1)
+                  .build().sql,
+              );
+              try {
+                checkStmt.setParameter(1, idValue);
+                const checkRs = await checkStmt.executeQuery();
+                if (await checkRs.next()) {
+                  const row = checkRs.getRow();
+                  const val = Object.values(row)[0];
+                  actualVersion = typeof val === "number" ? val : Number(val);
+                }
+              } finally {
+                await checkStmt.close().catch(() => {});
+              }
               throw new OptimisticLockException(
                 entityClass.name,
                 idValue,
                 currentVersion,
-                null,
+                actualVersion,
               );
             }
             // No rows returned for unversioned entity — entity was deleted
@@ -512,12 +532,32 @@ export function createDerivedRepository<T, ID>(
             stmt.setParameter(i + 1, query.params[i]);
           }
           const affected = await stmt.executeUpdate();
-          if (versionField && currentVersion !== undefined && affected === 0) {
+          if (versionField && versionCol && currentVersion !== undefined && affected === 0) {
+            // Re-read to distinguish "deleted" from "version mismatch"
+            let actualVersion: number | null = null;
+            const checkStmt = conn.prepareStatement(
+              new SelectBuilder(metadata.tableName)
+                .columns(versionCol)
+                .where(new ComparisonCriteria("eq", idCol, idValue))
+                .limit(1)
+                .build().sql,
+            );
+            try {
+              checkStmt.setParameter(1, idValue);
+              const checkRs = await checkStmt.executeQuery();
+              if (await checkRs.next()) {
+                const row = checkRs.getRow();
+                const val = Object.values(row)[0];
+                actualVersion = typeof val === "number" ? val : Number(val);
+              }
+            } finally {
+              await checkStmt.close().catch(() => {});
+            }
             throw new OptimisticLockException(
               entityClass.name,
               idValue,
               currentVersion,
-              null,
+              actualVersion,
             );
           }
           await invokeLifecycleCallbacks(entity, "PostRemove");
