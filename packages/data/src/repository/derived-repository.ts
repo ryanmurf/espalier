@@ -131,14 +131,18 @@ export function createDerivedRepository<T, ID>(
         const conn = await dataSource.getConnection();
         try {
           const stmt = conn.prepareStatement(query.sql);
-          for (let i = 0; i < query.params.length; i++) {
-            stmt.setParameter(i + 1, query.params[i]);
+          try {
+            for (let i = 0; i < query.params.length; i++) {
+              stmt.setParameter(i + 1, query.params[i]);
+            }
+            const rs = await stmt.executeQuery();
+            if (await rs.next()) {
+              return projMapper.mapRow(rs.getRow());
+            }
+            return null;
+          } finally {
+            await stmt.close().catch(() => {});
           }
-          const rs = await stmt.executeQuery();
-          if (await rs.next()) {
-            return projMapper.mapRow(rs.getRow());
-          }
-          return null;
         } finally {
           await conn.close();
         }
@@ -159,26 +163,30 @@ export function createDerivedRepository<T, ID>(
       const conn = await dataSource.getConnection();
       try {
         const stmt = conn.prepareStatement(query.sql);
-        for (let i = 0; i < query.params.length; i++) {
-          stmt.setParameter(i + 1, query.params[i]);
+        try {
+          for (let i = 0; i < query.params.length; i++) {
+            stmt.setParameter(i + 1, query.params[i]);
+          }
+          const rs = await stmt.executeQuery();
+          if (await rs.next()) {
+            const result = rowMapper.mapRow(rs);
+            await invokeLifecycleCallbacks(result, "PostLoad");
+            changeTracker.snapshot(result);
+            entityCache.put(entityClass, id, result);
+            await emitEntityEvent(ENTITY_EVENTS.LOADED, `${ENTITY_EVENTS.LOADED}:${entityName}`, {
+              type: "loaded",
+              entityClass,
+              entityName,
+              entity: result,
+              id,
+              timestamp: new Date(),
+            } satisfies EntityLoadedEvent<T>);
+            return result;
+          }
+          return null;
+        } finally {
+          await stmt.close().catch(() => {});
         }
-        const rs = await stmt.executeQuery();
-        if (await rs.next()) {
-          const result = rowMapper.mapRow(rs);
-          await invokeLifecycleCallbacks(result, "PostLoad");
-          changeTracker.snapshot(result);
-          entityCache.put(entityClass, id, result);
-          await emitEntityEvent(ENTITY_EVENTS.LOADED, `${ENTITY_EVENTS.LOADED}:${entityName}`, {
-            type: "loaded",
-            entityClass,
-            entityName,
-            entity: result,
-            id,
-            timestamp: new Date(),
-          } satisfies EntityLoadedEvent<T>);
-          return result;
-        }
-        return null;
       } finally {
         await conn.close();
       }
@@ -199,11 +207,15 @@ export function createDerivedRepository<T, ID>(
       const conn = await dataSource.getConnection();
       try {
         const stmt = conn.prepareStatement(query.sql);
-        for (let i = 0; i < query.params.length; i++) {
-          stmt.setParameter(i + 1, query.params[i]);
+        try {
+          for (let i = 0; i < query.params.length; i++) {
+            stmt.setParameter(i + 1, query.params[i]);
+          }
+          const rs = await stmt.executeQuery();
+          return await rs.next();
+        } finally {
+          await stmt.close().catch(() => {});
         }
-        const rs = await stmt.executeQuery();
-        return await rs.next();
       } finally {
         await conn.close();
       }
@@ -219,12 +231,16 @@ export function createDerivedRepository<T, ID>(
         const conn = await dataSource.getConnection();
         try {
           const stmt = conn.prepareStatement(query.sql);
-          const rs = await stmt.executeQuery();
-          const results: any[] = [];
-          while (await rs.next()) {
-            results.push(projMapper.mapRow(rs.getRow()));
+          try {
+            const rs = await stmt.executeQuery();
+            const results: any[] = [];
+            while (await rs.next()) {
+              results.push(projMapper.mapRow(rs.getRow()));
+            }
+            return results;
+          } finally {
+            await stmt.close().catch(() => {});
           }
-          return results;
         } finally {
           await conn.close();
         }
@@ -250,28 +266,32 @@ export function createDerivedRepository<T, ID>(
       const conn = await dataSource.getConnection();
       try {
         const stmt = conn.prepareStatement(query.sql);
-        for (let i = 0; i < query.params.length; i++) {
-          stmt.setParameter(i + 1, query.params[i]);
+        try {
+          for (let i = 0; i < query.params.length; i++) {
+            stmt.setParameter(i + 1, query.params[i]);
+          }
+          const rs = await stmt.executeQuery();
+          const results: T[] = [];
+          while (await rs.next()) {
+            const entity = rowMapper.mapRow(rs);
+            await invokeLifecycleCallbacks(entity, "PostLoad");
+            changeTracker.snapshot(entity);
+            entityCache.put(entityClass, getEntityId(entity), entity);
+            await emitEntityEvent(ENTITY_EVENTS.LOADED, `${ENTITY_EVENTS.LOADED}:${entityName}`, {
+              type: "loaded",
+              entityClass,
+              entityName,
+              entity,
+              id: getEntityId(entity),
+              timestamp: new Date(),
+            } satisfies EntityLoadedEvent<T>);
+            results.push(entity);
+          }
+          queryCache.put(cacheKey, results, entityClass);
+          return results;
+        } finally {
+          await stmt.close().catch(() => {});
         }
-        const rs = await stmt.executeQuery();
-        const results: T[] = [];
-        while (await rs.next()) {
-          const entity = rowMapper.mapRow(rs);
-          await invokeLifecycleCallbacks(entity, "PostLoad");
-          changeTracker.snapshot(entity);
-          entityCache.put(entityClass, getEntityId(entity), entity);
-          await emitEntityEvent(ENTITY_EVENTS.LOADED, `${ENTITY_EVENTS.LOADED}:${entityName}`, {
-            type: "loaded",
-            entityClass,
-            entityName,
-            entity,
-            id: getEntityId(entity),
-            timestamp: new Date(),
-          } satisfies EntityLoadedEvent<T>);
-          results.push(entity);
-        }
-        queryCache.put(cacheKey, results, entityClass);
-        return results;
       } finally {
         await conn.close();
       }
@@ -355,38 +375,42 @@ export function createDerivedRepository<T, ID>(
         const conn = await dataSource.getConnection();
         try {
           const stmt = conn.prepareStatement(query.sql);
-          for (let i = 0; i < query.params.length; i++) {
-            stmt.setParameter(i + 1, query.params[i]);
+          try {
+            for (let i = 0; i < query.params.length; i++) {
+              stmt.setParameter(i + 1, query.params[i]);
+            }
+            const rs = await stmt.executeQuery();
+            if (await rs.next()) {
+              const saved = rowMapper.mapRow(rs);
+              await invokeLifecycleCallbacks(saved, "PostUpdate");
+              changeTracker.snapshot(saved);
+              entityCache.put(entityClass, getEntityId(saved), saved);
+              queryCache.invalidate(entityClass);
+              await emitEntityEvent(ENTITY_EVENTS.UPDATED, `${ENTITY_EVENTS.UPDATED}:${entityName}`, {
+                type: "updated",
+                entityClass,
+                entityName,
+                entity: saved,
+                id: getEntityId(saved),
+                changes: hasSnapshot ? dirtyFields : undefined,
+                timestamp: new Date(),
+              } satisfies EntityUpdatedEvent<T>);
+              return saved;
+            }
+            // No rows returned — if versioned, this is an optimistic lock conflict
+            if (versionField && currentVersion !== undefined) {
+              entityCache.evict(entityClass, idValue);
+              throw new OptimisticLockException(
+                entityClass.name,
+                idValue,
+                currentVersion,
+                null,
+              );
+            }
+            return entity;
+          } finally {
+            await stmt.close().catch(() => {});
           }
-          const rs = await stmt.executeQuery();
-          if (await rs.next()) {
-            const saved = rowMapper.mapRow(rs);
-            await invokeLifecycleCallbacks(saved, "PostUpdate");
-            changeTracker.snapshot(saved);
-            entityCache.put(entityClass, getEntityId(saved), saved);
-            queryCache.invalidate(entityClass);
-            await emitEntityEvent(ENTITY_EVENTS.UPDATED, `${ENTITY_EVENTS.UPDATED}:${entityName}`, {
-              type: "updated",
-              entityClass,
-              entityName,
-              entity: saved,
-              id: getEntityId(saved),
-              changes: hasSnapshot ? dirtyFields : undefined,
-              timestamp: new Date(),
-            } satisfies EntityUpdatedEvent<T>);
-            return saved;
-          }
-          // No rows returned — if versioned, this is an optimistic lock conflict
-          if (versionField && currentVersion !== undefined) {
-            entityCache.evict(entityClass, idValue);
-            throw new OptimisticLockException(
-              entityClass.name,
-              idValue,
-              currentVersion,
-              null,
-            );
-          }
-          return entity;
         } finally {
           await conn.close();
         }
@@ -411,27 +435,31 @@ export function createDerivedRepository<T, ID>(
         const conn = await dataSource.getConnection();
         try {
           const stmt = conn.prepareStatement(query.sql);
-          for (let i = 0; i < query.params.length; i++) {
-            stmt.setParameter(i + 1, query.params[i]);
+          try {
+            for (let i = 0; i < query.params.length; i++) {
+              stmt.setParameter(i + 1, query.params[i]);
+            }
+            const rs = await stmt.executeQuery();
+            if (await rs.next()) {
+              const saved = rowMapper.mapRow(rs);
+              await invokeLifecycleCallbacks(saved, "PostPersist");
+              changeTracker.snapshot(saved);
+              entityCache.put(entityClass, getEntityId(saved), saved);
+              queryCache.invalidate(entityClass);
+              await emitEntityEvent(ENTITY_EVENTS.PERSISTED, `${ENTITY_EVENTS.PERSISTED}:${entityName}`, {
+                type: "persisted",
+                entityClass,
+                entityName,
+                entity: saved,
+                id: getEntityId(saved),
+                timestamp: new Date(),
+              } satisfies EntityPersistedEvent<T>);
+              return saved;
+            }
+            return entity;
+          } finally {
+            await stmt.close().catch(() => {});
           }
-          const rs = await stmt.executeQuery();
-          if (await rs.next()) {
-            const saved = rowMapper.mapRow(rs);
-            await invokeLifecycleCallbacks(saved, "PostPersist");
-            changeTracker.snapshot(saved);
-            entityCache.put(entityClass, getEntityId(saved), saved);
-            queryCache.invalidate(entityClass);
-            await emitEntityEvent(ENTITY_EVENTS.PERSISTED, `${ENTITY_EVENTS.PERSISTED}:${entityName}`, {
-              type: "persisted",
-              entityClass,
-              entityName,
-              entity: saved,
-              id: getEntityId(saved),
-              timestamp: new Date(),
-            } satisfies EntityPersistedEvent<T>);
-            return saved;
-          }
-          return entity;
         } finally {
           await conn.close();
         }
@@ -474,30 +502,34 @@ export function createDerivedRepository<T, ID>(
       const conn = await dataSource.getConnection();
       try {
         const stmt = conn.prepareStatement(query.sql);
-        for (let i = 0; i < query.params.length; i++) {
-          stmt.setParameter(i + 1, query.params[i]);
+        try {
+          for (let i = 0; i < query.params.length; i++) {
+            stmt.setParameter(i + 1, query.params[i]);
+          }
+          const affected = await stmt.executeUpdate();
+          if (versionField && currentVersion !== undefined && affected === 0) {
+            throw new OptimisticLockException(
+              entityClass.name,
+              idValue,
+              currentVersion,
+              null,
+            );
+          }
+          await invokeLifecycleCallbacks(entity, "PostRemove");
+          await emitEntityEvent(ENTITY_EVENTS.REMOVED, `${ENTITY_EVENTS.REMOVED}:${entityName}`, {
+            type: "removed",
+            entityClass,
+            entityName,
+            entity,
+            id: idValue,
+            timestamp: new Date(),
+          } satisfies EntityRemovedEvent<T>);
+          changeTracker.clearSnapshot(entity);
+          entityCache.evict(entityClass, idValue);
+          queryCache.invalidate(entityClass);
+        } finally {
+          await stmt.close().catch(() => {});
         }
-        const affected = await stmt.executeUpdate();
-        if (versionField && currentVersion !== undefined && affected === 0) {
-          throw new OptimisticLockException(
-            entityClass.name,
-            idValue,
-            currentVersion,
-            null,
-          );
-        }
-        await invokeLifecycleCallbacks(entity, "PostRemove");
-        await emitEntityEvent(ENTITY_EVENTS.REMOVED, `${ENTITY_EVENTS.REMOVED}:${entityName}`, {
-          type: "removed",
-          entityClass,
-          entityName,
-          entity,
-          id: idValue,
-          timestamp: new Date(),
-        } satisfies EntityRemovedEvent<T>);
-        changeTracker.clearSnapshot(entity);
-        entityCache.evict(entityClass, idValue);
-        queryCache.invalidate(entityClass);
       } finally {
         await conn.close();
       }
@@ -518,12 +550,16 @@ export function createDerivedRepository<T, ID>(
       const conn = await dataSource.getConnection();
       try {
         const stmt = conn.prepareStatement(query.sql);
-        for (let i = 0; i < query.params.length; i++) {
-          stmt.setParameter(i + 1, query.params[i]);
+        try {
+          for (let i = 0; i < query.params.length; i++) {
+            stmt.setParameter(i + 1, query.params[i]);
+          }
+          await stmt.executeUpdate();
+          entityCache.evict(entityClass, id);
+          queryCache.invalidate(entityClass);
+        } finally {
+          await stmt.close().catch(() => {});
         }
-        await stmt.executeUpdate();
-        entityCache.evict(entityClass, id);
-        queryCache.invalidate(entityClass);
       } finally {
         await conn.close();
       }
@@ -542,12 +578,13 @@ export function createDerivedRepository<T, ID>(
       return {
         [Symbol.asyncIterator](): AsyncIterator<T> {
           let conn: Awaited<ReturnType<DataSource["getConnection"]>> | null = null;
+          let stmt: import("espalier-jdbc").PreparedStatement | null = null;
           let rs: Awaited<ReturnType<import("espalier-jdbc").PreparedStatement["executeQuery"]>> | null = null;
           let done = false;
 
           async function init() {
             conn = await dataSource.getConnection();
-            const stmt = conn.prepareStatement(query.sql);
+            stmt = conn.prepareStatement(query.sql);
             for (let i = 0; i < query.params.length; i++) {
               stmt.setParameter(i + 1, query.params[i]);
             }
@@ -559,6 +596,10 @@ export function createDerivedRepository<T, ID>(
             if (rs) {
               await rs.close().catch(() => {});
               rs = null;
+            }
+            if (stmt) {
+              await stmt.close().catch(() => {});
+              stmt = null;
             }
             if (conn) {
               await conn.close().catch(() => {});
@@ -617,19 +658,23 @@ export function createDerivedRepository<T, ID>(
       const conn = await dataSource.getConnection();
       try {
         const stmt = conn.prepareStatement(query.sql);
-        for (let i = 0; i < query.params.length; i++) {
-          stmt.setParameter(i + 1, query.params[i]);
+        try {
+          for (let i = 0; i < query.params.length; i++) {
+            stmt.setParameter(i + 1, query.params[i]);
+          }
+          const rs = await stmt.executeQuery();
+          if (await rs.next()) {
+            const row = rs.getRow();
+            const val = Object.values(row)[0];
+            const result = typeof val === "number" ? val : Number(val);
+            queryCache.put(cacheKey, [result], entityClass);
+            return result;
+          }
+          queryCache.put(cacheKey, [0], entityClass);
+          return 0;
+        } finally {
+          await stmt.close().catch(() => {});
         }
-        const rs = await stmt.executeQuery();
-        if (await rs.next()) {
-          const row = rs.getRow();
-          const val = Object.values(row)[0];
-          const result = typeof val === "number" ? val : Number(val);
-          queryCache.put(cacheKey, [result], entityClass);
-          return result;
-        }
-        queryCache.put(cacheKey, [0], entityClass);
-        return 0;
       } finally {
         await conn.close();
       }
@@ -680,12 +725,13 @@ export function createDerivedRepository<T, ID>(
           return {
             [Symbol.asyncIterator](): AsyncIterator<any> {
               let conn: Awaited<ReturnType<DataSource["getConnection"]>> | null = null;
+              let stmt: import("espalier-jdbc").PreparedStatement | null = null;
               let rs: Awaited<ReturnType<import("espalier-jdbc").PreparedStatement["executeQuery"]>> | null = null;
               let done = false;
 
               async function init() {
                 conn = await dataSource.getConnection();
-                const stmt = conn.prepareStatement(builtQuery.sql);
+                stmt = conn.prepareStatement(builtQuery.sql);
                 for (let i = 0; i < builtQuery.params.length; i++) {
                   stmt.setParameter(i + 1, builtQuery.params[i]);
                 }
@@ -697,6 +743,10 @@ export function createDerivedRepository<T, ID>(
                 if (rs) {
                   await rs.close().catch(() => {});
                   rs = null;
+                }
+                if (stmt) {
+                  await stmt.close().catch(() => {});
+                  stmt = null;
                 }
                 if (conn) {
                   await conn.close().catch(() => {});
@@ -758,13 +808,17 @@ export function createDerivedRepository<T, ID>(
           const conn = await dataSource.getConnection();
           try {
             const stmt = conn.prepareStatement(query.sql);
-            for (let i = 0; i < query.params.length; i++) {
-              stmt.setParameter(i + 1, query.params[i]);
+            try {
+              for (let i = 0; i < query.params.length; i++) {
+                stmt.setParameter(i + 1, query.params[i]);
+              }
+              await stmt.executeUpdate();
+              entityCache.evictAll(entityClass);
+              queryCache.invalidate(entityClass);
+              return;
+            } finally {
+              await stmt.close().catch(() => {});
             }
-            await stmt.executeUpdate();
-            entityCache.evictAll(entityClass);
-            queryCache.invalidate(entityClass);
-            return;
           } finally {
             await conn.close();
           }
@@ -791,60 +845,64 @@ export function createDerivedRepository<T, ID>(
         const conn = await dataSource.getConnection();
         try {
           const stmt = conn.prepareStatement(query.sql);
-          for (let i = 0; i < query.params.length; i++) {
-            stmt.setParameter(i + 1, query.params[i]);
-          }
+          try {
+            for (let i = 0; i < query.params.length; i++) {
+              stmt.setParameter(i + 1, query.params[i]);
+            }
 
-          if (descriptor.action === "count") {
-            const rs = await stmt.executeQuery();
-            if (await rs.next()) {
-              const row = rs.getRow();
-              const val = Object.values(row)[0];
-              const result = typeof val === "number" ? val : Number(val);
+            if (descriptor.action === "count") {
+              const rs = await stmt.executeQuery();
+              if (await rs.next()) {
+                const row = rs.getRow();
+                const val = Object.values(row)[0];
+                const result = typeof val === "number" ? val : Number(val);
+                queryCache.put(cacheKey, [result], entityClass);
+                return result;
+              }
+              queryCache.put(cacheKey, [0], entityClass);
+              return 0;
+            }
+
+            if (descriptor.action === "exists") {
+              const rs = await stmt.executeQuery();
+              const result = await rs.next();
               queryCache.put(cacheKey, [result], entityClass);
               return result;
             }
-            queryCache.put(cacheKey, [0], entityClass);
-            return 0;
-          }
 
-          if (descriptor.action === "exists") {
+            // find action
             const rs = await stmt.executeQuery();
-            const result = await rs.next();
-            queryCache.put(cacheKey, [result], entityClass);
-            return result;
-          }
-
-          // find action
-          const rs = await stmt.executeQuery();
-          const results: any[] = [];
-          while (await rs.next()) {
-            if (projMapper) {
-              results.push(projMapper.mapRow(rs.getRow()));
-            } else {
-              const mapped = rowMapper.mapRow(rs);
-              await invokeLifecycleCallbacks(mapped, "PostLoad");
-              changeTracker.snapshot(mapped);
-              await emitEntityEvent(ENTITY_EVENTS.LOADED, `${ENTITY_EVENTS.LOADED}:${entityName}`, {
-                type: "loaded",
-                entityClass,
-                entityName,
-                entity: mapped,
-                id: getEntityId(mapped),
-                timestamp: new Date(),
-              } satisfies EntityLoadedEvent<T>);
-              results.push(mapped);
+            const results: any[] = [];
+            while (await rs.next()) {
+              if (projMapper) {
+                results.push(projMapper.mapRow(rs.getRow()));
+              } else {
+                const mapped = rowMapper.mapRow(rs);
+                await invokeLifecycleCallbacks(mapped, "PostLoad");
+                changeTracker.snapshot(mapped);
+                await emitEntityEvent(ENTITY_EVENTS.LOADED, `${ENTITY_EVENTS.LOADED}:${entityName}`, {
+                  type: "loaded",
+                  entityClass,
+                  entityName,
+                  entity: mapped,
+                  id: getEntityId(mapped),
+                  timestamp: new Date(),
+                } satisfies EntityLoadedEvent<T>);
+                results.push(mapped);
+              }
             }
+
+            queryCache.put(cacheKey, results, entityClass);
+
+            // If limit=1, return single entity or null
+            if (descriptor.limit === 1) {
+              return results[0] ?? null;
+            }
+
+            return results;
+          } finally {
+            await stmt.close().catch(() => {});
           }
-
-          queryCache.put(cacheKey, results, entityClass);
-
-          // If limit=1, return single entity or null
-          if (descriptor.limit === 1) {
-            return results[0] ?? null;
-          }
-
-          return results;
         } finally {
           await conn.close();
         }
