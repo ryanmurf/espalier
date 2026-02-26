@@ -32,6 +32,10 @@ export interface EntityMetadata {
 export function getEntityMetadata(
   entityClass: new (...args: any[]) => any,
 ): EntityMetadata {
+  // Create a temp instance to trigger field decorator initializers (@Column, @Id, @Version, etc.)
+  // which register metadata in WeakMaps keyed on the constructor.
+  new entityClass();
+
   const tableName = getTableName(entityClass);
   if (!tableName) {
     throw new Error(

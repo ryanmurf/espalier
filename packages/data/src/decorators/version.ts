@@ -6,7 +6,8 @@ export function Version<T>(
 ): void {
   context.addInitializer(function (this: T) {
     const constructor = (this as object).constructor;
-    if (versionMetadata.has(constructor)) {
+    const existing = versionMetadata.get(constructor);
+    if (existing !== undefined && existing !== context.name) {
       throw new Error(
         `Multiple @Version fields found on ${constructor.name}. ` +
           `Only one @Version field is allowed per entity.`,
