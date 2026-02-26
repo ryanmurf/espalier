@@ -6,7 +6,7 @@ import type {
   StreamingResultSet,
   SqlValue,
 } from "espalier-jdbc";
-import { QueryError, convertPositionalParams } from "espalier-jdbc";
+import { QueryError, convertPositionalParams, getGlobalLogger, LogLevel } from "espalier-jdbc";
 import { SqliteResultSet } from "./sqlite-result-set.js";
 import { SqliteCursorResultSet } from "./sqlite-cursor-result-set.js";
 import { mapSqliteErrorCode } from "./error-codes.js";
@@ -18,16 +18,26 @@ function toBindValue(val: SqlValue): unknown {
   return val;
 }
 
+function truncateSql(sql: string): string {
+  return sql.length > 200 ? sql.slice(0, 200) + "..." : sql;
+}
+
 export class SqliteStatement implements Statement {
   constructor(protected readonly db: Database.Database) {}
 
   async executeQuery(sql: string): Promise<ResultSet> {
+    const logger = getGlobalLogger().child("sqlite-query");
+    const startTime = Date.now();
     try {
       const stmt = this.db.prepare(sql);
       const columns = stmt.columns();
       const rows = stmt.all() as Record<string, unknown>[];
+      if (logger.isEnabled(LogLevel.DEBUG)) {
+        logger.debug("query executed", { sql: truncateSql(sql), duration: Date.now() - startTime });
+      }
       return new SqliteResultSet(rows, columns);
     } catch (err) {
+      logger.error("query failed", { sql: truncateSql(sql), duration: Date.now() - startTime, error: (err as Error).message });
       throw new QueryError(
         `Failed to execute query: ${(err as Error).message}`,
         sql,
@@ -38,11 +48,17 @@ export class SqliteStatement implements Statement {
   }
 
   async executeUpdate(sql: string): Promise<number> {
+    const logger = getGlobalLogger().child("sqlite-query");
+    const startTime = Date.now();
     try {
       const stmt = this.db.prepare(sql);
       const result = stmt.run();
+      if (logger.isEnabled(LogLevel.DEBUG)) {
+        logger.debug("update executed", { sql: truncateSql(sql), duration: Date.now() - startTime });
+      }
       return result.changes;
     } catch (err) {
+      logger.error("update failed", { sql: truncateSql(sql), duration: Date.now() - startTime, error: (err as Error).message });
       throw new QueryError(
         `Failed to execute update: ${(err as Error).message}`,
         sql,
@@ -91,12 +107,18 @@ export class SqlitePreparedStatement extends SqliteStatement implements Prepared
   override async executeQuery(sql?: string): Promise<ResultSet> {
     const queryText = convertPositionalParams(sql ?? this.sql);
     const params = this.collectParameters();
+    const logger = getGlobalLogger().child("sqlite-query");
+    const startTime = Date.now();
     try {
       const stmt = this.db.prepare(queryText);
       const columns = stmt.columns();
       const rows = stmt.all(...params) as Record<string, unknown>[];
+      if (logger.isEnabled(LogLevel.DEBUG)) {
+        logger.debug("prepared query executed", { sql: truncateSql(queryText), paramCount: params.length, duration: Date.now() - startTime });
+      }
       return new SqliteResultSet(rows, columns);
     } catch (err) {
+      logger.error("prepared query failed", { sql: truncateSql(queryText), paramCount: params.length, duration: Date.now() - startTime, error: (err as Error).message });
       throw new QueryError(
         `Failed to execute prepared query: ${(err as Error).message}`,
         queryText,
@@ -110,11 +132,17 @@ export class SqlitePreparedStatement extends SqliteStatement implements Prepared
   override async executeUpdate(sql?: string): Promise<number> {
     const queryText = convertPositionalParams(sql ?? this.sql);
     const params = this.collectParameters();
+    const logger = getGlobalLogger().child("sqlite-query");
+    const startTime = Date.now();
     try {
       const stmt = this.db.prepare(queryText);
       const result = stmt.run(...params);
+      if (logger.isEnabled(LogLevel.DEBUG)) {
+        logger.debug("prepared update executed", { sql: truncateSql(queryText), paramCount: params.length, duration: Date.now() - startTime });
+      }
       return result.changes;
     } catch (err) {
+      logger.error("prepared update failed", { sql: truncateSql(queryText), paramCount: params.length, duration: Date.now() - startTime, error: (err as Error).message });
       throw new QueryError(
         `Failed to execute prepared update: ${(err as Error).message}`,
         queryText,

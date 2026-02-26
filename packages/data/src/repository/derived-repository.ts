@@ -1,4 +1,5 @@
-import type { DataSource, Connection, SqlValue } from "espalier-jdbc";
+import type { DataSource, Connection, SqlValue, Logger } from "espalier-jdbc";
+import { getGlobalLogger, LogLevel } from "espalier-jdbc";
 import type { CrudRepository } from "./crud-repository.js";
 import type { EntityMetadata, FieldMapping } from "../mapping/entity-metadata.js";
 import { getEntityMetadata } from "../mapping/entity-metadata.js";
@@ -61,6 +62,7 @@ export function createDerivedRepository<T, ID>(
   const queryCache = new QueryCache(queryCacheConfig);
   const changeTracker = new EntityChangeTracker<T>(metadata);
   const entityName = entityClass.name;
+  const repoLogger: Logger = getGlobalLogger().child("repository");
 
   async function emitEntityEvent(genericEvent: string, specificEvent: string, payload: unknown): Promise<void> {
     if (!eventBus) return;
@@ -100,6 +102,9 @@ export function createDerivedRepository<T, ID>(
   async function invokeLifecycleCallbacks(entity: T, event: LifecycleEvent): Promise<void> {
     const methods = metadata.lifecycleCallbacks.get(event);
     if (!methods) return;
+    if (repoLogger.isEnabled(LogLevel.TRACE)) {
+      repoLogger.trace("lifecycle callback", { entityType: entityName, event });
+    }
     for (const methodName of methods) {
       const result = (entity as Record<string | symbol, (...args: any[]) => any>)[methodName].call(entity);
       if (result instanceof Promise) {
@@ -373,6 +378,9 @@ export function createDerivedRepository<T, ID>(
 
   const crudMethods: CrudRepository<T, ID> = {
     async findById(id: ID, projectionClass?: new (...args: any[]) => any): Promise<any> {
+      if (repoLogger.isEnabled(LogLevel.DEBUG)) {
+        repoLogger.debug("findById", { operation: "findById", entityType: entityName, id: String(id) });
+      }
       const idCol = getIdColumn();
 
       if (projectionClass && isProjectionClass(projectionClass)) {
@@ -478,6 +486,9 @@ export function createDerivedRepository<T, ID>(
     },
 
     async findAll(specOrProjection?: Specification<T> | (new (...args: any[]) => any)): Promise<any[]> {
+      if (repoLogger.isEnabled(LogLevel.DEBUG)) {
+        repoLogger.debug("findAll", { operation: "findAll", entityType: entityName });
+      }
       if (specOrProjection && isProjectionClass(specOrProjection)) {
         const projMapper = getCachedProjectionMapper(specOrProjection);
         const builder = new SelectBuilder(metadata.tableName)
@@ -557,6 +568,9 @@ export function createDerivedRepository<T, ID>(
     },
 
     async save(entity: T): Promise<T> {
+      if (repoLogger.isEnabled(LogLevel.DEBUG)) {
+        repoLogger.debug("save", { operation: "save", entityType: entityName });
+      }
       const conn = await dataSource.getConnection();
       try {
         return await saveWithConnection(entity, conn);
@@ -584,6 +598,9 @@ export function createDerivedRepository<T, ID>(
     },
 
     async delete(entity: T): Promise<void> {
+      if (repoLogger.isEnabled(LogLevel.DEBUG)) {
+        repoLogger.debug("delete", { operation: "delete", entityType: entityName });
+      }
       const conn = await dataSource.getConnection();
       try {
         await deleteWithConnection(entity, conn);
@@ -609,6 +626,9 @@ export function createDerivedRepository<T, ID>(
     },
 
     async deleteById(id: ID): Promise<void> {
+      if (repoLogger.isEnabled(LogLevel.DEBUG)) {
+        repoLogger.debug("deleteById", { operation: "deleteById", entityType: entityName, id: String(id) });
+      }
       const idCol = getIdColumn();
       const builder = new DeleteBuilder(metadata.tableName)
         .where(new ComparisonCriteria("eq", idCol, id as SqlValue));
@@ -709,6 +729,9 @@ export function createDerivedRepository<T, ID>(
     },
 
     async count(spec?: Specification<T>): Promise<number> {
+      if (repoLogger.isEnabled(LogLevel.DEBUG)) {
+        repoLogger.debug("count", { operation: "count", entityType: entityName });
+      }
       const builder = new SelectBuilder(metadata.tableName).columns("COUNT(*)");
 
       if (spec) {

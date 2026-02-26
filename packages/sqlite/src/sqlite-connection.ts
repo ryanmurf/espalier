@@ -6,6 +6,8 @@ import {
   ConnectionError,
   TransactionError,
   DatabaseErrorCode,
+  getGlobalLogger,
+  LogLevel,
 } from "espalier-jdbc";
 import { SqliteStatement, SqlitePreparedStatement } from "./sqlite-statement.js";
 import { SqliteNamedPreparedStatement } from "./sqlite-named-statement.js";
@@ -45,6 +47,7 @@ export class SqliteConnection implements TypeAwareConnection {
 
   async beginTransaction(isolation?: IsolationLevel): Promise<Transaction> {
     this.ensureOpen();
+    const txLogger = getGlobalLogger().child("sqlite-transaction");
     try {
       // SQLite supports DEFERRED, IMMEDIATE, EXCLUSIVE transaction types
       const beginType = mapIsolationToBeginType(isolation);
@@ -57,11 +60,18 @@ export class SqliteConnection implements TypeAwareConnection {
       );
     }
 
+    if (txLogger.isEnabled(LogLevel.DEBUG)) {
+      txLogger.debug("transaction begun", { isolationLevel: isolation ?? "default" });
+    }
+
     const db = this.db;
     return {
       async commit(): Promise<void> {
         try {
           db.exec("COMMIT");
+          if (txLogger.isEnabled(LogLevel.DEBUG)) {
+            txLogger.debug("transaction committed");
+          }
         } catch (err) {
           throw new TransactionError(
             `Failed to commit: ${(err as Error).message}`,
@@ -73,6 +83,9 @@ export class SqliteConnection implements TypeAwareConnection {
       async rollback(): Promise<void> {
         try {
           db.exec("ROLLBACK");
+          if (txLogger.isEnabled(LogLevel.DEBUG)) {
+            txLogger.debug("transaction rolled back");
+          }
         } catch (err) {
           throw new TransactionError(
             `Failed to rollback: ${(err as Error).message}`,
@@ -91,6 +104,9 @@ export class SqliteConnection implements TypeAwareConnection {
         }
         try {
           db.exec(`SAVEPOINT ${name}`);
+          if (txLogger.isEnabled(LogLevel.DEBUG)) {
+            txLogger.debug("savepoint set", { savepoint: name });
+          }
         } catch (err) {
           throw new TransactionError(
             `Failed to set savepoint: ${(err as Error).message}`,
@@ -109,6 +125,9 @@ export class SqliteConnection implements TypeAwareConnection {
         }
         try {
           db.exec(`ROLLBACK TO SAVEPOINT ${name}`);
+          if (txLogger.isEnabled(LogLevel.DEBUG)) {
+            txLogger.debug("rolled back to savepoint", { savepoint: name });
+          }
         } catch (err) {
           throw new TransactionError(
             `Failed to rollback to savepoint: ${(err as Error).message}`,

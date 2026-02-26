@@ -1,3 +1,6 @@
+import { getGlobalLogger, LogLevel } from "espalier-jdbc";
+import type { Logger } from "espalier-jdbc";
+
 export interface QueryCacheConfig {
   enabled?: boolean;
   maxSize?: number;
@@ -55,6 +58,14 @@ export class QueryCache {
   private readonly maxResultSize: number;
   private readonly ttlJitterPercent: number;
 
+  private get logger(): Logger {
+    return getGlobalLogger().child("query-cache");
+  }
+
+  private static truncateKey(key: string): string {
+    return key.length > 200 ? key.slice(0, 200) + "..." : key;
+  }
+
   constructor(config?: QueryCacheConfig) {
     this.enabled = config?.enabled ?? true;
     this.maxSize = config?.maxSize ?? DEFAULT_MAX_SIZE;
@@ -83,6 +94,9 @@ export class QueryCache {
 
     if (!entry) {
       this._misses++;
+      if (this.logger.isEnabled(LogLevel.TRACE)) {
+        this.logger.trace("cache miss", { cacheKey: QueryCache.truncateKey(strKey), hit: false });
+      }
       return undefined;
     }
 
@@ -90,11 +104,17 @@ export class QueryCache {
       this.removeEntry(entry);
       this._expirations++;
       this._misses++;
+      if (this.logger.isEnabled(LogLevel.TRACE)) {
+        this.logger.trace("cache expired", { cacheKey: QueryCache.truncateKey(strKey), hit: false });
+      }
       return undefined;
     }
 
     this.moveToHead(entry);
     this._hits++;
+    if (this.logger.isEnabled(LogLevel.TRACE)) {
+      this.logger.trace("cache hit", { cacheKey: QueryCache.truncateKey(strKey), hit: true });
+    }
     return entry.results;
   }
 
@@ -154,10 +174,14 @@ export class QueryCache {
   invalidate(entityClass: new (...args: any[]) => any): void {
     const entries = this.entityIndex.get(entityClass);
     if (!entries || entries.size === 0) return;
+    const count = entries.size;
     // Copy to array since removeEntry mutates the set
     for (const entry of [...entries]) {
       this.removeEntry(entry);
       this._invalidations++;
+    }
+    if (this.logger.isEnabled(LogLevel.TRACE)) {
+      this.logger.trace("cache invalidated", { entityType: entityClass.name, entriesRemoved: count });
     }
   }
 

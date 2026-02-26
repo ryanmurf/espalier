@@ -1,4 +1,6 @@
 import type { PreparedStatement } from "./statement.js";
+import { getGlobalLogger, LogLevel } from "./logger.js";
+import type { Logger } from "./logger.js";
 
 export interface StatementCacheConfig {
   enabled?: boolean;
@@ -14,6 +16,10 @@ export interface StatementCacheStats {
 }
 
 const DEFAULT_MAX_SIZE = 256;
+
+function truncateSql(sql: string): string {
+  return sql.length > 200 ? sql.slice(0, 200) + "..." : sql;
+}
 
 interface CacheEntry {
   key: string;
@@ -38,6 +44,10 @@ export class StatementCache {
   private _puts = 0;
   private _evictions = 0;
 
+  private get logger(): Logger {
+    return getGlobalLogger().child("statement-cache");
+  }
+
   constructor(config?: StatementCacheConfig) {
     this.enabled = config?.enabled ?? true;
     this.maxSize = config?.maxSize ?? DEFAULT_MAX_SIZE;
@@ -49,11 +59,17 @@ export class StatementCache {
     const entry = this.map.get(sql);
     if (!entry) {
       this._misses++;
+      if (this.logger.isEnabled(LogLevel.TRACE)) {
+        this.logger.trace("cache miss", { sql: truncateSql(sql), hit: false, cacheSize: this.map.size });
+      }
       return undefined;
     }
 
     this.moveToHead(entry);
     this._hits++;
+    if (this.logger.isEnabled(LogLevel.TRACE)) {
+      this.logger.trace("cache hit", { sql: truncateSql(sql), hit: true, cacheSize: this.map.size });
+    }
     return entry.statement;
   }
 
@@ -85,6 +101,9 @@ export class StatementCache {
       if (evicted) {
         this.map.delete(evicted.key);
         this._evictions++;
+        if (this.logger.isEnabled(LogLevel.TRACE)) {
+          this.logger.trace("cache eviction", { sql: truncateSql(evicted.key), cacheSize: this.map.size });
+        }
         // Close evicted statement to release resources (fire-and-forget)
         evicted.statement.close().catch(() => {});
       }

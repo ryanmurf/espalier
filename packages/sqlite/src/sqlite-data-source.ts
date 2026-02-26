@@ -1,6 +1,6 @@
 import Database from "better-sqlite3";
 import type { Connection, DataSource, TypeConverterRegistry } from "espalier-jdbc";
-import { ConnectionError, DatabaseErrorCode } from "espalier-jdbc";
+import { ConnectionError, DatabaseErrorCode, getGlobalLogger } from "espalier-jdbc";
 import { SqliteConnection } from "./sqlite-connection.js";
 
 export interface SqliteDataSourceConfig {
@@ -45,7 +45,10 @@ export class SqliteDataSource implements DataSource {
   async close(): Promise<void> {
     if (this.closed) return;
     this.closed = true;
+    const logger = getGlobalLogger().child("sqlite-datasource");
+    logger.info("datasource closing");
     this.db.close();
+    logger.info("datasource closed");
   }
 
   /** Access the underlying better-sqlite3 Database instance. */

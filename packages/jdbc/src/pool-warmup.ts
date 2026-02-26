@@ -1,5 +1,6 @@
 import type { Connection } from "./connection.js";
 import type { PooledDataSource } from "./pool.js";
+import { getGlobalLogger, LogLevel } from "./logger.js";
 
 export interface WarmupResult {
   connectionsCreated: number;
@@ -26,6 +27,9 @@ export async function warmupPool(
   dataSource: PooledDataSource,
   targetConnections: number,
 ): Promise<WarmupResult> {
+  const logger = getGlobalLogger().child("pool-warmup");
+  logger.info("pool warmup starting", { targetConnections });
+
   const startTime = Date.now();
 
   const results = await Promise.allSettled(
@@ -43,12 +47,27 @@ export async function warmupPool(
     }
   }
 
-  return {
+  const result: WarmupResult = {
     connectionsCreated: results.length - failed,
     connectionsFailed: failed,
     durationMs: Date.now() - startTime,
     errors,
   };
+
+  if (failed > 0) {
+    logger.warn("pool warmup completed with failures", {
+      connectionsCreated: result.connectionsCreated,
+      connectionsFailed: result.connectionsFailed,
+      durationMs: result.durationMs,
+    });
+  } else {
+    logger.info("pool warmup completed", {
+      connectionsCreated: result.connectionsCreated,
+      durationMs: result.durationMs,
+    });
+  }
+
+  return result;
 }
 
 /**
@@ -60,10 +79,15 @@ export async function validateConnection(
   config: PrePingConfig,
   lastPingTimestamp?: number,
 ): Promise<{ valid: boolean; error?: Error }> {
+  const logger = getGlobalLogger().child("pool-warmup");
+
   // Skip if recently validated
   if (lastPingTimestamp !== undefined) {
     const elapsed = Date.now() - lastPingTimestamp;
     if (elapsed < config.intervalMs) {
+      if (logger.isEnabled(LogLevel.TRACE)) {
+        logger.trace("pre-ping skipped (recently validated)", { elapsedMs: elapsed, intervalMs: config.intervalMs });
+      }
       return { valid: true };
     }
   }
@@ -71,8 +95,14 @@ export async function validateConnection(
   const stmt = connection.createStatement();
   try {
     await stmt.executeQuery(config.query);
+    if (logger.isEnabled(LogLevel.TRACE)) {
+      logger.trace("pre-ping succeeded", { query: config.query });
+    }
     return { valid: true };
   } catch (err) {
+    if (logger.isEnabled(LogLevel.TRACE)) {
+      logger.trace("pre-ping failed", { query: config.query, error: (err as Error).message });
+    }
     return { valid: false, error: err as Error };
   } finally {
     await stmt.close().catch(() => {});

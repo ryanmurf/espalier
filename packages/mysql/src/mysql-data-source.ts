@@ -1,7 +1,7 @@
 import mysql from "mysql2/promise";
 import type { Pool, PoolOptions } from "mysql2/promise";
 import type { Connection, PoolConfig, PoolStats, PooledDataSource, TypeConverterRegistry } from "espalier-jdbc";
-import { ConnectionError, DatabaseErrorCode } from "espalier-jdbc";
+import { ConnectionError, DatabaseErrorCode, getGlobalLogger, LogLevel } from "espalier-jdbc";
 import { MysqlConnection } from "./mysql-connection.js";
 
 export interface MysqlDataSourceConfig {
@@ -55,8 +55,20 @@ export class MysqlDataSource implements PooledDataSource {
         DatabaseErrorCode.CONNECTION_CLOSED,
       );
     }
+    const logger = getGlobalLogger().child("mysql-pool");
+    const startTime = Date.now();
     try {
       const conn = await this.pool.getConnection();
+      const acquireTimeMs = Date.now() - startTime;
+      const stats = this.getPoolStats();
+      if (logger.isEnabled(LogLevel.DEBUG)) {
+        logger.debug("connection acquired", {
+          acquireTimeMs,
+          poolSize: stats.total,
+          activeCount: stats.total - stats.idle,
+          idleCount: stats.idle,
+        });
+      }
       return new MysqlConnection(conn, this.typeConverters);
     } catch (err) {
       const code = (err as { code?: string }).code === "ECONNREFUSED"
@@ -64,6 +76,7 @@ export class MysqlDataSource implements PooledDataSource {
         : (err as { code?: string }).code === "ETIMEDOUT"
           ? DatabaseErrorCode.CONNECTION_TIMEOUT
           : DatabaseErrorCode.CONNECTION_FAILED;
+      logger.error("connection acquire failed", { error: (err as Error).message, duration: Date.now() - startTime });
       throw new ConnectionError(
         `Failed to get connection: ${(err as Error).message}`,
         err as Error,
@@ -89,11 +102,14 @@ export class MysqlDataSource implements PooledDataSource {
   async close(force?: boolean): Promise<void> {
     if (this.closed) return;
     this.closed = true;
+    const logger = getGlobalLogger().child("mysql-pool");
+    logger.info("pool closing", { force: force ?? false });
     if (force) {
       // Force close: don't wait for active connections to finish
       void this.pool.end();
     } else {
       await this.pool.end();
     }
+    logger.info("pool closed");
   }
 }

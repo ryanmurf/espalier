@@ -1,3 +1,6 @@
+import { getGlobalLogger, LogLevel } from "espalier-jdbc";
+import type { Logger } from "espalier-jdbc";
+
 export interface EntityCacheConfig {
   enabled?: boolean;
   maxSize?: number;
@@ -149,6 +152,10 @@ export class EntityCache {
   private _puts = 0;
   private _evictions = 0;
 
+  private get logger(): Logger {
+    return getGlobalLogger().child("entity-cache");
+  }
+
   constructor(config?: EntityCacheConfig) {
     this.enabled = config?.enabled ?? true;
     this.maxSize = config?.maxSize ?? DEFAULT_MAX_SIZE;
@@ -173,13 +180,22 @@ export class EntityCache {
     const cache = this.caches.get(entityClass);
     if (!cache) {
       this._misses++;
+      if (this.logger.isEnabled(LogLevel.TRACE)) {
+        this.logger.trace("cache miss", { entityType: entityClass.name, id: String(id), hit: false, cacheSize: this.size() });
+      }
       return undefined;
     }
     const value = cache.get(this.idKey(id));
     if (value !== undefined) {
       this._hits++;
+      if (this.logger.isEnabled(LogLevel.TRACE)) {
+        this.logger.trace("cache hit", { entityType: entityClass.name, id: String(id), hit: true, cacheSize: this.size() });
+      }
     } else {
       this._misses++;
+      if (this.logger.isEnabled(LogLevel.TRACE)) {
+        this.logger.trace("cache miss", { entityType: entityClass.name, id: String(id), hit: false, cacheSize: this.size() });
+      }
     }
     return value as T | undefined;
   }
@@ -188,7 +204,12 @@ export class EntityCache {
     if (!this.enabled) return;
     const cache = this.getOrCreateCache(entityClass);
     const evicted = cache.put(this.idKey(id), entity);
-    if (evicted) this._evictions++;
+    if (evicted) {
+      this._evictions++;
+      if (this.logger.isEnabled(LogLevel.TRACE)) {
+        this.logger.trace("cache eviction", { entityType: entityClass.name, cacheSize: this.size() });
+      }
+    }
     this._puts++;
     this.enforceGlobalLimit();
   }

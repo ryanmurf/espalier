@@ -20,6 +20,8 @@ import {
   DEFAULT_PRE_PING_QUERY,
   DEFAULT_PRE_PING_INTERVAL_MS,
   DEFAULT_MAX_PING_RETRIES,
+  getGlobalLogger,
+  LogLevel,
 } from "espalier-jdbc";
 import { PgConnection } from "./pg-connection.js";
 
@@ -105,6 +107,8 @@ export class PgDataSource implements MonitoredPooledDataSource {
    */
   async warmup(targetConnections?: number): Promise<WarmupResult> {
     const target = targetConnections ?? this.poolConfig?.minConnections ?? 1;
+    const logger = getGlobalLogger().child("pg-pool");
+    logger.info("pool warmup requested", { targetConnections: target });
     const result = await warmupPool(this, target);
     this._warmupResult = result;
     this._warmupConnectionsCreated += result.connectionsCreated;
@@ -124,6 +128,7 @@ export class PgDataSource implements MonitoredPooledDataSource {
       );
     }
 
+    const logger = getGlobalLogger().child("pg-pool");
     const maxRetries = this.prePingConfig ? DEFAULT_MAX_PING_RETRIES : 1;
 
     for (let attempt = 0; attempt < maxRetries; attempt++) {
@@ -172,11 +177,17 @@ export class PgDataSource implements MonitoredPooledDataSource {
             await client.query(this.prePingConfig.query);
             this.lastPingTimestamps.set(client, Date.now());
             this._prePingSuccesses++;
+            if (logger.isEnabled(LogLevel.TRACE)) {
+              logger.trace("pre-ping succeeded");
+            }
           } catch (pingErr) {
             this._prePingFailures++;
 
             if (this.prePingConfig.evictOnFailure) {
               this._deadConnectionsEvicted++;
+              logger.warn("stale connection evicted after failed pre-ping", {
+                error: (pingErr as Error).message,
+              });
               // Release with destroy to remove from pool
               (client as any).release(true);
 
@@ -192,6 +203,16 @@ export class PgDataSource implements MonitoredPooledDataSource {
             }
           }
         }
+      }
+
+      const stats = this.getPoolStats();
+      if (logger.isEnabled(LogLevel.DEBUG)) {
+        logger.debug("connection acquired", {
+          acquireTimeMs,
+          poolSize: stats.total,
+          activeCount: stats.total - stats.idle,
+          idleCount: stats.idle,
+        });
       }
 
       this.metrics.emitAcquire({
@@ -212,17 +233,27 @@ export class PgDataSource implements MonitoredPooledDataSource {
 
       const conn = new PgConnection(client, this.typeConverters, stmtCache);
 
-      // Wrap close to emit release event
+      // Wrap close to emit release event and log
       const originalClose = conn.close.bind(conn);
       const acquiredAt = Date.now();
       const metrics = this.metrics;
       const getStats = () => this.getPoolStats();
       conn.close = async function () {
         await originalClose();
+        const heldTimeMs = Date.now() - acquiredAt;
+        const releaseStats = getStats();
+        if (logger.isEnabled(LogLevel.DEBUG)) {
+          logger.debug("connection released", {
+            heldTimeMs,
+            poolSize: releaseStats.total,
+            activeCount: releaseStats.total - releaseStats.idle,
+            idleCount: releaseStats.idle,
+          });
+        }
         metrics.emitRelease({
           timestamp: new Date(),
-          poolStats: getStats(),
-          heldTimeMs: Date.now() - acquiredAt,
+          poolStats: releaseStats,
+          heldTimeMs,
         });
       };
 
@@ -263,11 +294,14 @@ export class PgDataSource implements MonitoredPooledDataSource {
   async close(force?: boolean): Promise<void> {
     if (this.closed) return;
     this.closed = true;
+    const logger = getGlobalLogger().child("pg-pool");
+    logger.info("pool closing", { force: force ?? false });
     if (force) {
       // Force close: don't wait for active clients to finish
       void this.pool.end();
     } else {
       await this.pool.end();
     }
+    logger.info("pool closed");
   }
 }

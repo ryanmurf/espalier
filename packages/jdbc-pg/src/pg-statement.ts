@@ -7,7 +7,7 @@ import type {
   StreamingResultSet,
   SqlValue,
 } from "espalier-jdbc";
-import { QueryError, DatabaseErrorCode } from "espalier-jdbc";
+import { QueryError, DatabaseErrorCode, getGlobalLogger, LogLevel } from "espalier-jdbc";
 import { PgResultSet } from "./pg-result-set.js";
 import { PgCursorResultSet } from "./pg-cursor-result-set.js";
 
@@ -29,14 +29,24 @@ function mapPgErrorCode(err: unknown): DatabaseErrorCode {
   }
 }
 
+function truncateSql(sql: string): string {
+  return sql.length > 200 ? sql.slice(0, 200) + "..." : sql;
+}
+
 export class PgStatement implements Statement {
   constructor(protected readonly client: PoolClient) {}
 
   async executeQuery(sql: string): Promise<ResultSet> {
+    const logger = getGlobalLogger().child("pg-query");
+    const startTime = Date.now();
     try {
       const result = await this.client.query(sql);
+      if (logger.isEnabled(LogLevel.DEBUG)) {
+        logger.debug("query executed", { sql: truncateSql(sql), duration: Date.now() - startTime });
+      }
       return new PgResultSet(result);
     } catch (err) {
+      logger.error("query failed", { sql: truncateSql(sql), duration: Date.now() - startTime, error: (err as Error).message });
       throw new QueryError(
         `Failed to execute query: ${(err as Error).message}`,
         sql,
@@ -47,10 +57,16 @@ export class PgStatement implements Statement {
   }
 
   async executeUpdate(sql: string): Promise<number> {
+    const logger = getGlobalLogger().child("pg-query");
+    const startTime = Date.now();
     try {
       const result = await this.client.query(sql);
+      if (logger.isEnabled(LogLevel.DEBUG)) {
+        logger.debug("update executed", { sql: truncateSql(sql), duration: Date.now() - startTime });
+      }
       return result.rowCount ?? 0;
     } catch (err) {
+      logger.error("update failed", { sql: truncateSql(sql), duration: Date.now() - startTime, error: (err as Error).message });
       throw new QueryError(
         `Failed to execute update: ${(err as Error).message}`,
         sql,
@@ -101,10 +117,16 @@ export class PgPreparedStatement extends PgStatement implements PreparedStatemen
   override async executeQuery(sql?: string): Promise<ResultSet> {
     const queryText = sql ?? this.sql;
     const params = this.collectParameters();
+    const logger = getGlobalLogger().child("pg-query");
+    const startTime = Date.now();
     try {
       const result = await this.client.query(queryText, params);
+      if (logger.isEnabled(LogLevel.DEBUG)) {
+        logger.debug("prepared query executed", { sql: truncateSql(queryText), paramCount: params.length, duration: Date.now() - startTime });
+      }
       return new PgResultSet(result);
     } catch (err) {
+      logger.error("prepared query failed", { sql: truncateSql(queryText), paramCount: params.length, duration: Date.now() - startTime, error: (err as Error).message });
       throw new QueryError(
         `Failed to execute prepared query: ${(err as Error).message}`,
         queryText,
@@ -118,10 +140,16 @@ export class PgPreparedStatement extends PgStatement implements PreparedStatemen
   override async executeUpdate(sql?: string): Promise<number> {
     const queryText = sql ?? this.sql;
     const params = this.collectParameters();
+    const logger = getGlobalLogger().child("pg-query");
+    const startTime = Date.now();
     try {
       const result = await this.client.query(queryText, params);
+      if (logger.isEnabled(LogLevel.DEBUG)) {
+        logger.debug("prepared update executed", { sql: truncateSql(queryText), paramCount: params.length, duration: Date.now() - startTime });
+      }
       return result.rowCount ?? 0;
     } catch (err) {
+      logger.error("prepared update failed", { sql: truncateSql(queryText), paramCount: params.length, duration: Date.now() - startTime, error: (err as Error).message });
       throw new QueryError(
         `Failed to execute prepared update: ${(err as Error).message}`,
         queryText,

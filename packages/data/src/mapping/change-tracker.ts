@@ -1,4 +1,5 @@
 import type { EntityMetadata, FieldMapping } from "./entity-metadata.js";
+import { getGlobalLogger, LogLevel } from "espalier-jdbc";
 
 export interface FieldChange {
   field: string | symbol;
@@ -155,6 +156,14 @@ export class EntityChangeTracker<T> {
           newValue: current,
         });
       }
+    }
+    const logger = getGlobalLogger().child("change-tracker");
+    if (changes.length > 0 && logger.isEnabled(LogLevel.TRACE)) {
+      logger.trace("dirty fields detected", {
+        entityType: this.metadata.tableName,
+        dirtyFieldCount: changes.length,
+        fields: changes.map((c) => String(c.field)),
+      });
     }
     return changes;
   }

@@ -6,6 +6,8 @@ import {
   ConnectionError,
   TransactionError,
   DatabaseErrorCode,
+  getGlobalLogger,
+  LogLevel,
 } from "espalier-jdbc";
 import { PgStatement, PgPreparedStatement } from "./pg-statement.js";
 import { PgNamedPreparedStatement } from "./pg-named-statement.js";
@@ -62,6 +64,7 @@ export class PgConnection implements TypeAwareConnection, CacheableConnection {
 
   async beginTransaction(isolation?: IsolationLevel): Promise<Transaction> {
     this.ensureOpen();
+    const txLogger = getGlobalLogger().child("pg-transaction");
     try {
       await this.client.query("BEGIN");
       if (isolation) {
@@ -77,11 +80,18 @@ export class PgConnection implements TypeAwareConnection, CacheableConnection {
       );
     }
 
+    if (txLogger.isEnabled(LogLevel.DEBUG)) {
+      txLogger.debug("transaction begun", { isolationLevel: isolation ?? "default" });
+    }
+
     const client = this.client;
     return {
       async commit(): Promise<void> {
         try {
           await client.query("COMMIT");
+          if (txLogger.isEnabled(LogLevel.DEBUG)) {
+            txLogger.debug("transaction committed");
+          }
         } catch (err) {
           throw new TransactionError(
             `Failed to commit: ${(err as Error).message}`,
@@ -93,6 +103,9 @@ export class PgConnection implements TypeAwareConnection, CacheableConnection {
       async rollback(): Promise<void> {
         try {
           await client.query("ROLLBACK");
+          if (txLogger.isEnabled(LogLevel.DEBUG)) {
+            txLogger.debug("transaction rolled back");
+          }
         } catch (err) {
           throw new TransactionError(
             `Failed to rollback: ${(err as Error).message}`,
@@ -111,6 +124,9 @@ export class PgConnection implements TypeAwareConnection, CacheableConnection {
         }
         try {
           await client.query(`SAVEPOINT ${name}`);
+          if (txLogger.isEnabled(LogLevel.DEBUG)) {
+            txLogger.debug("savepoint set", { savepoint: name });
+          }
         } catch (err) {
           throw new TransactionError(
             `Failed to set savepoint: ${(err as Error).message}`,
@@ -129,6 +145,9 @@ export class PgConnection implements TypeAwareConnection, CacheableConnection {
         }
         try {
           await client.query(`ROLLBACK TO SAVEPOINT ${name}`);
+          if (txLogger.isEnabled(LogLevel.DEBUG)) {
+            txLogger.debug("rolled back to savepoint", { savepoint: name });
+          }
         } catch (err) {
           throw new TransactionError(
             `Failed to rollback to savepoint: ${(err as Error).message}`,

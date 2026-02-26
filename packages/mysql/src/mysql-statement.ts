@@ -6,22 +6,32 @@ import type {
   StreamingResultSet,
   SqlValue,
 } from "espalier-jdbc";
-import { QueryError, convertPositionalParams } from "espalier-jdbc";
+import { QueryError, convertPositionalParams, getGlobalLogger, LogLevel } from "espalier-jdbc";
 import { MysqlResultSet } from "./mysql-result-set.js";
 import { MysqlCursorResultSet } from "./mysql-cursor-result-set.js";
 import { mapMysqlErrorCode } from "./error-codes.js";
+
+function truncateSql(sql: string): string {
+  return sql.length > 200 ? sql.slice(0, 200) + "..." : sql;
+}
 
 export class MysqlStatement implements Statement {
   constructor(protected readonly connection: MysqlPoolConnection) {}
 
   async executeQuery(sql: string): Promise<ResultSet> {
+    const logger = getGlobalLogger().child("mysql-query");
+    const startTime = Date.now();
     try {
       const [rows, fields] = await this.connection.query(sql);
+      if (logger.isEnabled(LogLevel.DEBUG)) {
+        logger.debug("query executed", { sql: truncateSql(sql), duration: Date.now() - startTime });
+      }
       return new MysqlResultSet(
         rows as Record<string, unknown>[],
         fields as FieldPacket[],
       );
     } catch (err) {
+      logger.error("query failed", { sql: truncateSql(sql), duration: Date.now() - startTime, error: (err as Error).message });
       throw new QueryError(
         `Failed to execute query: ${(err as Error).message}`,
         sql,
@@ -32,10 +42,16 @@ export class MysqlStatement implements Statement {
   }
 
   async executeUpdate(sql: string): Promise<number> {
+    const logger = getGlobalLogger().child("mysql-query");
+    const startTime = Date.now();
     try {
       const [result] = await this.connection.query(sql);
+      if (logger.isEnabled(LogLevel.DEBUG)) {
+        logger.debug("update executed", { sql: truncateSql(sql), duration: Date.now() - startTime });
+      }
       return (result as ResultSetHeader).affectedRows ?? 0;
     } catch (err) {
+      logger.error("update failed", { sql: truncateSql(sql), duration: Date.now() - startTime, error: (err as Error).message });
       throw new QueryError(
         `Failed to execute update: ${(err as Error).message}`,
         sql,
@@ -86,13 +102,19 @@ export class MysqlPreparedStatement extends MysqlStatement implements PreparedSt
   override async executeQuery(sql?: string): Promise<ResultSet> {
     const queryText = convertPositionalParams(sql ?? this.sql);
     const params = this.collectParameters();
+    const logger = getGlobalLogger().child("mysql-query");
+    const startTime = Date.now();
     try {
       const [rows, fields] = await this.connection.execute(queryText, params);
+      if (logger.isEnabled(LogLevel.DEBUG)) {
+        logger.debug("prepared query executed", { sql: truncateSql(queryText), paramCount: params.length, duration: Date.now() - startTime });
+      }
       return new MysqlResultSet(
         rows as Record<string, unknown>[],
         fields as FieldPacket[],
       );
     } catch (err) {
+      logger.error("prepared query failed", { sql: truncateSql(queryText), paramCount: params.length, duration: Date.now() - startTime, error: (err as Error).message });
       throw new QueryError(
         `Failed to execute prepared query: ${(err as Error).message}`,
         queryText,
@@ -106,10 +128,16 @@ export class MysqlPreparedStatement extends MysqlStatement implements PreparedSt
   override async executeUpdate(sql?: string): Promise<number> {
     const queryText = convertPositionalParams(sql ?? this.sql);
     const params = this.collectParameters();
+    const logger = getGlobalLogger().child("mysql-query");
+    const startTime = Date.now();
     try {
       const [result] = await this.connection.execute(queryText, params);
+      if (logger.isEnabled(LogLevel.DEBUG)) {
+        logger.debug("prepared update executed", { sql: truncateSql(queryText), paramCount: params.length, duration: Date.now() - startTime });
+      }
       return (result as ResultSetHeader).affectedRows ?? 0;
     } catch (err) {
+      logger.error("prepared update failed", { sql: truncateSql(queryText), paramCount: params.length, duration: Date.now() - startTime, error: (err as Error).message });
       throw new QueryError(
         `Failed to execute prepared update: ${(err as Error).message}`,
         queryText,

@@ -6,6 +6,8 @@ import {
   ConnectionError,
   TransactionError,
   DatabaseErrorCode,
+  getGlobalLogger,
+  LogLevel,
 } from "espalier-jdbc";
 import { MysqlStatement, MysqlPreparedStatement } from "./mysql-statement.js";
 import { MysqlNamedPreparedStatement } from "./mysql-named-statement.js";
@@ -45,6 +47,7 @@ export class MysqlConnection implements TypeAwareConnection {
 
   async beginTransaction(isolation?: IsolationLevel): Promise<Transaction> {
     this.ensureOpen();
+    const txLogger = getGlobalLogger().child("mysql-transaction");
     try {
       if (isolation) {
         await this.connection.query(
@@ -60,11 +63,18 @@ export class MysqlConnection implements TypeAwareConnection {
       );
     }
 
+    if (txLogger.isEnabled(LogLevel.DEBUG)) {
+      txLogger.debug("transaction begun", { isolationLevel: isolation ?? "default" });
+    }
+
     const conn = this.connection;
     return {
       async commit(): Promise<void> {
         try {
           await conn.commit();
+          if (txLogger.isEnabled(LogLevel.DEBUG)) {
+            txLogger.debug("transaction committed");
+          }
         } catch (err) {
           throw new TransactionError(
             `Failed to commit: ${(err as Error).message}`,
@@ -76,6 +86,9 @@ export class MysqlConnection implements TypeAwareConnection {
       async rollback(): Promise<void> {
         try {
           await conn.rollback();
+          if (txLogger.isEnabled(LogLevel.DEBUG)) {
+            txLogger.debug("transaction rolled back");
+          }
         } catch (err) {
           throw new TransactionError(
             `Failed to rollback: ${(err as Error).message}`,
@@ -94,6 +107,9 @@ export class MysqlConnection implements TypeAwareConnection {
         }
         try {
           await conn.query(`SAVEPOINT ${name}`);
+          if (txLogger.isEnabled(LogLevel.DEBUG)) {
+            txLogger.debug("savepoint set", { savepoint: name });
+          }
         } catch (err) {
           throw new TransactionError(
             `Failed to set savepoint: ${(err as Error).message}`,
@@ -112,6 +128,9 @@ export class MysqlConnection implements TypeAwareConnection {
         }
         try {
           await conn.query(`ROLLBACK TO SAVEPOINT ${name}`);
+          if (txLogger.isEnabled(LogLevel.DEBUG)) {
+            txLogger.debug("rolled back to savepoint", { savepoint: name });
+          }
         } catch (err) {
           throw new TransactionError(
             `Failed to rollback to savepoint: ${(err as Error).message}`,
