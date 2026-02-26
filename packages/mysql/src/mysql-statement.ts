@@ -125,8 +125,12 @@ export class MysqlPreparedStatement extends MysqlStatement implements PreparedSt
   }
 
   private collectParameters(): SqlValue[] {
+    if (this.parameters.size === 0) return [];
+    let maxIndex = 0;
+    for (const key of this.parameters.keys()) {
+      if (key > maxIndex) maxIndex = key;
+    }
     const params: SqlValue[] = [];
-    const maxIndex = Math.max(...this.parameters.keys(), 0);
     for (let i = 1; i <= maxIndex; i++) {
       params.push(this.parameters.get(i) ?? null);
     }

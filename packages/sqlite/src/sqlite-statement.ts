@@ -130,8 +130,12 @@ export class SqlitePreparedStatement extends SqliteStatement implements Prepared
   }
 
   private collectParameters(): unknown[] {
+    if (this.parameters.size === 0) return [];
+    let maxIndex = 0;
+    for (const key of this.parameters.keys()) {
+      if (key > maxIndex) maxIndex = key;
+    }
     const params: unknown[] = [];
-    const maxIndex = Math.max(...this.parameters.keys(), 0);
     for (let i = 1; i <= maxIndex; i++) {
       params.push(toBindValue(this.parameters.get(i) ?? null));
     }
