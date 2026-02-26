@@ -116,6 +116,261 @@ export function createDerivedRepository<T, ID>(
     return field ? field.columnName : undefined;
   }
 
+  async function saveWithConnection(entity: T, conn: Connection): Promise<T> {
+    const idField = metadata.idField;
+    const idValue = (entity as Record<string | symbol, unknown>)[idField] as SqlValue;
+    const idCol = getIdColumn();
+    const versionCol = getVersionColumn();
+    const versionField = metadata.versionField;
+
+    if (idValue != null) {
+      // Update
+      await invokeLifecycleCallbacks(entity, "PreUpdate");
+
+      // Dirty checking: if entity has a snapshot, only update changed fields
+      const hasSnapshot = changeTracker.getSnapshot(entity) !== undefined;
+      const dirtyFields = hasSnapshot ? changeTracker.getDirtyFields(entity) : [];
+      const isFullUpdate = !hasSnapshot;
+
+      // If entity is clean (no dirty fields) and no version bumping needed, skip UPDATE
+      if (hasSnapshot && dirtyFields.length === 0) {
+        return entity;
+      }
+
+      const updateBuilder = new UpdateBuilder(metadata.tableName);
+
+      // Build WHERE clause: id = ? (and optionally version = ?)
+      let currentVersion: number | undefined;
+      if (versionField && versionCol) {
+        currentVersion = (entity as Record<string | symbol, unknown>)[versionField] as number;
+        const newVersion = (currentVersion ?? 0) + 1;
+        updateBuilder.where(
+          new LogicalCriteria(
+            "and",
+            new ComparisonCriteria("eq", idCol, idValue),
+            new ComparisonCriteria("eq", versionCol, currentVersion as SqlValue),
+          ),
+        );
+
+        if (isFullUpdate) {
+          for (const field of metadata.fields) {
+            if (field.fieldName === idField) continue;
+            if (field.fieldName === versionField) {
+              updateBuilder.set(field.columnName, newVersion as SqlValue);
+            } else {
+              const value = (entity as Record<string | symbol, unknown>)[field.fieldName] as SqlValue;
+              updateBuilder.set(field.columnName, value);
+            }
+          }
+        } else {
+          updateBuilder.set(versionCol, newVersion as SqlValue);
+          for (const change of dirtyFields) {
+            if (change.field === idField || change.field === versionField) continue;
+            updateBuilder.set(change.columnName, change.newValue as SqlValue);
+          }
+        }
+      } else {
+        updateBuilder.where(new ComparisonCriteria("eq", idCol, idValue));
+
+        if (isFullUpdate) {
+          for (const field of metadata.fields) {
+            if (field.fieldName === idField) continue;
+            const value = (entity as Record<string | symbol, unknown>)[field.fieldName] as SqlValue;
+            updateBuilder.set(field.columnName, value);
+          }
+        } else {
+          for (const change of dirtyFields) {
+            if (change.field === idField) continue;
+            updateBuilder.set(change.columnName, change.newValue as SqlValue);
+          }
+        }
+      }
+      updateBuilder.returning("*");
+
+      const query = updateBuilder.build();
+      const stmt = conn.prepareStatement(query.sql);
+      try {
+        for (let i = 0; i < query.params.length; i++) {
+          stmt.setParameter(i + 1, query.params[i]);
+        }
+        const rs = await stmt.executeQuery();
+        if (await rs.next()) {
+          const saved = rowMapper.mapRow(rs);
+          await invokeLifecycleCallbacks(saved, "PostUpdate");
+          changeTracker.snapshot(saved);
+          entityCache.put(entityClass, getEntityId(saved), saved);
+          queryCache.invalidate(entityClass);
+          await emitEntityEvent(ENTITY_EVENTS.UPDATED, `${ENTITY_EVENTS.UPDATED}:${entityName}`, {
+            type: "updated",
+            entityClass,
+            entityName,
+            entity: saved,
+            id: getEntityId(saved),
+            changes: hasSnapshot ? dirtyFields : undefined,
+            timestamp: new Date(),
+          } satisfies EntityUpdatedEvent<T>);
+          return saved;
+        }
+        // No rows returned — if versioned, this is an optimistic lock conflict
+        if (versionField && versionCol && currentVersion !== undefined) {
+          entityCache.evict(entityClass, idValue);
+          let actualVersion: number | null = null;
+          const checkQuery = new SelectBuilder(metadata.tableName)
+            .columns(versionCol)
+            .where(new ComparisonCriteria("eq", idCol, idValue))
+            .limit(1)
+            .build();
+          const checkStmt = conn.prepareStatement(checkQuery.sql);
+          try {
+            for (let pi = 0; pi < checkQuery.params.length; pi++) {
+              checkStmt.setParameter(pi + 1, checkQuery.params[pi]);
+            }
+            const checkRs = await checkStmt.executeQuery();
+            if (await checkRs.next()) {
+              const row = checkRs.getRow();
+              const val = Object.values(row)[0];
+              actualVersion = typeof val === "number" ? val : Number(val);
+            }
+          } finally {
+            await checkStmt.close().catch(() => {});
+          }
+          throw new OptimisticLockException(
+            entityClass.name,
+            idValue,
+            currentVersion,
+            actualVersion,
+          );
+        }
+        // No rows returned for unversioned entity — entity was deleted
+        entityCache.evict(entityClass, idValue);
+        queryCache.invalidate(entityClass);
+        changeTracker.clearSnapshot(entity);
+        throw new EntityNotFoundException(entityClass.name, idValue);
+      } finally {
+        await stmt.close().catch(() => {});
+      }
+    } else {
+      // Insert
+      await invokeLifecycleCallbacks(entity, "PrePersist");
+      const insertBuilder = new InsertBuilder(metadata.tableName);
+
+      for (const field of metadata.fields) {
+        if (field.fieldName === idField) continue;
+        if (versionField && field.fieldName === versionField) {
+          insertBuilder.set(field.columnName, 1 as SqlValue);
+        } else {
+          const value = (entity as Record<string | symbol, unknown>)[field.fieldName] as SqlValue;
+          insertBuilder.set(field.columnName, value);
+        }
+      }
+      insertBuilder.returning("*");
+
+      const query = insertBuilder.build();
+      const stmt = conn.prepareStatement(query.sql);
+      try {
+        for (let i = 0; i < query.params.length; i++) {
+          stmt.setParameter(i + 1, query.params[i]);
+        }
+        const rs = await stmt.executeQuery();
+        if (await rs.next()) {
+          const saved = rowMapper.mapRow(rs);
+          await invokeLifecycleCallbacks(saved, "PostPersist");
+          changeTracker.snapshot(saved);
+          entityCache.put(entityClass, getEntityId(saved), saved);
+          queryCache.invalidate(entityClass);
+          await emitEntityEvent(ENTITY_EVENTS.PERSISTED, `${ENTITY_EVENTS.PERSISTED}:${entityName}`, {
+            type: "persisted",
+            entityClass,
+            entityName,
+            entity: saved,
+            id: getEntityId(saved),
+            timestamp: new Date(),
+          } satisfies EntityPersistedEvent<T>);
+          return saved;
+        }
+        return entity;
+      } finally {
+        await stmt.close().catch(() => {});
+      }
+    }
+  }
+
+  async function deleteWithConnection(entity: T, conn: Connection): Promise<void> {
+    await invokeLifecycleCallbacks(entity, "PreRemove");
+    const idField = metadata.idField;
+    const idValue = (entity as Record<string | symbol, unknown>)[idField] as SqlValue;
+    const idCol = getIdColumn();
+    const versionCol = getVersionColumn();
+    const versionField = metadata.versionField;
+
+    const builder = new DeleteBuilder(metadata.tableName);
+
+    let currentVersion: number | undefined;
+    if (versionField && versionCol) {
+      currentVersion = (entity as Record<string | symbol, unknown>)[versionField] as number;
+      builder.where(
+        new LogicalCriteria(
+          "and",
+          new ComparisonCriteria("eq", idCol, idValue),
+          new ComparisonCriteria("eq", versionCol, currentVersion as SqlValue),
+        ),
+      );
+    } else {
+      builder.where(new ComparisonCriteria("eq", idCol, idValue));
+    }
+
+    const query = builder.build();
+    const stmt = conn.prepareStatement(query.sql);
+    try {
+      for (let i = 0; i < query.params.length; i++) {
+        stmt.setParameter(i + 1, query.params[i]);
+      }
+      const affected = await stmt.executeUpdate();
+      if (versionField && versionCol && currentVersion !== undefined && affected === 0) {
+        let actualVersion: number | null = null;
+        const checkQuery = new SelectBuilder(metadata.tableName)
+          .columns(versionCol)
+          .where(new ComparisonCriteria("eq", idCol, idValue))
+          .limit(1)
+          .build();
+        const checkStmt = conn.prepareStatement(checkQuery.sql);
+        try {
+          for (let pi = 0; pi < checkQuery.params.length; pi++) {
+            checkStmt.setParameter(pi + 1, checkQuery.params[pi]);
+          }
+          const checkRs = await checkStmt.executeQuery();
+          if (await checkRs.next()) {
+            const row = checkRs.getRow();
+            const val = Object.values(row)[0];
+            actualVersion = typeof val === "number" ? val : Number(val);
+          }
+        } finally {
+          await checkStmt.close().catch(() => {});
+        }
+        throw new OptimisticLockException(
+          entityClass.name,
+          idValue,
+          currentVersion,
+          actualVersion,
+        );
+      }
+      await invokeLifecycleCallbacks(entity, "PostRemove");
+      await emitEntityEvent(ENTITY_EVENTS.REMOVED, `${ENTITY_EVENTS.REMOVED}:${entityName}`, {
+        type: "removed",
+        entityClass,
+        entityName,
+        entity,
+        id: idValue,
+        timestamp: new Date(),
+      } satisfies EntityRemovedEvent<T>);
+      changeTracker.clearSnapshot(entity);
+      entityCache.evict(entityClass, idValue);
+      queryCache.invalidate(entityClass);
+    } finally {
+      await stmt.close().catch(() => {});
+    }
+  }
+
   const crudMethods: CrudRepository<T, ID> = {
     async findById(id: ID, projectionClass?: new (...args: any[]) => any): Promise<any> {
       const idCol = getIdColumn();
@@ -299,292 +554,54 @@ export function createDerivedRepository<T, ID>(
     },
 
     async save(entity: T): Promise<T> {
-      const idField = metadata.idField;
-      const idValue = (entity as Record<string | symbol, unknown>)[idField] as SqlValue;
-      const idCol = getIdColumn();
-      const versionCol = getVersionColumn();
-      const versionField = metadata.versionField;
-
-      if (idValue != null) {
-        // Update
-        await invokeLifecycleCallbacks(entity, "PreUpdate");
-
-        // Dirty checking: if entity has a snapshot, only update changed fields
-        const hasSnapshot = changeTracker.getSnapshot(entity) !== undefined;
-        const dirtyFields = hasSnapshot ? changeTracker.getDirtyFields(entity) : [];
-        const isFullUpdate = !hasSnapshot;
-
-        // If entity is clean (no dirty fields) and no version bumping needed, skip UPDATE
-        if (hasSnapshot && dirtyFields.length === 0) {
-          return entity;
-        }
-
-        const updateBuilder = new UpdateBuilder(metadata.tableName);
-
-        // Build WHERE clause: id = ? (and optionally version = ?)
-        let currentVersion: number | undefined;
-        if (versionField && versionCol) {
-          currentVersion = (entity as Record<string | symbol, unknown>)[versionField] as number;
-          const newVersion = (currentVersion ?? 0) + 1;
-          updateBuilder.where(
-            new LogicalCriteria(
-              "and",
-              new ComparisonCriteria("eq", idCol, idValue),
-              new ComparisonCriteria("eq", versionCol, currentVersion as SqlValue),
-            ),
-          );
-
-          if (isFullUpdate) {
-            // No snapshot — full update (existing behavior)
-            for (const field of metadata.fields) {
-              if (field.fieldName === idField) continue;
-              if (field.fieldName === versionField) {
-                updateBuilder.set(field.columnName, newVersion as SqlValue);
-              } else {
-                const value = (entity as Record<string | symbol, unknown>)[field.fieldName] as SqlValue;
-                updateBuilder.set(field.columnName, value);
-              }
-            }
-          } else {
-            // Minimal update — only dirty fields + version
-            updateBuilder.set(versionCol, newVersion as SqlValue);
-            for (const change of dirtyFields) {
-              if (change.field === idField || change.field === versionField) continue;
-              updateBuilder.set(change.columnName, change.newValue as SqlValue);
-            }
-          }
-        } else {
-          updateBuilder.where(new ComparisonCriteria("eq", idCol, idValue));
-
-          if (isFullUpdate) {
-            for (const field of metadata.fields) {
-              if (field.fieldName === idField) continue;
-              const value = (entity as Record<string | symbol, unknown>)[field.fieldName] as SqlValue;
-              updateBuilder.set(field.columnName, value);
-            }
-          } else {
-            // Minimal update — only dirty fields
-            for (const change of dirtyFields) {
-              if (change.field === idField) continue;
-              updateBuilder.set(change.columnName, change.newValue as SqlValue);
-            }
-          }
-        }
-        updateBuilder.returning("*");
-
-        const query = updateBuilder.build();
-        const conn = await dataSource.getConnection();
-        try {
-          const stmt = conn.prepareStatement(query.sql);
-          try {
-            for (let i = 0; i < query.params.length; i++) {
-              stmt.setParameter(i + 1, query.params[i]);
-            }
-            const rs = await stmt.executeQuery();
-            if (await rs.next()) {
-              const saved = rowMapper.mapRow(rs);
-              await invokeLifecycleCallbacks(saved, "PostUpdate");
-              changeTracker.snapshot(saved);
-              entityCache.put(entityClass, getEntityId(saved), saved);
-              queryCache.invalidate(entityClass);
-              await emitEntityEvent(ENTITY_EVENTS.UPDATED, `${ENTITY_EVENTS.UPDATED}:${entityName}`, {
-                type: "updated",
-                entityClass,
-                entityName,
-                entity: saved,
-                id: getEntityId(saved),
-                changes: hasSnapshot ? dirtyFields : undefined,
-                timestamp: new Date(),
-              } satisfies EntityUpdatedEvent<T>);
-              return saved;
-            }
-            // No rows returned — if versioned, this is an optimistic lock conflict
-            if (versionField && versionCol && currentVersion !== undefined) {
-              entityCache.evict(entityClass, idValue);
-              // Re-read to distinguish "deleted" from "version mismatch"
-              let actualVersion: number | null = null;
-              const checkQuery = new SelectBuilder(metadata.tableName)
-                .columns(versionCol)
-                .where(new ComparisonCriteria("eq", idCol, idValue))
-                .limit(1)
-                .build();
-              const checkStmt = conn.prepareStatement(checkQuery.sql);
-              try {
-                for (let pi = 0; pi < checkQuery.params.length; pi++) {
-                  checkStmt.setParameter(pi + 1, checkQuery.params[pi]);
-                }
-                const checkRs = await checkStmt.executeQuery();
-                if (await checkRs.next()) {
-                  const row = checkRs.getRow();
-                  const val = Object.values(row)[0];
-                  actualVersion = typeof val === "number" ? val : Number(val);
-                }
-              } finally {
-                await checkStmt.close().catch(() => {});
-              }
-              throw new OptimisticLockException(
-                entityClass.name,
-                idValue,
-                currentVersion,
-                actualVersion,
-              );
-            }
-            // No rows returned for unversioned entity — entity was deleted
-            entityCache.evict(entityClass, idValue);
-            queryCache.invalidate(entityClass);
-            changeTracker.clearSnapshot(entity);
-            throw new EntityNotFoundException(entityClass.name, idValue);
-          } finally {
-            await stmt.close().catch(() => {});
-          }
-        } finally {
-          await conn.close();
-        }
-      } else {
-        // Insert
-        await invokeLifecycleCallbacks(entity, "PrePersist");
-        const insertBuilder = new InsertBuilder(metadata.tableName);
-
-        for (const field of metadata.fields) {
-          if (field.fieldName === idField) continue;
-          if (versionField && field.fieldName === versionField) {
-            // Set initial version to 1
-            insertBuilder.set(field.columnName, 1 as SqlValue);
-          } else {
-            const value = (entity as Record<string | symbol, unknown>)[field.fieldName] as SqlValue;
-            insertBuilder.set(field.columnName, value);
-          }
-        }
-        insertBuilder.returning("*");
-
-        const query = insertBuilder.build();
-        const conn = await dataSource.getConnection();
-        try {
-          const stmt = conn.prepareStatement(query.sql);
-          try {
-            for (let i = 0; i < query.params.length; i++) {
-              stmt.setParameter(i + 1, query.params[i]);
-            }
-            const rs = await stmt.executeQuery();
-            if (await rs.next()) {
-              const saved = rowMapper.mapRow(rs);
-              await invokeLifecycleCallbacks(saved, "PostPersist");
-              changeTracker.snapshot(saved);
-              entityCache.put(entityClass, getEntityId(saved), saved);
-              queryCache.invalidate(entityClass);
-              await emitEntityEvent(ENTITY_EVENTS.PERSISTED, `${ENTITY_EVENTS.PERSISTED}:${entityName}`, {
-                type: "persisted",
-                entityClass,
-                entityName,
-                entity: saved,
-                id: getEntityId(saved),
-                timestamp: new Date(),
-              } satisfies EntityPersistedEvent<T>);
-              return saved;
-            }
-            return entity;
-          } finally {
-            await stmt.close().catch(() => {});
-          }
-        } finally {
-          await conn.close();
-        }
+      const conn = await dataSource.getConnection();
+      try {
+        return await saveWithConnection(entity, conn);
+      } finally {
+        await conn.close();
       }
     },
 
     async saveAll(entities: T[]): Promise<T[]> {
-      const results: T[] = [];
-      for (const entity of entities) {
-        results.push(await crudMethods.save(entity));
+      const conn = await dataSource.getConnection();
+      const tx = await conn.beginTransaction();
+      try {
+        const results: T[] = [];
+        for (const entity of entities) {
+          results.push(await saveWithConnection(entity, conn));
+        }
+        await tx.commit();
+        return results;
+      } catch (err) {
+        await tx.rollback();
+        throw err;
+      } finally {
+        await conn.close();
       }
-      return results;
     },
 
     async delete(entity: T): Promise<void> {
-      await invokeLifecycleCallbacks(entity, "PreRemove");
-      const idField = metadata.idField;
-      const idValue = (entity as Record<string | symbol, unknown>)[idField] as SqlValue;
-      const idCol = getIdColumn();
-      const versionCol = getVersionColumn();
-      const versionField = metadata.versionField;
-
-      const builder = new DeleteBuilder(metadata.tableName);
-
-      let currentVersion: number | undefined;
-      if (versionField && versionCol) {
-        currentVersion = (entity as Record<string | symbol, unknown>)[versionField] as number;
-        builder.where(
-          new LogicalCriteria(
-            "and",
-            new ComparisonCriteria("eq", idCol, idValue),
-            new ComparisonCriteria("eq", versionCol, currentVersion as SqlValue),
-          ),
-        );
-      } else {
-        builder.where(new ComparisonCriteria("eq", idCol, idValue));
-      }
-
-      const query = builder.build();
       const conn = await dataSource.getConnection();
       try {
-        const stmt = conn.prepareStatement(query.sql);
-        try {
-          for (let i = 0; i < query.params.length; i++) {
-            stmt.setParameter(i + 1, query.params[i]);
-          }
-          const affected = await stmt.executeUpdate();
-          if (versionField && versionCol && currentVersion !== undefined && affected === 0) {
-            // Re-read to distinguish "deleted" from "version mismatch"
-            let actualVersion: number | null = null;
-            const checkQuery = new SelectBuilder(metadata.tableName)
-              .columns(versionCol)
-              .where(new ComparisonCriteria("eq", idCol, idValue))
-              .limit(1)
-              .build();
-            const checkStmt = conn.prepareStatement(checkQuery.sql);
-            try {
-              for (let pi = 0; pi < checkQuery.params.length; pi++) {
-                checkStmt.setParameter(pi + 1, checkQuery.params[pi]);
-              }
-              const checkRs = await checkStmt.executeQuery();
-              if (await checkRs.next()) {
-                const row = checkRs.getRow();
-                const val = Object.values(row)[0];
-                actualVersion = typeof val === "number" ? val : Number(val);
-              }
-            } finally {
-              await checkStmt.close().catch(() => {});
-            }
-            throw new OptimisticLockException(
-              entityClass.name,
-              idValue,
-              currentVersion,
-              actualVersion,
-            );
-          }
-          await invokeLifecycleCallbacks(entity, "PostRemove");
-          await emitEntityEvent(ENTITY_EVENTS.REMOVED, `${ENTITY_EVENTS.REMOVED}:${entityName}`, {
-            type: "removed",
-            entityClass,
-            entityName,
-            entity,
-            id: idValue,
-            timestamp: new Date(),
-          } satisfies EntityRemovedEvent<T>);
-          changeTracker.clearSnapshot(entity);
-          entityCache.evict(entityClass, idValue);
-          queryCache.invalidate(entityClass);
-        } finally {
-          await stmt.close().catch(() => {});
-        }
+        await deleteWithConnection(entity, conn);
       } finally {
         await conn.close();
       }
     },
 
     async deleteAll(entities: T[]): Promise<void> {
-      for (const entity of entities) {
-        await crudMethods.delete(entity);
+      const conn = await dataSource.getConnection();
+      const tx = await conn.beginTransaction();
+      try {
+        for (const entity of entities) {
+          await deleteWithConnection(entity, conn);
+        }
+        await tx.commit();
+      } catch (err) {
+        await tx.rollback();
+        throw err;
+      } finally {
+        await conn.close();
       }
     },
 
