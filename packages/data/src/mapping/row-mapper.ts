@@ -15,6 +15,7 @@ export function createRowMapper<T>(
       const entity = Object.create(entityClass.prototype) as T;
 
       for (const field of metadata.fields) {
+        if (field.fieldName === "__proto__" || field.fieldName === "constructor") continue;
         const value = row[field.columnName];
         (entity as Record<string | symbol, unknown>)[field.fieldName] = value;
       }

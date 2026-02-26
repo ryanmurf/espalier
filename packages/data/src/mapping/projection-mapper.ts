@@ -49,6 +49,7 @@ export function createProjectionMapper<T>(
     mapRow(row: Record<string, unknown>): T {
       const instance = Object.create(projectionClass.prototype) as T;
       for (const [fieldName, columnName] of fieldToColumn) {
+        if (fieldName === "__proto__" || fieldName === "constructor") continue;
         (instance as Record<string | symbol, unknown>)[fieldName] = row[columnName];
       }
       return instance;
