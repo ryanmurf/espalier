@@ -164,26 +164,47 @@ function extractOrderBy(predicate: string): {
 
   // Split on direction suffixes. Pattern: PropertyAsc or PropertyDesc
   // Multiple order-by: OrderByAgeDescNameAsc
+  // Direction suffixes must be at a word boundary: followed by end-of-string
+  // or an uppercase letter (start of next property name).
+  // Property names may contain "Asc" or "Desc" as substrings (e.g. "Description"),
+  // so we must only match at valid boundaries.
   let remaining = orderByPart;
   while (remaining.length > 0) {
-    let direction: "Asc" | "Desc" = "Asc";
+    // Find the earliest valid direction suffix match across both "Desc" and "Asc"
+    let bestIdx = -1;
+    let bestDir: "Asc" | "Desc" = "Asc";
+
+    for (const dir of ["Desc", "Asc"] as const) {
+      let searchFrom = 1; // property must be at least 1 char
+      while (searchFrom < remaining.length) {
+        const idx = remaining.indexOf(dir, searchFrom);
+        if (idx === -1) break;
+
+        const afterIdx = idx + dir.length;
+        const atBoundary = afterIdx === remaining.length ||
+          (remaining[afterIdx] >= "A" && remaining[afterIdx] <= "Z");
+
+        if (atBoundary && (bestIdx === -1 || idx < bestIdx)) {
+          bestIdx = idx;
+          bestDir = dir;
+          break; // first valid match for this direction, move to next direction
+        }
+
+        searchFrom = idx + 1;
+      }
+    }
+
     let propPart: string;
+    let direction: "Asc" | "Desc" = "Asc";
 
-    const descIdx = remaining.indexOf("Desc");
-    const ascIdx = remaining.indexOf("Asc");
-
-    if (descIdx === -1 && ascIdx === -1) {
+    if (bestIdx === -1) {
       // No explicit direction — default Asc, entire remainder is property
       propPart = remaining;
       remaining = "";
-    } else if (descIdx !== -1 && (ascIdx === -1 || descIdx < ascIdx)) {
-      propPart = remaining.slice(0, descIdx);
-      direction = "Desc";
-      remaining = remaining.slice(descIdx + "Desc".length);
     } else {
-      propPart = remaining.slice(0, ascIdx);
-      direction = "Asc";
-      remaining = remaining.slice(ascIdx + "Asc".length);
+      propPart = remaining.slice(0, bestIdx);
+      direction = bestDir;
+      remaining = remaining.slice(bestIdx + bestDir.length);
     }
 
     if (!propPart) {
