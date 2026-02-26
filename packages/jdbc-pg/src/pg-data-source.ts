@@ -15,6 +15,7 @@ import {
   ConnectionError,
   DatabaseErrorCode,
   DefaultPoolMetricsCollector,
+  StatementCache,
   warmupPool,
   DEFAULT_PRE_PING_QUERY,
   DEFAULT_PRE_PING_INTERVAL_MS,
@@ -57,6 +58,7 @@ export class PgDataSource implements MonitoredPooledDataSource {
   private readonly poolConfig?: PoolConfig;
   private readonly prePingConfig?: PrePingConfig;
   private readonly lastPingTimestamps = new WeakMap<PoolClient, number>();
+  private readonly statementCaches = new WeakMap<PoolClient, StatementCache>();
   private readonly metrics: DefaultPoolMetricsCollector;
   private closed = false;
 
@@ -198,7 +200,17 @@ export class PgDataSource implements MonitoredPooledDataSource {
         acquireTimeMs,
       });
 
-      const conn = new PgConnection(client, this.typeConverters, this.statementCacheConfig);
+      // Look up or create a statement cache for this pool client
+      let stmtCache: StatementCache | undefined;
+      if (this.statementCacheConfig && this.statementCacheConfig.enabled !== false) {
+        stmtCache = this.statementCaches.get(client);
+        if (!stmtCache) {
+          stmtCache = new StatementCache(this.statementCacheConfig);
+          this.statementCaches.set(client, stmtCache);
+        }
+      }
+
+      const conn = new PgConnection(client, this.typeConverters, stmtCache);
 
       // Wrap close to emit release event
       const originalClose = conn.close.bind(conn);

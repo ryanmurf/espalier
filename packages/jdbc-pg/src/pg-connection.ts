@@ -1,12 +1,11 @@
 import type { PoolClient } from "pg";
-import type { Connection, TypeAwareConnection, CacheableConnection, PreparedStatement, NamedPreparedStatement, BatchStatement, Statement, TypeConverterRegistry, StatementCacheConfig, StatementCacheStats } from "espalier-jdbc";
+import type { Connection, TypeAwareConnection, CacheableConnection, PreparedStatement, NamedPreparedStatement, BatchStatement, Statement, TypeConverterRegistry, StatementCacheStats, StatementCache } from "espalier-jdbc";
 import {
   type Transaction,
   type IsolationLevel,
   ConnectionError,
   TransactionError,
   DatabaseErrorCode,
-  StatementCache,
 } from "espalier-jdbc";
 import { PgStatement, PgPreparedStatement } from "./pg-statement.js";
 import { PgNamedPreparedStatement } from "./pg-named-statement.js";
@@ -19,11 +18,9 @@ export class PgConnection implements TypeAwareConnection, CacheableConnection {
   constructor(
     private readonly client: PoolClient,
     private readonly typeConverters?: TypeConverterRegistry,
-    statementCacheConfig?: StatementCacheConfig,
+    statementCache?: StatementCache,
   ) {
-    if (statementCacheConfig && statementCacheConfig.enabled !== false) {
-      this.stmtCache = new StatementCache(statementCacheConfig);
-    }
+    this.stmtCache = statementCache;
   }
 
   getTypeConverterRegistry(): TypeConverterRegistry | undefined {
@@ -146,9 +143,6 @@ export class PgConnection implements TypeAwareConnection, CacheableConnection {
   async close(): Promise<void> {
     if (!this.closed) {
       this.closed = true;
-      if (this.stmtCache) {
-        await this.stmtCache.clear();
-      }
       this.client.release();
     }
   }
