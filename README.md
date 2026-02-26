@@ -374,6 +374,71 @@ custom.on("my.event", (data) => console.log(data));
 custom.emit("my.event", { message: "hello" });
 ```
 
+## Migration CLI
+
+Manage database migrations from the command line:
+
+```bash
+# Create a new migration
+espalier migrate create AddUsersTable
+
+# Run pending migrations
+espalier migrate up
+espalier migrate up --to 20260101120000
+
+# Roll back migrations
+espalier migrate down           # roll back 1
+espalier migrate down 3         # roll back 3
+espalier migrate down --to 0    # roll back all
+
+# Show migration status
+espalier migrate status
+```
+
+Configure via `espalier.config.json`:
+```json
+{
+  "adapter": "pg",
+  "connection": { "connectionString": "postgres://localhost/mydb" },
+  "migrations": { "directory": "./migrations" }
+}
+```
+
+## Auto-Generated Repositories
+
+Declare repository interfaces with `@Repository` — methods are auto-implemented from their names:
+
+```typescript
+import { Repository, CrudRepository, createAutoRepository } from "espalier-data";
+
+@Repository({ entity: User })
+class UserRepository extends CrudRepository<User, number> {
+  findByName!: (name: string) => Promise<User[]>;
+  findByEmailAndStatus!: (email: string, status: string) => Promise<User[]>;
+  countByStatus!: (status: string) => Promise<number>;
+  existsByEmail!: (email: string) => Promise<boolean>;
+}
+
+const userRepo = createAutoRepository(UserRepository, dataSource);
+const users = await userRepo.findByName("Alice");
+const count = await userRepo.countByStatus("active");
+```
+
+## Debug Logging
+
+Enable structured logging for all database operations:
+
+```typescript
+import { createConsoleLogger, setGlobalLogger, LogLevel } from "espalier-jdbc";
+
+// Enable debug logging
+setGlobalLogger(createConsoleLogger({ level: LogLevel.DEBUG }));
+
+// Logs: connection acquired/released, queries with duration,
+// transactions, cache hits/misses, lifecycle events
+// SQL truncated to 200 chars, parameter values NEVER logged
+```
+
 ## Roadmap
 
 - [x] MySQL/MariaDB adapter (`espalier-jdbc-mysql`) *(Y1 Q4)*
@@ -398,4 +463,11 @@ custom.emit("my.event", { message: "hello" });
 - [x] Change tracking / dirty checking *(Y2 Q3)*
 - [x] Async iterator improvements (`toArray`, `mapResultSet`, etc.) *(Y2 Q3)*
 - [x] Event bus with entity lifecycle event publishing *(Y2 Q3)*
-- [ ] CLI for migrations *(Y2 Q4)*
+- [x] CLI for migrations (`espalier migrate create/up/down/status`) *(Y2 Q4)*
+- [x] Auto-generated repositories (`@Repository` decorator) *(Y2 Q4)*
+- [x] Structured error types with SQL context and cause chaining *(Y2 Q4)*
+- [x] Pluggable logger interface with debug/trace instrumentation *(Y2 Q4)*
+- [ ] Advanced relationships (lazy loading, eager fetch, cascade) *(Y3 Q1)*
+- [ ] Multi-tenancy & sharding *(Y3 Q2)*
+- [ ] Observability (OpenTelemetry, query plan analysis) *(Y3 Q3)*
+- [ ] Ecosystem (plugin system, MSSQL/Oracle, GraphQL/REST) *(Y3 Q4)*

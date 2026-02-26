@@ -81,10 +81,12 @@ function createMockConnection(stmt: PreparedStatement): Connection {
     beginTransaction: vi.fn(async () => ({
       commit: vi.fn(async () => {}),
       rollback: vi.fn(async () => {}),
+      setSavepoint: vi.fn(async () => "sp"),
+      rollbackTo: vi.fn(async () => {}),
     })),
     close: vi.fn(async () => {}),
     isClosed: vi.fn(() => false),
-  };
+  } as unknown as Connection;
 }
 
 function createMockDataSource(conn: Connection): DataSource {

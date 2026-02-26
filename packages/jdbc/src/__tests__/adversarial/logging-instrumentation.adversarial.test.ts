@@ -11,7 +11,8 @@ import { StatementCache } from "../../statement-cache.js";
 import type { PreparedStatement } from "../../statement.js";
 import { warmupPool, validateConnection } from "../../pool-warmup.js";
 import type { PooledDataSource } from "../../pool.js";
-import type { Connection, Statement } from "../../connection.js";
+import type { Connection } from "../../connection.js";
+import type { Statement } from "../../statement.js";
 import type { ResultSet } from "../../result-set.js";
 
 // ---------------------------------------------------------------------------
@@ -48,11 +49,11 @@ function createMockResultSet(): ResultSet {
 }
 
 function createMockConnection(): Connection {
-  const stmt: Statement = {
+  const stmt = {
     executeQuery: vi.fn(async () => createMockResultSet()),
     executeUpdate: vi.fn(async () => 0),
     close: vi.fn(async () => {}),
-  };
+  } as unknown as Statement;
   return {
     createStatement: vi.fn(() => stmt),
     prepareStatement: vi.fn(() => createMockStatement()),
@@ -62,7 +63,7 @@ function createMockConnection(): Connection {
     })),
     close: vi.fn(async () => {}),
     isClosed: vi.fn(() => false),
-  };
+  } as unknown as Connection;
 }
 
 function createMockPooledDataSource(failCount = 0): PooledDataSource {
@@ -82,7 +83,7 @@ function createMockPooledDataSource(failCount = 0): PooledDataSource {
       activeConnections: 2,
       waitingRequests: 0,
     })),
-  };
+  } as unknown as PooledDataSource;
 }
 
 /**

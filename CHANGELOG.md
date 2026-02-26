@@ -1,5 +1,93 @@
 # Changelog
 
+## 0.8.0 — Y2 Q4
+
+### espalier-cli (new package)
+
+#### CLI for Migrations
+- New `espalier` CLI binary with `migrate create`, `migrate up`, `migrate down`, and `migrate status` commands
+- `espalier migrate create <name>` scaffolds timestamped migration files with `up()` and `down()` stubs
+- `espalier migrate up` runs pending migrations in order, supports `--to <version>` targeting
+- `espalier migrate down` rolls back migrations by step count (default 1) or `--to <version>`
+- `espalier migrate status` displays a formatted table of all migrations with applied/pending status, dates, and orphan detection
+- JSON config loader (`espalier.config.json`) with adapter, connection, and migrations directory settings
+- Dynamic adapter loading — only the installed adapter (pg/mysql/sqlite) is imported
+- Lightweight arg parser with `VALUED_FLAGS` whitelist to prevent subcommand consumption
+- Proper input validation: migration name length (max 200), steps validation, duplicate version detection, non-empty target versions
+- Safe error handling: `close()` errors in `finally` blocks don't swallow original errors
+
+### espalier-data
+
+#### @Repository Decorator and Auto-Generated Repositories
+- Added `@Repository({ entity: EntityClass })` TC39 standard class decorator with WeakMap metadata storage
+- Added `createAutoRepository(RepoClass, dataSource, options?)` factory that reads decorator metadata and creates a fully-functional repository
+- Auto-implements all `CrudRepository` methods (findById, findAll, save, delete, etc.)
+- Proxy-based derived query method resolution — any `findBy*`, `countBy*`, `existsBy*`, `deleteBy*` method is auto-implemented from its name
+- Added `getDeclaredDerivedMethods()` and `validateDerivedMethods()` for creation-time method name validation against entity metadata
+- Registry of decorated repositories via `getRegisteredRepositories()` (keyed by entity class reference)
+- Passes through entityCache, queryCache, and eventBus options to underlying derived repository
+- Proxy correctly handles well-known properties (`then`, `catch`, `toJSON`, `valueOf`) to prevent broken `await`
+
+#### Structured Error Types
+- Enhanced `DatabaseError` hierarchy with optional `ErrorContext`: SQL template, parameter count, error code, cause, connection ID, timestamp
+- Added `ErrorCode` const object with 25 structured codes: connection (4), query (7), transaction (4), migration (3), schema (3), generic (1)
+- Added static factory methods: `DatabaseError.connectionFailed()`, `.queryFailed()`, `.transactionFailed()`
+- Added `toJSON()` for safe serializable representation (no sensitive data) and enhanced `toString()` with multi-line context
+- Added `MigrationError` and `SchemaError` subclasses
+- ES2022 `cause` chaining for wrapping driver errors
+- Fully backward-compatible — existing error construction patterns still work
+
+### espalier-jdbc
+
+#### Pluggable Logger Interface
+- Added `Logger` interface with `trace()`, `debug()`, `info()`, `warn()`, `error()` methods accepting structured context objects
+- Added `LogLevel` enum: TRACE, DEBUG, INFO, WARN, ERROR, OFF
+- Added `NoopLogger` — zero-overhead default when logging is disabled
+- Added `ConsoleLogger` — structured formatting with ISO timestamp, level, logger name, and JSON context
+- `ConsoleLogger` supports minimum level filtering, `child()` creates dot-separated name prefixes
+- Handles circular references (outputs `[unserializable]`) and BigInt values (serialized as `"123n"`)
+- `setGlobalLogger()` / `getGlobalLogger()` for global configuration
+- `createConsoleLogger(options?)` factory for quick setup
+
+#### Debug/Trace Logging Instrumentation
+- Statement cache: TRACE hits/misses/evictions with truncated SQL and cache size
+- Pool warmup: INFO start/complete, TRACE pre-ping results
+- All logging uses `isEnabled()` guards to avoid context object allocation overhead
+- SQL truncated to 200 chars in all log contexts — parameter values NEVER logged
+
+### espalier-jdbc-pg / espalier-jdbc-mysql / espalier-jdbc-sqlite
+
+#### Logging Instrumentation
+- Connection lifecycle: DEBUG acquired/released with pool stats
+- Transaction lifecycle: DEBUG begin/commit/rollback/savepoint with isolation level
+- Query execution: DEBUG with truncated SQL, parameter count, and duration
+- Error conditions: ERROR with context
+
+### Bug Fixes
+
+#### High — Migration CLI
+- **#138**: `migrateDown(steps=0)` no longer rolls back all migrations (was caused by `slice(-0)` equaling `slice(0)`)
+- **#139**: `migrateUp(toVersion="")` now throws instead of silently applying all migrations
+- **#140**: `migrateDown` validates steps is a positive finite integer (rejects NaN, Infinity, negatives, floats)
+
+#### Medium — Data Correctness
+- **#150**: `parseDerivedQueryMethod("findByAndAnd")` now throws instead of producing zero predicates (prevented silent unfiltered queries)
+- **#148**: `ConsoleLogger` handles circular references in context objects gracefully
+- **#161**: QueryCache no longer leaks parameter values (passwords, tokens) into log output
+
+#### Low — Robustness
+- **#117/#118/#119**: CLI arg parser flag handling, migration name length validation, snake_case digit boundary
+- **#141**: Duplicate migration version detection in `migrateUp`
+- **#142**: `close()` errors in finally blocks no longer swallow original errors
+- **#143**: `formatStatusTable` handles Invalid Date gracefully
+- **#144**: `formatStatusTable` sanitizes newlines/tabs in descriptions
+- **#149**: `ConsoleLogger` handles BigInt values in context objects
+- **#151**: EntityCache/QueryCache validate config values (reject negative maxSize/TTL)
+- **#152**: Repository registry uses entity class reference as key (prevents name collisions)
+- **#153**: Derived repo proxy returns `undefined` for well-known non-query properties (`then`, `catch`, etc.)
+- **#154**: `ErrorCode` object is `Object.freeze()`'d at runtime
+- **#155**: `DatabaseError.toString()` consistent with `toJSON()` for empty string fields
+
 ## 0.7.0 — Y2 Q3
 
 ### espalier-data
