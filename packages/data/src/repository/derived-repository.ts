@@ -13,6 +13,7 @@ import { SelectBuilder, InsertBuilder, UpdateBuilder, DeleteBuilder } from "../q
 import { ComparisonCriteria, LogicalCriteria } from "../query/criteria.js";
 import type { Specification } from "../query/specification.js";
 import { OptimisticLockException } from "./optimistic-lock.js";
+import { EntityNotFoundException } from "./entity-not-found.js";
 import { EntityCache } from "../cache/entity-cache.js";
 import type { EntityCacheConfig } from "../cache/entity-cache.js";
 import { QueryCache } from "../cache/query-cache.js";
@@ -407,7 +408,11 @@ export function createDerivedRepository<T, ID>(
                 null,
               );
             }
-            return entity;
+            // No rows returned for unversioned entity — entity was deleted
+            entityCache.evict(entityClass, idValue);
+            queryCache.invalidate(entityClass);
+            changeTracker.clearSnapshot(entity);
+            throw new EntityNotFoundException(entityClass.name, idValue);
           } finally {
             await stmt.close().catch(() => {});
           }

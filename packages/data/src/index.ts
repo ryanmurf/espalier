@@ -88,6 +88,7 @@ export type { StreamOptions } from "./repository/streaming.js";
 export type { DerivedRepositoryOptions } from "./repository/derived-repository.js";
 export { createDerivedRepository } from "./repository/derived-repository.js";
 export { OptimisticLockException } from "./repository/optimistic-lock.js";
+export { EntityNotFoundException } from "./repository/entity-not-found.js";
 
 export type { EntityCacheConfig, EntityCacheStats } from "./cache/index.js";
 export { EntityCache } from "./cache/index.js";
