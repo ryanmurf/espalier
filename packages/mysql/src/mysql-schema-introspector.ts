@@ -12,16 +12,23 @@ export class MysqlSchemaIntrospector implements SchemaIntrospector {
        ORDER BY table_name`,
     );
     ps.setParameter(1, dbName);
-    const rs = await ps.executeQuery();
-
-    const tables: TableInfo[] = [];
-    while (await rs.next()) {
-      tables.push({
-        tableName: rs.getString("table_name") ?? rs.getString("TABLE_NAME")!,
-        schema: rs.getString("table_schema") ?? rs.getString("TABLE_SCHEMA")!,
-      });
+    try {
+      const rs = await ps.executeQuery();
+      try {
+        const tables: TableInfo[] = [];
+        while (await rs.next()) {
+          tables.push({
+            tableName: rs.getString("table_name") ?? rs.getString("TABLE_NAME")!,
+            schema: rs.getString("table_schema") ?? rs.getString("TABLE_SCHEMA")!,
+          });
+        }
+        return tables;
+      } finally {
+        await rs.close();
+      }
+    } finally {
+      await ps.close();
     }
-    return tables;
   }
 
   async getColumns(tableName: string, schema?: string): Promise<ColumnInfo[]> {
@@ -41,22 +48,29 @@ export class MysqlSchemaIntrospector implements SchemaIntrospector {
     );
     ps.setParameter(1, tableName);
     ps.setParameter(2, dbName);
-    const rs = await ps.executeQuery();
-
-    const columns: ColumnInfo[] = [];
-    while (await rs.next()) {
-      const columnName = rs.getString("column_name") ?? rs.getString("COLUMN_NAME")!;
-      columns.push({
-        columnName,
-        dataType: rs.getString("data_type") ?? rs.getString("DATA_TYPE")!,
-        nullable: (rs.getString("is_nullable") ?? rs.getString("IS_NULLABLE")) === "YES",
-        defaultValue: rs.getString("column_default") ?? rs.getString("COLUMN_DEFAULT"),
-        primaryKey: pkColumns.has(columnName),
-        unique: uniqueColumns.has(columnName),
-        maxLength: rs.getNumber("character_maximum_length") ?? rs.getNumber("CHARACTER_MAXIMUM_LENGTH"),
-      });
+    try {
+      const rs = await ps.executeQuery();
+      try {
+        const columns: ColumnInfo[] = [];
+        while (await rs.next()) {
+          const columnName = rs.getString("column_name") ?? rs.getString("COLUMN_NAME")!;
+          columns.push({
+            columnName,
+            dataType: rs.getString("data_type") ?? rs.getString("DATA_TYPE")!,
+            nullable: (rs.getString("is_nullable") ?? rs.getString("IS_NULLABLE")) === "YES",
+            defaultValue: rs.getString("column_default") ?? rs.getString("COLUMN_DEFAULT"),
+            primaryKey: pkColumns.has(columnName),
+            unique: uniqueColumns.has(columnName),
+            maxLength: rs.getNumber("character_maximum_length") ?? rs.getNumber("CHARACTER_MAXIMUM_LENGTH"),
+          });
+        }
+        return columns;
+      } finally {
+        await rs.close();
+      }
+    } finally {
+      await ps.close();
     }
-    return columns;
   }
 
   async getPrimaryKeys(tableName: string, schema?: string): Promise<string[]> {
@@ -74,13 +88,20 @@ export class MysqlSchemaIntrospector implements SchemaIntrospector {
     );
     ps.setParameter(1, tableName);
     ps.setParameter(2, dbName);
-    const rs = await ps.executeQuery();
-
-    const keys: string[] = [];
-    while (await rs.next()) {
-      keys.push(rs.getString("column_name") ?? rs.getString("COLUMN_NAME")!);
+    try {
+      const rs = await ps.executeQuery();
+      try {
+        const keys: string[] = [];
+        while (await rs.next()) {
+          keys.push(rs.getString("column_name") ?? rs.getString("COLUMN_NAME")!);
+        }
+        return keys;
+      } finally {
+        await rs.close();
+      }
+    } finally {
+      await ps.close();
     }
-    return keys;
   }
 
   async tableExists(tableName: string, schema?: string): Promise<boolean> {
@@ -91,8 +112,16 @@ export class MysqlSchemaIntrospector implements SchemaIntrospector {
     );
     ps.setParameter(1, tableName);
     ps.setParameter(2, dbName);
-    const rs = await ps.executeQuery();
-    return rs.next();
+    try {
+      const rs = await ps.executeQuery();
+      try {
+        return rs.next();
+      } finally {
+        await rs.close();
+      }
+    } finally {
+      await ps.close();
+    }
   }
 
   private async getUniqueColumns(tableName: string, schema: string): Promise<Set<string>> {
@@ -108,21 +137,36 @@ export class MysqlSchemaIntrospector implements SchemaIntrospector {
     );
     ps.setParameter(1, tableName);
     ps.setParameter(2, schema);
-    const rs = await ps.executeQuery();
-
-    const columns = new Set<string>();
-    while (await rs.next()) {
-      columns.add(rs.getString("column_name") ?? rs.getString("COLUMN_NAME")!);
+    try {
+      const rs = await ps.executeQuery();
+      try {
+        const columns = new Set<string>();
+        while (await rs.next()) {
+          columns.add(rs.getString("column_name") ?? rs.getString("COLUMN_NAME")!);
+        }
+        return columns;
+      } finally {
+        await rs.close();
+      }
+    } finally {
+      await ps.close();
     }
-    return columns;
   }
 
   private async currentDatabase(): Promise<string> {
     const stmt = this.connection.createStatement();
-    const rs = await stmt.executeQuery("SELECT DATABASE() AS db");
-    if (await rs.next()) {
-      return rs.getString("db")!;
+    try {
+      const rs = await stmt.executeQuery("SELECT DATABASE() AS db");
+      try {
+        if (await rs.next()) {
+          return rs.getString("db")!;
+        }
+        throw new Error("Could not determine current MySQL database");
+      } finally {
+        await rs.close();
+      }
+    } finally {
+      await stmt.close();
     }
-    throw new Error("Could not determine current MySQL database");
   }
 }

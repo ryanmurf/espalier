@@ -14,16 +14,23 @@ export class PgSchemaIntrospector implements SchemaIntrospector {
        ORDER BY table_name`,
     );
     ps.setParameter(1, schemaName);
-    const rs = await ps.executeQuery();
-
-    const tables: TableInfo[] = [];
-    while (await rs.next()) {
-      tables.push({
-        tableName: rs.getString("table_name")!,
-        schema: rs.getString("table_schema")!,
-      });
+    try {
+      const rs = await ps.executeQuery();
+      try {
+        const tables: TableInfo[] = [];
+        while (await rs.next()) {
+          tables.push({
+            tableName: rs.getString("table_name")!,
+            schema: rs.getString("table_schema")!,
+          });
+        }
+        return tables;
+      } finally {
+        await rs.close();
+      }
+    } finally {
+      await ps.close();
     }
-    return tables;
   }
 
   async getColumns(tableName: string, schema?: string): Promise<ColumnInfo[]> {
@@ -43,22 +50,29 @@ export class PgSchemaIntrospector implements SchemaIntrospector {
     );
     ps.setParameter(1, tableName);
     ps.setParameter(2, schemaName);
-    const rs = await ps.executeQuery();
-
-    const columns: ColumnInfo[] = [];
-    while (await rs.next()) {
-      const columnName = rs.getString("column_name")!;
-      columns.push({
-        columnName,
-        dataType: rs.getString("data_type")!,
-        nullable: rs.getString("is_nullable") === "YES",
-        defaultValue: rs.getString("column_default"),
-        primaryKey: pkColumns.has(columnName),
-        unique: uniqueColumns.has(columnName),
-        maxLength: rs.getNumber("character_maximum_length"),
-      });
+    try {
+      const rs = await ps.executeQuery();
+      try {
+        const columns: ColumnInfo[] = [];
+        while (await rs.next()) {
+          const columnName = rs.getString("column_name")!;
+          columns.push({
+            columnName,
+            dataType: rs.getString("data_type")!,
+            nullable: rs.getString("is_nullable") === "YES",
+            defaultValue: rs.getString("column_default"),
+            primaryKey: pkColumns.has(columnName),
+            unique: uniqueColumns.has(columnName),
+            maxLength: rs.getNumber("character_maximum_length"),
+          });
+        }
+        return columns;
+      } finally {
+        await rs.close();
+      }
+    } finally {
+      await ps.close();
     }
-    return columns;
   }
 
   async getPrimaryKeys(tableName: string, schema?: string): Promise<string[]> {
@@ -76,13 +90,20 @@ export class PgSchemaIntrospector implements SchemaIntrospector {
     );
     ps.setParameter(1, tableName);
     ps.setParameter(2, schemaName);
-    const rs = await ps.executeQuery();
-
-    const keys: string[] = [];
-    while (await rs.next()) {
-      keys.push(rs.getString("column_name")!);
+    try {
+      const rs = await ps.executeQuery();
+      try {
+        const keys: string[] = [];
+        while (await rs.next()) {
+          keys.push(rs.getString("column_name")!);
+        }
+        return keys;
+      } finally {
+        await rs.close();
+      }
+    } finally {
+      await ps.close();
     }
-    return keys;
   }
 
   async tableExists(tableName: string, schema?: string): Promise<boolean> {
@@ -93,8 +114,16 @@ export class PgSchemaIntrospector implements SchemaIntrospector {
     );
     ps.setParameter(1, tableName);
     ps.setParameter(2, schemaName);
-    const rs = await ps.executeQuery();
-    return rs.next();
+    try {
+      const rs = await ps.executeQuery();
+      try {
+        return rs.next();
+      } finally {
+        await rs.close();
+      }
+    } finally {
+      await ps.close();
+    }
   }
 
   private async getUniqueColumns(tableName: string, schema: string): Promise<Set<string>> {
@@ -110,12 +139,19 @@ export class PgSchemaIntrospector implements SchemaIntrospector {
     );
     ps.setParameter(1, tableName);
     ps.setParameter(2, schema);
-    const rs = await ps.executeQuery();
-
-    const columns = new Set<string>();
-    while (await rs.next()) {
-      columns.add(rs.getString("column_name")!);
+    try {
+      const rs = await ps.executeQuery();
+      try {
+        const columns = new Set<string>();
+        while (await rs.next()) {
+          columns.add(rs.getString("column_name")!);
+        }
+        return columns;
+      } finally {
+        await rs.close();
+      }
+    } finally {
+      await ps.close();
     }
-    return columns;
   }
 }
