@@ -8,7 +8,7 @@ export interface FieldChange {
 }
 
 function deepEqual(a: unknown, b: unknown): boolean {
-  if (a === b) return true;
+  if (Object.is(a, b)) return true;
   if (a === null || b === null) return false;
   if (a === undefined || b === undefined) return false;
   if (typeof a !== typeof b) return false;
