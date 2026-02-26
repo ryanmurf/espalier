@@ -90,7 +90,8 @@ export class MysqlDataSource implements PooledDataSource {
     if (this.closed) return;
     this.closed = true;
     if (force) {
-      await this.pool.end();
+      // Force close: don't wait for active connections to finish
+      void this.pool.end();
     } else {
       await this.pool.end();
     }

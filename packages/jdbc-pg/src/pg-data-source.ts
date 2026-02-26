@@ -264,7 +264,8 @@ export class PgDataSource implements MonitoredPooledDataSource {
     if (this.closed) return;
     this.closed = true;
     if (force) {
-      await this.pool.end();
+      // Force close: don't wait for active clients to finish
+      void this.pool.end();
     } else {
       await this.pool.end();
     }
