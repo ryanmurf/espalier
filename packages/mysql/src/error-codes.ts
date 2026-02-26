@@ -1,6 +1,7 @@
 import { DatabaseErrorCode } from "espalier-jdbc";
 
 export function mapMysqlErrorCode(err: unknown): DatabaseErrorCode {
+  if (err == null) return DatabaseErrorCode.QUERY_FAILED;
   const code = (err as { code?: string }).code;
   const errno = (err as { errno?: number }).errno;
 

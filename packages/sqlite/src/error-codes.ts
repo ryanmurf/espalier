@@ -1,6 +1,7 @@
 import { DatabaseErrorCode } from "espalier-jdbc";
 
 export function mapSqliteErrorCode(err: unknown): DatabaseErrorCode {
+  if (err == null) return DatabaseErrorCode.QUERY_FAILED;
   const code = (err as { code?: string }).code;
 
   switch (code) {
