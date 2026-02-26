@@ -5,7 +5,7 @@ export interface ParsedArgs {
   flags: Record<string, string | boolean>;
 }
 
-const VALUED_FLAGS = new Set(["config", "dir"]);
+const VALUED_FLAGS = new Set(["config", "dir", "to"]);
 
 export function parseArgs(argv: string[]): ParsedArgs {
   // Skip node and script path
