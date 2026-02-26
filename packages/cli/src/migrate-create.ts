@@ -15,6 +15,7 @@ export interface CreateMigrationResult {
 function toSnakeCase(name: string): string {
   return name
     .replace(/([a-z])([A-Z])/g, "$1_$2")
+    .replace(/([0-9])([A-Z])/g, "$1_$2")
     .replace(/[\s-]+/g, "_")
     .toLowerCase();
 }
@@ -68,6 +69,12 @@ export function createMigration(options: CreateMigrationOptions): CreateMigratio
   if (!/^[a-zA-Z][a-zA-Z0-9_ -]*$/.test(name)) {
     throw new Error(
       `Invalid migration name: "${name}". Use only letters, digits, spaces, hyphens, and underscores.`,
+    );
+  }
+
+  if (name.length > 200) {
+    throw new Error(
+      `Migration name is too long (${name.length} chars). Maximum is 200 characters.`,
     );
   }
 
