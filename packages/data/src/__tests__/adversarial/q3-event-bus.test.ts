@@ -12,7 +12,7 @@ import { EventBus } from "../../events/event-bus.js";
 // ══════════════════════════════════════════════════
 
 describe("EventBus adversarial: handler self-removal during emit", () => {
-  it("BUG #78: handler removes ITSELF via off() during emit — next handler skipped", () => {
+  it("handler removes ITSELF via off() during emit — next handler still fires", () => {
     const bus = new EventBus();
     const log: string[] = [];
 
@@ -27,26 +27,21 @@ describe("EventBus adversarial: handler self-removal during emit", () => {
     bus.on("evt", selfRemover);
     bus.on("evt", afterHandler);
 
-    // selfRemover is at index 0, afterHandler at index 1.
-    // When selfRemover runs and calls off(), splice removes index 0.
-    // afterHandler shifts from index 1 to index 0.
-    // Loop increments i to 1, but entries.length is now 1, so loop ends.
-    // afterHandler never fires.
     return bus.emit("evt", null).then(() => {
       expect(log).toContain("self-remover");
-      // BUG: afterHandler was skipped due to live splice
-      expect(log).not.toContain("after"); // This is the bug
+      // emit() iterates over a snapshot, so afterHandler still fires
+      expect(log).toContain("after");
     });
   });
 
-  it("BUG #78: handler removes a PREVIOUS handler — index corruption", () => {
+  it("handler removes a PREVIOUS handler — all handlers still fire", () => {
     const bus = new EventBus();
     const log: string[] = [];
 
     const handler1 = () => { log.push("h1"); };
     const handler2 = () => {
       log.push("h2");
-      bus.off("evt", handler1); // remove handler1 which is at index 0
+      bus.off("evt", handler1);
     };
     const handler3 = () => { log.push("h3"); };
 
@@ -55,22 +50,16 @@ describe("EventBus adversarial: handler self-removal during emit", () => {
     bus.on("evt", handler3);
 
     return bus.emit("evt", null).then(() => {
-      // handler1 fires (i=0). handler2 fires (i=1), removes handler1 via splice(0,1).
-      // Now handler3 shifted from index 2 to index 1. Loop increments i to 2.
-      // entries.length is now 2, so i=2 >= length=2, loop ends. handler3 skipped.
+      // emit() iterates over a snapshot, so all 3 handlers fire
       expect(log).toContain("h1");
       expect(log).toContain("h2");
-      // BUG: h3 may or may not be skipped depending on removal timing
-      // Since handler2 removes handler1 (already executed), the splice shifts handler3 down.
-      // i was 1 for handler2, increments to 2. entries is now [handler2, handler3].
-      // entries[2] is undefined. So handler3 is skipped.
-      expect(log).not.toContain("h3"); // BUG: handler3 skipped
+      expect(log).toContain("h3");
     });
   });
 });
 
 describe("EventBus adversarial: handler addition during emit", () => {
-  it("BUG #78: on() during emit — new handler fires in same cycle", () => {
+  it("on() during emit — new handler does NOT fire in same cycle", () => {
     const bus = new EventBus();
     const log: string[] = [];
 
@@ -80,15 +69,12 @@ describe("EventBus adversarial: handler addition during emit", () => {
     });
 
     return bus.emit("evt", null).then(() => {
-      // The for loop uses entries.length which is LIVE.
-      // After the first handler pushes a new entry, length increases.
-      // The new handler fires in the same emit cycle.
-      expect(log).toContain("original");
-      expect(log).toContain("added-during-emit"); // BUG: fires in same cycle
+      // emit() snapshots the handlers, so the new handler doesn't fire this cycle
+      expect(log).toEqual(["original"]);
     });
   });
 
-  it("BUG #78: once() registered during emit fires in same cycle", () => {
+  it("once() registered during emit does NOT fire in same cycle", () => {
     const bus = new EventBus();
     const log: string[] = [];
 
@@ -98,9 +84,7 @@ describe("EventBus adversarial: handler addition during emit", () => {
     });
 
     return bus.emit("evt", null).then(() => {
-      expect(log).toContain("trigger");
-      // BUG: once handler added during emit fires immediately
-      expect(log).toContain("once-added-mid-emit");
+      expect(log).toEqual(["trigger"]);
     });
   });
 });

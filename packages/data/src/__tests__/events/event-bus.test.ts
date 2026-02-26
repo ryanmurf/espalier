@@ -331,37 +331,35 @@ describe("EventBus", () => {
   // Edge cases and adversarial scenarios
   // ──────────────────────────────────────────────
 
-  it("BUG: handler added during emit fires in same cycle (entries array is live)", async () => {
+  it("handler added during emit does not fire in same cycle", async () => {
     const log: string[] = [];
     bus.on("evt", () => {
       log.push("original");
-      // Add a new handler during emit — entries array is mutated live
       bus.on("evt", () => { log.push("late-add"); });
     });
 
     await bus.emit("evt", null);
-    // The for loop uses entries.length which is LIVE — so late-add handler fires
-    // in the same emit cycle. This is a bug: handlers added during emit should
-    // not fire until the next emit.
-    expect(log).toContain("original");
-    expect(log).toContain("late-add"); // BUG: fires in same cycle
+    // emit() snapshots the handlers array, so late-add does not fire this cycle
+    expect(log).toEqual(["original"]);
+
+    // But it fires on the next emit
+    await bus.emit("evt", null);
+    expect(log).toContain("late-add");
   });
 
-  it("BUG: off() during emit skips next handler due to live splice", async () => {
+  it("off() during emit does not skip remaining handlers", async () => {
     const log: string[] = [];
     const handler2 = () => { log.push("handler2"); };
     bus.on("evt", () => {
       log.push("handler1");
-      bus.off("evt", handler2); // splice removes index 1
+      bus.off("evt", handler2);
     });
-    bus.on("evt", handler2); // at index 1
+    bus.on("evt", handler2);
 
     await bus.emit("evt", null);
-    // handler1 runs at index 0, calls off() which splices handler2 out of index 1.
-    // The for loop increments i to 1, but entries now has length 1, so the loop ends.
-    // handler2 never fires even though it was registered before emit() was called.
-    // BUG: off() during iteration uses splice which shifts indices.
-    expect(log).toEqual(["handler1"]); // handler2 was skipped
+    // emit() iterates over a snapshot, so handler2 still fires even though
+    // it was removed during iteration
+    expect(log).toEqual(["handler1", "handler2"]);
   });
 
   it("emit with same event name but different payload types works", async () => {

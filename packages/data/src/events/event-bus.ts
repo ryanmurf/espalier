@@ -32,11 +32,14 @@ export class EventBus {
     const entries = this.listeners.get(event);
     if (!entries || entries.length === 0) return;
 
+    // Snapshot to avoid concurrent modification issues:
+    // - Handlers added during emit won't fire in this cycle
+    // - off() during emit won't cause handler skips
+    const snapshot = entries.slice();
     const errors: unknown[] = [];
-    const toRemove: number[] = [];
+    const onceEntries: HandlerEntry[] = [];
 
-    for (let i = 0; i < entries.length; i++) {
-      const entry = entries[i];
+    for (const entry of snapshot) {
       try {
         const result = entry.handler(payload);
         if (result instanceof Promise) {
@@ -46,13 +49,16 @@ export class EventBus {
         errors.push(err);
       }
       if (entry.once) {
-        toRemove.push(i);
+        onceEntries.push(entry);
       }
     }
 
-    // Remove once-handlers in reverse order to preserve indices
-    for (let i = toRemove.length - 1; i >= 0; i--) {
-      entries.splice(toRemove[i], 1);
+    // Remove once-handlers from the live array by reference
+    for (const entry of onceEntries) {
+      const idx = entries.indexOf(entry);
+      if (idx !== -1) {
+        entries.splice(idx, 1);
+      }
     }
     if (entries.length === 0) {
       this.listeners.delete(event);
