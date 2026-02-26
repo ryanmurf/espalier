@@ -80,8 +80,9 @@ export class PgBatchStatement implements BatchStatement {
     }
 
     // Replace the VALUES (...) clause with multi-row version
+    // Regex handles one level of nested parens (e.g., COALESCE($1, 0))
     const multiSql = this.sql.replace(
-      /VALUES\s*\([^)]*\)/i,
+      /VALUES\s*\((?:[^)(]|\([^)]*\))*\)/i,
       `VALUES ${valueClauses.join(", ")}`,
     );
 

@@ -61,9 +61,10 @@ export class MysqlBatchStatement implements BatchStatement {
     }
 
     // Replace the VALUES (...) clause with multi-row version
+    // Regex handles one level of nested parens (e.g., COALESCE($1, 0))
     const baseSql = convertPositionalParams(this.sql);
     const multiSql = baseSql.replace(
-      /VALUES\s*\([^)]*\)/i,
+      /VALUES\s*\((?:[^)(]|\([^)]*\))*\)/i,
       `VALUES ${valueClauses.join(", ")}`,
     );
 
