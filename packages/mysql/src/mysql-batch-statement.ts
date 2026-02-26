@@ -1,12 +1,7 @@
 import type { PoolConnection as MysqlPoolConnection, ResultSetHeader } from "mysql2/promise";
 import type { BatchStatement, SqlValue } from "espalier-jdbc";
-import { QueryError } from "espalier-jdbc";
+import { QueryError, convertPositionalParams } from "espalier-jdbc";
 import { mapMysqlErrorCode } from "./error-codes.js";
-
-/** Convert $1, $2, ... positional params to ? placeholders for mysql2. */
-function convertPositionalParams(sql: string): string {
-  return sql.replace(/\$\d+/g, "?");
-}
 
 export class MysqlBatchStatement implements BatchStatement {
   private readonly batches: SqlValue[][] = [];

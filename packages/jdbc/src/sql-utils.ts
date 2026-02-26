@@ -28,6 +28,52 @@ export function quoteIdentifier(name: string): string {
 }
 
 /**
+ * Convert $1, $2, ... positional params to ? placeholders.
+ * Skips single-quoted string literals so that occurrences like 'cost is $1'
+ * are left intact.
+ *
+ * @param sql The SQL string with $N positional parameters
+ * @returns The SQL string with $N replaced by ? outside of string literals
+ */
+export function convertPositionalParams(sql: string): string {
+  let result = "";
+  let i = 0;
+  while (i < sql.length) {
+    if (sql[i] === "'") {
+      // Inside a single-quoted string literal — copy through, handling '' escapes
+      result += "'";
+      i++;
+      while (i < sql.length) {
+        if (sql[i] === "'" && sql[i + 1] === "'") {
+          // Escaped quote
+          result += "''";
+          i += 2;
+        } else if (sql[i] === "'") {
+          // End of string literal
+          result += "'";
+          i++;
+          break;
+        } else {
+          result += sql[i];
+          i++;
+        }
+      }
+    } else if (sql[i] === "$" && i + 1 < sql.length && sql[i + 1] >= "0" && sql[i + 1] <= "9") {
+      // $N parameter — replace with ?
+      result += "?";
+      i++; // skip $
+      while (i < sql.length && sql[i] >= "0" && sql[i] <= "9") {
+        i++; // skip digits
+      }
+    } else {
+      result += sql[i];
+      i++;
+    }
+  }
+  return result;
+}
+
+/**
  * Validate that a string is a safe SQL identifier (alphanumeric + underscore, starts with letter or underscore).
  * Throws if the identifier is invalid.
  *

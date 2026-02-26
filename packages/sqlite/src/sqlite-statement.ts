@@ -6,15 +6,10 @@ import type {
   StreamingResultSet,
   SqlValue,
 } from "espalier-jdbc";
-import { QueryError } from "espalier-jdbc";
+import { QueryError, convertPositionalParams } from "espalier-jdbc";
 import { SqliteResultSet } from "./sqlite-result-set.js";
 import { SqliteCursorResultSet } from "./sqlite-cursor-result-set.js";
 import { mapSqliteErrorCode } from "./error-codes.js";
-
-/** Convert $1, $2, ... positional params to ? placeholders for better-sqlite3. */
-function convertPositionalParams(sql: string): string {
-  return sql.replace(/\$\d+/g, "?");
-}
 
 /** Convert SqlValue to a type that better-sqlite3 accepts. */
 function toBindValue(val: SqlValue): unknown {

@@ -1,14 +1,9 @@
 import type { PoolConnection as MysqlPoolConnection, FieldPacket, ResultSetHeader } from "mysql2/promise";
 import type { NamedPreparedStatement, ResultSet, SqlValue } from "espalier-jdbc";
-import { QueryError, parseNamedParams } from "espalier-jdbc";
+import { QueryError, parseNamedParams, convertPositionalParams } from "espalier-jdbc";
 import type { ParsedNamedQuery } from "espalier-jdbc";
 import { MysqlResultSet } from "./mysql-result-set.js";
 import { mapMysqlErrorCode } from "./error-codes.js";
-
-/** Convert $1, $2, ... positional params to ? placeholders for mysql2. */
-function convertPositionalParams(sql: string): string {
-  return sql.replace(/\$\d+/g, "?");
-}
 
 export class MysqlNamedPreparedStatement implements NamedPreparedStatement {
   private readonly namedParams = new Map<string, SqlValue>();

@@ -1,12 +1,7 @@
 import type Database from "better-sqlite3";
 import type { BatchStatement, SqlValue } from "espalier-jdbc";
-import { QueryError } from "espalier-jdbc";
+import { QueryError, convertPositionalParams } from "espalier-jdbc";
 import { mapSqliteErrorCode } from "./error-codes.js";
-
-/** Convert $1, $2, ... positional params to ? placeholders for better-sqlite3. */
-function convertPositionalParams(sql: string): string {
-  return sql.replace(/\$\d+/g, "?");
-}
 
 /** Convert SqlValue to a type that better-sqlite3 accepts. */
 function toBindValue(val: SqlValue): unknown {
