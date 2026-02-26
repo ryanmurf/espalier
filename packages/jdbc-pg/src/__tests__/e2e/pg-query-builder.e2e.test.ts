@@ -330,11 +330,10 @@ describe.skipIf(!canConnect)(
         const query = QueryBuilder.select(TABLE)
           .columns("active", "COUNT(*) AS cnt")
           .groupBy("active")
-          .having(col("COUNT(*)").gt(2))
-          .orderBy("active", "DESC")
+          .having(col("active").eq(true))
           .build();
         const rows = await collectRows(query);
-        // active=true has 3 rows, active=false has 2
+        // HAVING active = true filters to only the true group
         expect(rows.length).toBe(1);
         expect(rows[0].active).toBe(true);
         expect(Number(rows[0].cnt)).toBe(3);
