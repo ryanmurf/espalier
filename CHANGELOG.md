@@ -1,5 +1,91 @@
 # Changelog
 
+## 0.7.0 — Y2 Q3
+
+### espalier-data
+
+#### Entity Lifecycle Event Decorators
+- Added `@PrePersist`, `@PostPersist`, `@PreUpdate`, `@PostUpdate`, `@PreRemove`, `@PostRemove`, `@PostLoad` method decorators (TC39 standard)
+- Lifecycle callbacks fire automatically during repository `save()`, `delete()`, and `findById()`/`findAll()` operations
+- `getLifecycleCallbacks(entity, event)` accessor returns registered callbacks for a given lifecycle event
+- Supports inheritance: child class callbacks fire alongside parent class callbacks without duplication
+
+#### Change Tracking / Dirty Checking
+- Added `EntityChangeTracker<T>` class for snapshot-based dirty checking of entities
+- `snapshot(entity)` captures a deep clone of all mapped fields as the baseline
+- `isDirty(entity)` compares current field values against the snapshot
+- `getDirtyFields(entity)` returns `FieldChange[]` with field name, column name, old value, and new value
+- Enables minimal UPDATE statements — only changed columns are included in the SET clause
+- `deepEqual()` handles Date, RegExp, Map, Set, NaN, Arrays, and nested objects including Symbol-keyed properties
+- `cloneDeep()` handles circular references, Map, Set, RegExp, and Symbol-keyed properties
+
+#### Event Bus
+- Added `EventBus` class with `on()`, `once()`, `off()`, and `emit()` methods for pub/sub event handling
+- Added `getGlobalEventBus()` singleton accessor
+- Added entity lifecycle event types: `EntityPersistedEvent`, `EntityUpdatedEvent`, `EntityRemovedEvent`, `EntityLoadedEvent`
+- Added `ENTITY_EVENTS` constant with event name strings (`entity.persisted`, `entity.updated`, `entity.removed`, `entity.loaded`)
+- Repository operations automatically publish lifecycle events through the global event bus
+
+### espalier-jdbc
+
+#### Async Iterator Improvements
+- Added `toArray(rs)` — collects all ResultSet rows into an array with automatic cleanup
+- Added `mapResultSet(rs, fn)` — async generator that transforms each row with automatic cleanup
+- Added `filterResultSet(rs, predicate)` — async generator that yields matching rows with automatic cleanup
+- Added `reduceResultSet(rs, reducer, initial)` — reduces all rows to a single value with automatic cleanup
+- Added `forEachResultSet(rs, fn)` — iterates all rows with optional async callback and automatic cleanup
+- All utility functions close the ResultSet in a `finally` block, preventing resource leaks on early break or error
+
+### Bug Fixes
+
+#### Critical — SQL Injection Prevention
+- **#48/#50/#52/#74**: `quoteIdentifier()` applied across all SQL generation — query builder, DDL generator, migration runners, and criteria `toSql()` methods now quote all table/column identifiers
+- **#66**: Savepoint names in `pg-connection.ts` validated to prevent SQL injection via string interpolation
+
+#### High — Resource Leaks
+- **#84**: ResultSet utility functions (`toArray`, `mapResultSet`, etc.) now close ResultSet in `finally` blocks
+- **#89**: All schema introspectors (PG, MySQL, SQLite) now close PreparedStatement/ResultSet in `try/finally`
+- **#54**: `findById()` with `projectionClass` no longer leaks PreparedStatement
+- **#40**: `validateConnection()` closes statement on query failure
+- **#35**: `StatementCache.put()` closes old PreparedStatement before replacing
+- **#44**: StatementCache scoped per PoolClient so it survives connection return-to-pool
+
+#### High — Data Correctness
+- **#63**: `saveAll()` and `deleteAll()` now wrapped in transactions for atomicity
+- **#47**: `OptimisticLockException` reports actual version from DB instead of null
+- **#46**: `save()` throws `EntityNotFoundException` when UPDATE matches 0 rows for unversioned entities
+- **#61**: Entity cache populated from query cache hits; PostLoad lifecycle fires correctly
+
+#### Medium — Behavioral Bugs
+- **#83**: `deepEqual()` and `cloneDeep()` use `Reflect.ownKeys()` to compare Symbol-keyed properties
+- **#82**: `deepEqual()` correctly compares Map, Set, and RegExp values
+- **#79**: `cloneValue()` handles circular references via recursive clone with cycle detection
+- **#77**: `deepEqual()` uses `Object.is()` semantics to handle `NaN === NaN` correctly
+- **#78**: `EventBus.emit()` snapshots handler array to prevent concurrent modification
+- **#85**: `EventBus.once()` handler prevented from firing multiple times under concurrent emit
+- **#76**: Lifecycle decorator initializers no longer register duplicate callbacks on repeated instantiation
+- **#86**: Parent+child lifecycle decorator override no longer registers same callback twice
+- **#58**: Version decorator metadata stored correctly across inheritance chains
+- **#56**: `QueryCache.invalidate()` uses reverse index for O(1) entity-class invalidation
+- **#68**: `EntityCache.get()` no longer counts misses when cache is disabled
+- **#65**: `PgPreparedStatement.collectParameters()` uses loop instead of `Math.max(...spread)` to prevent RangeError on empty Map
+- **#60**: `warmupPool()` uses `Promise.allSettled` to avoid shared mutable state race condition
+- **#43**: `PgDataSource.close()` now respects the `force` parameter
+- **#88**: All error code mapper functions (`mapPgErrorCode`, `mapMysqlErrorCode`, `mapSqliteErrorCode`) handle null/undefined input
+- **#90**: `convertPositionalParams()` skips `$N` inside single-quoted SQL string literals
+- **#91**: `SqliteSchemaIntrospector` uses `quoteIdentifier()` instead of rejecting valid quoted table names
+
+#### Low — Parser & Query Fixes
+- **#36**: DISTINCT generates single keyword after SELECT instead of per-column
+- **#38**: `IN()` with empty array generates `1=0` instead of invalid SQL
+- **#39**: QueryCache key collision fixed for NaN, Infinity, and undefined parameter values
+- **#41**: `EntityCache.clear()` preserves cumulative eviction stats
+- **#51**: `findDistinctBy` prefix check order corrected to avoid dead code path
+- **#53**: OrderBy parser handles property names containing "Asc" or "Desc" substrings
+
+#### Security
+- **#55**: `QueryError.toJSON()` and `toSafeString()` prevent raw SQL disclosure in error messages
+
 ## 0.6.0 — Y2 Q2
 
 ### espalier-data

@@ -287,6 +287,93 @@ console.log(result.connectionsCreated, result.durationMs);
 const conn = await ds.getConnection();
 ```
 
+## Entity Lifecycle Events
+
+Hook into entity persistence lifecycle with decorator-based callbacks:
+
+```typescript
+import { Table, Column, Id, PrePersist, PostLoad, PostUpdate } from "espalier-data";
+
+@Table("users")
+class User {
+  @Id @Column() id!: number;
+  @Column() name!: string;
+  @Column("created_at") createdAt!: Date;
+
+  @PrePersist
+  beforeInsert() {
+    this.createdAt = new Date();
+  }
+
+  @PostLoad
+  afterLoad() {
+    console.log(`Loaded user ${this.name}`);
+  }
+
+  @PostUpdate
+  afterUpdate() {
+    console.log(`Updated user ${this.id}`);
+  }
+}
+
+// Callbacks fire automatically during repository operations
+await userRepo.save(new User()); // triggers @PrePersist, then @PostPersist
+const user = await userRepo.findById(1); // triggers @PostLoad
+```
+
+## Change Tracking
+
+Snapshot-based dirty checking generates minimal UPDATE statements:
+
+```typescript
+import { EntityChangeTracker, getEntityMetadata } from "espalier-data";
+
+const metadata = getEntityMetadata(User);
+const tracker = new EntityChangeTracker<User>(metadata);
+
+const user = await userRepo.findById(1);
+tracker.snapshot(user); // capture baseline
+
+user.name = "Updated Name";
+
+tracker.isDirty(user); // true
+tracker.getDirtyFields(user);
+// [{ field: "name", columnName: "name", oldValue: "Alice", newValue: "Updated Name" }]
+
+// Repository save() uses dirty fields to generate:
+// UPDATE users SET name = $1 WHERE id = $2
+// instead of updating all columns
+```
+
+## Event Bus
+
+Pub/sub event system with entity lifecycle event integration:
+
+```typescript
+import { EventBus, getGlobalEventBus, ENTITY_EVENTS } from "espalier-data";
+import type { EntityPersistedEvent } from "espalier-data";
+
+const bus = getGlobalEventBus();
+
+// Subscribe to entity lifecycle events
+bus.on(ENTITY_EVENTS.PERSISTED, (event: EntityPersistedEvent) => {
+  console.log(`Entity persisted: ${event.entityName} #${event.entityId}`);
+});
+
+// One-time listener
+bus.once(ENTITY_EVENTS.REMOVED, (event) => {
+  console.log("First entity removal detected");
+});
+
+// Repository operations automatically publish events
+await userRepo.save(newUser); // emits ENTITY_EVENTS.PERSISTED
+
+// Custom event bus for isolation
+const custom = new EventBus();
+custom.on("my.event", (data) => console.log(data));
+custom.emit("my.event", { message: "hello" });
+```
+
 ## Roadmap
 
 - [x] MySQL/MariaDB adapter (`espalier-jdbc-mysql`) *(Y1 Q4)*
@@ -307,6 +394,8 @@ const conn = await ds.getConnection();
 - [x] Query result caching *(Y2 Q2)*
 - [x] Prepared statement caching *(Y2 Q2)*
 - [x] Connection pool warmup & pre-ping *(Y2 Q2)*
-- [ ] Entity lifecycle events (`@PrePersist`, `@PostLoad`) *(Y2 Q3)*
-- [ ] Change tracking / dirty checking *(Y2 Q3)*
+- [x] Entity lifecycle events (`@PrePersist`, `@PostLoad`) *(Y2 Q3)*
+- [x] Change tracking / dirty checking *(Y2 Q3)*
+- [x] Async iterator improvements (`toArray`, `mapResultSet`, etc.) *(Y2 Q3)*
+- [x] Event bus with entity lifecycle event publishing *(Y2 Q3)*
 - [ ] CLI for migrations *(Y2 Q4)*
