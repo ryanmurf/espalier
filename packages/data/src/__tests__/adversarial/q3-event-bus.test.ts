@@ -94,7 +94,7 @@ describe("EventBus adversarial: handler addition during emit", () => {
 
     bus.on("evt", () => {
       log.push("trigger");
-      bus.once("evt", () => log.push("once-added-mid-emit"));
+      bus.once("evt", () => { log.push("once-added-mid-emit"); });
     });
 
     return bus.emit("evt", null).then(() => {
@@ -146,7 +146,7 @@ describe("EventBus adversarial: removeAllListeners during emit", () => {
       log.push("h1");
       bus.removeAllListeners(); // clears ALL events
     });
-    bus.on("evt", () => log.push("h2"));
+    bus.on("evt", () => { log.push("h2"); });
 
     return bus.emit("evt", null).then(() => {
       expect(log).toContain("h1");
@@ -341,7 +341,7 @@ describe("EventBus adversarial: event name edge cases", () => {
     const bus = new EventBus();
     const log: string[] = [];
     const weirdName = "event\0with\nnull\tand\ttabs";
-    bus.on(weirdName, () => log.push("fired"));
+    bus.on(weirdName, () => { log.push("fired"); });
     await bus.emit(weirdName, null);
     expect(log).toEqual(["fired"]);
   });
@@ -349,7 +349,7 @@ describe("EventBus adversarial: event name edge cases", () => {
   it("event name '__proto__' does not corrupt Map", async () => {
     const bus = new EventBus();
     const log: string[] = [];
-    bus.on("__proto__", () => log.push("proto"));
+    bus.on("__proto__", () => { log.push("proto"); });
     await bus.emit("__proto__", null);
     expect(log).toEqual(["proto"]);
     expect(bus.listenerCount("__proto__")).toBe(1);
@@ -358,7 +358,7 @@ describe("EventBus adversarial: event name edge cases", () => {
   it("event name 'constructor' works safely", async () => {
     const bus = new EventBus();
     const log: string[] = [];
-    bus.on("constructor", () => log.push("ctor"));
+    bus.on("constructor", () => { log.push("ctor"); });
     await bus.emit("constructor", null);
     expect(log).toEqual(["ctor"]);
   });
