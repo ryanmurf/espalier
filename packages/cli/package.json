@@ -28,7 +28,18 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "espalier-data": "workspace:*"
+    "espalier-data": "workspace:*",
+    "espalier-jdbc": "workspace:*"
+  },
+  "peerDependencies": {
+    "espalier-jdbc-pg": "workspace:*",
+    "espalier-jdbc-mysql": "workspace:*",
+    "espalier-jdbc-sqlite": "workspace:*"
+  },
+  "peerDependenciesMeta": {
+    "espalier-jdbc-pg": { "optional": true },
+    "espalier-jdbc-mysql": { "optional": true },
+    "espalier-jdbc-sqlite": { "optional": true }
   },
   "devDependencies": {
     "@types/node": "^25.0.0",
