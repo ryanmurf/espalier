@@ -21,7 +21,10 @@ function addLifecycleCallback(
   if (!map.has(event)) {
     map.set(event, []);
   }
-  map.get(event)!.push(methodName);
+  const callbacks = map.get(event)!;
+  if (!callbacks.includes(methodName)) {
+    callbacks.push(methodName);
+  }
 }
 
 function createLifecycleDecorator(event: LifecycleEvent) {
