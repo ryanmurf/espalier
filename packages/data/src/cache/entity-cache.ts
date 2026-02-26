@@ -158,8 +158,16 @@ export class EntityCache {
 
   constructor(config?: EntityCacheConfig) {
     this.enabled = config?.enabled ?? true;
-    this.maxSize = config?.maxSize ?? DEFAULT_MAX_SIZE;
-    this.maxTotalSize = config?.maxTotalSize ?? DEFAULT_MAX_TOTAL_SIZE;
+    const maxSize = config?.maxSize ?? DEFAULT_MAX_SIZE;
+    if (!Number.isFinite(maxSize) || !Number.isInteger(maxSize) || maxSize < 0) {
+      throw new Error(`Invalid EntityCache maxSize: ${maxSize}. Must be a non-negative integer.`);
+    }
+    this.maxSize = maxSize;
+    const maxTotalSize = config?.maxTotalSize ?? DEFAULT_MAX_TOTAL_SIZE;
+    if (!Number.isFinite(maxTotalSize) || !Number.isInteger(maxTotalSize) || maxTotalSize < 0) {
+      throw new Error(`Invalid EntityCache maxTotalSize: ${maxTotalSize}. Must be a non-negative integer.`);
+    }
+    this.maxTotalSize = maxTotalSize;
   }
 
   private getOrCreateCache(entityClass: new (...args: any[]) => any): LruMap<any> {

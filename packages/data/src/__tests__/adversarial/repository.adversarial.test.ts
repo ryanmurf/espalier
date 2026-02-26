@@ -296,26 +296,13 @@ describe("Adversarial: @Repository decorator and auto-generated repository", () 
       );
     });
 
-    it("BUG: 'findByAndAnd' silently produces zero properties instead of throwing", () => {
+    it("'findByAndAnd' throws because it produces zero properties", () => {
       // After findBy: rest = "AndAnd"
-      // extractOrderBy finds no "OrderBy", so predicatePart = "AndAnd"
-      // splitProperties("AndAnd"):
-      //   findConnectorPositions("AndAnd", "And"):
-      //     idx=0: charBefore undefined -> validBefore=true, charAfter='A' -> validAfter=true -> position 0
-      //     idx=3: charBefore='A'(uppercase) -> validBefore=false -> skip
-      //   So andPositions=[0], splits at position 0 with length 3: ["", "nd"]
-      //   filter(p => p.length > 0) -> ["nd"]
-      //   Actually wait, let's trace more carefully:
-      //     splitAtPositions("AndAnd", [0], 3): parts = ["".slice(0,0), "AndAnd".slice(3)] = ["", "And"]
-      //     filter -> ["And"]
-      //   parsePropertyExpression("And") -> no operator suffix match -> Equals, property = "and"
-      //
-      // But testing reveals 0 properties, which means the split produces all-empty parts.
-      // This is a BUG: "findByAndAnd" should either parse meaningfully or throw.
-      const descriptor = parseDerivedQueryMethod("findByAndAnd");
-      // BUG: produces zero properties, which means calling the derived query
-      // would generate SQL with no WHERE clause predicates
-      expect(descriptor.properties.length).toBe(0);
+      // splitProperties produces empty parts which are filtered out.
+      // The parser now validates that at least one property predicate is present.
+      expect(() => parseDerivedQueryMethod("findByAndAnd")).toThrow(
+        /no property predicates could be parsed/,
+      );
     });
 
     it("'countByCountBy' parses without crashing", () => {
@@ -570,28 +557,24 @@ describe("Adversarial: @Repository decorator and auto-generated repository", () 
   // 9. Cache option validation — negative maxSize, negative TTL
   // =========================================================================
   describe("cache option validation", () => {
-    it("negative maxSize for entityCache does not throw at creation time", () => {
+    it("negative maxSize for entityCache throws at creation time", () => {
       @Repository({ entity: AdvUser })
       class NegCacheRepo {}
 
       const { ds } = buildMockStack();
-      // EntityCache constructor doesn't validate; it simply stores the value.
-      // A negative maxSize means the LRU map will immediately evict everything.
-      const repo = createAutoRepository<AdvUser, number>(NegCacheRepo, ds, {
+      expect(() => createAutoRepository<AdvUser, number>(NegCacheRepo, ds, {
         entityCache: { maxSize: -1 },
-      });
-      expect(repo).toBeDefined();
+      })).toThrow(/Invalid EntityCache maxSize: -1/);
     });
 
-    it("negative TTL for queryCache does not throw at creation time", () => {
+    it("negative TTL for queryCache throws at creation time", () => {
       @Repository({ entity: AdvUser })
       class NegTtlRepo {}
 
       const { ds } = buildMockStack();
-      const repo = createAutoRepository<AdvUser, number>(NegTtlRepo, ds, {
+      expect(() => createAutoRepository<AdvUser, number>(NegTtlRepo, ds, {
         queryCache: { defaultTtlMs: -5000 },
-      });
-      expect(repo).toBeDefined();
+      })).toThrow(/Invalid QueryCache defaultTtlMs: -5000/);
     });
 
     it("zero maxSize for entityCache still allows puts (LRU immediately evicts)", async () => {
@@ -609,36 +592,24 @@ describe("Adversarial: @Repository decorator and auto-generated repository", () 
       expect(user!.name).toBe("Test");
     });
 
-    it("negative TTL causes query cache entries to expire immediately", async () => {
+    it("NaN maxSize for entityCache throws at creation time", () => {
       @Repository({ entity: AdvUser })
-      class NegTtlRepo2 {}
+      class NaNCacheRepo {}
 
-      let callCount = 0;
-      const makeRs = () => {
-        callCount++;
-        return createMockResultSet([{ "COUNT(*)": callCount }]);
-      };
+      const { ds } = buildMockStack();
+      expect(() => createAutoRepository<AdvUser, number>(NaNCacheRepo, ds, {
+        entityCache: { maxSize: NaN },
+      })).toThrow(/Invalid EntityCache maxSize: NaN/);
+    });
 
-      const stmt: PreparedStatement = {
-        setParameter: vi.fn(),
-        executeQuery: vi.fn(async () => makeRs()),
-        executeUpdate: vi.fn(async () => 1),
-        close: vi.fn(async () => {}),
-      };
-      const conn = createMockConnection(stmt);
-      const ds = createMockDataSource(conn);
+    it("Infinity maxSize for queryCache throws at creation time", () => {
+      @Repository({ entity: AdvUser })
+      class InfCacheRepo {}
 
-      const repo = createAutoRepository<AdvUser, number>(NegTtlRepo2, ds, {
-        queryCache: { defaultTtlMs: -1000 },
-      });
-
-      // With negative TTL, every count() call should miss the cache
-      const count1 = await repo.count();
-      const count2 = await repo.count();
-      // Both calls should hit the DB (no cache benefit with negative TTL)
-      // The exact values depend on mock behavior, but the key thing is no crash
-      expect(count1).toBeGreaterThanOrEqual(0);
-      expect(count2).toBeGreaterThanOrEqual(0);
+      const { ds } = buildMockStack();
+      expect(() => createAutoRepository<AdvUser, number>(InfCacheRepo, ds, {
+        queryCache: { maxSize: Infinity },
+      })).toThrow(/Invalid QueryCache maxSize: Infinity/);
     });
   });
 
@@ -724,34 +695,34 @@ describe("Adversarial: @Repository decorator and auto-generated repository", () 
       expect(() => (repo as any)[Symbol.toPrimitive]).not.toThrow();
     });
 
-    it("accessing 'then' does not break Promise interop (thenable check)", async () => {
+    it("accessing 'then' returns undefined so repo is not thenable", async () => {
       @Repository({ entity: AdvUser })
       class ThenRepo {}
 
       const { ds } = buildMockStack();
       const repo = createAutoRepository<AdvUser, number>(ThenRepo, ds);
 
-      // When JS checks if something is a thenable, it accesses .then
-      // The proxy should return a function for 'then' (since it's not a known method,
-      // it falls through to the derived query handler). This is NOT a method name
-      // that starts with find/count/exists/delete, so parseDerivedQueryMethod will throw.
-      // But the proxy always returns a function. Calling it will fail.
-      // The key test: accessing .then returns something (proxy returns a function)
+      // When JS checks if something is a thenable, it accesses .then.
+      // The proxy now returns undefined for "then" (via passthroughProperties),
+      // so the repo is NOT treated as a thenable. This means `await repo` works correctly.
       const thenProp = (repo as any).then;
-      expect(typeof thenProp).toBe("function");
+      expect(thenProp).toBeUndefined();
     });
 
-    it("accessing toString/valueOf does not crash", () => {
+    it("accessing toString/valueOf passes through to Object.prototype (not derived query)", () => {
       @Repository({ entity: AdvUser })
       class ToStringRepo {}
 
       const { ds } = buildMockStack();
       const repo = createAutoRepository<AdvUser, number>(ToStringRepo, ds);
 
-      // These are common property accesses that might happen in logging/debugging
-      // The proxy will return async functions for these (derived query handler)
+      // These are common property accesses that happen in logging/debugging.
+      // The proxy now passes them through (they're in passthroughProperties),
+      // returning the inherited Object.prototype methods, not async derived query functions.
       expect(typeof (repo as any).toString).toBe("function");
+      expect((repo as any).toString).toBe(Object.prototype.toString);
       expect(typeof (repo as any).valueOf).toBe("function");
+      expect((repo as any).valueOf).toBe(Object.prototype.valueOf);
     });
   });
 

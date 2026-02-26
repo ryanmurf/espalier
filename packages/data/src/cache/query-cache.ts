@@ -68,10 +68,26 @@ export class QueryCache {
 
   constructor(config?: QueryCacheConfig) {
     this.enabled = config?.enabled ?? true;
-    this.maxSize = config?.maxSize ?? DEFAULT_MAX_SIZE;
-    this.defaultTtlMs = config?.defaultTtlMs ?? DEFAULT_TTL_MS;
-    this.maxResultSize = config?.maxResultSize ?? DEFAULT_MAX_RESULT_SIZE;
-    this.ttlJitterPercent = config?.ttlJitterPercent ?? DEFAULT_TTL_JITTER_PERCENT;
+    const maxSize = config?.maxSize ?? DEFAULT_MAX_SIZE;
+    if (!Number.isFinite(maxSize) || !Number.isInteger(maxSize) || maxSize < 0) {
+      throw new Error(`Invalid QueryCache maxSize: ${maxSize}. Must be a non-negative integer.`);
+    }
+    this.maxSize = maxSize;
+    const defaultTtlMs = config?.defaultTtlMs ?? DEFAULT_TTL_MS;
+    if (!Number.isFinite(defaultTtlMs) || defaultTtlMs < 0) {
+      throw new Error(`Invalid QueryCache defaultTtlMs: ${defaultTtlMs}. Must be a non-negative number.`);
+    }
+    this.defaultTtlMs = defaultTtlMs;
+    const maxResultSize = config?.maxResultSize ?? DEFAULT_MAX_RESULT_SIZE;
+    if (!Number.isFinite(maxResultSize) || !Number.isInteger(maxResultSize) || maxResultSize < 0) {
+      throw new Error(`Invalid QueryCache maxResultSize: ${maxResultSize}. Must be a non-negative integer.`);
+    }
+    this.maxResultSize = maxResultSize;
+    const ttlJitterPercent = config?.ttlJitterPercent ?? DEFAULT_TTL_JITTER_PERCENT;
+    if (!Number.isFinite(ttlJitterPercent) || ttlJitterPercent < 0 || ttlJitterPercent > 100) {
+      throw new Error(`Invalid QueryCache ttlJitterPercent: ${ttlJitterPercent}. Must be between 0 and 100.`);
+    }
+    this.ttlJitterPercent = ttlJitterPercent;
   }
 
   private static cacheKey(key: QueryCacheKey): string {

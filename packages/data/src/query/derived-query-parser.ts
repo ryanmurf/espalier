@@ -347,6 +347,13 @@ export function parseDerivedQueryMethod(
   const { parts, connector } = splitProperties(predicatePart);
   const properties = parts.map(parsePropertyExpression);
 
+  if (properties.length === 0) {
+    throw new Error(
+      `Invalid derived query method name "${methodName}": ` +
+        `no property predicates could be parsed from "${predicatePart}".`,
+    );
+  }
+
   return {
     action: prefix.action,
     distinct: prefix.distinct,

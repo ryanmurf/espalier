@@ -795,6 +795,26 @@ export function createDerivedRepository<T, ID>(
   (crudMethods as any).isDirty = (entity: T) => changeTracker.isDirty(entity);
   (crudMethods as any).getDirtyFields = (entity: T) => changeTracker.getDirtyFields(entity);
 
+  // Properties that should NOT be treated as derived query methods.
+  // "then" is critical — returning a function for "then" makes the repo look thenable,
+  // which breaks `await repo` (Promise.resolve checks for .then).
+  const passthroughProperties = new Set([
+    "then",
+    "catch",
+    "finally",
+    "toJSON",
+    "valueOf",
+    "toString",
+    "constructor",
+    "inspect",
+    "nodeType",
+    "tagName",
+    "hasOwnProperty",
+    "isPrototypeOf",
+    "propertyIsEnumerable",
+    "toLocaleString",
+  ]);
+
   return new Proxy(crudMethods as CrudRepository<T, ID> & Record<string, (...args: any[]) => Promise<any>>, {
     get(target, prop, receiver) {
       if (typeof prop === "symbol") {
@@ -802,6 +822,12 @@ export function createDerivedRepository<T, ID>(
       }
 
       if (knownMethods.has(prop)) {
+        return Reflect.get(target, prop, receiver);
+      }
+
+      // Pass through well-known non-query properties to avoid
+      // treating them as derived query method names
+      if (passthroughProperties.has(prop)) {
         return Reflect.get(target, prop, receiver);
       }
 
