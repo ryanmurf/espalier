@@ -94,8 +94,8 @@ export { createRepository } from "./repository/repository-factory.js";
 export type { CreateRepositoryOptions } from "./repository/repository-factory.js";
 export { Repository, getRepositoryMetadata, getRegisteredRepositories } from "./decorators/repository.js";
 export type { RepositoryOptions } from "./decorators/repository.js";
-export { createAutoRepository } from "./repository/auto-repository.js";
-export type { AutoRepositoryOptions } from "./repository/auto-repository.js";
+export { createAutoRepository, getDeclaredDerivedMethods, validateDerivedMethods } from "./repository/auto-repository.js";
+export type { AutoRepositoryOptions, ValidatedMethod, MethodValidationError } from "./repository/auto-repository.js";
 export { OptimisticLockException } from "./repository/optimistic-lock.js";
 export { EntityNotFoundException } from "./repository/entity-not-found.js";
 
