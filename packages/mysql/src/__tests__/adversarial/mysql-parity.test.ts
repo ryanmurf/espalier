@@ -153,8 +153,8 @@ function createMockStatement(rs?: ResultSet): Statement {
   } as unknown as Statement;
 }
 
-describe("MysqlSchemaIntrospector — resource leaks", () => {
-  it("getTables() never closes PreparedStatement", async () => {
+describe("MysqlSchemaIntrospector — resource cleanup (FIXED #89)", () => {
+  it("getTables() closes PreparedStatement", async () => {
     const rs = createMockResultSet([
       { table_name: "users", table_schema: "test_db" },
     ]);
@@ -170,11 +170,10 @@ describe("MysqlSchemaIntrospector — resource leaks", () => {
     const introspector = new MysqlSchemaIntrospector(conn);
     await introspector.getTables("test_db");
 
-    // BUG: PreparedStatement is NEVER closed after use
-    expect(ps.close).not.toHaveBeenCalled();
+    expect(ps.close).toHaveBeenCalled();
   });
 
-  it("getTables() never closes ResultSet", async () => {
+  it("getTables() closes ResultSet", async () => {
     const rs = createMockResultSet([
       { table_name: "users", table_schema: "test_db" },
     ]);
@@ -190,11 +189,10 @@ describe("MysqlSchemaIntrospector — resource leaks", () => {
     const introspector = new MysqlSchemaIntrospector(conn);
     await introspector.getTables("test_db");
 
-    // BUG: ResultSet is NEVER closed after use
-    expect(rs.close).not.toHaveBeenCalled();
+    expect(rs.close).toHaveBeenCalled();
   });
 
-  it("getColumns() never closes any of its 3 PreparedStatements", async () => {
+  it("getColumns() closes all 3 PreparedStatements", async () => {
     const pkRs = createMockResultSet([{ column_name: "id" }]);
     const uniqueRs = createMockResultSet([]);
     const colRs = createMockResultSet([
@@ -221,13 +219,12 @@ describe("MysqlSchemaIntrospector — resource leaks", () => {
     const introspector = new MysqlSchemaIntrospector(conn);
     await introspector.getColumns("users", "test_db");
 
-    // BUG: None of the 3 PreparedStatements are closed
-    expect(pkPs.close).not.toHaveBeenCalled();
-    expect(uniquePs.close).not.toHaveBeenCalled();
-    expect(colPs.close).not.toHaveBeenCalled();
+    expect(pkPs.close).toHaveBeenCalled();
+    expect(uniquePs.close).toHaveBeenCalled();
+    expect(colPs.close).toHaveBeenCalled();
   });
 
-  it("getPrimaryKeys() never closes PreparedStatement", async () => {
+  it("getPrimaryKeys() closes PreparedStatement", async () => {
     const rs = createMockResultSet([{ column_name: "id" }]);
     const ps = createMockPreparedStatement(rs);
     const conn = {
@@ -241,11 +238,10 @@ describe("MysqlSchemaIntrospector — resource leaks", () => {
     const introspector = new MysqlSchemaIntrospector(conn);
     await introspector.getPrimaryKeys("users", "test_db");
 
-    // BUG: PreparedStatement is NEVER closed
-    expect(ps.close).not.toHaveBeenCalled();
+    expect(ps.close).toHaveBeenCalled();
   });
 
-  it("tableExists() never closes PreparedStatement", async () => {
+  it("tableExists() closes PreparedStatement", async () => {
     const rs = createMockResultSet([{ "1": 1 }]);
     const ps = createMockPreparedStatement(rs);
     const conn = {
@@ -259,11 +255,10 @@ describe("MysqlSchemaIntrospector — resource leaks", () => {
     const introspector = new MysqlSchemaIntrospector(conn);
     await introspector.tableExists("users", "test_db");
 
-    // BUG: PreparedStatement is NEVER closed
-    expect(ps.close).not.toHaveBeenCalled();
+    expect(ps.close).toHaveBeenCalled();
   });
 
-  it("currentDatabase() never closes Statement", async () => {
+  it("currentDatabase() closes Statement", async () => {
     const dbRs = createMockResultSet([{ db: "test_db" }]);
     const dbStmt = createMockStatement(dbRs);
     const tablesRs = createMockResultSet([]);
@@ -278,11 +273,9 @@ describe("MysqlSchemaIntrospector — resource leaks", () => {
     } as unknown as Connection;
 
     const introspector = new MysqlSchemaIntrospector(conn);
-    // getTables() without schema triggers currentDatabase()
     await introspector.getTables();
 
-    // BUG: Statement from currentDatabase() is NEVER closed
-    expect(dbStmt.close).not.toHaveBeenCalled();
+    expect(dbStmt.close).toHaveBeenCalled();
   });
 });
 
