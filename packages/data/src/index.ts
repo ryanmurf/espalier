@@ -26,7 +26,7 @@ export {
   getLifecycleCallbacks,
 } from "./decorators/lifecycle.js";
 
-export type { Repository } from "./repository/repository.js";
+export type { Repository as RepositoryInterface } from "./repository/repository.js";
 export type {
   CrudRepository,
   PagingAndSortingRepository,
@@ -90,6 +90,12 @@ export {
 export type { StreamOptions } from "./repository/streaming.js";
 export type { DerivedRepositoryOptions } from "./repository/derived-repository.js";
 export { createDerivedRepository } from "./repository/derived-repository.js";
+export { createRepository } from "./repository/repository-factory.js";
+export type { CreateRepositoryOptions } from "./repository/repository-factory.js";
+export { Repository, getRepositoryMetadata, getRegisteredRepositories } from "./decorators/repository.js";
+export type { RepositoryOptions } from "./decorators/repository.js";
+export { createAutoRepository } from "./repository/auto-repository.js";
+export type { AutoRepositoryOptions } from "./repository/auto-repository.js";
 export { OptimisticLockException } from "./repository/optimistic-lock.js";
 export { EntityNotFoundException } from "./repository/entity-not-found.js";
 
