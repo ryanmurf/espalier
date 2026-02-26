@@ -280,11 +280,11 @@ describe("QueryCache", () => {
   // ──────────────────────────────────────────────
 
   describe("configuration", () => {
-    it("enabled: false makes get always return undefined and increment misses", () => {
+    it("enabled: false makes get always return undefined without counting miss", () => {
       const cache = new QueryCache({ enabled: false });
       cache.put(key("SELECT 1"), [1], User);
       expect(cache.get(key("SELECT 1"))).toBeUndefined();
-      expect(cache.getStats().misses).toBe(1);
+      expect(cache.getStats().misses).toBe(0);
     });
 
     it("enabled: false makes put a no-op", () => {

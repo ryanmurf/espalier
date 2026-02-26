@@ -155,10 +155,7 @@ export class EntityCache {
   }
 
   get<T>(entityClass: new (...args: any[]) => T, id: unknown): T | undefined {
-    if (!this.enabled) {
-      this._misses++;
-      return undefined;
-    }
+    if (!this.enabled) return undefined;
     const cache = this.caches.get(entityClass);
     if (!cache) {
       this._misses++;

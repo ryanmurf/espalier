@@ -66,10 +66,7 @@ export class QueryCache {
   }
 
   get(key: QueryCacheKey): unknown[] | undefined {
-    if (!this.enabled) {
-      this._misses++;
-      return undefined;
-    }
+    if (!this.enabled) return undefined;
 
     const strKey = QueryCache.cacheKey(key);
     const entry = this.map.get(strKey);

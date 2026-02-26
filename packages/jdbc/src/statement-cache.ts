@@ -44,10 +44,7 @@ export class StatementCache {
   }
 
   get(sql: string): PreparedStatement | undefined {
-    if (!this.enabled) {
-      this._misses++;
-      return undefined;
-    }
+    if (!this.enabled) return undefined;
 
     const entry = this.map.get(sql);
     if (!entry) {

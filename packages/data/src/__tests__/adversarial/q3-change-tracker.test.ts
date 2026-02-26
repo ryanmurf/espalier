@@ -40,7 +40,7 @@ const objMetadata: EntityMetadata = {
 // ══════════════════════════════════════════════════
 
 describe("ChangeTracker adversarial: circular references", () => {
-  it("BUG #79: circular object is not cloned — mutation pollutes snapshot", () => {
+  it("circular object is properly cloned — mutation detected", () => {
     const tracker = new EntityChangeTracker(objMetadata);
     const circular: Record<string, unknown> = { key: "original" };
     circular.self = circular;
@@ -48,17 +48,13 @@ describe("ChangeTracker adversarial: circular references", () => {
     const entity = { id: 1, data: circular };
     tracker.snapshot(entity);
 
-    // Mutate the circular object
     circular.key = "mutated";
 
-    // Because cloneValue catches the JSON.stringify error and returns the
-    // SAME reference, the snapshot is the same object as the entity field.
-    // isDirty compares the snapshot reference with the entity field reference,
-    // which are the same object, so deepEqual returns true (a === b).
-    expect(tracker.isDirty(entity)).toBe(false); // BUG: should be true
+    // cloneDeep handles circular refs, so the snapshot is a separate copy
+    expect(tracker.isDirty(entity)).toBe(true);
   });
 
-  it("BUG #79: getDirtyFields returns empty for circular object mutation", () => {
+  it("getDirtyFields detects circular object mutation", () => {
     const tracker = new EntityChangeTracker(objMetadata);
     const circular: Record<string, unknown> = { value: 42 };
     circular.ref = circular;
@@ -68,12 +64,11 @@ describe("ChangeTracker adversarial: circular references", () => {
 
     circular.value = 999;
 
-    // Same bug: snapshot holds the same reference
     const changes = tracker.getDirtyFields(entity);
-    expect(changes).toHaveLength(0); // BUG: should be 1
+    expect(changes).toHaveLength(1);
   });
 
-  it("BUG #79: replacing circular object with new value IS detected (different ref)", () => {
+  it("replacing circular object with new value IS detected", () => {
     const tracker = new EntityChangeTracker(objMetadata);
     const circular: Record<string, unknown> = { key: "v1" };
     circular.self = circular;
@@ -81,26 +76,23 @@ describe("ChangeTracker adversarial: circular references", () => {
     const entity: Record<string, unknown> = { id: 1, data: circular };
     tracker.snapshot(entity);
 
-    // Replace the field entirely with a new object (not same reference)
     entity.data = { key: "v2" };
 
-    // This IS detected because the references differ
     expect(tracker.isDirty(entity as any)).toBe(true);
   });
 
-  it("deeply nested circular: A -> B -> A is not cloned", () => {
+  it("deeply nested circular: A -> B -> A is properly cloned", () => {
     const tracker = new EntityChangeTracker(objMetadata);
     const a: Record<string, unknown> = { name: "A" };
     const b: Record<string, unknown> = { name: "B", parent: a };
-    a.child = b; // circular: A -> B -> A
+    a.child = b;
 
     const entity = { id: 1, data: a };
     tracker.snapshot(entity);
 
     a.name = "A-mutated";
 
-    // Same bug as #79
-    expect(tracker.isDirty(entity)).toBe(false); // BUG: should be true
+    expect(tracker.isDirty(entity)).toBe(true);
   });
 });
 
@@ -229,23 +221,12 @@ describe("ChangeTracker adversarial: toJSON override", () => {
     const entity = { id: 1, data: tricky };
     tracker.snapshot(entity);
 
-    // The snapshot was cloned via JSON.parse(JSON.stringify(tricky))
-    // which calls toJSON(), producing { real: "data" }.
-    // Now mutate "secret" — it was never in the snapshot:
+    // cloneDeep copies all own properties including toJSON and secret.
+    // Mutating secret is detected because the snapshot has the original value.
     tricky.secret = "CHANGED";
 
-    // deepEqual compares: current tricky has keys [real, secret, toJSON] (3 keys)
-    // snapshot has keys [real] (1 key). 3 !== 1 => dirty.
-    // BUT WAIT: the snapshot is { real: "data" } and current is the tricky object.
-    // deepEqual uses Object.keys on both. Object.keys(tricky) = ["real", "secret"].
-    // (toJSON is on the prototype or own? It's own. So 3 keys vs 1 key.)
-    // Actually toJSON is an own method. Object.keys includes it.
-    // So keysA (current) = ["real", "secret", "toJSON"], keysB (snapshot) = ["real"]
-    // Different length => isDirty = true.
     expect(tracker.isDirty(entity)).toBe(true);
 
-    // The snapshot is fundamentally different from the object structure.
-    // This means the entity will ALWAYS appear dirty even if nothing changed.
     const changes = tracker.getDirtyFields(entity);
     expect(changes).toHaveLength(1);
   });
@@ -256,27 +237,21 @@ describe("ChangeTracker adversarial: toJSON override", () => {
 // ══════════════════════════════════════════════════
 
 describe("ChangeTracker adversarial: Map/Set fields", () => {
-  it("Map field: cloneValue produces empty object (JSON.stringify of Map = {})", () => {
+  it("Map field: properly cloned and mutations detected", () => {
     const tracker = new EntityChangeTracker(objMetadata);
     const map = new Map([["key", "value"]]);
     const entity = { id: 1, data: map };
     tracker.snapshot(entity);
 
-    // JSON.stringify(new Map()) = "{}" — all entries are lost.
-    // Snapshot holds an empty plain object {}.
-    // Current value is a Map with 1 entry.
-    // deepEqual: typeof Map === "object" => yes.
-    // Object.keys(map) = [] (Maps don't have enumerable keys).
-    // Object.keys({}) = []. Same length (0). deepEqual returns true.
-    // BUG: Map field always appears clean even after mutation.
-    expect(tracker.isDirty(entity)).toBe(false); // BUG: Map data is lost in snapshot
+    // cloneDeep handles Map, deepEqual compares Maps entry-by-entry
+    expect(tracker.isDirty(entity)).toBe(false);
 
-    // Even adding entries won't be detected:
+    // Adding entries is detected:
     map.set("new", "entry");
-    expect(tracker.isDirty(entity)).toBe(false); // BUG: still appears clean
+    expect(tracker.isDirty(entity)).toBe(true);
   });
 
-  it("Set field: cloneValue produces empty object (JSON.stringify of Set = {})", () => {
+  it("Set field: properly cloned and mutations detected", () => {
     const tracker = new EntityChangeTracker(objMetadata);
     const set = new Set([1, 2, 3]);
     const entity = { id: 1, data: set };
@@ -284,9 +259,8 @@ describe("ChangeTracker adversarial: Map/Set fields", () => {
 
     set.add(999);
 
-    // Same issue as Map: JSON.stringify(Set) = "{}".
-    // Object.keys(set) = [], Object.keys({}) = []. deepEqual = true.
-    expect(tracker.isDirty(entity)).toBe(false); // BUG: Set changes invisible
+    // cloneDeep handles Set, deepEqual compares Sets by membership
+    expect(tracker.isDirty(entity)).toBe(true);
   });
 });
 
@@ -295,17 +269,16 @@ describe("ChangeTracker adversarial: Map/Set fields", () => {
 // ══════════════════════════════════════════════════
 
 describe("ChangeTracker adversarial: non-plain objects", () => {
-  it("RegExp field: JSON.stringify produces {} so snapshot loses data", () => {
+  it("RegExp field: properly cloned and changes detected", () => {
     const tracker = new EntityChangeTracker(objMetadata);
     const entity = { id: 1, data: /hello/gi };
     tracker.snapshot(entity);
 
-    // JSON.stringify(/hello/gi) = "{}". Snapshot holds {}.
-    // Object.keys(/hello/gi) = []. Object.keys({}) = [].
-    // deepEqual returns true even if regex is replaced:
+    // cloneDeep handles RegExp, deepEqual compares source+flags
+    expect(tracker.isDirty(entity)).toBe(false);
+
     (entity as any).data = /different/;
-    // Both have Object.keys = [], so still equal.
-    expect(tracker.isDirty(entity)).toBe(false); // BUG: regex changes not detected
+    expect(tracker.isDirty(entity)).toBe(true);
   });
 });
 

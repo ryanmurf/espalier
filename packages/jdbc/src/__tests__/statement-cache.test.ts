@@ -206,11 +206,11 @@ describe("StatementCache", () => {
   // ──────────────────────────────────────────────
 
   describe("configuration", () => {
-    it("enabled: false makes get always return undefined", () => {
+    it("enabled: false makes get always return undefined without counting miss", () => {
       const cache = new StatementCache({ enabled: false });
       cache.put("SELECT 1", mockStmt());
       expect(cache.get("SELECT 1")).toBeUndefined();
-      expect(cache.getStats().misses).toBe(1);
+      expect(cache.getStats().misses).toBe(0);
     });
 
     it("enabled: false makes put a no-op", () => {
