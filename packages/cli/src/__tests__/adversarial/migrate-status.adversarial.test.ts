@@ -527,7 +527,7 @@ describe("formatStatusTable adversarial", () => {
   });
 
   describe("special characters in descriptions", () => {
-    it("handles description with newline characters (breaks table formatting)", () => {
+    it("sanitizes description with newline characters to preserve table formatting", () => {
       const result: MigrateStatusResult = {
         entries: [
           { version: "20260101120000", description: "line1\nline2", status: "pending", appliedAt: null },
@@ -539,13 +539,12 @@ describe("formatStatusTable adversarial", () => {
       };
 
       const output = formatStatusTable(result);
-      // BUG: newlines in description will break the table layout
-      // The padEnd calculation uses the full string length including \n
-      // but the actual rendering splits across lines
-      expect(output).toContain("line1\nline2");
+      // Fixed: newlines are replaced with spaces to preserve alignment
+      expect(output).not.toContain("line1\nline2");
+      expect(output).toContain("line1 line2");
     });
 
-    it("handles description with tab characters", () => {
+    it("sanitizes description with tab characters to preserve table formatting", () => {
       const result: MigrateStatusResult = {
         entries: [
           { version: "20260101120000", description: "col1\tcol2", status: "pending", appliedAt: null },
@@ -557,7 +556,9 @@ describe("formatStatusTable adversarial", () => {
       };
 
       const output = formatStatusTable(result);
-      expect(output).toContain("col1\tcol2");
+      // Fixed: tabs are replaced with spaces to preserve alignment
+      expect(output).not.toContain("col1\tcol2");
+      expect(output).toContain("col1 col2");
     });
 
     it("handles description with ANSI escape codes", () => {
@@ -688,7 +689,7 @@ describe("formatStatusTable adversarial", () => {
       expect(output).toContain("9999");
     });
 
-    it("handles Invalid Date", () => {
+    it("handles Invalid Date gracefully", () => {
       const result: MigrateStatusResult = {
         entries: [
           { version: "20260101120000", description: "test", status: "applied", appliedAt: new Date("invalid") },
@@ -699,8 +700,9 @@ describe("formatStatusTable adversarial", () => {
         currentVersion: "20260101120000",
       };
 
-      // new Date("invalid").toISOString() throws RangeError: Invalid time value
-      expect(() => formatStatusTable(result)).toThrow();
+      // Fixed: Invalid Date is now caught and displayed as "(invalid date)"
+      const output = formatStatusTable(result);
+      expect(output).toContain("(invalid date)");
     });
   });
 

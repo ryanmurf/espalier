@@ -18,6 +18,7 @@ export async function migrateDown(options: MigrateDownOptions): Promise<MigrateD
   const { config, migrationsDir, steps, toVersion } = options;
   const { dataSource, runner } = await createAdapter(config);
 
+  let originalError: unknown;
   try {
     await runner.initialize();
 
@@ -55,7 +56,18 @@ export async function migrateDown(options: MigrateDownOptions): Promise<MigrateD
       return { rolledBack: versionsToRollback, currentVersion };
     }
 
+    // Validate steps
     const effectiveSteps = steps ?? 1;
+    if (!Number.isFinite(effectiveSteps) || !Number.isInteger(effectiveSteps) || effectiveSteps < 0) {
+      throw new Error(
+        `Invalid steps value: ${steps}. Steps must be a non-negative integer.`,
+      );
+    }
+    if (effectiveSteps === 0) {
+      const currentVersion = await runner.getCurrentVersion();
+      return { rolledBack: [], currentVersion };
+    }
+
     const versionsToRollback = appliedBefore
       .slice(-effectiveSteps)
       .reverse()
@@ -65,7 +77,15 @@ export async function migrateDown(options: MigrateDownOptions): Promise<MigrateD
 
     const currentVersion = await runner.getCurrentVersion();
     return { rolledBack: versionsToRollback, currentVersion };
+  } catch (err) {
+    originalError = err;
+    throw err;
   } finally {
-    await dataSource.close();
+    try {
+      await dataSource.close();
+    } catch (closeErr) {
+      if (!originalError) throw closeErr;
+      // Original error takes priority; close error is not surfaced
+    }
   }
 }

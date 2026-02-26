@@ -27,6 +27,7 @@ export async function migrateStatus(options: MigrateStatusOptions): Promise<Migr
   const { config, migrationsDir } = options;
   const { dataSource, runner } = await createAdapter(config);
 
+  let originalError: unknown;
   try {
     await runner.initialize();
 
@@ -70,9 +71,30 @@ export async function migrateStatus(options: MigrateStatusOptions): Promise<Migr
       orphanedRecords,
       currentVersion,
     };
+  } catch (err) {
+    originalError = err;
+    throw err;
   } finally {
-    await dataSource.close();
+    try {
+      await dataSource.close();
+    } catch (closeErr) {
+      if (!originalError) throw closeErr;
+      // Original error takes priority; close error is not surfaced
+    }
   }
+}
+
+function formatDate(date: Date | null): string {
+  if (!date) return "-";
+  const iso = date.toISOString();
+  // Invalid Date produces "Invalid Date" from toISOString() or throws
+  if (!iso || iso === "Invalid Date") return "(invalid date)";
+  return iso.replace("T", " ").slice(0, 19);
+}
+
+function sanitizeForTable(s: string): string {
+  // Replace newlines, tabs, and other control chars with space to preserve alignment
+  return s.replace(/[\n\r\t\v\f]/g, " ");
 }
 
 export function formatStatusTable(result: MigrateStatusResult): string {
@@ -88,13 +110,17 @@ export function formatStatusTable(result: MigrateStatusResult): string {
   const statusHeader = "Status";
   const appliedHeader = "Applied At";
 
-  // Calculate column widths
-  const allVersions = result.entries.map((e) => e.version);
-  const allDescs = result.entries.map((e) => e.description);
+  // Calculate column widths with sanitized values
+  const allVersions = result.entries.map((e) => sanitizeForTable(e.version));
+  const allDescs = result.entries.map((e) => sanitizeForTable(e.description));
   const allStatuses = result.entries.map((e) => e.status);
-  const allDates = result.entries.map((e) =>
-    e.appliedAt ? e.appliedAt.toISOString().replace("T", " ").slice(0, 19) : "-",
-  );
+  const allDates = result.entries.map((e) => {
+    try {
+      return formatDate(e.appliedAt);
+    } catch {
+      return "(invalid date)";
+    }
+  });
 
   const versionWidth = Math.max(versionHeader.length, ...allVersions.map((v) => v.length));
   const descWidth = Math.max(descHeader.length, ...allDescs.map((d) => d.length));
@@ -110,9 +136,8 @@ export function formatStatusTable(result: MigrateStatusResult): string {
   lines.push(sep);
 
   for (let i = 0; i < result.entries.length; i++) {
-    const e = result.entries[i];
     lines.push(
-      `${pad(e.version, versionWidth)}  ${pad(e.description, descWidth)}  ${pad(e.status, statusWidth)}  ${pad(allDates[i], dateWidth)}`,
+      `${pad(allVersions[i], versionWidth)}  ${pad(allDescs[i], descWidth)}  ${pad(allStatuses[i], statusWidth)}  ${pad(allDates[i], dateWidth)}`,
     );
   }
 
@@ -130,7 +155,7 @@ export function formatStatusTable(result: MigrateStatusResult): string {
     lines.push("");
     lines.push(`WARNING: ${result.orphanedRecords.length} orphaned migration(s) found in database with no matching file:`);
     for (const record of result.orphanedRecords) {
-      lines.push(`  - ${record.version} (${record.description})`);
+      lines.push(`  - ${record.version} (${sanitizeForTable(record.description)})`);
     }
   }
 

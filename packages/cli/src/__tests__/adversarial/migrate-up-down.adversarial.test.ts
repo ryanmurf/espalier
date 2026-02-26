@@ -200,12 +200,7 @@ describe("migrateUp adversarial", () => {
   // --- --to version edge cases ---
 
   describe("--to version edge cases", () => {
-    it("BUG: --to empty string silently applies all migrations instead of throwing", async () => {
-      // BUG: migrateUp checks `if (toVersion)` which is falsy for "".
-      // So toVersion="" bypasses the target version logic entirely and
-      // applies ALL migrations, same as if toVersion was not provided.
-      // Expected: throw an error or validate the empty string.
-      // Actual: silently applies everything.
+    it("--to empty string throws instead of silently applying all", async () => {
       const runner = createMockRunner();
       const ds = createMockDataSource();
       vi.mocked(createAdapter).mockResolvedValue({ dataSource: ds, runner });
@@ -216,14 +211,13 @@ describe("migrateUp adversarial", () => {
         },
       ]);
 
-      const result = await migrateUp({
-        config: baseConfig,
-        migrationsDir: "/tmp/m",
-        toVersion: "",
-      });
-
-      // BUG: applies everything instead of throwing
-      expect(result.applied).toEqual(["20260101120000"]);
+      await expect(
+        migrateUp({
+          config: baseConfig,
+          migrationsDir: "/tmp/m",
+          toVersion: "",
+        }),
+      ).rejects.toThrow(/must not be empty/);
     });
 
     it("applies only the first migration when --to points to it", async () => {
@@ -417,7 +411,7 @@ describe("migrateUp adversarial", () => {
   // --- Duplicate / out-of-order migrations ---
 
   describe("duplicate and out-of-order migrations", () => {
-    it("handles duplicate version numbers in migration files", async () => {
+    it("throws on duplicate version numbers in migration files", async () => {
       const runner = createMockRunner();
       const ds = createMockDataSource();
       vi.mocked(createAdapter).mockResolvedValue({ dataSource: ds, runner });
@@ -432,17 +426,12 @@ describe("migrateUp adversarial", () => {
         },
       ]);
 
-      // Both migrations have the same version "20260101120000".
-      // pending() returns migrations not in applied set. Both will be pending.
-      // runner.run() is called with both. This could cause duplicate version
-      // tracking entries. The code does NOT validate for duplicate versions.
-      const result = await migrateUp({
-        config: baseConfig,
-        migrationsDir: "/tmp/m",
-      });
-
-      // BUG: No duplicate version detection. Both are applied.
-      expect(result.applied.length).toBe(2);
+      await expect(
+        migrateUp({
+          config: baseConfig,
+          migrationsDir: "/tmp/m",
+        }),
+      ).rejects.toThrow(/Duplicate migration version/);
     });
 
     it("handles migrations returned in reverse order", async () => {
@@ -634,26 +623,18 @@ describe("migrateDown adversarial", () => {
         },
       ]);
 
-      // steps=0 means slice(-0) which returns the ENTIRE array in JS.
-      // This is likely a BUG: the CLI validates steps >= 1 in bin.ts
-      // but migrateDown itself does NOT validate. If called programmatically
-      // with steps=0, it rolls back ALL migrations instead of zero.
+      // steps=0 should roll back zero migrations.
       const result = await migrateDown({
         config: baseConfig,
         migrationsDir: "/tmp/m",
         steps: 0,
       });
 
-      // BUG: slice(-0) === slice(0) which returns the full array,
-      // meaning steps=0 rolls back EVERYTHING instead of nothing.
-      // The code at line 58-59: effectiveSteps = steps ?? 1
-      // steps is 0 (falsy but defined), so ?? doesn't kick in.
-      // Then slice(-0) is slice(0) = all elements.
-      expect(result.rolledBack.length).toBe(2);
-      // Expected: 0, Actual: 2. This is a real BUG.
+      // Fixed: steps=0 now correctly returns an empty rollback list.
+      expect(result.rolledBack.length).toBe(0);
     });
 
-    it("negative steps are not validated by migrateDown itself", async () => {
+    it("negative steps are validated by migrateDown", async () => {
       const runner = createMockRunner([
         "20260101120000",
         "20260102120000",
@@ -676,19 +657,14 @@ describe("migrateDown adversarial", () => {
         },
       ]);
 
-      // The CLI validates steps >= 1 in bin.ts, but migrateDown() doesn't.
-      // Negative steps: slice(-(-1)) = slice(1) = all except first element
-      const result = await migrateDown({
-        config: baseConfig,
-        migrationsDir: "/tmp/m",
-        steps: -1,
-      });
-
-      // BUG: slice(--1) = slice(1) returns [second, third] reversed
-      // That's 2 migrations rolled back when -1 steps was passed.
-      // The programmatic API should validate or the bin.ts validation is the
-      // only safety net.
-      expect(result.rolledBack.length).toBeGreaterThan(0);
+      // Fixed: negative steps now throws a validation error
+      await expect(
+        migrateDown({
+          config: baseConfig,
+          migrationsDir: "/tmp/m",
+          steps: -1,
+        }),
+      ).rejects.toThrow(/Invalid steps value/);
     });
 
     it("steps greater than applied count still works (slice clamps)", async () => {
@@ -717,7 +693,7 @@ describe("migrateDown adversarial", () => {
       expect(runner.rollback).toHaveBeenCalledWith(expect.any(Array), 100);
     });
 
-    it("steps=NaN is not validated by migrateDown", async () => {
+    it("steps=NaN throws a validation error", async () => {
       const runner = createMockRunner(["20260101120000"]);
       const ds = createMockDataSource();
       vi.mocked(createAdapter).mockResolvedValue({ dataSource: ds, runner });
@@ -728,19 +704,17 @@ describe("migrateDown adversarial", () => {
         },
       ]);
 
-      // NaN steps: effectiveSteps = NaN ?? 1 = NaN (NaN is not nullish)
-      // slice(-NaN) = slice(0) = all elements
-      const result = await migrateDown({
-        config: baseConfig,
-        migrationsDir: "/tmp/m",
-        steps: NaN,
-      });
-
-      // BUG: Same as steps=0, NaN steps rolls back everything
-      expect(result.rolledBack.length).toBe(1);
+      // Fixed: NaN steps now throws a validation error
+      await expect(
+        migrateDown({
+          config: baseConfig,
+          migrationsDir: "/tmp/m",
+          steps: NaN,
+        }),
+      ).rejects.toThrow(/Invalid steps value/);
     });
 
-    it("steps=Infinity rolls back everything", async () => {
+    it("steps=Infinity throws a validation error", async () => {
       const runner = createMockRunner(["20260101120000", "20260102120000"]);
       const ds = createMockDataSource();
       vi.mocked(createAdapter).mockResolvedValue({ dataSource: ds, runner });
@@ -755,17 +729,17 @@ describe("migrateDown adversarial", () => {
         },
       ]);
 
-      const result = await migrateDown({
-        config: baseConfig,
-        migrationsDir: "/tmp/m",
-        steps: Infinity,
-      });
-
-      // slice(-Infinity) = slice(0) = all
-      expect(result.rolledBack.length).toBe(2);
+      // Fixed: Infinity steps now throws a validation error
+      await expect(
+        migrateDown({
+          config: baseConfig,
+          migrationsDir: "/tmp/m",
+          steps: Infinity,
+        }),
+      ).rejects.toThrow(/Invalid steps value/);
     });
 
-    it("fractional steps like 1.5 are passed directly to rollback", async () => {
+    it("fractional steps like 1.5 throw a validation error", async () => {
       const runner = createMockRunner([
         "20260101120000",
         "20260102120000",
@@ -788,16 +762,14 @@ describe("migrateDown adversarial", () => {
         },
       ]);
 
-      // slice(-1.5) truncates to slice(-1) in JS
-      const result = await migrateDown({
-        config: baseConfig,
-        migrationsDir: "/tmp/m",
-        steps: 1.5,
-      });
-
-      // JS truncates: slice(-1.5) -> slice(-1), so 1 migration rolled back
-      expect(result.rolledBack.length).toBe(1);
-      expect(runner.rollback).toHaveBeenCalledWith(expect.any(Array), 1.5);
+      // Fixed: fractional steps now throws a validation error
+      await expect(
+        migrateDown({
+          config: baseConfig,
+          migrationsDir: "/tmp/m",
+          steps: 1.5,
+        }),
+      ).rejects.toThrow(/Invalid steps value/);
     });
   });
 

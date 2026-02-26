@@ -17,13 +17,30 @@ export async function migrateUp(options: MigrateUpOptions): Promise<MigrateUpRes
   const { config, migrationsDir, toVersion } = options;
   const { dataSource, runner } = await createAdapter(config);
 
+  let originalError: unknown;
   try {
     await runner.initialize();
 
     const loaded = await loadMigrations(migrationsDir);
     let migrations = loaded.map((l) => l.migration);
 
-    if (toVersion) {
+    // Detect duplicate versions
+    const versionSet = new Set<string>();
+    for (const m of migrations) {
+      if (versionSet.has(m.version)) {
+        throw new Error(
+          `Duplicate migration version "${m.version}" found. Each migration must have a unique version.`,
+        );
+      }
+      versionSet.add(m.version);
+    }
+
+    if (toVersion !== undefined) {
+      if (toVersion === "") {
+        throw new Error(
+          `Target version must not be empty. Provide a valid migration version.`,
+        );
+      }
       const targetExists = migrations.some((m) => m.version === toVersion);
       if (!targetExists) {
         throw new Error(
@@ -45,7 +62,15 @@ export async function migrateUp(options: MigrateUpOptions): Promise<MigrateUpRes
 
     const currentVersion = await runner.getCurrentVersion();
     return { applied: pendingVersions, currentVersion };
+  } catch (err) {
+    originalError = err;
+    throw err;
   } finally {
-    await dataSource.close();
+    try {
+      await dataSource.close();
+    } catch (closeErr) {
+      if (!originalError) throw closeErr;
+      // Original error takes priority; close error is not surfaced
+    }
   }
 }
