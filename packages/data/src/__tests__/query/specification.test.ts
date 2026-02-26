@@ -47,7 +47,7 @@ describe("Specification", () => {
       const spec = equal<TestUser>("name", "alice");
       const criteria = spec.toPredicate(metadata);
       const result = criteria.toSql(1);
-      expect(result.sql).toBe("user_name = $1");
+      expect(result.sql).toBe('"user_name" = $1');
       expect(result.params).toEqual(["alice"]);
     });
 
@@ -55,7 +55,7 @@ describe("Specification", () => {
       const spec = like<TestUser>("email", "%@gmail%");
       const criteria = spec.toPredicate(metadata);
       const result = criteria.toSql(1);
-      expect(result.sql).toBe("email LIKE $1");
+      expect(result.sql).toBe('"email" LIKE $1');
       expect(result.params).toEqual(["%@gmail%"]);
     });
 
@@ -63,7 +63,7 @@ describe("Specification", () => {
       const spec = greaterThan<TestUser>("age", 25);
       const criteria = spec.toPredicate(metadata);
       const result = criteria.toSql(1);
-      expect(result.sql).toBe("age > $1");
+      expect(result.sql).toBe('"age" > $1');
       expect(result.params).toEqual([25]);
     });
 
@@ -71,7 +71,7 @@ describe("Specification", () => {
       const spec = lessThan<TestUser>("age", 50);
       const criteria = spec.toPredicate(metadata);
       const result = criteria.toSql(1);
-      expect(result.sql).toBe("age < $1");
+      expect(result.sql).toBe('"age" < $1');
       expect(result.params).toEqual([50]);
     });
 
@@ -79,7 +79,7 @@ describe("Specification", () => {
       const spec = between<TestUser>("age", 20, 30);
       const criteria = spec.toPredicate(metadata);
       const result = criteria.toSql(1);
-      expect(result.sql).toBe("age BETWEEN $1 AND $2");
+      expect(result.sql).toBe('"age" BETWEEN $1 AND $2');
       expect(result.params).toEqual([20, 30]);
     });
 
@@ -87,7 +87,7 @@ describe("Specification", () => {
       const spec = isIn<TestUser>("status", ["active", "pending"]);
       const criteria = spec.toPredicate(metadata);
       const result = criteria.toSql(1);
-      expect(result.sql).toContain("status IN");
+      expect(result.sql).toContain('"status" IN');
       expect(result.params).toEqual(["active", "pending"]);
     });
 
@@ -95,7 +95,7 @@ describe("Specification", () => {
       const spec = isNull<TestUser>("email");
       const criteria = spec.toPredicate(metadata);
       const result = criteria.toSql(1);
-      expect(result.sql).toBe("email IS NULL");
+      expect(result.sql).toBe('"email" IS NULL');
       expect(result.params).toEqual([]);
     });
 
@@ -103,7 +103,7 @@ describe("Specification", () => {
       const spec = isNotNull<TestUser>("name");
       const criteria = spec.toPredicate(metadata);
       const result = criteria.toSql(1);
-      expect(result.sql).toBe("user_name IS NOT NULL");
+      expect(result.sql).toBe('"user_name" IS NOT NULL');
       expect(result.params).toEqual([]);
     });
   });
@@ -121,8 +121,8 @@ describe("Specification", () => {
       const criteria = spec.toPredicate(metadata);
       const result = criteria.toSql(1);
       expect(result.sql).toContain("AND");
-      expect(result.sql).toContain("user_name = $1");
-      expect(result.sql).toContain("age > $2");
+      expect(result.sql).toContain('"user_name" = $1');
+      expect(result.sql).toContain('"age" > $2');
       expect(result.params).toEqual(["alice", 25]);
     });
 
@@ -134,8 +134,8 @@ describe("Specification", () => {
       const criteria = spec.toPredicate(metadata);
       const result = criteria.toSql(1);
       expect(result.sql).toContain("OR");
-      expect(result.sql).toContain("user_name = $1");
-      expect(result.sql).toContain("user_name = $2");
+      expect(result.sql).toContain('"user_name" = $1');
+      expect(result.sql).toContain('"user_name" = $2');
       expect(result.params).toEqual(["alice", "bob"]);
     });
 
@@ -146,7 +146,7 @@ describe("Specification", () => {
       const criteria = spec.toPredicate(metadata);
       const result = criteria.toSql(1);
       expect(result.sql).toContain("NOT");
-      expect(result.sql).toContain("status = $1");
+      expect(result.sql).toContain('"status" = $1');
       expect(result.params).toEqual(["inactive"]);
     });
 
@@ -158,9 +158,9 @@ describe("Specification", () => {
       );
       const criteria = spec.toPredicate(metadata);
       const result = criteria.toSql(1);
-      expect(result.sql).toContain("user_name = $1");
-      expect(result.sql).toContain("age > $2");
-      expect(result.sql).toContain("status = $3");
+      expect(result.sql).toContain('"user_name" = $1');
+      expect(result.sql).toContain('"age" > $2');
+      expect(result.sql).toContain('"status" = $3');
       expect(result.params).toEqual(["alice", 20, "active"]);
     });
 
@@ -198,7 +198,7 @@ describe("Specification", () => {
       const spec = Specifications.where(inner);
       const criteria = spec.toPredicate(metadata);
       const result = criteria.toSql(1);
-      expect(result.sql).toBe("user_name = $1");
+      expect(result.sql).toBe('"user_name" = $1');
     });
   });
 
@@ -212,7 +212,7 @@ describe("Specification", () => {
       const criteria = spec.toPredicate(metadata);
       const result = criteria.toSql(1);
       // "name" field maps to "user_name" column
-      expect(result.sql).toBe("user_name = $1");
+      expect(result.sql).toBe('"user_name" = $1');
     });
 
     it("throws for non-existent field", () => {

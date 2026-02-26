@@ -147,7 +147,7 @@ describe("DdlGenerator with @ManyToOne", () => {
     new DdlEmp();
 
     const sql = generator.generateCreateTable(DdlEmp);
-    expect(sql).toContain("department_id INTEGER REFERENCES departments(id)");
+    expect(sql).toContain('"department_id" INTEGER REFERENCES "departments"("id")');
   });
 
   it("generates NOT NULL FK for nullable: false", () => {
@@ -160,7 +160,7 @@ describe("DdlGenerator with @ManyToOne", () => {
     new DdlEmpRequired();
 
     const sql = generator.generateCreateTable(DdlEmpRequired);
-    expect(sql).toContain("department_id INTEGER NOT NULL REFERENCES departments(id)");
+    expect(sql).toContain('"department_id" INTEGER NOT NULL REFERENCES "departments"("id")');
   });
 
   it("generates nullable FK by default", () => {
@@ -173,8 +173,8 @@ describe("DdlGenerator with @ManyToOne", () => {
     new DdlEmpNullable();
 
     const sql = generator.generateCreateTable(DdlEmpNullable);
-    expect(sql).toContain("department_id INTEGER REFERENCES departments(id)");
-    expect(sql).not.toContain("department_id INTEGER NOT NULL");
+    expect(sql).toContain('"department_id" INTEGER REFERENCES "departments"("id")');
+    expect(sql).not.toContain('"department_id" INTEGER NOT NULL');
   });
 
   it("generates self-referencing FK", () => {
@@ -188,7 +188,7 @@ describe("DdlGenerator with @ManyToOne", () => {
     new DdlCategory();
 
     const sql = generator.generateCreateTable(DdlCategory);
-    expect(sql).toContain("parent_id INTEGER REFERENCES ddl_categories(id)");
+    expect(sql).toContain('"parent_id" INTEGER REFERENCES "ddl_categories"("id")');
   });
 
   it("generates multiple FK columns", () => {
@@ -203,8 +203,8 @@ describe("DdlGenerator with @ManyToOne", () => {
     new DdlMultiFk();
 
     const sql = generator.generateCreateTable(DdlMultiFk);
-    expect(sql).toContain("dept_id INTEGER REFERENCES departments(id)");
-    expect(sql).toContain("parent_dept_id INTEGER REFERENCES departments(id)");
+    expect(sql).toContain('"dept_id" INTEGER REFERENCES "departments"("id")');
+    expect(sql).toContain('"parent_dept_id" INTEGER REFERENCES "departments"("id")');
   });
 });
 
@@ -305,8 +305,8 @@ describe("@OneToMany does not affect DDL", () => {
 
     const sql = generator.generateCreateTable(DdlOtmDept);
     // Should only have id and name columns, no FK for @OneToMany
-    expect(sql).toContain("id INTEGER PRIMARY KEY");
-    expect(sql).toContain("name TEXT");
+    expect(sql).toContain('"id" INTEGER PRIMARY KEY');
+    expect(sql).toContain('"name" TEXT');
     expect(sql).not.toContain("children");
     expect(sql).not.toContain("REFERENCES");
   });
@@ -351,7 +351,7 @@ describe("@ManyToOne + @OneToMany bidirectional", () => {
     expect(deptSql).not.toContain("REFERENCES");
 
     const empSql = generator.generateCreateTable(BiEmp);
-    expect(empSql).toContain("department_id INTEGER REFERENCES bi_dept(id)");
+    expect(empSql).toContain('"department_id" INTEGER REFERENCES "bi_dept"("id")');
   });
 });
 
@@ -487,10 +487,10 @@ describe("DdlGenerator join table generation", () => {
 
     const joinTables = generator.generateJoinTables([JtStudent, JtCourse]);
     expect(joinTables).toHaveLength(1);
-    expect(joinTables[0]).toContain("CREATE TABLE student_courses_jt");
-    expect(joinTables[0]).toContain("student_id INTEGER NOT NULL REFERENCES jt_students(id)");
-    expect(joinTables[0]).toContain("course_id INTEGER NOT NULL REFERENCES jt_courses(id)");
-    expect(joinTables[0]).toContain("PRIMARY KEY (student_id, course_id)");
+    expect(joinTables[0]).toContain('CREATE TABLE "student_courses_jt"');
+    expect(joinTables[0]).toContain('"student_id" INTEGER NOT NULL REFERENCES "jt_students"("id")');
+    expect(joinTables[0]).toContain('"course_id" INTEGER NOT NULL REFERENCES "jt_courses"("id")');
+    expect(joinTables[0]).toContain('PRIMARY KEY ("student_id", "course_id")');
   });
 
   it("does not generate duplicate join tables when both sides are in the input", () => {
@@ -557,6 +557,6 @@ describe("DdlGenerator join table generation", () => {
     new IneA();
 
     const joinTables = generator.generateJoinTables([IneA], { ifNotExists: true });
-    expect(joinTables[0]).toContain("CREATE TABLE IF NOT EXISTS ine_join");
+    expect(joinTables[0]).toContain('CREATE TABLE IF NOT EXISTS "ine_join"');
   });
 });

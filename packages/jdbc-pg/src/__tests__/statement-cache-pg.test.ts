@@ -153,7 +153,7 @@ describe.skipIf(!canConnect)("E2E: Prepared Statement Cache with PgConnection", 
   // Connection close clears cache
   // ──────────────────────────────────────────────
 
-  it("connection close clears statement cache", async () => {
+  it("connection close preserves statement cache for pooled connections", async () => {
     const cacheDS = createCacheDS();
     const conn = await cacheDS.getConnection();
     const cacheConn = conn as CacheableConnection;
@@ -166,13 +166,17 @@ describe.skipIf(!canConnect)("E2E: Prepared Statement Cache with PgConnection", 
 
     await conn.close();
 
-    // After close, stats are still accessible but cache was cleared
-    // Opening a new connection gives fresh cache
+    // FIXED #44: Pooled connection close preserves the statement cache.
+    // When the same connection is reused from the pool, the cache and its stats persist.
     const conn2 = await cacheDS.getConnection();
     const cacheConn2 = conn2 as CacheableConnection;
     const stats2 = cacheConn2.getStatementCacheStats();
-    expect(stats2.puts).toBe(0);
-    expect(stats2.hits).toBe(0);
+    expect(stats2.puts).toBe(2);
+
+    // Re-using a cached statement produces a hit
+    conn2.prepareStatement("SELECT 1");
+    const stats3 = cacheConn2.getStatementCacheStats();
+    expect(stats3.hits).toBe(1);
 
     await conn2.close();
     await cacheDS.close();

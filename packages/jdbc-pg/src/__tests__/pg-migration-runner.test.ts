@@ -153,7 +153,7 @@ describe("PgMigrationRunner", () => {
       await runner.initialize();
 
       expect(stmt.executeUpdate).toHaveBeenCalledWith(
-        expect.stringContaining("CREATE TABLE IF NOT EXISTS public._espalier_migrations"),
+        expect.stringContaining('CREATE TABLE IF NOT EXISTS "public"."_espalier_migrations"'),
       );
       expect(stmt.executeUpdate).toHaveBeenCalledWith(
         expect.stringContaining("version VARCHAR(255) PRIMARY KEY"),
@@ -176,7 +176,7 @@ describe("PgMigrationRunner", () => {
       await runner.initialize();
 
       expect(stmt.executeUpdate).toHaveBeenCalledWith(
-        expect.stringContaining("myschema.custom_migrations"),
+        expect.stringContaining('"myschema"."custom_migrations"'),
       );
     });
   });

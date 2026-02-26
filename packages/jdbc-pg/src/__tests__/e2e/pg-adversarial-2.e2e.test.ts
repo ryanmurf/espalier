@@ -81,22 +81,13 @@ describe.skipIf(!canConnect)("E2E: Adversarial Tests Round 2", { timeout: 15000 
 
     // Now try to update the (already deleted) entity
     saved.name = "Updated Name";
-    const result = await repo.save(saved);
 
-    // BUG: save() returns the original entity as if the update succeeded
-    // because the UPDATE matched 0 rows, returned nothing from RETURNING *,
-    // and the code falls through to `return entity`
-    expect(result.name).toBe("Updated Name"); // stale data returned as "saved"
+    // FIXED #46: save() now detects the UPDATE matched 0 rows and throws EntityNotFoundException
+    await expect(repo.save(saved)).rejects.toThrow(/not found/);
 
-    // DOUBLE BUG: findById returns the stale entity from the entity cache.
-    // save() put the mutated entity into the cache even though the UPDATE
-    // matched 0 rows. So we get a "ghost" entity that exists in cache but
-    // not in the database.
+    // After the fix, entity cache is evicted so findById returns null
     const fromDb = await repo.findById(id);
-    // Correct behavior: should be null (deleted from DB)
-    // Actual behavior: returns the cached stale entity
-    expect(fromDb).not.toBeNull(); // confirms entity cache serving ghost data
-    expect(fromDb!.name).toBe("Updated Name"); // stale mutated data from cache
+    expect(fromDb).toBeNull();
   });
 
   // ──────────────────────────────────────────────
@@ -120,16 +111,13 @@ describe.skipIf(!canConnect)("E2E: Adversarial Tests Round 2", { timeout: 15000 
 
     // Try to update (this will match 0 rows)
     saved.name = "StaleUpdate";
-    await repo.save(saved);
 
-    // BUG: save() didn't detect the UPDATE matched 0 rows, so it:
-    // 1. Returned the mutated entity as "saved"
-    // 2. Put the mutated entity into the entity cache
-    // The entity cache now has a ghost entry for a row that doesn't exist in DB.
+    // FIXED #46: save() now detects the UPDATE matched 0 rows and throws
+    await expect(repo.save(saved)).rejects.toThrow(/not found/);
+
+    // After the fix, entity cache is evicted — no ghost entry
     const cached = cache.get(Adv2Item, saved.id);
-    expect(cached).toBeDefined(); // confirms cache still has the entry
-    // The cache has the MUTATED name because save() cached the mutated entity
-    expect(cached!.name).toBe("StaleUpdate"); // confirms ghost data in cache
+    expect(cached).toBeUndefined();
   });
 
   // ──────────────────────────────────────────────

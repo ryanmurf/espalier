@@ -34,62 +34,62 @@ describe("buildDerivedQuery", () => {
   describe("find queries", () => {
     it("findByName produces SELECT with WHERE name = $1", () => {
       const q = buildQuery("findByName", ["alice"]);
-      expect(q.sql).toContain("FROM users");
-      expect(q.sql).toContain("WHERE name = $1");
+      expect(q.sql).toContain('FROM "users"');
+      expect(q.sql).toContain('WHERE "name" = $1');
       expect(q.params).toEqual(["alice"]);
     });
 
     it("findByNameAndAge produces AND condition", () => {
       const q = buildQuery("findByNameAndAge", ["alice", 30]);
-      expect(q.sql).toContain("name = $1 AND age = $2");
+      expect(q.sql).toContain('"name" = $1 AND "age" = $2');
       expect(q.params).toEqual(["alice", 30]);
     });
 
     it("findByEmailLike produces LIKE condition", () => {
       const q = buildQuery("findByEmailLike", ["%@gmail%"]);
-      expect(q.sql).toContain("WHERE email LIKE $1");
+      expect(q.sql).toContain('WHERE "email" LIKE $1');
       expect(q.params).toEqual(["%@gmail%"]);
     });
 
     it("findByAgeBetween produces BETWEEN condition", () => {
       const q = buildQuery("findByAgeBetween", [20, 30]);
-      expect(q.sql).toContain("WHERE age BETWEEN $1 AND $2");
+      expect(q.sql).toContain('WHERE "age" BETWEEN $1 AND $2');
       expect(q.params).toEqual([20, 30]);
     });
 
     it("findByStatusIn produces IN condition", () => {
       const q = buildQuery("findByStatusIn", [["active", "pending"]]);
-      expect(q.sql).toContain("WHERE status IN");
+      expect(q.sql).toContain('WHERE "status" IN');
       expect(q.params).toEqual(["active", "pending"]);
     });
 
     it("findByNameIsNull produces IS NULL condition", () => {
       const q = buildQuery("findByNameIsNull", []);
-      expect(q.sql).toContain("WHERE name IS NULL");
+      expect(q.sql).toContain('WHERE "name" IS NULL');
       expect(q.params).toEqual([]);
     });
 
     it("findByNameIsNotNull produces IS NOT NULL condition", () => {
       const q = buildQuery("findByNameIsNotNull", []);
-      expect(q.sql).toContain("WHERE name IS NOT NULL");
+      expect(q.sql).toContain('WHERE "name" IS NOT NULL');
       expect(q.params).toEqual([]);
     });
 
     it("findByAgeGreaterThan produces > condition", () => {
       const q = buildQuery("findByAgeGreaterThan", [25]);
-      expect(q.sql).toContain("WHERE age > $1");
+      expect(q.sql).toContain('WHERE "age" > $1');
       expect(q.params).toEqual([25]);
     });
 
     it("findByAgeLessThanEqual produces <= condition", () => {
       const q = buildQuery("findByAgeLessThanEqual", [50]);
-      expect(q.sql).toContain("WHERE age <= $1");
+      expect(q.sql).toContain('WHERE "age" <= $1');
       expect(q.params).toEqual([50]);
     });
 
     it("findByNameNot produces != condition", () => {
       const q = buildQuery("findByNameNot", ["bob"]);
-      expect(q.sql).toContain("WHERE name != $1");
+      expect(q.sql).toContain('WHERE "name" != $1');
       expect(q.params).toEqual(["bob"]);
     });
 
@@ -119,13 +119,13 @@ describe("buildDerivedQuery", () => {
 
     it("findByActiveTrue produces = true condition", () => {
       const q = buildQuery("findByActiveTrue", []);
-      expect(q.sql).toContain("WHERE active = $1");
+      expect(q.sql).toContain('WHERE "active" = $1');
       expect(q.params).toEqual([true]);
     });
 
     it("findByActiveFalse produces = false condition", () => {
       const q = buildQuery("findByActiveFalse", []);
-      expect(q.sql).toContain("WHERE active = $1");
+      expect(q.sql).toContain('WHERE "active" = $1');
       expect(q.params).toEqual([false]);
     });
 
@@ -144,8 +144,8 @@ describe("buildDerivedQuery", () => {
     it("countByStatus produces COUNT query", () => {
       const q = buildQuery("countByStatus", ["active"]);
       expect(q.sql).toContain("SELECT COUNT(*)");
-      expect(q.sql).toContain("FROM users");
-      expect(q.sql).toContain("WHERE status = $1");
+      expect(q.sql).toContain('FROM "users"');
+      expect(q.sql).toContain('WHERE "status" = $1');
       expect(q.params).toEqual(["active"]);
     });
   });
@@ -153,8 +153,8 @@ describe("buildDerivedQuery", () => {
   describe("delete queries", () => {
     it("deleteByStatus produces DELETE query", () => {
       const q = buildQuery("deleteByStatus", ["inactive"]);
-      expect(q.sql).toContain("DELETE FROM users");
-      expect(q.sql).toContain("WHERE status = $1");
+      expect(q.sql).toContain('DELETE FROM "users"');
+      expect(q.sql).toContain('WHERE "status" = $1');
       expect(q.params).toEqual(["inactive"]);
     });
   });
@@ -163,8 +163,8 @@ describe("buildDerivedQuery", () => {
     it("existsByEmail produces SELECT 1 with LIMIT 1", () => {
       const q = buildQuery("existsByEmail", ["a@b.com"]);
       expect(q.sql).toContain("SELECT 1");
-      expect(q.sql).toContain("FROM users");
-      expect(q.sql).toContain("WHERE email = $1");
+      expect(q.sql).toContain('FROM "users"');
+      expect(q.sql).toContain('WHERE "email" = $1');
       expect(q.sql).toContain("LIMIT");
       expect(q.params[0]).toBe("a@b.com");
     });
@@ -192,17 +192,17 @@ describe("buildDerivedQuery", () => {
   describe("order by queries", () => {
     it("findByNameOrderByAgeDesc produces ORDER BY age DESC", () => {
       const q = buildQuery("findByNameOrderByAgeDesc", ["alice"]);
-      expect(q.sql).toContain("ORDER BY age DESC");
+      expect(q.sql).toContain('ORDER BY "age" DESC');
     });
 
     it("findByNameOrderByAge defaults to ASC", () => {
       const q = buildQuery("findByNameOrderByAge", ["alice"]);
-      expect(q.sql).toContain("ORDER BY age ASC");
+      expect(q.sql).toContain('ORDER BY "age" ASC');
     });
 
     it("findByStatusOrderByNameAscAgeDesc produces multiple order-by", () => {
       const q = buildQuery("findByStatusOrderByNameAscAgeDesc", ["active"]);
-      expect(q.sql).toContain("ORDER BY name ASC, age DESC");
+      expect(q.sql).toContain('ORDER BY "name" ASC, "age" DESC');
     });
   });
 
@@ -240,7 +240,7 @@ describe("buildDerivedQuery", () => {
 
       const descriptor = parseDerivedQueryMethod("findByUserName");
       const q = buildDerivedQuery(descriptor, customMetadata, ["alice"]);
-      expect(q.sql).toContain("user_name = $1");
+      expect(q.sql).toContain('"user_name" = $1');
     });
   });
 });

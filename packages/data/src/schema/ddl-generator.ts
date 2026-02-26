@@ -1,3 +1,4 @@
+import { quoteIdentifier } from "espalier-jdbc";
 import { getEntityMetadata } from "../mapping/entity-metadata.js";
 import { getColumnMetadataEntries } from "../decorators/column.js";
 import type { ColumnMetadataEntry } from "../decorators/column.js";
@@ -68,7 +69,7 @@ export class DdlGenerator {
       const isPk = field.fieldName === metadata.idField;
       const isCreatedDate = field.fieldName === createdDateField;
 
-      const parts: string[] = [field.columnName, sqlType];
+      const parts: string[] = [quoteIdentifier(field.columnName), sqlType];
 
       if (isPk) {
         parts.push("PRIMARY KEY");
@@ -109,15 +110,15 @@ export class DdlGenerator {
       const targetColumnMappings = getColumnMappings(targetClass);
       const targetPkColumn = targetColumnMappings.get(targetIdField) ?? String(targetIdField);
 
-      const parts: string[] = [relation.joinColumn, "INTEGER"];
+      const parts: string[] = [quoteIdentifier(relation.joinColumn), "INTEGER"];
       if (!relation.nullable) {
         parts.push("NOT NULL");
       }
-      parts.push(`REFERENCES ${targetTableName}(${targetPkColumn})`);
+      parts.push(`REFERENCES ${quoteIdentifier(targetTableName)}(${quoteIdentifier(targetPkColumn)})`);
       columns.push(`  ${parts.join(" ")}`);
     }
 
-    return `CREATE TABLE ${ifNotExists}${metadata.tableName} (\n${columns.join(",\n")}\n)`;
+    return `CREATE TABLE ${ifNotExists}${quoteIdentifier(metadata.tableName)} (\n${columns.join(",\n")}\n)`;
   }
 
   generateJoinTables(
@@ -150,13 +151,13 @@ export class DdlGenerator {
 
         const jt = relation.joinTable;
         const columns = [
-          `  ${jt.joinColumn} INTEGER NOT NULL REFERENCES ${ownerTableName}(${ownerPkColumn})`,
-          `  ${jt.inverseJoinColumn} INTEGER NOT NULL REFERENCES ${targetTableName}(${targetPkColumn})`,
-          `  PRIMARY KEY (${jt.joinColumn}, ${jt.inverseJoinColumn})`,
+          `  ${quoteIdentifier(jt.joinColumn)} INTEGER NOT NULL REFERENCES ${quoteIdentifier(ownerTableName)}(${quoteIdentifier(ownerPkColumn)})`,
+          `  ${quoteIdentifier(jt.inverseJoinColumn)} INTEGER NOT NULL REFERENCES ${quoteIdentifier(targetTableName)}(${quoteIdentifier(targetPkColumn)})`,
+          `  PRIMARY KEY (${quoteIdentifier(jt.joinColumn)}, ${quoteIdentifier(jt.inverseJoinColumn)})`,
         ];
 
         results.push(
-          `CREATE TABLE ${ifNotExists}${jt.name} (\n${columns.join(",\n")}\n)`,
+          `CREATE TABLE ${ifNotExists}${quoteIdentifier(jt.name)} (\n${columns.join(",\n")}\n)`,
         );
       }
     }
@@ -171,6 +172,6 @@ export class DdlGenerator {
     const metadata = getEntityMetadata(entityClass);
     const ifExists = options?.ifExists ? "IF EXISTS " : "";
     const cascade = options?.cascade ? " CASCADE" : "";
-    return `DROP TABLE ${ifExists}${metadata.tableName}${cascade}`;
+    return `DROP TABLE ${ifExists}${quoteIdentifier(metadata.tableName)}${cascade}`;
   }
 }

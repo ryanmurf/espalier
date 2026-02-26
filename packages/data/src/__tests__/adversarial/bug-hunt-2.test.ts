@@ -61,7 +61,7 @@ describe("FIXED #49: DISTINCT SQL generation", () => {
     const distinctCount = (selectPart.match(/DISTINCT/g) || []).length;
 
     expect(distinctCount).toBe(1);
-    expect(selectPart).toMatch(/^SELECT DISTINCT \w/);
+    expect(selectPart).toMatch(/^SELECT DISTINCT "?\w/);
   });
 });
 
@@ -69,34 +69,33 @@ describe("FIXED #49: DISTINCT SQL generation", () => {
 // BUG #53: OrderBy parser misidentifies properties with Asc/Desc substrings
 // ══════════════════════════════════════════════════
 
-describe("BUG #53: OrderBy parser with Asc/Desc in property names", () => {
-  it("BUG: property named 'description' throws because parser finds 'Desc' inside it", () => {
+describe("FIXED #53: OrderBy parser with Asc/Desc in property names", () => {
+  it("property named 'description' parses correctly (no longer throws)", () => {
     // "findByNameOrderByDescription" -- "Description" contains "Desc" at position 0
-    // The parser uses indexOf("Desc") which finds it at position 0,
-    // making propPart = "" (empty string), which triggers the error.
-    // Correct behavior would be to parse "description" as the property name.
-    expect(() => parseDerivedQueryMethod("findByNameOrderByDescription")).toThrow(
-      "Invalid OrderBy clause: expected property name before direction."
-    );
+    // Fixed: parser now uses endsWith() for Asc/Desc suffix detection
+    const desc = parseDerivedQueryMethod("findByNameOrderByDescription");
+    expect(desc.properties[0].property).toBe("name");
+    expect(desc.orderBy).toHaveLength(1);
+    expect(desc.orderBy![0].property).toBe("description");
   });
 
-  it("BUG: property named 'ascending' throws because parser finds 'Asc' inside it", () => {
+  it("property named 'ascending' parses correctly (no longer throws)", () => {
     // "findByNameOrderByAscending" -- "Ascending" contains "Asc" at position 0
-    // indexOf("Asc") returns 0, propPart = "" (empty), throws.
-    // Correct behavior would be to parse "ascending" as the property name.
-    expect(() => parseDerivedQueryMethod("findByNameOrderByAscending")).toThrow(
-      "Invalid OrderBy clause: expected property name before direction."
-    );
+    // Fixed: parser now uses endsWith() for Asc/Desc suffix detection
+    const desc = parseDerivedQueryMethod("findByNameOrderByAscending");
+    expect(desc.properties[0].property).toBe("name");
+    expect(desc.orderBy).toHaveLength(1);
+    expect(desc.orderBy![0].property).toBe("ascending");
   });
 
-  it("BUG: 'DescriptionDesc' throws because first 'Desc' is matched, not the suffix", () => {
+  it("'DescriptionDesc' parses as property=description, direction=Desc", () => {
     // "findByNameOrderByDescriptionDesc"
-    // indexOf("Desc") returns 0 (the "Desc" at start of "Description"),
-    // not the trailing "Desc" suffix. propPart = "" (empty), throws.
-    // Correct behavior: property="description", direction="Desc"
-    expect(() => parseDerivedQueryMethod("findByNameOrderByDescriptionDesc")).toThrow(
-      "Invalid OrderBy clause: expected property name before direction."
-    );
+    // Fixed: parser correctly identifies trailing "Desc" suffix
+    const desc = parseDerivedQueryMethod("findByNameOrderByDescriptionDesc");
+    expect(desc.properties[0].property).toBe("name");
+    expect(desc.orderBy).toHaveLength(1);
+    expect(desc.orderBy![0].property).toBe("description");
+    expect(desc.orderBy![0].direction).toBe("Desc");
   });
 });
 

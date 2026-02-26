@@ -14,8 +14,8 @@ function mockStmt(): PreparedStatement {
   } as unknown as PreparedStatement;
 }
 
-describe("BUG #35: StatementCache.put() doesn't close old statement on replace", () => {
-  it("replacing a cached statement leaks the old one (close never called)", () => {
+describe("FIXED #35: StatementCache.put() closes old statement on replace", () => {
+  it("replacing a cached statement closes the old one", () => {
     const cache = new StatementCache();
     const oldStmt = mockStmt();
     const newStmt = mockStmt();
@@ -23,9 +23,8 @@ describe("BUG #35: StatementCache.put() doesn't close old statement on replace",
     cache.put("SELECT 1", oldStmt);
     cache.put("SELECT 1", newStmt); // replaces oldStmt
 
-    // BUG: oldStmt.close() is never called
-    // The old statement is silently dropped without cleanup
-    expect(oldStmt.close).not.toHaveBeenCalled(); // confirms the bug
+    // FIXED: oldStmt.close() is now called when replaced
+    expect(oldStmt.close).toHaveBeenCalledOnce();
 
     // Verify the new statement is in the cache
     expect(cache.get("SELECT 1")).toBe(newStmt);

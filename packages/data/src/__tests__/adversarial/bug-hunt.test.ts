@@ -55,15 +55,15 @@ describe("BUG: findDistinct generates invalid SQL", () => {
     // The implementation produces: SELECT DISTINCT id, DISTINCT name, DISTINCT email, ...
     // Valid SQL should be: SELECT DISTINCT id, name, email, ...
     // Let's see what it actually generates:
-    const hasBadDistinct = query.sql.includes("DISTINCT id, DISTINCT name");
-    const hasGoodDistinct = query.sql.match(/^SELECT DISTINCT \w+, \w+/);
+    const hasBadDistinct = query.sql.includes('DISTINCT "id", DISTINCT "name"');
+    const hasGoodDistinct = query.sql.match(/^SELECT DISTINCT "?\w+"?, "?\w+"?/);
 
     // If this passes, it confirms the bug: DISTINCT is prepended to each column
     if (hasBadDistinct) {
       // Bug confirmed: DISTINCT is applied per-column instead of once after SELECT
       expect(hasBadDistinct).toBe(true);
       // This SQL would fail on any real database
-      expect(query.sql).not.toMatch(/^SELECT DISTINCT id, name/);
+      expect(query.sql).not.toMatch(/^SELECT DISTINCT "id", "name"/);
     } else {
       // If it's correct, the DISTINCT appears only once
       expect(hasGoodDistinct).toBeTruthy();
@@ -395,7 +395,7 @@ describe("Derived query executor adversarial tests", () => {
 
     const distinctCount = (query.sql.match(/DISTINCT/g) || []).length;
     expect(distinctCount).toBe(1);
-    expect(query.sql).toMatch(/^SELECT DISTINCT \w/);
+    expect(query.sql).toMatch(/^SELECT DISTINCT "?\w/);
   });
 
   it("SQL injection via property name is prevented by metadata lookup", () => {
@@ -440,7 +440,7 @@ describe("Specification adversarial tests", () => {
     const criteria = spec.toPredicate(userMetadata as EntityMetadata);
     // With single spec, should return the criteria directly, not wrapped
     const result = criteria.toSql(1);
-    expect(result.sql).toBe("name = $1");
+    expect(result.sql).toBe('"name" = $1');
   });
 
   it("isIn with empty array generates always-false condition", () => {
@@ -457,7 +457,7 @@ describe("Specification adversarial tests", () => {
     const criteria = spec.toPredicate(userMetadata as EntityMetadata);
     const result = criteria.toSql(1);
     // The dangerous string should be parameterized, not inlined
-    expect(result.sql).toBe("name LIKE $1");
+    expect(result.sql).toBe('"name" LIKE $1');
     expect(result.params[0]).toBe("%'; DROP TABLE users; --");
   });
 

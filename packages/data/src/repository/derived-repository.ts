@@ -1,4 +1,4 @@
-import type { DataSource, SqlValue } from "espalier-jdbc";
+import type { DataSource, Connection, SqlValue } from "espalier-jdbc";
 import type { CrudRepository } from "./crud-repository.js";
 import type { EntityMetadata, FieldMapping } from "../mapping/entity-metadata.js";
 import { getEntityMetadata } from "../mapping/entity-metadata.js";
@@ -403,15 +403,16 @@ export function createDerivedRepository<T, ID>(
               entityCache.evict(entityClass, idValue);
               // Re-read to distinguish "deleted" from "version mismatch"
               let actualVersion: number | null = null;
-              const checkStmt = conn.prepareStatement(
-                new SelectBuilder(metadata.tableName)
-                  .columns(versionCol)
-                  .where(new ComparisonCriteria("eq", idCol, idValue))
-                  .limit(1)
-                  .build().sql,
-              );
+              const checkQuery = new SelectBuilder(metadata.tableName)
+                .columns(versionCol)
+                .where(new ComparisonCriteria("eq", idCol, idValue))
+                .limit(1)
+                .build();
+              const checkStmt = conn.prepareStatement(checkQuery.sql);
               try {
-                checkStmt.setParameter(1, idValue);
+                for (let pi = 0; pi < checkQuery.params.length; pi++) {
+                  checkStmt.setParameter(pi + 1, checkQuery.params[pi]);
+                }
                 const checkRs = await checkStmt.executeQuery();
                 if (await checkRs.next()) {
                   const row = checkRs.getRow();
@@ -535,15 +536,16 @@ export function createDerivedRepository<T, ID>(
           if (versionField && versionCol && currentVersion !== undefined && affected === 0) {
             // Re-read to distinguish "deleted" from "version mismatch"
             let actualVersion: number | null = null;
-            const checkStmt = conn.prepareStatement(
-              new SelectBuilder(metadata.tableName)
-                .columns(versionCol)
-                .where(new ComparisonCriteria("eq", idCol, idValue))
-                .limit(1)
-                .build().sql,
-            );
+            const checkQuery = new SelectBuilder(metadata.tableName)
+              .columns(versionCol)
+              .where(new ComparisonCriteria("eq", idCol, idValue))
+              .limit(1)
+              .build();
+            const checkStmt = conn.prepareStatement(checkQuery.sql);
             try {
-              checkStmt.setParameter(1, idValue);
+              for (let pi = 0; pi < checkQuery.params.length; pi++) {
+                checkStmt.setParameter(pi + 1, checkQuery.params[pi]);
+              }
               const checkRs = await checkStmt.executeQuery();
               if (await checkRs.next()) {
                 const row = checkRs.getRow();

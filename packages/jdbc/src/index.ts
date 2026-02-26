@@ -45,6 +45,7 @@ export {
   reduceResultSet,
   forEachResultSet,
 } from "./result-set-utils.js";
+export { quoteIdentifier, validateIdentifier } from "./sql-utils.js";
 export type { TypeConverter, TypeConverterRegistry } from "./type-converter.js";
 export { DefaultTypeConverterRegistry } from "./type-converter-registry.js";
 export {

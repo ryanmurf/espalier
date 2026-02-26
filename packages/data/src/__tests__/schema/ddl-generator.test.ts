@@ -20,7 +20,7 @@ describe("DdlGenerator", () => {
 
       const sql = generator.generateCreateTable(User);
       expect(sql).toBe(
-        `CREATE TABLE users (\n  id INTEGER PRIMARY KEY,\n  user_name TEXT,\n  active BOOLEAN\n)`,
+        `CREATE TABLE "users" (\n  "id" INTEGER PRIMARY KEY,\n  "user_name" TEXT,\n  "active" BOOLEAN\n)`,
       );
     });
 
@@ -33,7 +33,7 @@ describe("DdlGenerator", () => {
       new Item();
 
       const sql = generator.generateCreateTable(Item, { ifNotExists: true });
-      expect(sql).toContain("CREATE TABLE IF NOT EXISTS items");
+      expect(sql).toContain('CREATE TABLE IF NOT EXISTS "items"');
     });
 
     it("infers TEXT type from string default", () => {
@@ -45,7 +45,7 @@ describe("DdlGenerator", () => {
       new T1();
 
       const sql = generator.generateCreateTable(T1);
-      expect(sql).toContain("label TEXT");
+      expect(sql).toContain('"label" TEXT');
     });
 
     it("infers INTEGER type from number default", () => {
@@ -57,7 +57,7 @@ describe("DdlGenerator", () => {
       new T2();
 
       const sql = generator.generateCreateTable(T2);
-      expect(sql).toContain("count INTEGER");
+      expect(sql).toContain('"count" INTEGER');
     });
 
     it("infers BOOLEAN type from boolean default", () => {
@@ -69,7 +69,7 @@ describe("DdlGenerator", () => {
       new T3();
 
       const sql = generator.generateCreateTable(T3);
-      expect(sql).toContain("enabled BOOLEAN");
+      expect(sql).toContain('"enabled" BOOLEAN');
     });
 
     it("infers TIMESTAMPTZ type from Date default", () => {
@@ -81,7 +81,7 @@ describe("DdlGenerator", () => {
       new T4();
 
       const sql = generator.generateCreateTable(T4);
-      expect(sql).toContain("created_at TIMESTAMPTZ");
+      expect(sql).toContain('"created_at" TIMESTAMPTZ');
     });
 
     it("uses explicit type from @Column({ type })", () => {
@@ -94,9 +94,9 @@ describe("DdlGenerator", () => {
       new T5();
 
       const sql = generator.generateCreateTable(T5);
-      expect(sql).toContain("id SERIAL PRIMARY KEY");
-      expect(sql).toContain("price DECIMAL(10,2)");
-      expect(sql).toContain("bio VARCHAR(500)");
+      expect(sql).toContain('"id" SERIAL PRIMARY KEY');
+      expect(sql).toContain('"price" DECIMAL(10,2)');
+      expect(sql).toContain('"bio" VARCHAR(500)');
     });
 
     it("marks only the @Id field as PRIMARY KEY", () => {
@@ -112,7 +112,7 @@ describe("DdlGenerator", () => {
       const lines = sql.split("\n");
       const pkLines = lines.filter((l) => l.includes("PRIMARY KEY"));
       expect(pkLines).toHaveLength(1);
-      expect(pkLines[0]).toContain("id");
+      expect(pkLines[0]).toContain('"id"');
     });
 
     it("uses table name from @Table decorator", () => {
@@ -123,7 +123,7 @@ describe("DdlGenerator", () => {
       new CustomEntity();
 
       const sql = generator.generateCreateTable(CustomEntity);
-      expect(sql).toContain("custom_table_name");
+      expect(sql).toContain('"custom_table_name"');
     });
 
     it("handles entity with auditing columns", () => {
@@ -137,8 +137,8 @@ describe("DdlGenerator", () => {
       new Audited();
 
       const sql = generator.generateCreateTable(Audited);
-      expect(sql).toContain("created_at TIMESTAMPTZ");
-      expect(sql).toContain("updated_at TIMESTAMPTZ");
+      expect(sql).toContain('"created_at" TIMESTAMPTZ');
+      expect(sql).toContain('"updated_at" TIMESTAMPTZ');
     });
 
     it("generates columns in field order", () => {
@@ -152,10 +152,10 @@ describe("DdlGenerator", () => {
       new Ordered();
 
       const sql = generator.generateCreateTable(Ordered);
-      const idIdx = sql.indexOf("id ");
-      const alphaIdx = sql.indexOf("alpha ");
-      const betaIdx = sql.indexOf("beta ");
-      const gammaIdx = sql.indexOf("gamma ");
+      const idIdx = sql.indexOf('"id" ');
+      const alphaIdx = sql.indexOf('"alpha" ');
+      const betaIdx = sql.indexOf('"beta" ');
+      const gammaIdx = sql.indexOf('"gamma" ');
       expect(idIdx).toBeLessThan(alphaIdx);
       expect(alphaIdx).toBeLessThan(betaIdx);
       expect(betaIdx).toBeLessThan(gammaIdx);
@@ -172,7 +172,7 @@ describe("DdlGenerator", () => {
       new C1();
 
       const sql = generator.generateCreateTable(C1);
-      expect(sql).toContain("name TEXT NOT NULL");
+      expect(sql).toContain('"name" TEXT NOT NULL');
     });
 
     it("does not add NOT NULL when nullable is unset", () => {
@@ -184,8 +184,8 @@ describe("DdlGenerator", () => {
       new C2();
 
       const sql = generator.generateCreateTable(C2);
-      expect(sql).toContain("name TEXT");
-      expect(sql).not.toContain("name TEXT NOT NULL");
+      expect(sql).toContain('"name" TEXT');
+      expect(sql).not.toContain('"name" TEXT NOT NULL');
     });
 
     it("generates UNIQUE constraint", () => {
@@ -197,7 +197,7 @@ describe("DdlGenerator", () => {
       new C3();
 
       const sql = generator.generateCreateTable(C3);
-      expect(sql).toContain("email TEXT UNIQUE");
+      expect(sql).toContain('"email" TEXT UNIQUE');
     });
 
     it("generates DEFAULT clause with raw SQL expression", () => {
@@ -209,7 +209,7 @@ describe("DdlGenerator", () => {
       new C4();
 
       const sql = generator.generateCreateTable(C4);
-      expect(sql).toContain("status TEXT DEFAULT 'active'");
+      expect(sql).toContain(`"status" TEXT DEFAULT 'active'`);
     });
 
     it("generates DEFAULT NOW() for numeric default", () => {
@@ -221,7 +221,7 @@ describe("DdlGenerator", () => {
       new C5();
 
       const sql = generator.generateCreateTable(C5);
-      expect(sql).toContain("count INTEGER DEFAULT 0");
+      expect(sql).toContain('"count" INTEGER DEFAULT 0');
     });
 
     it("generates VARCHAR(n) when length is specified", () => {
@@ -233,7 +233,7 @@ describe("DdlGenerator", () => {
       new C6();
 
       const sql = generator.generateCreateTable(C6);
-      expect(sql).toContain("name VARCHAR(255)");
+      expect(sql).toContain('"name" VARCHAR(255)');
     });
 
     it("explicit type takes precedence over length", () => {
@@ -245,7 +245,7 @@ describe("DdlGenerator", () => {
       new C7();
 
       const sql = generator.generateCreateTable(C7);
-      expect(sql).toContain("code CHAR(10)");
+      expect(sql).toContain('"code" CHAR(10)');
       expect(sql).not.toContain("VARCHAR(255)");
     });
 
@@ -258,7 +258,7 @@ describe("DdlGenerator", () => {
       new C8();
 
       const sql = generator.generateCreateTable(C8);
-      expect(sql).toContain("email TEXT NOT NULL UNIQUE");
+      expect(sql).toContain('"email" TEXT NOT NULL UNIQUE');
     });
 
     it("combines NOT NULL, UNIQUE, and DEFAULT", () => {
@@ -270,7 +270,7 @@ describe("DdlGenerator", () => {
       new C9();
 
       const sql = generator.generateCreateTable(C9);
-      expect(sql).toContain("status TEXT NOT NULL UNIQUE DEFAULT 'pending'");
+      expect(sql).toContain(`"status" TEXT NOT NULL UNIQUE DEFAULT 'pending'`);
     });
 
     it("combines length with NOT NULL", () => {
@@ -282,7 +282,7 @@ describe("DdlGenerator", () => {
       new C10();
 
       const sql = generator.generateCreateTable(C10);
-      expect(sql).toContain("name VARCHAR(100) NOT NULL");
+      expect(sql).toContain('"name" VARCHAR(100) NOT NULL');
     });
 
     it("@Id fields do not duplicate NOT NULL (PRIMARY KEY implies it)", () => {
@@ -294,7 +294,7 @@ describe("DdlGenerator", () => {
       new C11();
 
       const sql = generator.generateCreateTable(C11);
-      expect(sql).toContain("id INTEGER PRIMARY KEY");
+      expect(sql).toContain('"id" INTEGER PRIMARY KEY');
       expect(sql).not.toContain("PRIMARY KEY NOT NULL");
     });
 
@@ -307,7 +307,7 @@ describe("DdlGenerator", () => {
       new C12();
 
       const sql = generator.generateCreateTable(C12);
-      expect(sql).toContain("created_at TIMESTAMPTZ DEFAULT NOW()");
+      expect(sql).toContain('"created_at" TIMESTAMPTZ DEFAULT NOW()');
     });
 
     it("explicit defaultValue on @CreatedDate overrides automatic DEFAULT NOW()", () => {
@@ -319,7 +319,7 @@ describe("DdlGenerator", () => {
       new C13();
 
       const sql = generator.generateCreateTable(C13);
-      expect(sql).toContain("created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP");
+      expect(sql).toContain('"created_at" TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP');
       expect(sql).not.toContain("DEFAULT NOW()");
     });
 
@@ -332,8 +332,8 @@ describe("DdlGenerator", () => {
       new C14();
 
       const sql = generator.generateCreateTable(C14);
-      expect(sql).toContain("updated_at TIMESTAMPTZ");
-      expect(sql).not.toContain("updated_at TIMESTAMPTZ DEFAULT");
+      expect(sql).toContain('"updated_at" TIMESTAMPTZ');
+      expect(sql).not.toContain('"updated_at" TIMESTAMPTZ DEFAULT');
     });
 
     it("generates full entity with mixed constraints", () => {
@@ -349,12 +349,12 @@ describe("DdlGenerator", () => {
       new Product();
 
       const sql = generator.generateCreateTable(Product);
-      expect(sql).toContain("id SERIAL PRIMARY KEY");
-      expect(sql).toContain("name VARCHAR(200) NOT NULL");
-      expect(sql).toContain("sku VARCHAR(50) NOT NULL UNIQUE");
-      expect(sql).toContain("price DECIMAL(10,2) DEFAULT 0.00");
-      expect(sql).toContain("active BOOLEAN DEFAULT true");
-      expect(sql).toContain("created_at TIMESTAMPTZ DEFAULT NOW()");
+      expect(sql).toContain('"id" SERIAL PRIMARY KEY');
+      expect(sql).toContain('"name" VARCHAR(200) NOT NULL');
+      expect(sql).toContain('"sku" VARCHAR(50) NOT NULL UNIQUE');
+      expect(sql).toContain('"price" DECIMAL(10,2) DEFAULT 0.00');
+      expect(sql).toContain('"active" BOOLEAN DEFAULT true');
+      expect(sql).toContain('"created_at" TIMESTAMPTZ DEFAULT NOW()');
     });
   });
 
@@ -367,7 +367,7 @@ describe("DdlGenerator", () => {
       new DropTest();
 
       const sql = generator.generateDropTable(DropTest);
-      expect(sql).toBe("DROP TABLE drop_test");
+      expect(sql).toBe('DROP TABLE "drop_test"');
     });
 
     it("generates DROP TABLE IF EXISTS", () => {
@@ -378,7 +378,7 @@ describe("DdlGenerator", () => {
       new DropTest2();
 
       const sql = generator.generateDropTable(DropTest2, { ifExists: true });
-      expect(sql).toBe("DROP TABLE IF EXISTS drop_test2");
+      expect(sql).toBe('DROP TABLE IF EXISTS "drop_test2"');
     });
 
     it("generates DROP TABLE CASCADE", () => {
@@ -389,7 +389,7 @@ describe("DdlGenerator", () => {
       new DropTest3();
 
       const sql = generator.generateDropTable(DropTest3, { cascade: true });
-      expect(sql).toBe("DROP TABLE drop_test3 CASCADE");
+      expect(sql).toBe('DROP TABLE "drop_test3" CASCADE');
     });
 
     it("generates DROP TABLE IF EXISTS CASCADE", () => {
@@ -403,7 +403,7 @@ describe("DdlGenerator", () => {
         ifExists: true,
         cascade: true,
       });
-      expect(sql).toBe("DROP TABLE IF EXISTS drop_test4 CASCADE");
+      expect(sql).toBe('DROP TABLE IF EXISTS "drop_test4" CASCADE');
     });
   });
 });

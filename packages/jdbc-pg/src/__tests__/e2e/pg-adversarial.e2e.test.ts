@@ -207,9 +207,8 @@ describe.skipIf(!canConnect)("E2E: Adversarial Tests", { timeout: 15000 }, () =>
 
     // id=0 is truthy check: `if (idValue != null)` -- 0 != null is TRUE
     // So save() will try to UPDATE where id=0, not INSERT
-    // This will find no rows and return the original entity (no DB insert)
-    const saved = await repo.save(entity);
-    expect(saved.id).toBe(0); // returned original, not from DB
+    // FIXED #46: save() now detects UPDATE matched 0 rows and throws
+    await expect(repo.save(entity)).rejects.toThrow(/not found/);
 
     // Verify it didn't actually get inserted
     const found = await repo.findById(0);

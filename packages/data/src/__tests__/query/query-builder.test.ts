@@ -19,28 +19,28 @@ new User();
 describe("QueryBuilder.select", () => {
   it("builds a simple SELECT * from table string", () => {
     const q = QueryBuilder.select("users").build();
-    expect(q.sql).toBe("SELECT * FROM users");
+    expect(q.sql).toBe('SELECT * FROM "users"');
     expect(q.params).toEqual([]);
   });
 
   it("builds SELECT with entity class resolving columns", () => {
     const q = QueryBuilder.select(User).build();
     expect(q.sql).toBe(
-      "SELECT id, user_name, email_address, age FROM users",
+      'SELECT "id", "user_name", "email_address", "age" FROM "users"',
     );
     expect(q.params).toEqual([]);
   });
 
   it("builds SELECT with custom columns", () => {
     const q = QueryBuilder.select("users").columns("id", "name").build();
-    expect(q.sql).toBe("SELECT id, name FROM users");
+    expect(q.sql).toBe('SELECT "id", "name" FROM "users"');
   });
 
   it("builds SELECT with WHERE clause", () => {
     const q = QueryBuilder.select("users")
       .where(col("age").gt(18))
       .build();
-    expect(q.sql).toBe("SELECT * FROM users WHERE age > $1");
+    expect(q.sql).toBe('SELECT * FROM "users" WHERE "age" > $1');
     expect(q.params).toEqual([18]);
   });
 
@@ -50,7 +50,7 @@ describe("QueryBuilder.select", () => {
       .and(col("user_name").like("J%"))
       .build();
     expect(q.sql).toBe(
-      "SELECT * FROM users WHERE (age > $1 AND user_name LIKE $2)",
+      'SELECT * FROM "users" WHERE ("age" > $1 AND "user_name" LIKE $2)',
     );
     expect(q.params).toEqual([18, "J%"]);
   });
@@ -61,7 +61,7 @@ describe("QueryBuilder.select", () => {
       .or(col("status").eq("pending"))
       .build();
     expect(q.sql).toBe(
-      "SELECT * FROM users WHERE (status = $1 OR status = $2)",
+      'SELECT * FROM "users" WHERE ("status" = $1 OR "status" = $2)',
     );
     expect(q.params).toEqual(["active", "pending"]);
   });
@@ -71,13 +71,13 @@ describe("QueryBuilder.select", () => {
       .orderBy("name", "ASC")
       .orderBy("age", "DESC")
       .build();
-    expect(q.sql).toBe("SELECT * FROM users ORDER BY name ASC, age DESC");
+    expect(q.sql).toBe('SELECT * FROM "users" ORDER BY "name" ASC, "age" DESC');
     expect(q.params).toEqual([]);
   });
 
   it("builds SELECT with LIMIT and OFFSET", () => {
     const q = QueryBuilder.select("users").limit(10).offset(20).build();
-    expect(q.sql).toBe("SELECT * FROM users LIMIT $1 OFFSET $2");
+    expect(q.sql).toBe('SELECT * FROM "users" LIMIT $1 OFFSET $2');
     expect(q.params).toEqual([10, 20]);
   });
 
@@ -86,7 +86,7 @@ describe("QueryBuilder.select", () => {
       .columns("status", "COUNT(*)")
       .groupBy("status")
       .build();
-    expect(q.sql).toBe("SELECT status, COUNT(*) FROM orders GROUP BY status");
+    expect(q.sql).toBe('SELECT "status", COUNT(*) FROM "orders" GROUP BY "status"');
   });
 
   it("builds SELECT with GROUP BY and HAVING", () => {
@@ -96,7 +96,7 @@ describe("QueryBuilder.select", () => {
       .having(col("cnt").gt(5))
       .build();
     expect(q.sql).toBe(
-      "SELECT status, COUNT(*) as cnt FROM orders GROUP BY status HAVING cnt > $1",
+      'SELECT "status", COUNT(*) as cnt FROM "orders" GROUP BY "status" HAVING "cnt" > $1',
     );
     expect(q.params).toEqual([5]);
   });
@@ -106,7 +106,7 @@ describe("QueryBuilder.select", () => {
       .join("INNER", "orders", "users.id = orders.user_id")
       .build();
     expect(q.sql).toBe(
-      "SELECT * FROM users INNER JOIN orders ON users.id = orders.user_id",
+      'SELECT * FROM "users" INNER JOIN "orders" ON users.id = orders.user_id',
     );
   });
 
@@ -115,7 +115,7 @@ describe("QueryBuilder.select", () => {
       .join("LEFT", "profiles", "users.id = profiles.user_id")
       .build();
     expect(q.sql).toBe(
-      "SELECT * FROM users LEFT JOIN profiles ON users.id = profiles.user_id",
+      'SELECT * FROM "users" LEFT JOIN "profiles" ON users.id = profiles.user_id',
     );
   });
 
@@ -125,7 +125,7 @@ describe("QueryBuilder.select", () => {
       .join("LEFT", "addresses", "users.id = addresses.user_id")
       .build();
     expect(q.sql).toBe(
-      "SELECT * FROM users INNER JOIN orders ON users.id = orders.user_id LEFT JOIN addresses ON users.id = addresses.user_id",
+      'SELECT * FROM "users" INNER JOIN "orders" ON users.id = orders.user_id LEFT JOIN "addresses" ON users.id = addresses.user_id',
     );
   });
 
@@ -140,7 +140,7 @@ describe("QueryBuilder.select", () => {
       .offset(20)
       .build();
     expect(q.sql).toBe(
-      "SELECT user_name, age FROM users INNER JOIN orders ON users.id = orders.user_id WHERE (age > $1 AND user_name LIKE $2) ORDER BY user_name ASC LIMIT $3 OFFSET $4",
+      'SELECT "user_name", "age" FROM "users" INNER JOIN "orders" ON users.id = orders.user_id WHERE ("age" > $1 AND "user_name" LIKE $2) ORDER BY "user_name" ASC LIMIT $3 OFFSET $4',
     );
     expect(q.params).toEqual([18, "J%", 10, 20]);
   });
@@ -152,7 +152,7 @@ describe("QueryBuilder.select", () => {
     );
     const q = QueryBuilder.select("users").where(criteria).build();
     expect(q.sql).toBe(
-      "SELECT * FROM users WHERE (age > $1 AND (status = $2 OR NOT (banned = $3)))",
+      'SELECT * FROM "users" WHERE ("age" > $1 AND ("status" = $2 OR NOT ("banned" = $3)))',
     );
     expect(q.params).toEqual([18, "active", true]);
   });
@@ -161,7 +161,7 @@ describe("QueryBuilder.select", () => {
     const q = QueryBuilder.select("users")
       .where(col("id").in([1, 2, 3]))
       .build();
-    expect(q.sql).toBe("SELECT * FROM users WHERE id IN ($1, $2, $3)");
+    expect(q.sql).toBe('SELECT * FROM "users" WHERE "id" IN ($1, $2, $3)');
     expect(q.params).toEqual([1, 2, 3]);
   });
 
@@ -169,7 +169,7 @@ describe("QueryBuilder.select", () => {
     const q = QueryBuilder.select("users")
       .where(col("age").between(18, 65))
       .build();
-    expect(q.sql).toBe("SELECT * FROM users WHERE age BETWEEN $1 AND $2");
+    expect(q.sql).toBe('SELECT * FROM "users" WHERE "age" BETWEEN $1 AND $2');
     expect(q.params).toEqual([18, 65]);
   });
 
@@ -179,7 +179,7 @@ describe("QueryBuilder.select", () => {
       .and(col("email").isNotNull())
       .build();
     expect(q.sql).toBe(
-      "SELECT * FROM users WHERE (deleted_at IS NULL AND email IS NOT NULL)",
+      'SELECT * FROM "users" WHERE ("deleted_at" IS NULL AND "email" IS NOT NULL)',
     );
     expect(q.params).toEqual([]);
   });
@@ -188,7 +188,7 @@ describe("QueryBuilder.select", () => {
     const q = QueryBuilder.select("users")
       .and(col("age").gt(18))
       .build();
-    expect(q.sql).toBe("SELECT * FROM users WHERE age > $1");
+    expect(q.sql).toBe('SELECT * FROM "users" WHERE "age" > $1');
     expect(q.params).toEqual([18]);
   });
 
@@ -196,7 +196,7 @@ describe("QueryBuilder.select", () => {
     const q = QueryBuilder.select("users")
       .or(col("age").gt(18))
       .build();
-    expect(q.sql).toBe("SELECT * FROM users WHERE age > $1");
+    expect(q.sql).toBe('SELECT * FROM "users" WHERE "age" > $1');
     expect(q.params).toEqual([18]);
   });
 });
@@ -207,7 +207,7 @@ describe("QueryBuilder.insert", () => {
       .set("name", "Alice")
       .set("age", 30)
       .build();
-    expect(q.sql).toBe("INSERT INTO users (name, age) VALUES ($1, $2)");
+    expect(q.sql).toBe('INSERT INTO "users" ("name", "age") VALUES ($1, $2)');
     expect(q.params).toEqual(["Alice", 30]);
   });
 
@@ -215,7 +215,7 @@ describe("QueryBuilder.insert", () => {
     const q = QueryBuilder.insert("users")
       .values({ name: "Bob", age: 25 })
       .build();
-    expect(q.sql).toBe("INSERT INTO users (name, age) VALUES ($1, $2)");
+    expect(q.sql).toBe('INSERT INTO "users" ("name", "age") VALUES ($1, $2)');
     expect(q.params).toEqual(["Bob", 25]);
   });
 
@@ -225,7 +225,7 @@ describe("QueryBuilder.insert", () => {
       .returning("id")
       .build();
     expect(q.sql).toBe(
-      "INSERT INTO users (name) VALUES ($1) RETURNING id",
+      'INSERT INTO "users" ("name") VALUES ($1) RETURNING "id"',
     );
     expect(q.params).toEqual(["Alice"]);
   });
@@ -236,7 +236,7 @@ describe("QueryBuilder.insert", () => {
       .returning("id")
       .build();
     expect(q.sql).toBe(
-      "INSERT INTO users (user_name, email_address, age) VALUES ($1, $2, $3) RETURNING id",
+      'INSERT INTO "users" ("user_name", "email_address", "age") VALUES ($1, $2, $3) RETURNING "id"',
     );
     expect(q.params).toEqual(["Charlie", "c@test.com", 28]);
   });
@@ -247,7 +247,7 @@ describe("QueryBuilder.insert", () => {
       .returning("id", "created_at")
       .build();
     expect(q.sql).toBe(
-      "INSERT INTO users (name) VALUES ($1) RETURNING id, created_at",
+      'INSERT INTO "users" ("name") VALUES ($1) RETURNING "id", "created_at"',
     );
   });
 });
@@ -258,7 +258,7 @@ describe("QueryBuilder.update", () => {
       .set("name", "Alice")
       .where(col("id").eq(1))
       .build();
-    expect(q.sql).toBe("UPDATE users SET name = $1 WHERE id = $2");
+    expect(q.sql).toBe('UPDATE "users" SET "name" = $1 WHERE "id" = $2');
     expect(q.params).toEqual(["Alice", 1]);
   });
 
@@ -269,7 +269,7 @@ describe("QueryBuilder.update", () => {
       .where(col("id").eq(1))
       .build();
     expect(q.sql).toBe(
-      "UPDATE users SET name = $1, age = $2 WHERE id = $3",
+      'UPDATE "users" SET "name" = $1, "age" = $2 WHERE "id" = $3',
     );
     expect(q.params).toEqual(["Alice", 31, 1]);
   });
@@ -280,7 +280,7 @@ describe("QueryBuilder.update", () => {
       .where(col("id").eq(1))
       .build();
     expect(q.sql).toBe(
-      "UPDATE users SET name = $1, age = $2 WHERE id = $3",
+      'UPDATE "users" SET "name" = $1, "age" = $2 WHERE "id" = $3',
     );
     expect(q.params).toEqual(["Alice", 31, 1]);
   });
@@ -292,7 +292,7 @@ describe("QueryBuilder.update", () => {
       .and(col("verified").eq(false))
       .build();
     expect(q.sql).toBe(
-      "UPDATE users SET active = $1 WHERE (age < $2 AND verified = $3)",
+      'UPDATE "users" SET "active" = $1 WHERE ("age" < $2 AND "verified" = $3)',
     );
     expect(q.params).toEqual([false, 18, false]);
   });
@@ -304,13 +304,13 @@ describe("QueryBuilder.update", () => {
       .returning("*")
       .build();
     expect(q.sql).toBe(
-      "UPDATE users SET name = $1 WHERE id = $2 RETURNING *",
+      'UPDATE "users" SET "name" = $1 WHERE "id" = $2 RETURNING *',
     );
   });
 
   it("builds UPDATE without WHERE", () => {
     const q = QueryBuilder.update("users").set("active", false).build();
-    expect(q.sql).toBe("UPDATE users SET active = $1");
+    expect(q.sql).toBe('UPDATE "users" SET "active" = $1');
     expect(q.params).toEqual([false]);
   });
 
@@ -319,7 +319,7 @@ describe("QueryBuilder.update", () => {
       .set("user_name", "Updated")
       .where(col("id").eq(1))
       .build();
-    expect(q.sql).toBe("UPDATE users SET user_name = $1 WHERE id = $2");
+    expect(q.sql).toBe('UPDATE "users" SET "user_name" = $1 WHERE "id" = $2');
     expect(q.params).toEqual(["Updated", 1]);
   });
 
@@ -328,7 +328,7 @@ describe("QueryBuilder.update", () => {
       .set("active", false)
       .and(col("id").eq(1))
       .build();
-    expect(q.sql).toBe("UPDATE users SET active = $1 WHERE id = $2");
+    expect(q.sql).toBe('UPDATE "users" SET "active" = $1 WHERE "id" = $2');
     expect(q.params).toEqual([false, 1]);
   });
 });
@@ -338,7 +338,7 @@ describe("QueryBuilder.delete", () => {
     const q = QueryBuilder.delete("users")
       .where(col("id").eq(1))
       .build();
-    expect(q.sql).toBe("DELETE FROM users WHERE id = $1");
+    expect(q.sql).toBe('DELETE FROM "users" WHERE "id" = $1');
     expect(q.params).toEqual([1]);
   });
 
@@ -348,7 +348,7 @@ describe("QueryBuilder.delete", () => {
       .and(col("age").lt(18))
       .build();
     expect(q.sql).toBe(
-      "DELETE FROM users WHERE (active = $1 AND age < $2)",
+      'DELETE FROM "users" WHERE ("active" = $1 AND "age" < $2)',
     );
     expect(q.params).toEqual([false, 18]);
   });
@@ -359,13 +359,13 @@ describe("QueryBuilder.delete", () => {
       .returning("id", "name")
       .build();
     expect(q.sql).toBe(
-      "DELETE FROM users WHERE id = $1 RETURNING id, name",
+      'DELETE FROM "users" WHERE "id" = $1 RETURNING "id", "name"',
     );
   });
 
   it("builds DELETE without WHERE", () => {
     const q = QueryBuilder.delete("users").build();
-    expect(q.sql).toBe("DELETE FROM users");
+    expect(q.sql).toBe('DELETE FROM "users"');
     expect(q.params).toEqual([]);
   });
 
@@ -373,7 +373,7 @@ describe("QueryBuilder.delete", () => {
     const q = QueryBuilder.delete(User)
       .where(col("id").eq(42))
       .build();
-    expect(q.sql).toBe("DELETE FROM users WHERE id = $1");
+    expect(q.sql).toBe('DELETE FROM "users" WHERE "id" = $1');
     expect(q.params).toEqual([42]);
   });
 
@@ -381,7 +381,7 @@ describe("QueryBuilder.delete", () => {
     const q = QueryBuilder.delete("users")
       .and(col("id").eq(1))
       .build();
-    expect(q.sql).toBe("DELETE FROM users WHERE id = $1");
+    expect(q.sql).toBe('DELETE FROM "users" WHERE "id" = $1');
     expect(q.params).toEqual([1]);
   });
 });

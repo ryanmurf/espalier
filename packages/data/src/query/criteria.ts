@@ -1,4 +1,4 @@
-import type { SqlValue } from "espalier-jdbc";
+import { type SqlValue, quoteIdentifier } from "espalier-jdbc";
 
 export type CriteriaType =
   | "eq"
@@ -39,7 +39,7 @@ export class ComparisonCriteria implements Criteria {
       like: "LIKE",
     };
     return {
-      sql: `${this.column} ${ops[this.type]} $${paramOffset}`,
+      sql: `${quoteIdentifier(this.column)} ${ops[this.type]} $${paramOffset}`,
       params: [this.value],
     };
   }
@@ -59,7 +59,7 @@ export class InCriteria implements Criteria {
     }
     const placeholders = this.values.map((_, i) => `$${paramOffset + i}`);
     return {
-      sql: `${this.column} IN (${placeholders.join(", ")})`,
+      sql: `${quoteIdentifier(this.column)} IN (${placeholders.join(", ")})`,
       params: [...this.values],
     };
   }
@@ -76,7 +76,7 @@ export class BetweenCriteria implements Criteria {
 
   toSql(paramOffset: number): { sql: string; params: SqlValue[] } {
     return {
-      sql: `${this.column} BETWEEN $${paramOffset} AND $${paramOffset + 1}`,
+      sql: `${quoteIdentifier(this.column)} BETWEEN $${paramOffset} AND $${paramOffset + 1}`,
       params: [this.low, this.high],
     };
   }
@@ -91,7 +91,7 @@ export class NullCriteria implements Criteria {
   toSql(_paramOffset: number): { sql: string; params: SqlValue[] } {
     const op = this.type === "isNull" ? "IS NULL" : "IS NOT NULL";
     return {
-      sql: `${this.column} ${op}`,
+      sql: `${quoteIdentifier(this.column)} ${op}`,
       params: [],
     };
   }

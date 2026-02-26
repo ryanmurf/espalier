@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import type { DataSource, Connection } from "espalier-jdbc";
+import { validateIdentifier, quoteIdentifier } from "espalier-jdbc";
 import type {
   Migration,
   MigrationRecord,
@@ -15,12 +16,12 @@ export class PgMigrationRunner implements MigrationRunner {
 
   constructor(dataSource: DataSource, config?: MigrationRunnerConfig) {
     this.dataSource = dataSource;
-    this.tableName = config?.tableName ?? DEFAULT_MIGRATION_TABLE;
-    this.schema = config?.schema ?? DEFAULT_SCHEMA;
+    this.tableName = validateIdentifier(config?.tableName ?? DEFAULT_MIGRATION_TABLE, "migration table name");
+    this.schema = validateIdentifier(config?.schema ?? DEFAULT_SCHEMA, "schema");
   }
 
   private get qualifiedTable(): string {
-    return `${this.schema}.${this.tableName}`;
+    return `${quoteIdentifier(this.schema)}.${quoteIdentifier(this.tableName)}`;
   }
 
   async initialize(): Promise<void> {

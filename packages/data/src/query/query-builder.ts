@@ -1,4 +1,4 @@
-import type { SqlValue } from "espalier-jdbc";
+import { type SqlValue, quoteIdentifier } from "espalier-jdbc";
 import type { Criteria } from "./criteria.js";
 import { LogicalCriteria } from "./criteria.js";
 import { getEntityMetadata } from "../mapping/entity-metadata.js";
@@ -125,11 +125,11 @@ export class SelectBuilder {
     let paramIdx = 1;
     const parts: string[] = [];
 
-    parts.push(`SELECT ${this._distinct ? "DISTINCT " : ""}${this._columns.join(", ")}`);
-    parts.push(`FROM ${this._from}`);
+    parts.push(`SELECT ${this._distinct ? "DISTINCT " : ""}${this._columns.map(c => quoteIdentifier(c)).join(", ")}`);
+    parts.push(`FROM ${quoteIdentifier(this._from)}`);
 
     for (const join of this._joins) {
-      parts.push(`${join.type} JOIN ${join.table} ON ${join.on}`);
+      parts.push(`${join.type} JOIN ${quoteIdentifier(join.table)} ON ${join.on}`);
     }
 
     if (this._where) {
@@ -140,7 +140,7 @@ export class SelectBuilder {
     }
 
     if (this._groupBy.length > 0) {
-      parts.push(`GROUP BY ${this._groupBy.join(", ")}`);
+      parts.push(`GROUP BY ${this._groupBy.map(c => quoteIdentifier(c)).join(", ")}`);
     }
 
     if (this._having) {
@@ -151,7 +151,7 @@ export class SelectBuilder {
     }
 
     if (this._orderBy.length > 0) {
-      const clauses = this._orderBy.map((o) => `${o.column} ${o.direction}`);
+      const clauses = this._orderBy.map((o) => `${quoteIdentifier(o.column)} ${o.direction}`);
       parts.push(`ORDER BY ${clauses.join(", ")}`);
     }
 
@@ -202,10 +202,10 @@ export class InsertBuilder {
 
   build(): BuiltQuery {
     const placeholders = this._columns.map((_, i) => `$${i + 1}`);
-    let sql = `INSERT INTO ${this._table} (${this._columns.join(", ")}) VALUES (${placeholders.join(", ")})`;
+    let sql = `INSERT INTO ${quoteIdentifier(this._table)} (${this._columns.map(c => quoteIdentifier(c)).join(", ")}) VALUES (${placeholders.join(", ")})`;
 
     if (this._returning.length > 0) {
-      sql += ` RETURNING ${this._returning.join(", ")}`;
+      sql += ` RETURNING ${this._returning.map(c => quoteIdentifier(c)).join(", ")}`;
     }
 
     return { sql, params: [...this._values] };
@@ -259,10 +259,10 @@ export class UpdateBuilder {
 
     const setClauses = this._sets.map((s) => {
       params.push(s.value);
-      return `${s.column} = $${paramIdx++}`;
+      return `${quoteIdentifier(s.column)} = $${paramIdx++}`;
     });
 
-    let sql = `UPDATE ${this._table} SET ${setClauses.join(", ")}`;
+    let sql = `UPDATE ${quoteIdentifier(this._table)} SET ${setClauses.join(", ")}`;
 
     if (this._where) {
       const result = this._where.toSql(paramIdx);
@@ -271,7 +271,7 @@ export class UpdateBuilder {
     }
 
     if (this._returning.length > 0) {
-      sql += ` RETURNING ${this._returning.join(", ")}`;
+      sql += ` RETURNING ${this._returning.map(c => quoteIdentifier(c)).join(", ")}`;
     }
 
     return { sql, params };
@@ -310,7 +310,7 @@ export class DeleteBuilder {
     const params: SqlValue[] = [];
     const paramIdx = 1;
 
-    let sql = `DELETE FROM ${this._table}`;
+    let sql = `DELETE FROM ${quoteIdentifier(this._table)}`;
 
     if (this._where) {
       const result = this._where.toSql(paramIdx);
@@ -319,7 +319,7 @@ export class DeleteBuilder {
     }
 
     if (this._returning.length > 0) {
-      sql += ` RETURNING ${this._returning.join(", ")}`;
+      sql += ` RETURNING ${this._returning.map(c => quoteIdentifier(c)).join(", ")}`;
     }
 
     return { sql, params };

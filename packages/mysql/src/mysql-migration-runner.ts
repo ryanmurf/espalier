@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import type { DataSource, Connection } from "espalier-jdbc";
+import { validateIdentifier, quoteIdentifier } from "espalier-jdbc";
 import type {
   Migration,
   MigrationRecord,
@@ -11,10 +12,12 @@ import { DEFAULT_MIGRATION_TABLE } from "espalier-data";
 export class MysqlMigrationRunner implements MigrationRunner {
   private readonly dataSource: DataSource;
   private readonly tableName: string;
+  private readonly quotedTableName: string;
 
   constructor(dataSource: DataSource, config?: MigrationRunnerConfig) {
     this.dataSource = dataSource;
-    this.tableName = config?.tableName ?? DEFAULT_MIGRATION_TABLE;
+    this.tableName = validateIdentifier(config?.tableName ?? DEFAULT_MIGRATION_TABLE, "migration table name");
+    this.quotedTableName = quoteIdentifier(this.tableName);
   }
 
   async initialize(): Promise<void> {
@@ -22,7 +25,7 @@ export class MysqlMigrationRunner implements MigrationRunner {
     try {
       const stmt = conn.createStatement();
       await stmt.executeUpdate(
-        `CREATE TABLE IF NOT EXISTS ${this.tableName} (\n` +
+        `CREATE TABLE IF NOT EXISTS ${this.quotedTableName} (\n` +
         `  version VARCHAR(255) PRIMARY KEY,\n` +
         `  description TEXT NOT NULL,\n` +
         `  applied_at DATETIME NOT NULL DEFAULT NOW(),\n` +
@@ -39,7 +42,7 @@ export class MysqlMigrationRunner implements MigrationRunner {
     const conn = await this.dataSource.getConnection();
     try {
       const ps = conn.prepareStatement(
-        `SELECT version, description, applied_at, checksum FROM ${this.tableName} ORDER BY version`,
+        `SELECT version, description, applied_at, checksum FROM ${this.quotedTableName} ORDER BY version`,
       );
       const rs = await ps.executeQuery();
       const records: MigrationRecord[] = [];
@@ -63,7 +66,7 @@ export class MysqlMigrationRunner implements MigrationRunner {
     const conn = await this.dataSource.getConnection();
     try {
       const ps = conn.prepareStatement(
-        `SELECT version FROM ${this.tableName} ORDER BY version DESC LIMIT 1`,
+        `SELECT version FROM ${this.quotedTableName} ORDER BY version DESC LIMIT 1`,
       );
       const rs = await ps.executeQuery();
       let version: string | null = null;
@@ -199,7 +202,7 @@ export class MysqlMigrationRunner implements MigrationRunner {
     const tx = await conn.beginTransaction();
     try {
       const ps = conn.prepareStatement(
-        `DELETE FROM ${this.tableName} WHERE version = $1`,
+        `DELETE FROM ${this.quotedTableName} WHERE version = $1`,
       );
       ps.setParameter(1, migration.version);
       await ps.executeUpdate();
@@ -227,7 +230,7 @@ export class MysqlMigrationRunner implements MigrationRunner {
     const tx = await conn.beginTransaction();
     try {
       const ps = conn.prepareStatement(
-        `INSERT INTO ${this.tableName} (version, description, checksum) VALUES ($1, $2, $3)`,
+        `INSERT INTO ${this.quotedTableName} (version, description, checksum) VALUES ($1, $2, $3)`,
       );
       ps.setParameter(1, migration.version);
       ps.setParameter(2, migration.description);
