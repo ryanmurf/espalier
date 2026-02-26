@@ -74,12 +74,13 @@ export async function validateConnection(
     }
   }
 
+  const stmt = connection.createStatement();
   try {
-    const stmt = connection.createStatement();
     await stmt.executeQuery(config.query);
-    await stmt.close();
     return { valid: true };
   } catch (err) {
     return { valid: false, error: err as Error };
+  } finally {
+    await stmt.close().catch(() => {});
   }
 }
