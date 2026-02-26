@@ -129,6 +129,30 @@ export class NotCriteria implements Criteria {
   }
 }
 
+export class RawComparisonCriteria implements Criteria {
+  constructor(
+    readonly type: "eq" | "neq" | "gt" | "gte" | "lt" | "lte" | "like",
+    readonly expression: string,
+    readonly value: SqlValue,
+  ) {}
+
+  toSql(paramOffset: number): { sql: string; params: SqlValue[] } {
+    const ops: Record<string, string> = {
+      eq: "=",
+      neq: "!=",
+      gt: ">",
+      gte: ">=",
+      lt: "<",
+      lte: "<=",
+      like: "LIKE",
+    };
+    return {
+      sql: `${this.expression} ${ops[this.type]} $${paramOffset}`,
+      params: [this.value],
+    };
+  }
+}
+
 export function and(left: Criteria, right: Criteria): Criteria {
   return new LogicalCriteria("and", left, right);
 }

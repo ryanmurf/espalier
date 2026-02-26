@@ -46,6 +46,7 @@ export { EntityChangeTracker } from "./mapping/change-tracker.js";
 export type { Criteria, CriteriaType, BuiltQuery, JoinType, SortDirection } from "./query/index.js";
 export {
   ComparisonCriteria,
+  RawComparisonCriteria,
   InCriteria,
   BetweenCriteria,
   NullCriteria,
@@ -55,7 +56,9 @@ export {
   or,
   not,
   ColumnRef,
+  ExpressionRef,
   col,
+  expr,
   QueryBuilder,
   SelectBuilder,
   InsertBuilder,

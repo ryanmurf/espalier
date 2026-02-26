@@ -1,6 +1,7 @@
 export type { Criteria, CriteriaType } from "./criteria.js";
 export {
   ComparisonCriteria,
+  RawComparisonCriteria,
   InCriteria,
   BetweenCriteria,
   NullCriteria,
@@ -11,7 +12,7 @@ export {
   not,
 } from "./criteria.js";
 
-export { ColumnRef, col } from "./column-ref.js";
+export { ColumnRef, ExpressionRef, col, expr } from "./column-ref.js";
 
 export type { BuiltQuery, JoinType, SortDirection } from "./query-builder.js";
 export {
