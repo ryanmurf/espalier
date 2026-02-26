@@ -243,16 +243,17 @@ describe.skipIf(!canConnect)("E2E: Lifecycle Event Decorators", { timeout: 15000
     expect(lifecycleLog.filter(e => e.startsWith("PostLoad:")).length).toBeGreaterThanOrEqual(2);
   });
 
-  it("@PostLoad is called on save result (INSERT path)", async () => {
+  it("@PostLoad is NOT called on save result (INSERT path)", async () => {
     const repo = createRepo();
     clearLog();
     const entity = makeItem("SavePostLoad", "active");
     await repo.save(entity);
 
-    // After INSERT, the repository calls PostLoad on the mapped result
-    // then calls PostPersist
-    expect(lifecycleLog).toContain("PostLoad:SavePostLoad");
+    // PostLoad should NOT fire on INSERT — it's only for read paths (findById, findAll, etc.)
+    // Only PrePersist and PostPersist should fire on INSERT
+    expect(lifecycleLog).toContain("PrePersist:SavePostLoad");
     expect(lifecycleLog).toContain("PostPersist:SavePostLoad");
+    expect(lifecycleLog).not.toContain("PostLoad:SavePostLoad");
   });
 
   // ──────────────────────────────────────────────
@@ -293,24 +294,24 @@ describe.skipIf(!canConnect)("E2E: Lifecycle Event Decorators", { timeout: 15000
   // Callback ordering
   // ──────────────────────────────────────────────
 
-  it("insert lifecycle order: PrePersist before PostLoad and PostPersist", async () => {
+  it("insert lifecycle order: PrePersist before PostPersist (no PostLoad on INSERT)", async () => {
     const repo = createRepo();
     clearLog();
     await repo.save(makeItem("OrderTest", "active"));
 
     const prePersistIdx = lifecycleLog.indexOf("PrePersist:OrderTest");
-    const postLoadIdx = lifecycleLog.indexOf("PostLoad:OrderTest");
     const postPersistIdx = lifecycleLog.indexOf("PostPersist:OrderTest");
 
     expect(prePersistIdx).toBeGreaterThanOrEqual(0);
-    expect(postLoadIdx).toBeGreaterThanOrEqual(0);
     expect(postPersistIdx).toBeGreaterThanOrEqual(0);
 
-    expect(prePersistIdx).toBeLessThan(postLoadIdx); // PrePersist before PostLoad
-    expect(postLoadIdx).toBeLessThan(postPersistIdx); // PostLoad before PostPersist
+    // PostLoad should NOT be called on INSERT path
+    expect(lifecycleLog.indexOf("PostLoad:OrderTest")).toBe(-1);
+
+    expect(prePersistIdx).toBeLessThan(postPersistIdx); // PrePersist before PostPersist
   });
 
-  it("update lifecycle order: PreUpdate before PostLoad and PostUpdate", async () => {
+  it("update lifecycle order: PreUpdate before PostUpdate (no PostLoad on UPDATE)", async () => {
     const repo = createRepo();
     const saved = await repo.save(makeItem("UpdateOrderTest", "active"));
     saved.name = "UpdatedOrder";
@@ -318,15 +319,15 @@ describe.skipIf(!canConnect)("E2E: Lifecycle Event Decorators", { timeout: 15000
     await repo.save(saved);
 
     const preUpdateIdx = lifecycleLog.indexOf("PreUpdate:UpdatedOrder");
-    const postLoadIdx = lifecycleLog.indexOf("PostLoad:UpdatedOrder");
     const postUpdateIdx = lifecycleLog.indexOf("PostUpdate:UpdatedOrder");
 
     expect(preUpdateIdx).toBeGreaterThanOrEqual(0);
-    expect(postLoadIdx).toBeGreaterThanOrEqual(0);
     expect(postUpdateIdx).toBeGreaterThanOrEqual(0);
 
-    expect(preUpdateIdx).toBeLessThan(postLoadIdx); // PreUpdate before PostLoad
-    expect(postLoadIdx).toBeLessThan(postUpdateIdx); // PostLoad before PostUpdate
+    // PostLoad should NOT be called on UPDATE path
+    expect(lifecycleLog.indexOf("PostLoad:UpdatedOrder")).toBe(-1);
+
+    expect(preUpdateIdx).toBeLessThan(postUpdateIdx); // PreUpdate before PostUpdate
   });
 
   // ──────────────────────────────────────────────

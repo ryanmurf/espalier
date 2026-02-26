@@ -516,6 +516,9 @@ export function createDerivedRepository<T, ID>(
       // Check query cache
       const cachedResults = queryCache.get(cacheKey);
       if (cachedResults !== undefined) {
+        for (const entity of cachedResults as T[]) {
+          entityCache.put(entityClass, getEntityId(entity), entity);
+        }
         return cachedResults as T[];
       }
 
@@ -899,7 +902,10 @@ export function createDerivedRepository<T, ID>(
           if (descriptor.action === "exists") {
             return cachedResult[0];
           }
-          // find action
+          // find action — re-populate entity cache from query cache results
+          for (const entity of cachedResult as T[]) {
+            entityCache.put(entityClass, getEntityId(entity), entity);
+          }
           if (descriptor.limit === 1) {
             return (cachedResult as any[])[0] ?? null;
           }
