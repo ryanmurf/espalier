@@ -10,5 +10,7 @@ export { migrateDown } from "./migrate-down.js";
 export type { MigrateDownOptions, MigrateDownResult } from "./migrate-down.js";
 export { loadMigrations, discoverMigrationFiles } from "./migrate-loader.js";
 export type { LoadedMigration } from "./migrate-loader.js";
+export { migrateStatus, formatStatusTable } from "./migrate-status.js";
+export type { MigrateStatusOptions, MigrateStatusResult, MigrationStatusEntry } from "./migrate-status.js";
 export { createAdapter } from "./adapter-factory.js";
 export type { AdapterResources } from "./adapter-factory.js";

@@ -5,6 +5,7 @@ import { loadConfig, getMigrationsDir } from "./config.js";
 import { createMigration } from "./migrate-create.js";
 import { migrateUp } from "./migrate-up.js";
 import { migrateDown } from "./migrate-down.js";
+import { migrateStatus, formatStatusTable } from "./migrate-status.js";
 
 function main(): void {
   const parsed = parseArgs(process.argv);
@@ -45,8 +46,7 @@ function handleMigrate(
   }
 
   if (subcommand === "status") {
-    process.stderr.write(`"migrate status" is not yet implemented.\n`);
-    process.exitCode = 1;
+    handleMigrateStatus(flags);
     return;
   }
 
@@ -175,6 +175,32 @@ function handleMigrateDown(
           `\n${result.rolledBack.length} migration(s) rolled back. Current version: ${result.currentVersion ?? "none"}\n`,
         );
       }
+    })
+    .catch((err: Error) => {
+      process.stderr.write(`Error: ${err.message}\n`);
+      process.exitCode = 1;
+    });
+}
+
+function handleMigrateStatus(flags: Record<string, string | boolean>): void {
+  const configDir = typeof flags.config === "string" ? flags.config : undefined;
+
+  let config;
+  try {
+    config = loadConfig(configDir);
+  } catch (err) {
+    process.stderr.write(`Error: ${(err as Error).message}\n`);
+    process.exitCode = 1;
+    return;
+  }
+
+  const migrationsDir = typeof flags.dir === "string"
+    ? flags.dir
+    : getMigrationsDir(config, configDir);
+
+  migrateStatus({ config, migrationsDir })
+    .then((result) => {
+      process.stdout.write(formatStatusTable(result));
     })
     .catch((err: Error) => {
       process.stderr.write(`Error: ${err.message}\n`);
