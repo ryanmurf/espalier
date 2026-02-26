@@ -80,7 +80,7 @@ function mockResultSet(
 // ══════════════════════════════════════════════════
 
 describe("Async iterators adversarial: early break / cleanup", () => {
-  it("BUG: early break in mapResultSet does NOT close the ResultSet", async () => {
+  it("early break in mapResultSet closes the ResultSet (FIXED #84)", async () => {
     const rows = Array.from({ length: 100 }, (_, i) => ({ id: i }));
     const rs = mockResultSet(rows);
 
@@ -91,15 +91,10 @@ describe("Async iterators adversarial: early break / cleanup", () => {
     }
 
     expect(collected).toEqual([0, 1, 2]);
-
-    // The generator function mapResultSet uses `while (await rs.next()) { yield ... }`
-    // When the consumer breaks early, the generator is returned, but there is no
-    // `finally` block in the generator to call rs.close().
-    // The ResultSet is left in a half-consumed state with no cleanup.
-    expect(rs.closeSpy).not.toHaveBeenCalled(); // BUG: resource leak
+    expect(rs.closeSpy).toHaveBeenCalledOnce();
   });
 
-  it("BUG: early break in filterResultSet does NOT close the ResultSet", async () => {
+  it("early break in filterResultSet closes the ResultSet (FIXED #84)", async () => {
     const rows = Array.from({ length: 100 }, (_, i) => ({ id: i, pass: true }));
     const rs = mockResultSet(rows);
 
@@ -110,36 +105,33 @@ describe("Async iterators adversarial: early break / cleanup", () => {
     }
 
     expect(collected).toHaveLength(2);
-    expect(rs.closeSpy).not.toHaveBeenCalled(); // BUG: resource leak
+    expect(rs.closeSpy).toHaveBeenCalledOnce();
   });
 
-  it("BUG: toArray consumes entire ResultSet but never calls close()", async () => {
+  it("toArray closes ResultSet after consuming all rows (FIXED #84)", async () => {
     const rows = [{ id: 1 }, { id: 2 }];
     const rs = mockResultSet(rows);
 
     const result = await toArray(rs);
     expect(result).toHaveLength(2);
-
-    // toArray reads all rows but never calls rs.close().
-    // Callers must remember to close the ResultSet themselves.
-    expect(rs.closeSpy).not.toHaveBeenCalled(); // Not a "bug" per se, but resource concern
+    expect(rs.closeSpy).toHaveBeenCalledOnce();
   });
 
-  it("BUG: reduceResultSet consumes entire ResultSet but never calls close()", async () => {
+  it("reduceResultSet closes ResultSet after consuming all rows (FIXED #84)", async () => {
     const rows = [{ v: 1 }, { v: 2 }, { v: 3 }];
     const rs = mockResultSet(rows);
 
     const sum = await reduceResultSet(rs, (acc, row) => acc + (row.v as number), 0);
     expect(sum).toBe(6);
-    expect(rs.closeSpy).not.toHaveBeenCalled();
+    expect(rs.closeSpy).toHaveBeenCalledOnce();
   });
 
-  it("BUG: forEachResultSet consumes entire ResultSet but never calls close()", async () => {
+  it("forEachResultSet closes ResultSet after consuming all rows (FIXED #84)", async () => {
     const rows = [{ id: 1 }];
     const rs = mockResultSet(rows);
 
     await forEachResultSet(rs, () => {});
-    expect(rs.closeSpy).not.toHaveBeenCalled();
+    expect(rs.closeSpy).toHaveBeenCalledOnce();
   });
 });
 
@@ -148,7 +140,7 @@ describe("Async iterators adversarial: early break / cleanup", () => {
 // ══════════════════════════════════════════════════
 
 describe("Async iterators adversarial: error mid-stream", () => {
-  it("mapResultSet: error in map function leaves ResultSet unclosed", async () => {
+  it("mapResultSet: error in map function still closes ResultSet (FIXED #84)", async () => {
     const rows = [{ id: 1 }, { id: 2 }, { id: 3 }];
     const rs = mockResultSet(rows);
 
@@ -165,11 +157,10 @@ describe("Async iterators adversarial: error mid-stream", () => {
     }
 
     expect(collected).toEqual([1]);
-    // No finally block in the generator to close the ResultSet
-    expect(rs.closeSpy).not.toHaveBeenCalled();
+    expect(rs.closeSpy).toHaveBeenCalledOnce();
   });
 
-  it("filterResultSet: error in predicate leaves ResultSet unclosed", async () => {
+  it("filterResultSet: error in predicate still closes ResultSet (FIXED #84)", async () => {
     const rows = [{ id: 1 }, { id: 2 }];
     const rs = mockResultSet(rows);
 
@@ -184,10 +175,10 @@ describe("Async iterators adversarial: error mid-stream", () => {
       expect((err as Error).message).toBe("pred-error");
     }
 
-    expect(rs.closeSpy).not.toHaveBeenCalled();
+    expect(rs.closeSpy).toHaveBeenCalledOnce();
   });
 
-  it("reduceResultSet: error in reducer propagates but ResultSet not closed", async () => {
+  it("reduceResultSet: error in reducer propagates and ResultSet is closed (FIXED #84)", async () => {
     const rows = [{ v: 1 }, { v: 2 }, { v: 3 }];
     const rs = mockResultSet(rows);
 
@@ -198,10 +189,10 @@ describe("Async iterators adversarial: error mid-stream", () => {
       }, 0),
     ).rejects.toThrow("reduce-error");
 
-    expect(rs.closeSpy).not.toHaveBeenCalled();
+    expect(rs.closeSpy).toHaveBeenCalledOnce();
   });
 
-  it("forEachResultSet: error in callback propagates but ResultSet not closed", async () => {
+  it("forEachResultSet: error in callback propagates and ResultSet is closed (FIXED #84)", async () => {
     const rows = [{ id: 1 }, { id: 2 }];
     const rs = mockResultSet(rows);
 
@@ -211,15 +202,15 @@ describe("Async iterators adversarial: error mid-stream", () => {
       }),
     ).rejects.toThrow("each-error");
 
-    expect(rs.closeSpy).not.toHaveBeenCalled();
+    expect(rs.closeSpy).toHaveBeenCalledOnce();
   });
 
-  it("rs.next() throws mid-stream in toArray", async () => {
+  it("rs.next() throws mid-stream in toArray, ResultSet is still closed (FIXED #84)", async () => {
     const rows = [{ id: 1 }, { id: 2 }, { id: 3 }];
     const rs = mockResultSet(rows, { errorAtIndex: 1 });
 
     await expect(toArray(rs)).rejects.toThrow("Error at row 1");
-    expect(rs.closeSpy).not.toHaveBeenCalled();
+    expect(rs.closeSpy).toHaveBeenCalledOnce();
   });
 });
 

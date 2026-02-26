@@ -1,19 +1,27 @@
 import type { ResultSet } from "./result-set.js";
 
 export async function toArray(rs: ResultSet): Promise<Record<string, unknown>[]> {
-  const results: Record<string, unknown>[] = [];
-  while (await rs.next()) {
-    results.push(rs.getRow());
+  try {
+    const results: Record<string, unknown>[] = [];
+    while (await rs.next()) {
+      results.push(rs.getRow());
+    }
+    return results;
+  } finally {
+    await rs.close();
   }
-  return results;
 }
 
 export async function* mapResultSet<T>(
   rs: ResultSet,
   fn: (row: Record<string, unknown>) => T,
 ): AsyncIterable<T> {
-  while (await rs.next()) {
-    yield fn(rs.getRow());
+  try {
+    while (await rs.next()) {
+      yield fn(rs.getRow());
+    }
+  } finally {
+    await rs.close();
   }
 }
 
@@ -21,11 +29,15 @@ export async function* filterResultSet(
   rs: ResultSet,
   predicate: (row: Record<string, unknown>) => boolean,
 ): AsyncIterable<Record<string, unknown>> {
-  while (await rs.next()) {
-    const row = rs.getRow();
-    if (predicate(row)) {
-      yield row;
+  try {
+    while (await rs.next()) {
+      const row = rs.getRow();
+      if (predicate(row)) {
+        yield row;
+      }
     }
+  } finally {
+    await rs.close();
   }
 }
 
@@ -34,21 +46,29 @@ export async function reduceResultSet<T>(
   reducer: (acc: T, row: Record<string, unknown>) => T,
   initial: T,
 ): Promise<T> {
-  let acc = initial;
-  while (await rs.next()) {
-    acc = reducer(acc, rs.getRow());
+  try {
+    let acc = initial;
+    while (await rs.next()) {
+      acc = reducer(acc, rs.getRow());
+    }
+    return acc;
+  } finally {
+    await rs.close();
   }
-  return acc;
 }
 
 export async function forEachResultSet(
   rs: ResultSet,
   fn: (row: Record<string, unknown>) => void | Promise<void>,
 ): Promise<void> {
-  while (await rs.next()) {
-    const result = fn(rs.getRow());
-    if (result instanceof Promise) {
-      await result;
+  try {
+    while (await rs.next()) {
+      const result = fn(rs.getRow());
+      if (result instanceof Promise) {
+        await result;
+      }
     }
+  } finally {
+    await rs.close();
   }
 }
