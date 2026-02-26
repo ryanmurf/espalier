@@ -177,7 +177,7 @@ describe("EventBus adversarial: concurrent emit", () => {
     expect(log).toContain("end:second");
   });
 
-  it("once() handler fires for both concurrent emits", async () => {
+  it("once() handler fires exactly once even under concurrent emit", async () => {
     const bus = new EventBus();
     let fireCount = 0;
 
@@ -186,25 +186,16 @@ describe("EventBus adversarial: concurrent emit", () => {
       await new Promise((r) => setTimeout(r, 5));
     });
 
-    // Both emits see the once handler in the entries array
-    // because toRemove only splices AFTER the emit loop completes.
-    // But the second emit also gets the entries array reference.
     const [r1, r2] = await Promise.allSettled([
       bus.emit("evt", null),
       bus.emit("evt", null),
     ]);
 
-    // Both emits read the same entries array before cleanup happens.
-    // So the once handler fires TWICE — defeating the "once" contract.
-    // This is a race condition.
     expect(r1.status).toBe("fulfilled");
     expect(r2.status).toBe("fulfilled");
 
-    // BUG: once handler may fire twice under concurrent emit
-    if (fireCount > 1) {
-      // Bug confirmed: once handler fired multiple times
-      expect(fireCount).toBe(2);
-    }
+    // The consumed flag prevents the once handler from firing in the second emit
+    expect(fireCount).toBe(1);
   });
 });
 

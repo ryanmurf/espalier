@@ -3,6 +3,7 @@ type EventHandler<T = unknown> = (payload: T) => void | Promise<void>;
 interface HandlerEntry {
   handler: EventHandler<any>;
   once: boolean;
+  consumed: boolean;
 }
 
 export class EventBus {
@@ -40,6 +41,11 @@ export class EventBus {
     const onceEntries: HandlerEntry[] = [];
 
     for (const entry of snapshot) {
+      // Skip once-handlers that were already consumed by a concurrent emit
+      if (entry.once && entry.consumed) continue;
+      if (entry.once) {
+        entry.consumed = true;
+      }
       try {
         const result = entry.handler(payload);
         if (result instanceof Promise) {
@@ -90,7 +96,7 @@ export class EventBus {
       entries = [];
       this.listeners.set(event, entries);
     }
-    entries.push({ handler, once });
+    entries.push({ handler, once, consumed: false });
   }
 }
 
