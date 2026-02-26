@@ -63,7 +63,9 @@ export class QueryCache {
   }
 
   private static truncateKey(key: string): string {
-    return key.length > 200 ? key.slice(0, 200) + "..." : key;
+    // Strip parameter values (after \0 separator) to avoid leaking sensitive data
+    const sqlOnly = key.split("\0")[0];
+    return sqlOnly.length > 200 ? sqlOnly.slice(0, 200) + "..." : sqlOnly;
   }
 
   constructor(config?: QueryCacheConfig) {

@@ -407,10 +407,8 @@ describe("adversarial: logging instrumentation (Data layer)", () => {
       setGlobalLogger(spy);
 
       const cache = new QueryCache({ maxSize: 5 });
-      // The cache key is sql + "\0" + JSON.stringify(params)
-      // So we need a SQL whose total key length <= 200
-      // With empty params: key = sql + "\0[]" = sql.length + 3
-      const sql = "S".repeat(197); // 197 + 3 = 200
+      // After #161 fix, truncateKey strips params (after \0), so only SQL is logged
+      const sql = "S".repeat(200); // exactly 200 chars of SQL
       cache.get({ sql, params: [] });
 
       const missCall = spy.calls.find(c => c.message === "cache miss");
@@ -482,11 +480,9 @@ describe("adversarial: logging instrumentation (Data layer)", () => {
       }
     });
 
-    it("BUG: QueryCache cacheKey LEAKS parameter VALUES into logs", () => {
-      // BUG FOUND: The QueryCache cacheKey is sql + "\0" + JSON.stringify(params).
-      // When this key is logged (even truncated to 200 chars), the serialized params
-      // are included. For short SQL, the full param values (passwords, tokens, etc.)
-      // are exposed in log output. This is a sensitive data leak.
+    it("QueryCache cacheKey does NOT leak parameter values (FIXED #161)", () => {
+      // Fixed: truncateKey now strips everything after \0 separator,
+      // so parameter values are never included in log output.
       const spy = createSpyLogger();
       setGlobalLogger(spy);
 
@@ -497,8 +493,9 @@ describe("adversarial: logging instrumentation (Data layer)", () => {
       const missCall = spy.calls.find(c => c.message === "cache miss");
       expect(missCall).toBeDefined();
       const cacheKey = missCall!.context!["cacheKey"] as string;
-      // BUG: the cacheKey contains serialized params with actual values
-      expect(cacheKey).toContain("secret_password_123");
+      // Params are stripped — only SQL portion is logged
+      expect(cacheKey).not.toContain("secret_password_123");
+      expect(cacheKey).toBe("SELECT * FROM users WHERE pass = $1");
     });
 
     it("ChangeTracker logs field NAMES but NOT field VALUES", () => {
