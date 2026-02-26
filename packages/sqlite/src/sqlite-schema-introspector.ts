@@ -1,12 +1,5 @@
+import { quoteIdentifier } from "espalier-jdbc";
 import type { Connection, SchemaIntrospector, TableInfo, ColumnInfo } from "espalier-jdbc";
-
-/** Validate a table name to prevent SQL injection in PRAGMA calls. */
-function validateIdentifier(name: string): string {
-  if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name)) {
-    throw new Error(`Invalid identifier: ${name}`);
-  }
-  return name;
-}
 
 export class SqliteSchemaIntrospector implements SchemaIntrospector {
   constructor(private readonly connection: Connection) {}
@@ -35,7 +28,7 @@ export class SqliteSchemaIntrospector implements SchemaIntrospector {
   }
 
   async getColumns(tableName: string, schema?: string): Promise<ColumnInfo[]> {
-    const safeName = validateIdentifier(tableName);
+    const safeName = quoteIdentifier(tableName);
 
     // Get primary key and column info from table_info pragma
     const stmt = this.connection.createStatement();
@@ -69,7 +62,7 @@ export class SqliteSchemaIntrospector implements SchemaIntrospector {
   }
 
   async getPrimaryKeys(tableName: string, schema?: string): Promise<string[]> {
-    const safeName = validateIdentifier(tableName);
+    const safeName = quoteIdentifier(tableName);
     const stmt = this.connection.createStatement();
     try {
       const rs = await stmt.executeQuery(`PRAGMA table_info(${safeName})`);
@@ -107,7 +100,7 @@ export class SqliteSchemaIntrospector implements SchemaIntrospector {
   }
 
   private async getUniqueColumns(tableName: string): Promise<Set<string>> {
-    const safeName = validateIdentifier(tableName);
+    const safeName = quoteIdentifier(tableName);
     const stmt = this.connection.createStatement();
     try {
       // Get list of unique indexes
@@ -126,7 +119,7 @@ export class SqliteSchemaIntrospector implements SchemaIntrospector {
       // For each unique index, check if it's a single-column index
       const uniqueColumns = new Set<string>();
       for (const indexName of uniqueIndexNames) {
-        const safeIndexName = validateIdentifier(indexName);
+        const safeIndexName = quoteIdentifier(indexName);
         const infoRs = await stmt.executeQuery(`PRAGMA index_info(${safeIndexName})`);
         try {
           const cols: string[] = [];
