@@ -27,7 +27,12 @@ export {
   ConnectionError,
   QueryError,
   TransactionError,
+  MigrationError,
+  SchemaError,
 } from "./errors.js";
+export type { ErrorContext, DatabaseErrorJSON } from "./errors.js";
+export { ErrorCode } from "./error-codes.js";
+export type { ErrorCode as ErrorCodeType } from "./error-codes.js";
 export type { StatementCacheConfig, StatementCacheStats } from "./statement-cache.js";
 export { StatementCache } from "./statement-cache.js";
 export type { WarmupResult, PrePingConfig } from "./pool-warmup.js";
@@ -57,3 +62,12 @@ export {
   BooleanConverter,
   DateConverter,
 } from "./converters/index.js";
+export type { Logger } from "./logger.js";
+export {
+  LogLevel,
+  NoopLogger,
+  ConsoleLogger,
+  setGlobalLogger,
+  getGlobalLogger,
+  createConsoleLogger,
+} from "./logger.js";
