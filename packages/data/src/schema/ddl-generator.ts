@@ -7,6 +7,24 @@ import { getTableName } from "../decorators/table.js";
 import { getIdField } from "../decorators/id.js";
 import { getColumnMappings } from "../decorators/column.js";
 
+/**
+ * Validates that a DEFAULT value expression is a safe SQL literal or known function.
+ * Rejects arbitrary SQL fragments that could lead to DDL injection.
+ */
+const SAFE_DEFAULT_PATTERN = /^(?:-?\d+(?:\.\d+)?|'(?:[^'\\]|\\.)*'|NULL|TRUE|FALSE|NOW\(\)|CURRENT_TIMESTAMP|CURRENT_DATE|CURRENT_TIME|uuid_generate_v4\(\)|gen_random_uuid\(\)|datetime\('now'\))$/i;
+
+function validateDefaultValue(val: string): string {
+  if (SAFE_DEFAULT_PATTERN.test(val)) {
+    return val;
+  }
+  throw new Error(
+    `Unsafe defaultValue: "${val}". ` +
+    `Only literals (numbers, quoted strings, NULL, TRUE, FALSE) and known functions ` +
+    `(NOW(), CURRENT_TIMESTAMP, CURRENT_DATE, CURRENT_TIME, uuid_generate_v4(), ` +
+    `gen_random_uuid(), datetime('now')) are allowed.`,
+  );
+}
+
 export interface DdlOptions {
   ifNotExists?: boolean;
   dialect?: "postgres" | "generic";
@@ -90,7 +108,7 @@ export class DdlGenerator {
 
       // DEFAULT: explicit defaultValue, or @CreatedDate gets DEFAULT NOW()
       if (entry.defaultValue !== undefined) {
-        parts.push(`DEFAULT ${entry.defaultValue}`);
+        parts.push(`DEFAULT ${validateDefaultValue(entry.defaultValue)}`);
       } else if (isCreatedDate) {
         parts.push("DEFAULT NOW()");
       }
