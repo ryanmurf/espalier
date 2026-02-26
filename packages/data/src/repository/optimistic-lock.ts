@@ -22,4 +22,17 @@ export class OptimisticLockException extends Error {
     this.expectedVersion = expectedVersion;
     this.actualVersion = actualVersion;
   }
+
+  /** Returns a generic message safe for external API responses. */
+  toSafeString(): string {
+    return "Optimistic lock conflict: entity was concurrently modified";
+  }
+
+  /** Omits entity ID, version, and entity name from JSON serialization. */
+  toJSON(): Record<string, unknown> {
+    return {
+      name: this.name,
+      message: "Optimistic lock conflict",
+    };
+  }
 }
