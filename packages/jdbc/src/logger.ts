@@ -82,6 +82,17 @@ export class ConsoleLogger implements Logger {
     return new ConsoleLogger({ level: this.level, name: `${this.name}.${name}` });
   }
 
+  private static safeStringify(value: unknown): string {
+    try {
+      return JSON.stringify(value, (_key, v) => {
+        if (typeof v === "bigint") return `${v}n`;
+        return v;
+      });
+    } catch {
+      return "[unserializable]";
+    }
+  }
+
   private log(level: LogLevel, message: string, context?: Record<string, unknown>): void {
     if (level < this.level) return;
 
@@ -89,7 +100,7 @@ export class ConsoleLogger implements Logger {
     const label = LEVEL_LABELS[level] ?? "UNKNOWN";
     const prefix = `${timestamp} ${label} [${this.name}]`;
     const line = context !== undefined
-      ? `${prefix} ${message} ${JSON.stringify(context)}`
+      ? `${prefix} ${message} ${ConsoleLogger.safeStringify(context)}`
       : `${prefix} ${message}`;
 
     if (level >= LogLevel.ERROR) {

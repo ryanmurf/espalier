@@ -359,9 +359,9 @@ describe("Null/undefined everywhere", () => {
     expect(err.connectionId).toBe("");
     const json = err.toJSON();
     expect(json.connectionId).toBe("");
-    // But toString uses truthiness check, so empty string connectionId is skipped
+    // toString now uses !== undefined (consistent with toJSON), so empty string is included
     const str = err.toString();
-    expect(str).not.toContain("connectionId:");
+    expect(str).toContain("connectionId:");
   });
 });
 

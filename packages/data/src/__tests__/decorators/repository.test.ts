@@ -54,7 +54,7 @@ describe("@Repository decorator", () => {
     class OrderRepository {}
 
     const registry = getRegisteredRepositories();
-    expect(registry.has("Order")).toBe(true);
+    expect(registry.has(Order)).toBe(true);
   });
 
   it("returns the class unchanged", () => {

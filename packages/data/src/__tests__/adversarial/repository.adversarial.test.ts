@@ -220,16 +220,16 @@ describe("Adversarial: @Repository decorator and auto-generated repository", () 
       expect(meta!.entity).toBe(AdvProduct);
     });
 
-    it("global registry uses entity name as key, so last-write wins for same entity", () => {
+    it("global registry uses entity class ref as key, so last-write wins for same entity", () => {
       @Repository({ entity: AdvUser })
       class RepoA {}
 
       @Repository({ entity: AdvUser })
       class RepoB {}
 
-      // Both register with key "AdvUser" — RepoB's decorator ran last
+      // Both register with key AdvUser class — RepoB's decorator ran last
       const registry = getRegisteredRepositories();
-      expect(registry.get("AdvUser")).toBe(RepoB);
+      expect(registry.get(AdvUser)).toBe(RepoB);
       // RepoA's individual metadata still intact
       expect(getRepositoryMetadata(RepoA)!.entity).toBe(AdvUser);
     });
@@ -625,22 +625,18 @@ describe("Adversarial: @Repository decorator and auto-generated repository", () 
       expect(reg1).not.toBe(reg2);
 
       // Mutating the returned map should not affect the internal registry
-      reg1.set("FakeEntity", class Fake {} as any);
+      class FakeEntity {}
+      reg1.set(FakeEntity, class Fake {} as any);
       const reg3 = getRegisteredRepositories();
-      expect(reg3.has("FakeEntity")).toBe(false);
+      expect(reg3.has(FakeEntity)).toBe(false);
     });
 
     it("registering many repositories grows the registry", () => {
       const sizeBefore = getRegisteredRepositories().size;
 
-      // Create a bunch of entities and repos
+      // Create a bunch of entities and repos with unique entity class references
       for (let i = 0; i < 10; i++) {
-        // Each needs a unique entity class name for the registry key
-        const EntityClass = {
-          [Symbol.for("name")]: `RegistryGrowthEntity${i}`,
-        } as any;
-        // We can't use decorators dynamically, but we can call Repository() manually
-        // Actually, the decorator is a function factory, so we can call it programmatically
+        const EntityClass = class {} as any;
         const decoratorFn = Repository({ entity: EntityClass });
         class TestRepo {}
         // Apply decorator manually (simulating TC39 decorator behavior)
@@ -654,11 +650,11 @@ describe("Adversarial: @Repository decorator and auto-generated repository", () 
       }
 
       const sizeAfter = getRegisteredRepositories().size;
-      // Should have grown by some amount (maybe not exactly 10 if entity names collide)
-      expect(sizeAfter).toBeGreaterThanOrEqual(sizeBefore);
+      // Should have grown by exactly 10 since each entity class is unique
+      expect(sizeAfter).toBe(sizeBefore + 10);
     });
 
-    it("re-registering with same entity name overwrites the previous repository class", () => {
+    it("re-registering with same entity class overwrites the previous repository class", () => {
       @Table("overwrite_test")
       class OverwriteEntity {
         @Id @Column() id: number = 0;
@@ -668,13 +664,13 @@ describe("Adversarial: @Repository decorator and auto-generated repository", () 
       class FirstRepo {}
 
       const reg1 = getRegisteredRepositories();
-      expect(reg1.get("OverwriteEntity")).toBe(FirstRepo);
+      expect(reg1.get(OverwriteEntity)).toBe(FirstRepo);
 
       @Repository({ entity: OverwriteEntity })
       class SecondRepo {}
 
       const reg2 = getRegisteredRepositories();
-      expect(reg2.get("OverwriteEntity")).toBe(SecondRepo);
+      expect(reg2.get(OverwriteEntity)).toBe(SecondRepo);
     });
   });
 

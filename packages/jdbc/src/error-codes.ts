@@ -38,6 +38,8 @@ export const ErrorCode = {
 
   // ── Generic ───────────────────────────────────────────────────
   UNKNOWN: "ESPALIER_UNKNOWN",
-} as const;
+} as const satisfies Record<string, string>;
+
+Object.freeze(ErrorCode);
 
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];

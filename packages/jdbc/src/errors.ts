@@ -132,10 +132,10 @@ export class DatabaseError extends Error {
 
   override toString(): string {
     const parts: string[] = [`${this.name} [${this.code}]: ${this.message}`];
-    if (this.errorCode) parts.push(`  errorCode: ${this.errorCode}`);
-    if (this.sql) parts.push(`  sql: ${this.sql}`);
+    if (this.errorCode !== undefined) parts.push(`  errorCode: ${this.errorCode}`);
+    if (this.sql !== undefined) parts.push(`  sql: ${this.sql}`);
     if (this.parameterCount !== undefined) parts.push(`  parameterCount: ${this.parameterCount}`);
-    if (this.connectionId) parts.push(`  connectionId: ${this.connectionId}`);
+    if (this.connectionId !== undefined) parts.push(`  connectionId: ${this.connectionId}`);
     parts.push(`  timestamp: ${this.timestamp.toISOString()}`);
     if (this.cause instanceof Error) parts.push(`  cause: ${this.cause.name}: ${this.cause.message}`);
     return parts.join("\n");

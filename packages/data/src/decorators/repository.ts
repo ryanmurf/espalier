@@ -4,7 +4,7 @@ export interface RepositoryOptions {
 }
 
 const repositoryMetadata = new WeakMap<object, RepositoryOptions>();
-const registeredRepositories = new Map<string, new (...args: any[]) => any>();
+const registeredRepositories = new Map<new (...args: any[]) => any, new (...args: any[]) => any>();
 
 export function Repository(options: RepositoryOptions) {
   return function <T extends abstract new (...args: any[]) => any>(
@@ -12,7 +12,7 @@ export function Repository(options: RepositoryOptions) {
     _context: ClassDecoratorContext<T>,
   ): T {
     repositoryMetadata.set(target, options);
-    registeredRepositories.set(options.entity.name, target as unknown as new (...args: any[]) => any);
+    registeredRepositories.set(options.entity, target as unknown as new (...args: any[]) => any);
     return target;
   };
 }
@@ -21,6 +21,6 @@ export function getRepositoryMetadata(target: object): RepositoryOptions | undef
   return repositoryMetadata.get(target);
 }
 
-export function getRegisteredRepositories(): Map<string, new (...args: any[]) => any> {
+export function getRegisteredRepositories(): Map<new (...args: any[]) => any, new (...args: any[]) => any> {
   return new Map(registeredRepositories);
 }

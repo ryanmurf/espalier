@@ -168,13 +168,15 @@ describe("adversarial: logger", () => {
 
     // ── Circular references in context ──
 
-    it("throws when context contains circular references", () => {
+    it("handles context with circular references gracefully", () => {
       const logger = new ConsoleLogger({ level: LogLevel.INFO });
       const circular: Record<string, unknown> = { key: "value" };
       circular["self"] = circular;
 
-      // JSON.stringify throws on circular refs — this is an unhandled crash
-      expect(() => logger.info("circular", circular)).toThrow(TypeError);
+      // safeStringify catches the TypeError and returns "[unserializable]"
+      expect(() => logger.info("circular", circular)).not.toThrow();
+      const output = logSpy.mock.calls[0]![0] as string;
+      expect(output).toContain("[unserializable]");
     });
 
     // ── Special values in context ──
@@ -209,10 +211,11 @@ describe("adversarial: logger", () => {
       expect(output).toContain('"negInf":null');
     });
 
-    it("handles BigInt in context (JSON.stringify throws)", () => {
+    it("handles BigInt in context (serialized as string with 'n' suffix)", () => {
       const logger = new ConsoleLogger({ level: LogLevel.INFO });
-      // JSON.stringify cannot serialize BigInt
-      expect(() => logger.info("test", { big: BigInt(9007199254740991) } as Record<string, unknown>)).toThrow(TypeError);
+      expect(() => logger.info("test", { big: BigInt(9007199254740991) } as Record<string, unknown>)).not.toThrow();
+      const output = logSpy.mock.calls[0]![0] as string;
+      expect(output).toContain('"big":"9007199254740991n"');
     });
 
     it("handles function values in context (omitted by JSON.stringify)", () => {
