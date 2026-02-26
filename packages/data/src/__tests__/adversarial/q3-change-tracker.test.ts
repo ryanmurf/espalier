@@ -136,9 +136,9 @@ describe("ChangeTracker adversarial: symbol field names", () => {
     expect(changes[0].columnName).toBe("secret_col");
   });
 
-  it("symbol-keyed object field: deepEqual uses Object.keys which ignores symbol keys on nested objects", () => {
-    // deepEqual at line 29 uses Object.keys() which does NOT return symbol keys.
-    // If a nested object has symbol-keyed properties, those are invisible to deepEqual.
+  it("symbol-keyed object field: deepEqual detects symbol-keyed property changes (FIXED #83)", () => {
+    // deepEqual now uses Reflect.ownKeys() which returns symbol keys too.
+    // cloneDeep also uses Reflect.ownKeys() so the snapshot includes symbol-keyed properties.
     const tracker = new EntityChangeTracker(objMetadata);
     const innerSym = Symbol("inner");
     const obj = { visible: "same", [innerSym]: "hidden" } as Record<string | symbol, unknown>;
@@ -149,14 +149,7 @@ describe("ChangeTracker adversarial: symbol field names", () => {
     // Mutate only the symbol-keyed property
     obj[innerSym] = "CHANGED";
 
-    // BUG: deepEqual compares using Object.keys which ignores symbol properties.
-    // The "visible" key is the same, so deepEqual returns true.
-    // But the object HAS changed (the symbol-keyed property is different).
-    // The snapshot was cloned via JSON.parse(JSON.stringify) which also drops symbols,
-    // so the snapshot never had the symbol key. Now the current value has [innerSym]="CHANGED"
-    // but deepEqual still uses Object.keys on both, so it compares {visible: "same"} with
-    // {visible: "same"} and returns true.
-    expect(tracker.isDirty(entity)).toBe(false); // BUG: hidden mutation via symbol keys
+    expect(tracker.isDirty(entity)).toBe(true);
   });
 });
 

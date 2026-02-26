@@ -48,11 +48,11 @@ function deepEqual(a: unknown, b: unknown): boolean {
   }
 
   if (typeof a === "object" && typeof b === "object") {
-    const keysA = Object.keys(a as object);
-    const keysB = Object.keys(b as object);
+    const keysA = Reflect.ownKeys(a as object);
+    const keysB = Reflect.ownKeys(b as object);
     if (keysA.length !== keysB.length) return false;
     for (const key of keysA) {
-      if (!deepEqual((a as Record<string, unknown>)[key], (b as Record<string, unknown>)[key])) {
+      if (!deepEqual((a as Record<string | symbol, unknown>)[key], (b as Record<string | symbol, unknown>)[key])) {
         return false;
       }
     }
@@ -96,10 +96,10 @@ function cloneDeep(value: unknown, seen: Map<object, object>): unknown {
     return clone;
   }
 
-  const clone: Record<string, unknown> = {};
+  const clone: Record<string | symbol, unknown> = {};
   seen.set(obj, clone);
-  for (const key of Object.keys(value as Record<string, unknown>)) {
-    clone[key] = cloneDeep((value as Record<string, unknown>)[key], seen);
+  for (const key of Reflect.ownKeys(value as Record<string | symbol, unknown>)) {
+    clone[key] = cloneDeep((value as Record<string | symbol, unknown>)[key], seen);
   }
   return clone;
 }
