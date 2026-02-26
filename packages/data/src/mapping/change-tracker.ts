@@ -8,7 +8,9 @@ export interface FieldChange {
 }
 
 function deepEqual(a: unknown, b: unknown): boolean {
-  if (Object.is(a, b)) return true;
+  if (a === b) return true;
+  // Handle NaN === NaN (which is false with ===)
+  if (typeof a === "number" && typeof b === "number" && Number.isNaN(a) && Number.isNaN(b)) return true;
   if (a === null || b === null) return false;
   if (a === undefined || b === undefined) return false;
   if (typeof a !== typeof b) return false;
@@ -40,17 +42,52 @@ function deepEqual(a: unknown, b: unknown): boolean {
   return false;
 }
 
+function cloneDeep(value: unknown, seen: Map<object, object>): unknown {
+  if (value === null || value === undefined) return value;
+  if (typeof value !== "object") return value;
+
+  const obj = value as object;
+  if (seen.has(obj)) return seen.get(obj)!;
+
+  if (value instanceof Date) return new Date(value.getTime());
+  if (value instanceof RegExp) return new RegExp(value.source, value.flags);
+  if (value instanceof Map) {
+    const clone = new Map();
+    seen.set(obj, clone);
+    for (const [k, v] of value) {
+      clone.set(cloneDeep(k, seen), cloneDeep(v, seen));
+    }
+    return clone;
+  }
+  if (value instanceof Set) {
+    const clone = new Set();
+    seen.set(obj, clone);
+    for (const v of value) {
+      clone.add(cloneDeep(v, seen));
+    }
+    return clone;
+  }
+  if (Array.isArray(value)) {
+    const clone: unknown[] = [];
+    seen.set(obj, clone);
+    for (const item of value) {
+      clone.push(cloneDeep(item, seen));
+    }
+    return clone;
+  }
+
+  const clone: Record<string, unknown> = {};
+  seen.set(obj, clone);
+  for (const key of Object.keys(value as Record<string, unknown>)) {
+    clone[key] = cloneDeep((value as Record<string, unknown>)[key], seen);
+  }
+  return clone;
+}
+
 function cloneValue(value: unknown): unknown {
   if (value === null || value === undefined) return value;
-  if (value instanceof Date) return new Date(value.getTime());
-  if (typeof value === "object") {
-    try {
-      return JSON.parse(JSON.stringify(value));
-    } catch {
-      return value;
-    }
-  }
-  return value;
+  if (typeof value !== "object") return value;
+  return cloneDeep(value, new Map());
 }
 
 export class EntityChangeTracker<T> {
