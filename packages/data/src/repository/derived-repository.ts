@@ -1110,6 +1110,139 @@ export function createDerivedRepository<T, ID>(
     }
   }
 
+  /**
+   * Deletes a related entity by its class and ID.
+   * Used by cascade remove to delete related entities.
+   */
+  async function cascadeDeleteRelatedEntity(
+    relatedEntity: unknown,
+    relatedClass: new (...args: any[]) => any,
+    conn: Connection,
+    deleting: Set<unknown>,
+  ): Promise<void> {
+    if (deleting.has(relatedEntity)) return;
+    deleting.add(relatedEntity);
+    try {
+      const relMeta = getEntityMetadata(relatedClass);
+      const relIdField = relMeta.idField;
+      const relIdValue = (relatedEntity as Record<string | symbol, unknown>)[relIdField] as SqlValue;
+      if (relIdValue == null) return;
+
+      const relIdFieldMapping = relMeta.fields.find((f) => f.fieldName === relIdField);
+      const relIdCol = relIdFieldMapping ? relIdFieldMapping.columnName : String(relIdField);
+
+      const builder = new DeleteBuilder(relMeta.tableName)
+        .where(new ComparisonCriteria("eq", relIdCol, relIdValue));
+
+      const query = builder.build();
+      const stmt = conn.prepareStatement(query.sql);
+      try {
+        for (let i = 0; i < query.params.length; i++) {
+          stmt.setParameter(i + 1, query.params[i]);
+        }
+        await stmt.executeUpdate();
+      } finally {
+        await stmt.close().catch(() => {});
+      }
+    } finally {
+      deleting.delete(relatedEntity);
+    }
+  }
+
+  /**
+   * Cascade remove: delete children and join table rows BEFORE deleting the parent.
+   * - @OneToMany children with cascade remove: delete each child
+   * - @ManyToMany join table rows: delete rows referencing the parent
+   * - @OneToOne inverse: delete related entity (FK is on the target table)
+   */
+  async function cascadePreDelete(entity: T, conn: Connection, deleting: Set<unknown>): Promise<void> {
+    const rec = entity as Record<string | symbol, unknown>;
+    const parentId = getEntityId(entity) as SqlValue;
+
+    // @OneToMany children: delete children first (they have FK to parent)
+    for (const relation of metadata.oneToManyRelations) {
+      if (!relation.cascade.has("remove")) continue;
+      const children = rec[relation.fieldName];
+      if (!Array.isArray(children)) continue;
+      const targetClass = relation.target();
+      for (const child of children) {
+        if (child == null || isLazyProxy(child)) continue;
+        await cascadeDeleteRelatedEntity(child, targetClass, conn, deleting);
+      }
+    }
+
+    // @ManyToMany (owning side): delete join table rows first
+    for (const relation of metadata.manyToManyRelations) {
+      if (!relation.isOwning || !relation.joinTable) continue;
+      if (!relation.cascade.has("remove")) continue;
+      const jt = relation.joinTable;
+
+      // Delete all join table rows for this parent
+      const deleteJt = new DeleteBuilder(jt.name)
+        .where(new ComparisonCriteria("eq", jt.joinColumn, parentId));
+      const jtQuery = deleteJt.build();
+      const jtStmt = conn.prepareStatement(jtQuery.sql);
+      try {
+        for (let i = 0; i < jtQuery.params.length; i++) {
+          jtStmt.setParameter(i + 1, jtQuery.params[i]);
+        }
+        await jtStmt.executeUpdate();
+      } finally {
+        await jtStmt.close().catch(() => {});
+      }
+
+      // Optionally delete target entities too
+      const children = rec[relation.fieldName];
+      if (!Array.isArray(children)) continue;
+      const targetClass = relation.target();
+      for (const child of children) {
+        if (child == null || isLazyProxy(child)) continue;
+        await cascadeDeleteRelatedEntity(child, targetClass, conn, deleting);
+      }
+    }
+
+    // @OneToOne inverse side: delete the related entity (FK is on the target)
+    for (const relation of metadata.oneToOneRelations) {
+      if (relation.isOwning) continue;
+      if (!relation.cascade.has("remove")) continue;
+      const relatedEntity = rec[relation.fieldName];
+      if (relatedEntity == null || isLazyProxy(relatedEntity)) continue;
+      const targetClass = relation.target();
+      await cascadeDeleteRelatedEntity(relatedEntity, targetClass, conn, deleting);
+    }
+  }
+
+  /**
+   * Cascade remove: delete referenced entities AFTER deleting the parent.
+   * - Owning @OneToOne: delete the related entity (parent had FK to it)
+   * - @ManyToOne: typically NOT cascade-deleted, but support if configured
+   */
+  async function cascadePostDelete(entity: T, conn: Connection, deleting: Set<unknown>): Promise<void> {
+    const rec = entity as Record<string | symbol, unknown>;
+
+    // Owning @OneToOne: parent FK pointed to this entity
+    for (const relation of metadata.oneToOneRelations) {
+      if (!relation.isOwning) continue;
+      if (!relation.cascade.has("remove")) continue;
+      const relatedEntity = rec[relation.fieldName];
+      if (relatedEntity == null || isLazyProxy(relatedEntity)) continue;
+      const targetClass = relation.target();
+      await cascadeDeleteRelatedEntity(relatedEntity, targetClass, conn, deleting);
+    }
+
+    // @ManyToOne: cascade delete if configured
+    for (const relation of metadata.manyToOneRelations) {
+      if (!relation.cascade.has("remove")) continue;
+      const relatedEntity = rec[relation.fieldName];
+      if (relatedEntity == null || isLazyProxy(relatedEntity)) continue;
+      const targetClass = relation.target();
+      await cascadeDeleteRelatedEntity(relatedEntity, targetClass, conn, deleting);
+    }
+  }
+
+  // Cycle detection set for cascade delete operations
+  const cascadeDeleting = new Set<unknown>();
+
   async function deleteWithConnection(entity: T, conn: Connection): Promise<void> {
     await invokeLifecycleCallbacks(entity, "PreRemove");
     const idField = metadata.idField;
@@ -1117,6 +1250,9 @@ export function createDerivedRepository<T, ID>(
     const idCol = getIdColumn();
     const versionCol = getVersionColumn();
     const versionField = metadata.versionField;
+
+    // Cascade pre-delete: delete children and join table rows before parent
+    await cascadePreDelete(entity, conn, cascadeDeleting);
 
     const builder = new DeleteBuilder(metadata.tableName);
 
@@ -1170,6 +1306,8 @@ export function createDerivedRepository<T, ID>(
         );
       }
       await invokeLifecycleCallbacks(entity, "PostRemove");
+      // Cascade post-delete: delete owning @OneToOne and @ManyToOne targets after parent
+      await cascadePostDelete(entity, conn, cascadeDeleting);
       await emitEntityEvent(ENTITY_EVENTS.REMOVED, `${ENTITY_EVENTS.REMOVED}:${entityName}`, {
         type: "removed",
         entityClass,
@@ -1620,6 +1758,175 @@ export function createDerivedRepository<T, ID>(
       };
     },
 
+    async refresh(entity: T): Promise<T> {
+      if (repoLogger.isEnabled(LogLevel.DEBUG)) {
+        repoLogger.debug("refresh", { operation: "refresh", entityType: entityName });
+      }
+      const id = getEntityId(entity) as ID;
+      if (id == null) {
+        throw new EntityNotFoundException(entityClass.name, "null");
+      }
+
+      // Evict from caches to force a fresh load
+      entityCache.evict(entityClass, id);
+      queryCache.invalidate(entityClass);
+      changeTracker.clearSnapshot(entity);
+
+      // Re-load from database using the same logic as findById
+      const idCol = getIdColumn();
+      const conn = await dataSource.getConnection();
+      try {
+        const builder = new SelectBuilder(metadata.tableName);
+
+        if (joinFetchSpecs.length > 0) {
+          const joinCols = buildJoinColumns(metadata.tableName, metadata.fields, joinFetchSpecs);
+          builder.rawColumns(...joinCols);
+          addJoins(builder, metadata.tableName, joinFetchSpecs);
+          const qualifiedIdCol = `${quoteIdentifier(metadata.tableName)}.${quoteIdentifier(idCol)}`;
+          builder.where(new RawComparisonCriteria("eq", qualifiedIdCol, id as SqlValue));
+          builder.limit(1);
+        } else {
+          builder
+            .columns(...metadata.fields.map((f: FieldMapping) => f.columnName))
+            .where(new ComparisonCriteria("eq", idCol, id as SqlValue))
+            .limit(1);
+        }
+
+        const query = builder.build();
+        const stmt = conn.prepareStatement(query.sql);
+        try {
+          for (let i = 0; i < query.params.length; i++) {
+            stmt.setParameter(i + 1, query.params[i]);
+          }
+          const rs = await stmt.executeQuery();
+          if (!(await rs.next())) {
+            throw new EntityNotFoundException(entityClass.name, String(id));
+          }
+
+          const freshEntity = joinFetchSpecs.length > 0
+            ? mapJoinRow(rs.getRow())
+            : rowMapper.mapRow(rs);
+
+          // Load non-JOIN-fetched OneToOne relations
+          const selectOneToOnes = metadata.oneToOneRelations.filter(
+            (r) => r.fetchStrategy !== "JOIN",
+          );
+          if (selectOneToOnes.length > 0) {
+            await loadOneToOneRelations(freshEntity, conn);
+          }
+
+          // BATCH fetch collection relations (skip lazy)
+          const singleId = [id as SqlValue];
+          for (const relation of metadata.oneToManyRelations) {
+            if (relation.fetchStrategy !== "BATCH" || relation.lazy) continue;
+            const childMap = await batchLoadOneToMany(conn, singleId, relation, metadata);
+            (freshEntity as Record<string | symbol, unknown>)[relation.fieldName] =
+              childMap.get(id) ?? [];
+          }
+          for (const relation of metadata.manyToManyRelations) {
+            if (relation.fetchStrategy !== "BATCH" || relation.lazy) continue;
+            const childMap = await batchLoadManyToMany(conn, singleId, relation);
+            (freshEntity as Record<string | symbol, unknown>)[relation.fieldName] =
+              childMap.get(id) ?? [];
+          }
+
+          // Attach lazy proxies for relations marked lazy: true
+          attachLazyProxies(freshEntity);
+
+          // Cascade refresh: reload related entities marked with cascade "refresh"
+          for (const relation of metadata.manyToOneRelations) {
+            if (!relation.cascade.has("refresh")) continue;
+            const related = (freshEntity as Record<string | symbol, unknown>)[relation.fieldName];
+            if (related == null || isLazyProxy(related)) continue;
+            const targetClass = relation.target();
+            const targetMeta = getEntityMetadata(targetClass);
+            const relId = (related as Record<string | symbol, unknown>)[targetMeta.idField];
+            if (relId == null) continue;
+            const targetRepo = createDerivedRepository(targetClass, dataSource);
+            const refreshed = await targetRepo.refresh(related as any);
+            (freshEntity as Record<string | symbol, unknown>)[relation.fieldName] = refreshed;
+          }
+          for (const relation of metadata.oneToOneRelations) {
+            if (!relation.cascade.has("refresh")) continue;
+            const related = (freshEntity as Record<string | symbol, unknown>)[relation.fieldName];
+            if (related == null || isLazyProxy(related)) continue;
+            const targetClass = relation.target();
+            const targetMeta = getEntityMetadata(targetClass);
+            const relId = (related as Record<string | symbol, unknown>)[targetMeta.idField];
+            if (relId == null) continue;
+            const targetRepo = createDerivedRepository(targetClass, dataSource);
+            const refreshed = await targetRepo.refresh(related as any);
+            (freshEntity as Record<string | symbol, unknown>)[relation.fieldName] = refreshed;
+          }
+          for (const relation of metadata.oneToManyRelations) {
+            if (!relation.cascade.has("refresh")) continue;
+            const children = (freshEntity as Record<string | symbol, unknown>)[relation.fieldName];
+            if (!Array.isArray(children)) continue;
+            const targetClass = relation.target();
+            const targetRepo = createDerivedRepository(targetClass, dataSource);
+            const refreshed: unknown[] = [];
+            for (const child of children) {
+              if (child == null || isLazyProxy(child)) {
+                refreshed.push(child);
+                continue;
+              }
+              refreshed.push(await targetRepo.refresh(child as any));
+            }
+            (freshEntity as Record<string | symbol, unknown>)[relation.fieldName] = refreshed;
+          }
+          for (const relation of metadata.manyToManyRelations) {
+            if (!relation.cascade.has("refresh")) continue;
+            const children = (freshEntity as Record<string | symbol, unknown>)[relation.fieldName];
+            if (!Array.isArray(children)) continue;
+            const targetClass = relation.target();
+            const targetRepo = createDerivedRepository(targetClass, dataSource);
+            const refreshed: unknown[] = [];
+            for (const child of children) {
+              if (child == null || isLazyProxy(child)) {
+                refreshed.push(child);
+                continue;
+              }
+              refreshed.push(await targetRepo.refresh(child as any));
+            }
+            (freshEntity as Record<string | symbol, unknown>)[relation.fieldName] = refreshed;
+          }
+
+          // Copy refreshed values back to the original entity
+          for (const field of metadata.fields) {
+            (entity as Record<string | symbol, unknown>)[field.fieldName] =
+              (freshEntity as Record<string | symbol, unknown>)[field.fieldName];
+          }
+          // Copy relation fields
+          for (const relation of metadata.manyToOneRelations) {
+            (entity as Record<string | symbol, unknown>)[relation.fieldName] =
+              (freshEntity as Record<string | symbol, unknown>)[relation.fieldName];
+          }
+          for (const relation of metadata.oneToOneRelations) {
+            (entity as Record<string | symbol, unknown>)[relation.fieldName] =
+              (freshEntity as Record<string | symbol, unknown>)[relation.fieldName];
+          }
+          for (const relation of metadata.oneToManyRelations) {
+            (entity as Record<string | symbol, unknown>)[relation.fieldName] =
+              (freshEntity as Record<string | symbol, unknown>)[relation.fieldName];
+          }
+          for (const relation of metadata.manyToManyRelations) {
+            (entity as Record<string | symbol, unknown>)[relation.fieldName] =
+              (freshEntity as Record<string | symbol, unknown>)[relation.fieldName];
+          }
+
+          await invokeLifecycleCallbacks(entity, "PostLoad");
+          changeTracker.snapshot(entity);
+          entityCache.put(entityClass, id, entity);
+
+          return entity;
+        } finally {
+          await stmt.close().catch(() => {});
+        }
+      } finally {
+        await conn.close();
+      }
+    },
+
     async count(spec?: Specification<T>): Promise<number> {
       if (repoLogger.isEnabled(LogLevel.DEBUG)) {
         repoLogger.debug("count", { operation: "count", entityType: entityName });
@@ -1673,6 +1980,7 @@ export function createDerivedRepository<T, ID>(
     "delete",
     "deleteAll",
     "deleteById",
+    "refresh",
     "count",
     "getEntityCache",
     "getQueryCache",

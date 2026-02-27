@@ -15,6 +15,7 @@ export interface CrudRepository<T, ID> extends Repository<T, ID> {
   delete(entity: T): Promise<void>;
   deleteAll(entities: T[]): Promise<void>;
   deleteById(id: ID): Promise<void>;
+  refresh(entity: T): Promise<T>;
   count(): Promise<number>;
   count(spec: Specification<T>): Promise<number>;
 }
