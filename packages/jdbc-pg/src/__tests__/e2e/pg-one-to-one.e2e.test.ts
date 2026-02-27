@@ -435,7 +435,7 @@ describe.skipIf(!canConnect)("@OneToOne adversarial: repository E2E (Postgres)",
   // ─── Update @OneToOne Reference ───
 
   describe("update @OneToOne reference", () => {
-    it("BUG: change @OneToOne reference only — duplicate column assignment in UPDATE", async () => {
+    it("change @OneToOne reference only — FK column updated correctly", async () => {
       await clearAllData();
 
       const profileRepo = createRepository<E2eProfile, number>(E2eProfile, ds);
@@ -454,16 +454,19 @@ describe.skipIf(!canConnect)("@OneToOne adversarial: repository E2E (Postgres)",
       const loaded1 = await freshUserRepo.findById(savedUser.id);
       expect(loaded1!.profile!.bio).toBe("Profile A");
 
-      // BUG: The ChangeTracker now detects FK changes (adds profile_id as dirty field),
-      // but the save code also adds profile_id via the @OneToOne FK loop.
-      // This causes "multiple assignments to same column" error in Postgres.
+      // Change @OneToOne reference — previously caused duplicate column (Bug 3, now fixed)
       loaded1!.profile = savedB;
-      await expect(freshUserRepo.save(loaded1!)).rejects.toThrow(
-        /multiple assignments to same column/,
-      );
+      const updated = await freshUserRepo.save(loaded1!);
+      expect(updated.profile!.bio).toBe("Profile B");
+      expect(updated.profile!.id).toBe(savedB.id);
+
+      // Verify persisted to DB
+      const freshRepo2 = createRepository<E2eUser, number>(E2eUser, ds);
+      const reloaded = await freshRepo2.findById(savedUser.id);
+      expect(reloaded!.profile!.bio).toBe("Profile B");
     });
 
-    it("BUG: change @OneToOne + @Column together — also fails with duplicate column", async () => {
+    it("change @OneToOne + @Column together — both updated", async () => {
       await clearAllData();
 
       const profileRepo = createRepository<E2eProfile, number>(E2eProfile, ds);
@@ -482,15 +485,21 @@ describe.skipIf(!canConnect)("@OneToOne adversarial: repository E2E (Postgres)",
       const loaded1 = await freshUserRepo.findById(savedUser.id);
       expect(loaded1!.profile!.bio).toBe("Profile A");
 
-      // BUG: Same duplicate column issue
+      // Change both @OneToOne reference and @Column — previously caused duplicate column (Bug 3, now fixed)
       loaded1!.profile = savedB;
       loaded1!.name = "SwapperUpdated";
-      await expect(freshUserRepo.save(loaded1!)).rejects.toThrow(
-        /multiple assignments to same column/,
-      );
+      const updated = await freshUserRepo.save(loaded1!);
+      expect(updated.name).toBe("SwapperUpdated");
+      expect(updated.profile!.bio).toBe("Profile B");
+
+      // Verify persisted to DB
+      const freshRepo2 = createRepository<E2eUser, number>(E2eUser, ds);
+      const reloaded = await freshRepo2.findById(savedUser.id);
+      expect(reloaded!.name).toBe("SwapperUpdated");
+      expect(reloaded!.profile!.bio).toBe("Profile B");
     });
 
-    it("BUG: set @OneToOne to null — also fails with duplicate column", async () => {
+    it("set @OneToOne to null — FK column set to NULL", async () => {
       await clearAllData();
 
       const profileRepo = createRepository<E2eProfile, number>(E2eProfile, ds);
@@ -502,16 +511,20 @@ describe.skipIf(!canConnect)("@OneToOne adversarial: repository E2E (Postgres)",
       const user = newEntity(E2eUser, { name: "WillUnlink", profile: savedProfile });
       const savedUser = await userRepo.save(user);
 
-      // Verify initial state — save() now preserves profile on cached entity
+      // Verify initial state — save() preserves profile on cached entity
       expect(savedUser.profile).toBeDefined();
       expect(savedUser.profile!.bio).toBe("Will be unlinked");
 
-      // Set to null — this triggers both the ChangeTracker dirty field
-      // AND the @OneToOne FK loop in save, causing duplicate column assignment
+      // Set to null — previously caused duplicate column (Bug 3, now fixed)
       savedUser.profile = null;
-      await expect(userRepo.save(savedUser)).rejects.toThrow(
-        /multiple assignments to same column/,
-      );
+      const updated = await userRepo.save(savedUser);
+      expect(updated.profile).toBeNull();
+
+      // Verify persisted to DB — SELECT fetch strategy doesn't explicitly set null
+      // when FK is null, so the field may be undefined rather than null
+      const freshRepo = createRepository<E2eUser, number>(E2eUser, ds);
+      const reloaded = await freshRepo.findById(savedUser.id);
+      expect(reloaded!.profile ?? null).toBeNull();
     });
   });
 
