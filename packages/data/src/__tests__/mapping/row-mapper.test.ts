@@ -40,6 +40,7 @@ describe("createRowMapper", () => {
       oneToManyRelations: [],
       manyToManyRelations: [],
       oneToOneRelations: [],
+      embeddedFields: [],
       lifecycleCallbacks: new Map(),
     };
 
@@ -73,6 +74,7 @@ describe("createRowMapper", () => {
       oneToManyRelations: [],
       manyToManyRelations: [],
       oneToOneRelations: [],
+      embeddedFields: [],
       lifecycleCallbacks: new Map(),
     };
 
@@ -106,6 +108,7 @@ describe("createRowMapper", () => {
       oneToManyRelations: [],
       manyToManyRelations: [],
       oneToOneRelations: [],
+      embeddedFields: [],
       lifecycleCallbacks: new Map(),
     };
 
@@ -134,6 +137,7 @@ describe("createRowMapper", () => {
       oneToManyRelations: [],
       manyToManyRelations: [],
       oneToOneRelations: [],
+      embeddedFields: [],
       lifecycleCallbacks: new Map(),
     };
 

@@ -9,6 +9,8 @@ export {
   getLastModifiedDateField,
 } from "./decorators/auditing.js";
 export { ManyToOne, getManyToOneRelations, OneToMany, getOneToManyRelations, ManyToMany, getManyToManyRelations, OneToOne, getOneToOneRelations } from "./decorators/relations.js";
+export { Embeddable, isEmbeddable, Embedded, getEmbeddedFields } from "./decorators/embeddable.js";
+export type { EmbeddedOptions, EmbeddedField } from "./decorators/embeddable.js";
 export type { ManyToOneOptions, ManyToOneRelation, OneToManyOptions, OneToManyRelation, ManyToManyOptions, ManyToManyRelation, JoinTableConfig, OneToOneOptions, OneToOneRelation } from "./decorators/relations.js";
 export { Projection, getProjectionMetadata } from "./decorators/projection.js";
 export type { ProjectionOptions } from "./decorators/projection.js";

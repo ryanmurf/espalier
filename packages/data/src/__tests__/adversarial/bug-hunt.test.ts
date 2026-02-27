@@ -35,6 +35,7 @@ const userMetadata: EntityMetadata = {
   oneToManyRelations: [],
   manyToManyRelations: [],
   oneToOneRelations: [],
+  embeddedFields: [],
   lifecycleCallbacks: new Map(),
 };
 

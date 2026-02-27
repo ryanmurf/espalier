@@ -10,6 +10,8 @@ import type { ManyToOneRelation, OneToManyRelation, ManyToManyRelation, OneToOne
 import { getVersionField } from "../decorators/version.js";
 import { getLifecycleCallbacks } from "../decorators/lifecycle.js";
 import type { LifecycleEvent } from "../decorators/lifecycle.js";
+import { getEmbeddedFields, isEmbeddable } from "../decorators/embeddable.js";
+import type { EmbeddedField } from "../decorators/embeddable.js";
 
 export interface FieldMapping {
   fieldName: string | symbol;
@@ -27,6 +29,7 @@ export interface EntityMetadata {
   oneToManyRelations: OneToManyRelation[];
   manyToManyRelations: ManyToManyRelation[];
   oneToOneRelations: OneToOneRelation[];
+  embeddedFields: EmbeddedField[];
   lifecycleCallbacks: Map<LifecycleEvent, (string | symbol)[]>;
 }
 
@@ -59,6 +62,37 @@ export function getEntityMetadata(
     fields.push({ fieldName, columnName });
   }
 
+  // Resolve @Embedded fields: flatten embeddable columns into parent with prefix
+  const embeddedFields = getEmbeddedFields(entityClass);
+  for (const embedded of embeddedFields) {
+    const embeddableClass = embedded.target();
+
+    if (!isEmbeddable(embeddableClass)) {
+      throw new Error(
+        `Class "${embeddableClass.name}" used in @Embedded field "${String(embedded.fieldName)}" ` +
+        `is not decorated with @Embeddable.`,
+      );
+    }
+
+    // Check for nested @Embedded (not supported)
+    new embeddableClass();
+    const nestedEmbedded = getEmbeddedFields(embeddableClass);
+    if (nestedEmbedded.length > 0) {
+      throw new Error(
+        `Nested @Embedded is not supported. Class "${embeddableClass.name}" ` +
+        `contains @Embedded fields.`,
+      );
+    }
+
+    const embeddableColumns = getColumnMappings(embeddableClass);
+    for (const [embFieldName, embColumnName] of embeddableColumns) {
+      fields.push({
+        fieldName: `${String(embedded.fieldName)}.${String(embFieldName)}`,
+        columnName: `${embedded.prefix}${embColumnName}`,
+      });
+    }
+  }
+
   return {
     tableName,
     idField,
@@ -70,6 +104,7 @@ export function getEntityMetadata(
     oneToManyRelations: getOneToManyRelations(entityClass),
     manyToManyRelations: getManyToManyRelations(entityClass),
     oneToOneRelations: getOneToOneRelations(entityClass),
+    embeddedFields,
     lifecycleCallbacks: getLifecycleCallbacks(entityClass),
   };
 }
