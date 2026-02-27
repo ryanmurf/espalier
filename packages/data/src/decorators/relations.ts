@@ -16,6 +16,7 @@ export interface ManyToOneOptions {
   joinColumn?: string;
   nullable?: boolean;
   fetch?: FetchType | FetchOptions;
+  lazy?: boolean;
 }
 
 export interface ManyToOneRelation {
@@ -25,6 +26,7 @@ export interface ManyToOneRelation {
   nullable: boolean;
   fetchStrategy: FetchType;
   batchSize: number;
+  lazy: boolean;
 }
 
 const manyToOneMetadata = new WeakMap<object, Map<string | symbol, ManyToOneRelation>>();
@@ -38,6 +40,7 @@ export function ManyToOne(options: ManyToOneOptions) {
     const joinColumn = options.joinColumn ?? `${String(fieldName)}_id`;
     const nullable = options.nullable ?? true;
     const { fetchStrategy, batchSize } = parseFetch(options.fetch);
+    const lazy = options.lazy ?? false;
 
     context.addInitializer(function (this: T) {
       const constructor = (this as object).constructor;
@@ -51,6 +54,7 @@ export function ManyToOne(options: ManyToOneOptions) {
         nullable,
         fetchStrategy,
         batchSize,
+        lazy,
       });
     });
   };
@@ -66,6 +70,7 @@ export interface OneToManyOptions {
   target: () => new (...args: any[]) => any;
   mappedBy: string;
   fetch?: FetchType | FetchOptions;
+  lazy?: boolean;
 }
 
 export interface OneToManyRelation {
@@ -74,6 +79,7 @@ export interface OneToManyRelation {
   mappedBy: string;
   fetchStrategy: FetchType;
   batchSize: number;
+  lazy: boolean;
 }
 
 const oneToManyMetadata = new WeakMap<object, Map<string | symbol, OneToManyRelation>>();
@@ -85,6 +91,7 @@ export function OneToMany(options: OneToManyOptions) {
   ): void {
     const fieldName = context.name;
     const { fetchStrategy, batchSize } = parseFetch(options.fetch);
+    const lazy = options.lazy ?? false;
 
     context.addInitializer(function (this: T) {
       const constructor = (this as object).constructor;
@@ -97,6 +104,7 @@ export function OneToMany(options: OneToManyOptions) {
         mappedBy: options.mappedBy,
         fetchStrategy,
         batchSize,
+        lazy,
       });
     });
   };
@@ -119,6 +127,7 @@ export interface ManyToManyOptions {
   joinTable?: JoinTableConfig;
   mappedBy?: string;
   fetch?: FetchType | FetchOptions;
+  lazy?: boolean;
 }
 
 export interface ManyToManyRelation {
@@ -129,6 +138,7 @@ export interface ManyToManyRelation {
   isOwning: boolean;
   fetchStrategy: FetchType;
   batchSize: number;
+  lazy: boolean;
 }
 
 const manyToManyMetadata = new WeakMap<object, Map<string | symbol, ManyToManyRelation>>();
@@ -141,6 +151,7 @@ export function ManyToMany(options: ManyToManyOptions) {
     const fieldName = context.name;
     const isOwning = options.joinTable !== undefined;
     const { fetchStrategy, batchSize } = parseFetch(options.fetch);
+    const lazy = options.lazy ?? false;
 
     context.addInitializer(function (this: T) {
       const constructor = (this as object).constructor;
@@ -155,6 +166,7 @@ export function ManyToMany(options: ManyToManyOptions) {
         isOwning,
         fetchStrategy,
         batchSize,
+        lazy,
       });
     });
   };
@@ -173,6 +185,7 @@ export interface OneToOneOptions {
   nullable?: boolean;
   orphanRemoval?: boolean;
   fetch?: FetchType | FetchOptions;
+  lazy?: boolean;
 }
 
 export interface OneToOneRelation {
@@ -185,6 +198,7 @@ export interface OneToOneRelation {
   orphanRemoval: boolean;
   fetchStrategy: FetchType;
   batchSize: number;
+  lazy: boolean;
 }
 
 const oneToOneMetadata = new WeakMap<object, Map<string | symbol, OneToOneRelation>>();
@@ -202,6 +216,7 @@ export function OneToOne(options: OneToOneOptions) {
     const nullable = options.nullable ?? true;
     const orphanRemoval = options.orphanRemoval ?? false;
     const { fetchStrategy, batchSize } = parseFetch(options.fetch);
+    const lazy = options.lazy ?? false;
 
     context.addInitializer(function (this: T) {
       const constructor = (this as object).constructor;
@@ -218,6 +233,7 @@ export function OneToOne(options: OneToOneOptions) {
         orphanRemoval,
         fetchStrategy,
         batchSize,
+        lazy,
       });
     });
   };

@@ -30,7 +30,7 @@ export function getJoinFetchSpecs(metadata: EntityMetadata): JoinSpec[] {
   let aliasIdx = 0;
 
   for (const relation of metadata.manyToOneRelations) {
-    if (relation.fetchStrategy !== "JOIN") continue;
+    if (relation.fetchStrategy !== "JOIN" || relation.lazy) continue;
     const targetClass = relation.target();
     const targetMetadata = getEntityMetadata(targetClass);
     specs.push({
@@ -41,7 +41,7 @@ export function getJoinFetchSpecs(metadata: EntityMetadata): JoinSpec[] {
   }
 
   for (const relation of metadata.oneToOneRelations) {
-    if (relation.fetchStrategy !== "JOIN") continue;
+    if (relation.fetchStrategy !== "JOIN" || relation.lazy) continue;
     if (!relation.isOwning || !relation.joinColumn) continue;
     const targetClass = relation.target();
     const targetMetadata = getEntityMetadata(targetClass);

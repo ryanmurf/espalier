@@ -40,6 +40,11 @@ import {
   batchLoadManyToMany,
 } from "./relation-loader.js";
 import type { JoinSpec } from "./relation-loader.js";
+import {
+  createLazySingleProxy,
+  createLazyCollectionProxy,
+  isLazyProxy,
+} from "./lazy-proxy.js";
 
 function isProjectionClass(arg: unknown): arg is new (...args: any[]) => any {
   return typeof arg === "function" && getProjectionMetadata(arg) !== undefined;
@@ -197,6 +202,8 @@ export function createDerivedRepository<T, ID>(
 
   async function loadOneToOneRelations(entity: T, conn: Connection): Promise<void> {
     for (const relation of metadata.oneToOneRelations) {
+      // Skip lazy relations — they are handled by lazy proxies
+      if (relation.lazy) continue;
       const targetClass = relation.target();
       const targetMetadata = getEntityMetadata(targetClass);
       const targetRowMapper = createRowMapper(targetClass, targetMetadata);
@@ -281,6 +288,196 @@ export function createDerivedRepository<T, ID>(
           await relStmt.close().catch(() => {});
         }
       }
+    }
+  }
+
+  /**
+   * Attaches lazy proxies to all relation fields marked with `lazy: true`.
+   * The proxy initializer captures the entity's ID and uses a fresh connection
+   * from the DataSource to load the related data on first access.
+   */
+  function attachLazyProxies(entity: T): void {
+    const rec = entity as Record<string | symbol, unknown>;
+    const entityId = getEntityId(entity) as SqlValue;
+
+    // Lazy @ManyToOne relations
+    for (const relation of metadata.manyToOneRelations) {
+      if (!relation.lazy) continue;
+      // Already eagerly loaded (e.g., via JOIN fetch)
+      if (rec[relation.fieldName] !== undefined && !isLazyProxy(rec[relation.fieldName])) continue;
+
+      const fkColumn = relation.joinColumn;
+      rec[relation.fieldName] = createLazySingleProxy(async () => {
+        const conn = await dataSource.getConnection();
+        try {
+          // Get FK value from parent entity's row
+          const fkQuery = new SelectBuilder(metadata.tableName)
+            .columns(fkColumn)
+            .where(new ComparisonCriteria("eq", getIdColumn(), entityId))
+            .limit(1)
+            .build();
+          const fkStmt = conn.prepareStatement(fkQuery.sql);
+          try {
+            for (let i = 0; i < fkQuery.params.length; i++) {
+              fkStmt.setParameter(i + 1, fkQuery.params[i]);
+            }
+            const fkRs = await fkStmt.executeQuery();
+            if (await fkRs.next()) {
+              const fkValue = Object.values(fkRs.getRow())[0] as SqlValue;
+              if (fkValue != null) {
+                const targetClass = relation.target();
+                const targetMeta = getEntityMetadata(targetClass);
+                const targetRowMap = createRowMapper(targetClass, targetMeta);
+                const targetIdField = getIdField(targetClass);
+                if (!targetIdField) return null;
+                const targetColumnMappings = getColumnMappings(targetClass);
+                const targetPkCol = targetColumnMappings.get(targetIdField) ?? String(targetIdField);
+
+                const relQuery = new SelectBuilder(targetMeta.tableName)
+                  .columns(...targetMeta.fields.map(f => f.columnName))
+                  .where(new ComparisonCriteria("eq", targetPkCol, fkValue))
+                  .limit(1)
+                  .build();
+                const relStmt = conn.prepareStatement(relQuery.sql);
+                try {
+                  for (let i = 0; i < relQuery.params.length; i++) {
+                    relStmt.setParameter(i + 1, relQuery.params[i]);
+                  }
+                  const relRs = await relStmt.executeQuery();
+                  if (await relRs.next()) {
+                    return targetRowMap.mapRow(relRs) as object;
+                  }
+                } finally {
+                  await relStmt.close().catch(() => {});
+                }
+              }
+            }
+          } finally {
+            await fkStmt.close().catch(() => {});
+          }
+          return null;
+        } finally {
+          await conn.close();
+        }
+      });
+    }
+
+    // Lazy @OneToOne relations
+    for (const relation of metadata.oneToOneRelations) {
+      if (!relation.lazy) continue;
+      if (rec[relation.fieldName] !== undefined && !isLazyProxy(rec[relation.fieldName])) continue;
+
+      rec[relation.fieldName] = createLazySingleProxy(async () => {
+        const targetClass = relation.target();
+        const targetMeta = getEntityMetadata(targetClass);
+        const targetRowMap = createRowMapper(targetClass, targetMeta);
+        const conn = await dataSource.getConnection();
+        try {
+          if (relation.isOwning && relation.joinColumn) {
+            // Owner side: FK is on parent table
+            const fkQuery = new SelectBuilder(metadata.tableName)
+              .columns(relation.joinColumn)
+              .where(new ComparisonCriteria("eq", getIdColumn(), entityId))
+              .limit(1)
+              .build();
+            const fkStmt = conn.prepareStatement(fkQuery.sql);
+            try {
+              for (let i = 0; i < fkQuery.params.length; i++) {
+                fkStmt.setParameter(i + 1, fkQuery.params[i]);
+              }
+              const fkRs = await fkStmt.executeQuery();
+              if (await fkRs.next()) {
+                const fkValue = Object.values(fkRs.getRow())[0] as SqlValue;
+                if (fkValue != null) {
+                  const targetIdField = getIdField(targetClass);
+                  if (!targetIdField) return null;
+                  const targetColumnMappings = getColumnMappings(targetClass);
+                  const targetPkCol = targetColumnMappings.get(targetIdField) ?? String(targetIdField);
+
+                  const relQuery = new SelectBuilder(targetMeta.tableName)
+                    .columns(...targetMeta.fields.map(f => f.columnName))
+                    .where(new ComparisonCriteria("eq", targetPkCol, fkValue))
+                    .limit(1)
+                    .build();
+                  const relStmt = conn.prepareStatement(relQuery.sql);
+                  try {
+                    for (let i = 0; i < relQuery.params.length; i++) {
+                      relStmt.setParameter(i + 1, relQuery.params[i]);
+                    }
+                    const relRs = await relStmt.executeQuery();
+                    if (await relRs.next()) {
+                      return targetRowMap.mapRow(relRs) as object;
+                    }
+                  } finally {
+                    await relStmt.close().catch(() => {});
+                  }
+                }
+              }
+            } finally {
+              await fkStmt.close().catch(() => {});
+            }
+          } else if (relation.mappedBy) {
+            // Inverse side: FK is on target table
+            const owningRelation = targetMeta.oneToOneRelations.find(
+              r => r.isOwning && String(r.fieldName) === relation.mappedBy,
+            );
+            if (!owningRelation || !owningRelation.joinColumn) return null;
+
+            const relQuery = new SelectBuilder(targetMeta.tableName)
+              .columns(...targetMeta.fields.map(f => f.columnName))
+              .where(new ComparisonCriteria("eq", owningRelation.joinColumn, entityId))
+              .limit(1)
+              .build();
+            const relStmt = conn.prepareStatement(relQuery.sql);
+            try {
+              for (let i = 0; i < relQuery.params.length; i++) {
+                relStmt.setParameter(i + 1, relQuery.params[i]);
+              }
+              const relRs = await relStmt.executeQuery();
+              if (await relRs.next()) {
+                return targetRowMap.mapRow(relRs) as object;
+              }
+            } finally {
+              await relStmt.close().catch(() => {});
+            }
+          }
+          return null;
+        } finally {
+          await conn.close();
+        }
+      });
+    }
+
+    // Lazy @OneToMany relations
+    for (const relation of metadata.oneToManyRelations) {
+      if (!relation.lazy) continue;
+      if (rec[relation.fieldName] !== undefined && !isLazyProxy(rec[relation.fieldName])) continue;
+
+      rec[relation.fieldName] = createLazyCollectionProxy(async () => {
+        const conn = await dataSource.getConnection();
+        try {
+          const childMap = await batchLoadOneToMany(conn, [entityId], relation, metadata);
+          return (childMap.get(entityId) ?? []) as T[];
+        } finally {
+          await conn.close();
+        }
+      });
+    }
+
+    // Lazy @ManyToMany relations
+    for (const relation of metadata.manyToManyRelations) {
+      if (!relation.lazy) continue;
+      if (rec[relation.fieldName] !== undefined && !isLazyProxy(rec[relation.fieldName])) continue;
+
+      rec[relation.fieldName] = createLazyCollectionProxy(async () => {
+        const conn = await dataSource.getConnection();
+        try {
+          const childMap = await batchLoadManyToMany(conn, [entityId], relation);
+          return (childMap.get(entityId) ?? []) as T[];
+        } finally {
+          await conn.close();
+        }
+      });
     }
   }
 
@@ -685,20 +882,22 @@ export function createDerivedRepository<T, ID>(
             if (selectOneToOnes.length > 0) {
               await loadOneToOneRelations(result, conn);
             }
-            // BATCH fetch collection relations for single entity
+            // BATCH fetch collection relations for single entity (skip lazy)
             const singleId = [id as SqlValue];
             for (const relation of metadata.oneToManyRelations) {
-              if (relation.fetchStrategy !== "BATCH") continue;
+              if (relation.fetchStrategy !== "BATCH" || relation.lazy) continue;
               const childMap = await batchLoadOneToMany(conn, singleId, relation, metadata);
               (result as Record<string | symbol, unknown>)[relation.fieldName] =
                 childMap.get(id) ?? [];
             }
             for (const relation of metadata.manyToManyRelations) {
-              if (relation.fetchStrategy !== "BATCH") continue;
+              if (relation.fetchStrategy !== "BATCH" || relation.lazy) continue;
               const childMap = await batchLoadManyToMany(conn, singleId, relation);
               (result as Record<string | symbol, unknown>)[relation.fieldName] =
                 childMap.get(id) ?? [];
             }
+            // Attach lazy proxies for relations marked lazy: true
+            attachLazyProxies(result);
             await invokeLifecycleCallbacks(result, "PostLoad");
             changeTracker.snapshot(result);
             entityCache.put(entityClass, id, result);
@@ -829,11 +1028,11 @@ export function createDerivedRepository<T, ID>(
             results.push(entity);
           }
 
-          // BATCH fetch: load collection relations for all parent entities at once
+          // BATCH fetch: load collection relations for all parent entities at once (skip lazy)
           if (results.length > 0) {
             const parentIds = results.map((e) => getEntityId(e) as SqlValue);
             for (const relation of metadata.oneToManyRelations) {
-              if (relation.fetchStrategy !== "BATCH") continue;
+              if (relation.fetchStrategy !== "BATCH" || relation.lazy) continue;
               const childMap = await batchLoadOneToMany(conn, parentIds, relation, metadata);
               for (const entity of results) {
                 const id = getEntityId(entity);
@@ -842,7 +1041,7 @@ export function createDerivedRepository<T, ID>(
               }
             }
             for (const relation of metadata.manyToManyRelations) {
-              if (relation.fetchStrategy !== "BATCH") continue;
+              if (relation.fetchStrategy !== "BATCH" || relation.lazy) continue;
               const childMap = await batchLoadManyToMany(conn, parentIds, relation);
               for (const entity of results) {
                 const id = getEntityId(entity);
@@ -853,6 +1052,8 @@ export function createDerivedRepository<T, ID>(
           }
 
           for (const entity of results) {
+            // Attach lazy proxies for relations marked lazy: true
+            attachLazyProxies(entity);
             await invokeLifecycleCallbacks(entity, "PostLoad");
             changeTracker.snapshot(entity);
             entityCache.put(entityClass, getEntityId(entity), entity);

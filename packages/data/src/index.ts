@@ -90,6 +90,8 @@ export {
 } from "./query/index.js";
 
 export type { StreamOptions } from "./repository/streaming.js";
+export type { LazyInitializer } from "./repository/lazy-proxy.js";
+export { isLazyProxy, isInitialized, initializeProxy } from "./repository/lazy-proxy.js";
 export type { DerivedRepositoryOptions } from "./repository/derived-repository.js";
 export { createDerivedRepository } from "./repository/derived-repository.js";
 export { createRepository } from "./repository/repository-factory.js";
