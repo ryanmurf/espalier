@@ -136,6 +136,28 @@ export class DdlGenerator {
       columns.push(`  ${parts.join(" ")}`);
     }
 
+    // Generate FK columns with UNIQUE from @OneToOne owner-side relations
+    for (const relation of metadata.oneToOneRelations) {
+      if (!relation.isOwning || !relation.joinColumn) continue;
+
+      const targetClass = relation.target();
+      const targetTableName = getTableName(targetClass);
+      const targetIdField = getIdField(targetClass);
+
+      if (!targetTableName || !targetIdField) continue;
+
+      const targetColumnMappings = getColumnMappings(targetClass);
+      const targetPkColumn = targetColumnMappings.get(targetIdField) ?? String(targetIdField);
+
+      const parts: string[] = [quoteIdentifier(relation.joinColumn), "INTEGER"];
+      if (!relation.nullable) {
+        parts.push("NOT NULL");
+      }
+      parts.push("UNIQUE");
+      parts.push(`REFERENCES ${quoteIdentifier(targetTableName)}(${quoteIdentifier(targetPkColumn)})`);
+      columns.push(`  ${parts.join(" ")}`);
+    }
+
     return `CREATE TABLE ${ifNotExists}${quoteIdentifier(metadata.tableName)} (\n${columns.join(",\n")}\n)`;
   }
 
