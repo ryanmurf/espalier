@@ -153,6 +153,27 @@ export class RawComparisonCriteria implements Criteria {
   }
 }
 
+/** InCriteria variant with raw (pre-formatted) column expression. */
+export class RawInCriteria implements Criteria {
+  readonly type = "in" as const;
+
+  constructor(
+    readonly expression: string,
+    readonly values: SqlValue[],
+  ) {}
+
+  toSql(paramOffset: number): { sql: string; params: SqlValue[] } {
+    if (this.values.length === 0) {
+      return { sql: "1 = 0", params: [] };
+    }
+    const placeholders = this.values.map((_, i) => `$${paramOffset + i}`);
+    return {
+      sql: `${this.expression} IN (${placeholders.join(", ")})`,
+      params: [...this.values],
+    };
+  }
+}
+
 export function and(left: Criteria, right: Criteria): Criteria {
   return new LogicalCriteria("and", left, right);
 }

@@ -36,6 +36,8 @@ import {
   addJoins,
   extractParentRow,
   extractRelatedRow,
+  batchLoadOneToMany,
+  batchLoadManyToMany,
 } from "./relation-loader.js";
 import type { JoinSpec } from "./relation-loader.js";
 
@@ -677,6 +679,20 @@ export function createDerivedRepository<T, ID>(
             if (selectOneToOnes.length > 0) {
               await loadOneToOneRelations(result, conn);
             }
+            // BATCH fetch collection relations for single entity
+            const singleId = [id as SqlValue];
+            for (const relation of metadata.oneToManyRelations) {
+              if (relation.fetchStrategy !== "BATCH") continue;
+              const childMap = await batchLoadOneToMany(conn, singleId, relation, metadata);
+              (result as Record<string | symbol, unknown>)[relation.fieldName] =
+                childMap.get(id) ?? [];
+            }
+            for (const relation of metadata.manyToManyRelations) {
+              if (relation.fetchStrategy !== "BATCH") continue;
+              const childMap = await batchLoadManyToMany(conn, singleId, relation);
+              (result as Record<string | symbol, unknown>)[relation.fieldName] =
+                childMap.get(id) ?? [];
+            }
             await invokeLifecycleCallbacks(result, "PostLoad");
             changeTracker.snapshot(result);
             entityCache.put(entityClass, id, result);
@@ -804,6 +820,33 @@ export function createDerivedRepository<T, ID>(
             if (selectOneToOnes.length > 0) {
               await loadOneToOneRelations(entity, conn);
             }
+            results.push(entity);
+          }
+
+          // BATCH fetch: load collection relations for all parent entities at once
+          if (results.length > 0) {
+            const parentIds = results.map((e) => getEntityId(e) as SqlValue);
+            for (const relation of metadata.oneToManyRelations) {
+              if (relation.fetchStrategy !== "BATCH") continue;
+              const childMap = await batchLoadOneToMany(conn, parentIds, relation, metadata);
+              for (const entity of results) {
+                const id = getEntityId(entity);
+                (entity as Record<string | symbol, unknown>)[relation.fieldName] =
+                  childMap.get(id) ?? [];
+              }
+            }
+            for (const relation of metadata.manyToManyRelations) {
+              if (relation.fetchStrategy !== "BATCH") continue;
+              const childMap = await batchLoadManyToMany(conn, parentIds, relation);
+              for (const entity of results) {
+                const id = getEntityId(entity);
+                (entity as Record<string | symbol, unknown>)[relation.fieldName] =
+                  childMap.get(id) ?? [];
+              }
+            }
+          }
+
+          for (const entity of results) {
             await invokeLifecycleCallbacks(entity, "PostLoad");
             changeTracker.snapshot(entity);
             entityCache.put(entityClass, getEntityId(entity), entity);
@@ -815,7 +858,6 @@ export function createDerivedRepository<T, ID>(
               id: getEntityId(entity),
               timestamp: new Date(),
             } satisfies EntityLoadedEvent<T>);
-            results.push(entity);
           }
           queryCache.put(cacheKey, results, entityClass);
           return results;

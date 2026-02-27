@@ -3,8 +3,11 @@ import type { SqlValue, Connection } from "espalier-jdbc";
 import type { EntityMetadata, FieldMapping } from "../mapping/entity-metadata.js";
 import { getEntityMetadata } from "../mapping/entity-metadata.js";
 import { SelectBuilder } from "../query/query-builder.js";
-import { ComparisonCriteria } from "../query/criteria.js";
-import type { ManyToOneRelation, OneToOneRelation } from "../decorators/relations.js";
+import { ComparisonCriteria, InCriteria, RawInCriteria } from "../query/criteria.js";
+import type { ManyToOneRelation, OneToOneRelation, OneToManyRelation, ManyToManyRelation } from "../decorators/relations.js";
+import { createRowMapper } from "../mapping/row-mapper.js";
+import { getIdField } from "../decorators/id.js";
+import { getColumnMappings } from "../decorators/column.js";
 
 /**
  * Separator used in column aliases to disambiguate joined table columns.
@@ -153,6 +156,140 @@ export function extractRelatedRow(
   for (const field of spec.targetMetadata.fields) {
     result[field.columnName] = row[spec.alias + ALIAS_SEP + field.columnName];
   }
+  return result;
+}
+
+/**
+ * BATCH fetch: loads children for a set of parent IDs using IN queries in chunks.
+ * For @OneToMany: SELECT * FROM children WHERE fk_column IN (...)
+ * For @ManyToMany: SELECT t.* FROM target t JOIN join_table jt ON ... WHERE jt.join_col IN (...)
+ */
+export async function batchLoadOneToMany(
+  conn: Connection,
+  parentIds: SqlValue[],
+  relation: OneToManyRelation,
+  parentMetadata: EntityMetadata,
+): Promise<Map<unknown, unknown[]>> {
+  const targetClass = relation.target();
+  const targetMetadata = getEntityMetadata(targetClass);
+  const targetMapper = createRowMapper(targetClass, targetMetadata);
+  const result = new Map<unknown, unknown[]>();
+
+  // Find the FK column on the target entity that references the parent
+  const targetManyToOnes = targetMetadata.manyToOneRelations;
+  const owningRelation = targetManyToOnes.find(
+    (r) => String(r.fieldName) === relation.mappedBy,
+  );
+  if (!owningRelation) return result;
+  const fkColumn = owningRelation.joinColumn;
+
+  const batchSize = relation.batchSize;
+  for (let i = 0; i < parentIds.length; i += batchSize) {
+    const batch = parentIds.slice(i, i + batchSize);
+    const builder = new SelectBuilder(targetMetadata.tableName)
+      .columns(...targetMetadata.fields.map((f) => f.columnName));
+    builder.where(new InCriteria(fkColumn, batch));
+
+    const query = builder.build();
+    const stmt = conn.prepareStatement(query.sql);
+    try {
+      for (let p = 0; p < query.params.length; p++) {
+        stmt.setParameter(p + 1, query.params[p]);
+      }
+      const rs = await stmt.executeQuery();
+      while (await rs.next()) {
+        const row = rs.getRow();
+        const fkValue = row[fkColumn];
+        const entity = targetMapper.mapRow(rs);
+        if (!result.has(fkValue)) result.set(fkValue, []);
+        result.get(fkValue)!.push(entity);
+      }
+    } finally {
+      await stmt.close().catch(() => {});
+    }
+  }
+
+  return result;
+}
+
+export async function batchLoadManyToMany(
+  conn: Connection,
+  parentIds: SqlValue[],
+  relation: ManyToManyRelation,
+): Promise<Map<unknown, unknown[]>> {
+  const result = new Map<unknown, unknown[]>();
+  if (!relation.isOwning || !relation.joinTable) return result;
+
+  const targetClass = relation.target();
+  const targetMetadata = getEntityMetadata(targetClass);
+  const targetMapper = createRowMapper(targetClass, targetMetadata);
+
+  const jt = relation.joinTable;
+  const targetIdField = targetMetadata.idField;
+  const targetIdMapping = targetMetadata.fields.find((f) => f.fieldName === targetIdField);
+  const targetPkColumn = targetIdMapping ? targetIdMapping.columnName : String(targetIdField);
+
+  const batchSize = relation.batchSize;
+  for (let i = 0; i < parentIds.length; i += batchSize) {
+    const batch = parentIds.slice(i, i + batchSize);
+
+    // SELECT target.*, "jt"."join_col" AS "__jt_fk"
+    // FROM target
+    // INNER JOIN join_table "jt" ON target.pk = "jt".inverse_col
+    // WHERE "jt"."join_col" IN (...)
+    const tbl = targetMetadata.tableName;
+    const cols = targetMetadata.fields.map(
+      (f) => `${quoteIdentifier(tbl)}.${quoteIdentifier(f.columnName)}`,
+    );
+    cols.push(`${quoteIdentifier("jt")}.${quoteIdentifier(jt.joinColumn)} AS ${quoteIdentifier("__jt_fk")}`);
+
+    const builder = new SelectBuilder(tbl);
+    builder.rawColumns(...cols);
+    builder.join(
+      "INNER",
+      jt.name,
+      `${quoteIdentifier(tbl)}.${quoteIdentifier(targetPkColumn)} = ${quoteIdentifier("jt")}.${quoteIdentifier(jt.inverseJoinColumn)}`,
+      "jt",
+    );
+    const whereExpr = `${quoteIdentifier("jt")}.${quoteIdentifier(jt.joinColumn)}`;
+    builder.where(new RawInCriteria(whereExpr, batch));
+
+    const query = builder.build();
+    const stmt = conn.prepareStatement(query.sql);
+    try {
+      for (let p = 0; p < query.params.length; p++) {
+        stmt.setParameter(p + 1, query.params[p]);
+      }
+      const rs = await stmt.executeQuery();
+      while (await rs.next()) {
+        const row = rs.getRow();
+        const parentFk = row["__jt_fk"];
+        const targetRow: Record<string, unknown> = {};
+        for (const f of targetMetadata.fields) {
+          targetRow[f.columnName] = row[f.columnName];
+        }
+        const mockRs = {
+          getRow: () => targetRow,
+          next: async () => false,
+          getString: () => null,
+          getNumber: () => null,
+          getBoolean: () => null,
+          getDate: () => null,
+          getMetadata: () => [],
+          close: async () => {},
+          [Symbol.asyncIterator]: () => ({
+            async next() { return { value: undefined as any, done: true as const }; },
+          }),
+        };
+        const entity = targetMapper.mapRow(mockRs);
+        if (!result.has(parentFk)) result.set(parentFk, []);
+        result.get(parentFk)!.push(entity);
+      }
+    } finally {
+      await stmt.close().catch(() => {});
+    }
+  }
+
   return result;
 }
 

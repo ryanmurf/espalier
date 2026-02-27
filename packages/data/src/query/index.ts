@@ -3,6 +3,7 @@ export {
   ComparisonCriteria,
   RawComparisonCriteria,
   InCriteria,
+  RawInCriteria,
   BetweenCriteria,
   NullCriteria,
   LogicalCriteria,
