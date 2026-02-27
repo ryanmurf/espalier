@@ -80,10 +80,31 @@ export class DdlGenerator {
       // If constructor fails, work with prototype defaults
     }
 
+    // Build a map of embedded field column metadata from embeddable classes
+    const embeddedColumnEntries = new Map<string | symbol, ColumnMetadataEntry>();
+    for (const embedded of metadata.embeddedFields) {
+      const embeddableClass = embedded.target();
+      new embeddableClass(); // trigger decorator initializers
+      const embEntries = getColumnMetadataEntries(embeddableClass);
+      for (const [embFieldName, embEntry] of embEntries) {
+        const dottedName = `${String(embedded.fieldName)}.${String(embFieldName)}`;
+        embeddedColumnEntries.set(dottedName, {
+          ...embEntry,
+          columnName: `${embedded.prefix}${embEntry.columnName}`,
+        });
+      }
+    }
+
     const ifNotExists = options?.ifNotExists ? "IF NOT EXISTS " : "";
     const columns = metadata.fields.map((field) => {
-      const entry = entries.get(field.fieldName) ?? { columnName: field.columnName };
-      const sqlType = resolveColumnType(entry, instance[field.fieldName as string]);
+      const entry = entries.get(field.fieldName)
+        ?? embeddedColumnEntries.get(field.fieldName)
+        ?? { columnName: field.columnName };
+      const fieldStr = typeof field.fieldName === "string" ? field.fieldName : String(field.fieldName);
+      const defaultValue = fieldStr.includes(".")
+        ? undefined  // embedded fields don't use parent instance defaults
+        : instance[fieldStr];
+      const sqlType = resolveColumnType(entry, defaultValue);
       const isPk = field.fieldName === metadata.idField;
       const isCreatedDate = field.fieldName === createdDateField;
 

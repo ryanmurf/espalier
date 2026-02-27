@@ -1,5 +1,6 @@
 import type { EntityMetadata, FieldMapping } from "./entity-metadata.js";
 import { getGlobalLogger, LogLevel } from "espalier-jdbc";
+import { getFieldValue } from "./field-access.js";
 
 export interface FieldChange {
   field: string | symbol;
@@ -123,7 +124,7 @@ export class EntityChangeTracker<T> {
     const snap: Record<string | symbol, unknown> = {};
     for (const field of this.metadata.fields) {
       snap[field.fieldName] = cloneValue(
-        (entity as Record<string | symbol, unknown>)[field.fieldName],
+        getFieldValue(entity as Record<string | symbol, unknown>, field.fieldName),
       );
     }
     this.snapshots.set(entity as object, snap);
@@ -133,7 +134,7 @@ export class EntityChangeTracker<T> {
     const snap = this.snapshots.get(entity as object);
     if (!snap) return true; // No snapshot means we don't know — treat as dirty
     for (const field of this.metadata.fields) {
-      const current = (entity as Record<string | symbol, unknown>)[field.fieldName];
+      const current = getFieldValue(entity as Record<string | symbol, unknown>, field.fieldName);
       if (!deepEqual(current, snap[field.fieldName])) {
         return true;
       }
@@ -146,7 +147,7 @@ export class EntityChangeTracker<T> {
     if (!snap) return []; // No snapshot — can't determine dirty fields
     const changes: FieldChange[] = [];
     for (const field of this.metadata.fields) {
-      const current = (entity as Record<string | symbol, unknown>)[field.fieldName];
+      const current = getFieldValue(entity as Record<string | symbol, unknown>, field.fieldName);
       const old = snap[field.fieldName];
       if (!deepEqual(current, old)) {
         changes.push({

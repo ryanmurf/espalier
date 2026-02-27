@@ -29,6 +29,7 @@ import type { OneToOneRelation } from "../decorators/relations.js";
 import { getTableName } from "../decorators/table.js";
 import { getIdField } from "../decorators/id.js";
 import { getColumnMappings } from "../decorators/column.js";
+import { getFieldValue } from "../mapping/field-access.js";
 
 function isProjectionClass(arg: unknown): arg is new (...args: any[]) => any {
   return typeof arg === "function" && getProjectionMetadata(arg) !== undefined;
@@ -266,7 +267,7 @@ export function createDerivedRepository<T, ID>(
             if (field.fieldName === versionField) {
               updateBuilder.set(field.columnName, newVersion as SqlValue);
             } else {
-              const value = (entity as Record<string | symbol, unknown>)[field.fieldName] as SqlValue;
+              const value = getFieldValue(entity as Record<string | symbol, unknown>, field.fieldName) as SqlValue;
               updateBuilder.set(field.columnName, value);
             }
           }
@@ -297,7 +298,7 @@ export function createDerivedRepository<T, ID>(
         if (isFullUpdate) {
           for (const field of metadata.fields) {
             if (field.fieldName === idField) continue;
-            const value = (entity as Record<string | symbol, unknown>)[field.fieldName] as SqlValue;
+            const value = getFieldValue(entity as Record<string | symbol, unknown>, field.fieldName) as SqlValue;
             updateBuilder.set(field.columnName, value);
           }
           // Include FK columns for owning @OneToOne relations
@@ -395,7 +396,7 @@ export function createDerivedRepository<T, ID>(
         if (versionField && field.fieldName === versionField) {
           insertBuilder.set(field.columnName, 1 as SqlValue);
         } else {
-          const value = (entity as Record<string | symbol, unknown>)[field.fieldName] as SqlValue;
+          const value = getFieldValue(entity as Record<string | symbol, unknown>, field.fieldName) as SqlValue;
           insertBuilder.set(field.columnName, value);
         }
       }
