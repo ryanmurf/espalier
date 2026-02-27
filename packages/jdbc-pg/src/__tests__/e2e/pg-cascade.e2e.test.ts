@@ -4,17 +4,15 @@
  * orphan behavior, partial cascade, mixed strategies, and edge cases
  * against live Postgres.
  *
- * Bug 6: copyRelationFields() doesn't copy @OneToMany or @ManyToMany relations
- * from the original entity to the rowMapper result. This means cascadePostSave()
- * never sees collection relations on the INSERT path, so @OneToMany and @ManyToMany
- * cascade persist/merge silently do nothing. Tests that verify this bug are marked.
+ * Bugs fixed:
+ * - Bug 6 (b580167): copyRelationFields() now copies @OneToMany and @ManyToMany relations.
+ * - Bug 7 (b580167): cascade methods now use getEntityMetadata(targetClass).idField
+ *   instead of raw getIdField() WeakMap lookup.
+ * - Bug 8 (4f9f59c): dirty-check shortcut now runs cascadePostSave even when
+ *   parent entity has no dirty scalar fields.
  *
- * Bug 7: cascadePreSave/cascadePostSave use getIdField(targetClass) which does
- * a raw WeakMap lookup. If the target class hasn't been instantiated via `new`
- * (e.g. only used via Object.create()), the @Id initializer never ran and
- * getIdField returns undefined, silently skipping the cascade. Should use
- * getEntityMetadata(targetClass).idField which triggers initialization.
- * Workaround: call getEntityMetadata() for all entity classes upfront.
+ * We still call getEntityMetadata() upfront for all entity classes as good
+ * practice to ensure metadata initialization.
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { createTestDataSource, isPostgresAvailable } from "./setup.js";
@@ -68,7 +66,7 @@ class CscJEmployee {
   department!: CscJDepartment | null;
 }
 
-// -- @OneToMany (cascade post-save: affected by Bug 6) --
+// -- @OneToMany (cascade post-save) --
 @Table("e2e_csc_authors")
 class CscAuthor {
   @Id @Column({ type: "SERIAL" }) id: number = 0;
@@ -100,7 +98,7 @@ class CscUser {
   profile!: CscProfile | null;
 }
 
-// -- @ManyToMany (cascade post-save: affected by Bug 6) --
+// -- @ManyToMany (cascade post-save) --
 @Table("e2e_csc_tags")
 class CscTag {
   @Id @Column({ type: "SERIAL" }) id: number = 0;
@@ -168,7 +166,7 @@ class CscInvUser {
   profile!: CscInvProfile | null;
 }
 
-// Force metadata initialization for ALL entity classes (workaround for Bug 7).
+// Ensure metadata initialization for all entity classes (good practice).
 const allEntityClasses = [
   CscDepartment, CscEmployee, CscJDepartment, CscJEmployee,
   CscAuthor, CscBook, CscProfile, CscUser,
@@ -333,13 +331,12 @@ describe.skipIf(!canConnect)("cascade operations E2E", () => {
   });
 
   // ═══════════════════════════════════════
-  // Section 2: Bug 6 — @OneToMany/@ManyToMany cascade persist broken
-  // copyRelationFields() doesn't copy collection relations to `saved`,
-  // so cascadePostSave() never sees them.
+  // Section 2: @OneToMany/@ManyToMany cascade persist (post-save)
+  // Fixed in b580167: copyRelationFields() now copies collection relations.
   // ═══════════════════════════════════════
 
-  describe("Bug 6: @OneToMany/@ManyToMany cascade persist does NOT work", () => {
-    it("@OneToMany cascade persist — children are NOT saved (Bug 6)", async () => {
+  describe("cascade persist (post-save)", () => {
+    it("@OneToMany cascade persist — children saved transitively", async () => {
       const repo = createRepository(CscAuthor, ds);
       const author = make(CscAuthor, {
         authorName: "Tolkien",
@@ -350,18 +347,18 @@ describe.skipIf(!canConnect)("cascade operations E2E", () => {
       });
       const saved = await repo.save(author);
       expect(saved.id).toBeGreaterThan(0);
-      // Bug 6: children are NOT cascade-persisted because copyRelationFields
-      // doesn't copy @OneToMany to the `saved` object
       const conn = await ds.getConnection();
       try {
-        const rows = await rawQuery(conn, `SELECT * FROM e2e_csc_books WHERE author_id = ${saved.id}`);
-        expect(rows.length).toBe(0); // <-- Bug 6: should be 2
+        const rows = await rawQuery(conn, `SELECT * FROM e2e_csc_books WHERE author_id = ${saved.id} ORDER BY title`);
+        expect(rows.length).toBe(2);
+        expect(rows[0].title).toBe("LOTR");
+        expect(rows[1].title).toBe("The Hobbit");
       } finally {
         await conn.close();
       }
     });
 
-    it("@ManyToMany cascade persist — tags NOT saved, join table NOT populated (Bug 6)", async () => {
+    it("@ManyToMany cascade persist — tags saved and join table populated", async () => {
       const repo = createRepository(CscArticle, ds);
       const article = make(CscArticle, {
         title: "Cascade Testing",
@@ -372,11 +369,14 @@ describe.skipIf(!canConnect)("cascade operations E2E", () => {
       });
       const saved = await repo.save(article);
       expect(saved.id).toBeGreaterThan(0);
-      // Bug 6: tags are NOT cascade-persisted
       const conn = await ds.getConnection();
       try {
         const jtRows = await rawQuery(conn, `SELECT * FROM e2e_csc_article_tags WHERE article_id = ${saved.id}`);
-        expect(jtRows.length).toBe(0); // <-- Bug 6: should be 2
+        expect(jtRows.length).toBe(2);
+        const tagRows = await rawQuery(conn, `SELECT t.label FROM e2e_csc_tags t JOIN e2e_csc_article_tags jt ON t.id = jt.tag_id WHERE jt.article_id = ${saved.id} ORDER BY t.label`);
+        expect(tagRows.length).toBe(2);
+        expect(tagRows[0].label).toBe("testing");
+        expect(tagRows[1].label).toBe("typescript");
       } finally {
         await conn.close();
       }
@@ -385,12 +385,11 @@ describe.skipIf(!canConnect)("cascade operations E2E", () => {
 
   // ═══════════════════════════════════════
   // Section 3: Cascade Remove
-  // Uses raw SQL to set up data (bypassing Bug 6)
   // ═══════════════════════════════════════
 
   describe("cascade remove", () => {
     it("@OneToMany cascade remove — children deleted before parent", async () => {
-      // Set up data via raw SQL to bypass Bug 6
+      // Set up data via raw SQL so we have known IDs to attach
       const conn = await ds.getConnection();
       let authorId: number;
       let bookId1: number;
@@ -540,7 +539,7 @@ describe.skipIf(!canConnect)("cascade operations E2E", () => {
       }
     });
 
-    it("@OneToMany cascade merge on UPDATE path — Bug 6 prevents child updates", async () => {
+    it("@OneToMany cascade merge on UPDATE path — child updated even when parent is clean", async () => {
       // Insert author and book via raw SQL
       const conn0 = await ds.getConnection();
       let authorId: number;
@@ -554,7 +553,7 @@ describe.skipIf(!canConnect)("cascade operations E2E", () => {
         await conn0.close();
       }
 
-      // Load author, attach book with modified title, save (UPDATE)
+      // Load author (creates snapshot), attach book with modified title, save (UPDATE)
       const repo = createRepository(CscAuthor, ds);
       const loaded = await repo.findById(authorId);
       expect(loaded).not.toBeNull();
@@ -562,11 +561,10 @@ describe.skipIf(!canConnect)("cascade operations E2E", () => {
       loaded!.books = [modifiedBook];
       await repo.save(loaded!);
 
-      // Bug 6: cascadePostSave doesn't see books because copyRelationFields doesn't copy them
       const conn = await ds.getConnection();
       try {
         const rows = await rawQuery(conn, `SELECT * FROM e2e_csc_books WHERE id = ${bookId}`);
-        expect(rows[0].title).toBe("Original"); // <-- Bug 6: should be "Revised"
+        expect(rows[0].title).toBe("Revised");
       } finally {
         await conn.close();
       }
