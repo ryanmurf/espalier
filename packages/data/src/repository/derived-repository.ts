@@ -27,7 +27,6 @@ import type { EntityPersistedEvent, EntityUpdatedEvent, EntityRemovedEvent, Enti
 import { ENTITY_EVENTS } from "../events/entity-events.js";
 import type { OneToOneRelation } from "../decorators/relations.js";
 import { getTableName } from "../decorators/table.js";
-import { getIdField } from "../decorators/id.js";
 import { getColumnMappings } from "../decorators/column.js";
 import { getFieldValue } from "../mapping/field-access.js";
 import {
@@ -188,6 +187,16 @@ export function createDerivedRepository<T, ID>(
         rec[relation.fieldName] = src[relation.fieldName];
       }
     }
+    for (const relation of metadata.oneToManyRelations) {
+      if (src[relation.fieldName] !== undefined) {
+        rec[relation.fieldName] = src[relation.fieldName];
+      }
+    }
+    for (const relation of metadata.manyToManyRelations) {
+      if (src[relation.fieldName] !== undefined) {
+        rec[relation.fieldName] = src[relation.fieldName];
+      }
+    }
   }
 
   function getOneToOneFkValue(entity: T, relation: OneToOneRelation): SqlValue | undefined {
@@ -195,7 +204,7 @@ export function createDerivedRepository<T, ID>(
     const relatedEntity = (entity as Record<string | symbol, unknown>)[relation.fieldName];
     if (relatedEntity == null) return null;
     const targetClass = relation.target();
-    const targetIdField = getIdField(targetClass);
+    const targetIdField = getEntityMetadata(targetClass).idField;
     if (!targetIdField) return undefined;
     return (relatedEntity as Record<string | symbol, unknown>)[targetIdField] as SqlValue;
   }
@@ -204,7 +213,7 @@ export function createDerivedRepository<T, ID>(
     const relatedEntity = (entity as Record<string | symbol, unknown>)[relation.fieldName];
     if (relatedEntity == null) return null as SqlValue;
     const targetClass = relation.target();
-    const targetIdField = getIdField(targetClass);
+    const targetIdField = getEntityMetadata(targetClass).idField;
     if (!targetIdField) return null as SqlValue;
     return (relatedEntity as Record<string | symbol, unknown>)[targetIdField] as SqlValue;
   }
@@ -241,7 +250,7 @@ export function createDerivedRepository<T, ID>(
             const row = fkRs.getRow();
             const fkValue = Object.values(row)[0] as SqlValue;
             if (fkValue != null) {
-              const targetIdField = getIdField(targetClass);
+              const targetIdField = getEntityMetadata(targetClass).idField;
               if (!targetIdField) continue;
               const targetColumnMappings = getColumnMappings(targetClass);
               const targetPkColumn = targetColumnMappings.get(targetIdField) ?? String(targetIdField);
@@ -337,7 +346,7 @@ export function createDerivedRepository<T, ID>(
                 const targetClass = relation.target();
                 const targetMeta = getEntityMetadata(targetClass);
                 const targetRowMap = createRowMapper(targetClass, targetMeta);
-                const targetIdField = getIdField(targetClass);
+                const targetIdField = getEntityMetadata(targetClass).idField;
                 if (!targetIdField) return null;
                 const targetColumnMappings = getColumnMappings(targetClass);
                 const targetPkCol = targetColumnMappings.get(targetIdField) ?? String(targetIdField);
@@ -398,7 +407,7 @@ export function createDerivedRepository<T, ID>(
               if (await fkRs.next()) {
                 const fkValue = Object.values(fkRs.getRow())[0] as SqlValue;
                 if (fkValue != null) {
-                  const targetIdField = getIdField(targetClass);
+                  const targetIdField = getEntityMetadata(targetClass).idField;
                   if (!targetIdField) return null;
                   const targetColumnMappings = getColumnMappings(targetClass);
                   const targetPkCol = targetColumnMappings.get(targetIdField) ?? String(targetIdField);
@@ -572,7 +581,7 @@ export function createDerivedRepository<T, ID>(
           if (relEntity == null) {
             updateBuilder.set(rel.joinColumn, null as SqlValue);
           } else {
-            const targetIdField = getIdField(rel.target());
+            const targetIdField = getEntityMetadata(rel.target()).idField;
             if (targetIdField) {
               const fk = (relEntity as Record<string | symbol, unknown>)[targetIdField] as SqlValue;
               updateBuilder.set(rel.joinColumn, fk);
@@ -585,7 +594,7 @@ export function createDerivedRepository<T, ID>(
           if (mtoEntity == null) {
             updateBuilder.set(rel.joinColumn, null as SqlValue);
           } else {
-            const targetIdField = getIdField(rel.target());
+            const targetIdField = getEntityMetadata(rel.target()).idField;
             if (targetIdField) {
               const fk = (mtoEntity as Record<string | symbol, unknown>)[targetIdField] as SqlValue;
               updateBuilder.set(rel.joinColumn, fk);
@@ -627,7 +636,7 @@ export function createDerivedRepository<T, ID>(
             if (!rel.nullable) continue;
             insertBuilder.set(rel.joinColumn, null as SqlValue);
           } else {
-            const targetIdField = getIdField(rel.target());
+            const targetIdField = getEntityMetadata(rel.target()).idField;
             if (targetIdField) {
               const fk = (relEntity as Record<string | symbol, unknown>)[targetIdField] as SqlValue;
               insertBuilder.set(rel.joinColumn, fk);
@@ -641,7 +650,7 @@ export function createDerivedRepository<T, ID>(
             if (!rel.nullable) continue;
             insertBuilder.set(rel.joinColumn, null as SqlValue);
           } else {
-            const targetIdField = getIdField(rel.target());
+            const targetIdField = getEntityMetadata(rel.target()).idField;
             if (targetIdField) {
               const fk = (mtoEntity as Record<string | symbol, unknown>)[targetIdField] as SqlValue;
               insertBuilder.set(rel.joinColumn, fk);
@@ -691,7 +700,7 @@ export function createDerivedRepository<T, ID>(
       if (relatedEntity == null || isLazyProxy(relatedEntity)) continue;
 
       const targetClass = relation.target();
-      const targetIdField = getIdField(targetClass);
+      const targetIdField = getEntityMetadata(targetClass).idField;
       if (!targetIdField) continue;
       const relatedId = (relatedEntity as Record<string | symbol, unknown>)[targetIdField];
 
@@ -712,7 +721,7 @@ export function createDerivedRepository<T, ID>(
       if (relatedEntity == null || isLazyProxy(relatedEntity)) continue;
 
       const targetClass = relation.target();
-      const targetIdField = getIdField(targetClass);
+      const targetIdField = getEntityMetadata(targetClass).idField;
       if (!targetIdField) continue;
       const relatedId = (relatedEntity as Record<string | symbol, unknown>)[targetIdField];
 
@@ -737,7 +746,7 @@ export function createDerivedRepository<T, ID>(
       if (relatedEntity == null || isLazyProxy(relatedEntity)) continue;
 
       const targetClass = relation.target();
-      const targetIdField = getIdField(targetClass);
+      const targetIdField = getEntityMetadata(targetClass).idField;
       if (!targetIdField) continue;
 
       // Set the FK on the child entity pointing back to the parent
@@ -768,7 +777,7 @@ export function createDerivedRepository<T, ID>(
       if (!Array.isArray(children)) continue;
 
       const targetClass = relation.target();
-      const targetIdField = getIdField(targetClass);
+      const targetIdField = getEntityMetadata(targetClass).idField;
       if (!targetIdField) continue;
       const targetMeta = getEntityMetadata(targetClass);
 
@@ -803,7 +812,7 @@ export function createDerivedRepository<T, ID>(
       if (!Array.isArray(children)) continue;
 
       const targetClass = relation.target();
-      const targetIdField = getIdField(targetClass);
+      const targetIdField = getEntityMetadata(targetClass).idField;
       if (!targetIdField) continue;
       const jt = relation.joinTable;
 
