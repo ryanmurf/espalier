@@ -15,6 +15,7 @@ export interface BuiltQuery {
 interface JoinClause {
   type: JoinType;
   table: string;
+  alias?: string;
   on: string;
 }
 
@@ -34,6 +35,7 @@ export class SelectBuilder {
   private _limit: number | undefined;
   private _offset: number | undefined;
   private _distinct = false;
+  private _rawColumns = false;
   private _cacheable = false;
   private _cacheTtlMs: number | undefined;
 
@@ -48,6 +50,14 @@ export class SelectBuilder {
 
   columns(...columns: string[]): SelectBuilder {
     this._columns = columns;
+    this._rawColumns = false;
+    return this;
+  }
+
+  /** Set columns as raw SQL expressions (not quoted). */
+  rawColumns(...columns: string[]): SelectBuilder {
+    this._columns = columns;
+    this._rawColumns = true;
     return this;
   }
 
@@ -74,8 +84,8 @@ export class SelectBuilder {
     return this;
   }
 
-  join(type: JoinType, table: string, on: string): SelectBuilder {
-    this._joins.push({ type, table, on });
+  join(type: JoinType, table: string, on: string, alias?: string): SelectBuilder {
+    this._joins.push({ type, table, alias, on });
     return this;
   }
 
@@ -125,11 +135,17 @@ export class SelectBuilder {
     let paramIdx = 1;
     const parts: string[] = [];
 
-    parts.push(`SELECT ${this._distinct ? "DISTINCT " : ""}${this._columns.map(c => quoteIdentifier(c)).join(", ")}`);
+    const colList = this._rawColumns
+      ? this._columns.join(", ")
+      : this._columns.map(c => quoteIdentifier(c)).join(", ");
+    parts.push(`SELECT ${this._distinct ? "DISTINCT " : ""}${colList}`);
     parts.push(`FROM ${quoteIdentifier(this._from)}`);
 
     for (const join of this._joins) {
-      parts.push(`${join.type} JOIN ${quoteIdentifier(join.table)} ON ${join.on}`);
+      const tableExpr = join.alias
+        ? `${quoteIdentifier(join.table)} ${quoteIdentifier(join.alias)}`
+        : quoteIdentifier(join.table);
+      parts.push(`${join.type} JOIN ${tableExpr} ON ${join.on}`);
     }
 
     if (this._where) {

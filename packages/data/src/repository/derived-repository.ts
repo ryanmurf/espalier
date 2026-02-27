@@ -1,5 +1,5 @@
 import type { DataSource, Connection, SqlValue, Logger } from "espalier-jdbc";
-import { getGlobalLogger, LogLevel } from "espalier-jdbc";
+import { getGlobalLogger, LogLevel, quoteIdentifier } from "espalier-jdbc";
 import type { CrudRepository } from "./crud-repository.js";
 import type { EntityMetadata, FieldMapping } from "../mapping/entity-metadata.js";
 import { getEntityMetadata } from "../mapping/entity-metadata.js";
@@ -11,7 +11,7 @@ import { parseDerivedQueryMethod } from "../query/derived-query-parser.js";
 import type { DerivedQueryDescriptor } from "../query/derived-query-parser.js";
 import { buildDerivedQuery } from "../query/derived-query-executor.js";
 import { SelectBuilder, InsertBuilder, UpdateBuilder, DeleteBuilder } from "../query/query-builder.js";
-import { ComparisonCriteria, LogicalCriteria } from "../query/criteria.js";
+import { ComparisonCriteria, RawComparisonCriteria, LogicalCriteria } from "../query/criteria.js";
 import type { Specification } from "../query/specification.js";
 import { OptimisticLockException } from "./optimistic-lock.js";
 import { EntityNotFoundException } from "./entity-not-found.js";
@@ -30,6 +30,14 @@ import { getTableName } from "../decorators/table.js";
 import { getIdField } from "../decorators/id.js";
 import { getColumnMappings } from "../decorators/column.js";
 import { getFieldValue } from "../mapping/field-access.js";
+import {
+  getJoinFetchSpecs,
+  buildJoinColumns,
+  addJoins,
+  extractParentRow,
+  extractRelatedRow,
+} from "./relation-loader.js";
+import type { JoinSpec } from "./relation-loader.js";
 
 function isProjectionClass(arg: unknown): arg is new (...args: any[]) => any {
   return typeof arg === "function" && getProjectionMetadata(arg) !== undefined;
@@ -66,6 +74,7 @@ export function createDerivedRepository<T, ID>(
   const entityCache = new EntityCache(entityCacheConfig);
   const queryCache = new QueryCache(queryCacheConfig);
   const changeTracker = new EntityChangeTracker<T>(metadata);
+  const joinFetchSpecs = getJoinFetchSpecs(metadata);
   const entityName = entityClass.name;
   const repoLogger: Logger = getGlobalLogger().child("repository");
 
@@ -102,6 +111,56 @@ export function createDerivedRepository<T, ID>(
 
   function getEntityId(entity: T): unknown {
     return (entity as Record<string | symbol, unknown>)[metadata.idField];
+  }
+
+  /**
+   * Map a JOIN result row to the parent entity plus any JOIN-fetched relations.
+   * Uses a mock ResultSet that returns the extracted parent row.
+   */
+  function mapJoinRow(row: Record<string, unknown>): T {
+    const parentRow = extractParentRow(row, metadata.tableName, metadata.fields);
+    // Create a mock ResultSet for the row mapper
+    const mockRs = {
+      getRow: () => parentRow,
+      next: async () => false,
+      getString: () => null,
+      getNumber: () => null,
+      getBoolean: () => null,
+      getDate: () => null,
+      getMetadata: () => [],
+      close: async () => {},
+      [Symbol.asyncIterator]: () => ({
+        async next() { return { value: undefined as any, done: true as const }; },
+      }),
+    };
+    const entity = rowMapper.mapRow(mockRs);
+
+    // Map JOIN-fetched related entities
+    for (const spec of joinFetchSpecs) {
+      const relatedRow = extractRelatedRow(row, spec);
+      if (relatedRow) {
+        const targetClass = spec.relation.target();
+        const targetMapper = createRowMapper(targetClass, spec.targetMetadata);
+        const relMockRs = {
+          getRow: () => relatedRow,
+          next: async () => false,
+          getString: () => null,
+          getNumber: () => null,
+          getBoolean: () => null,
+          getDate: () => null,
+          getMetadata: () => [],
+          close: async () => {},
+          [Symbol.asyncIterator]: () => ({
+            async next() { return { value: undefined as any, done: true as const }; },
+          }),
+        };
+        (entity as Record<string | symbol, unknown>)[spec.relation.fieldName] = targetMapper.mapRow(relMockRs);
+      } else {
+        (entity as Record<string | symbol, unknown>)[spec.relation.fieldName] = null;
+      }
+    }
+
+    return entity;
   }
 
   function getOneToOneFkValue(entity: T, relation: OneToOneRelation): SqlValue | undefined {
@@ -559,10 +618,22 @@ export function createDerivedRepository<T, ID>(
         return cached;
       }
 
-      const builder = new SelectBuilder(metadata.tableName)
-        .columns(...metadata.fields.map((f: FieldMapping) => f.columnName))
-        .where(new ComparisonCriteria("eq", idCol, id as SqlValue))
-        .limit(1);
+      const builder = new SelectBuilder(metadata.tableName);
+
+      if (joinFetchSpecs.length > 0) {
+        // JOIN fetch: use aliased columns and LEFT JOINs
+        const joinCols = buildJoinColumns(metadata.tableName, metadata.fields, joinFetchSpecs);
+        builder.rawColumns(...joinCols);
+        addJoins(builder, metadata.tableName, joinFetchSpecs);
+        const qualifiedIdCol = `${quoteIdentifier(metadata.tableName)}.${quoteIdentifier(getIdColumn())}`;
+        builder.where(new RawComparisonCriteria("eq", qualifiedIdCol, id as SqlValue));
+        builder.limit(1);
+      } else {
+        builder
+          .columns(...metadata.fields.map((f: FieldMapping) => f.columnName))
+          .where(new ComparisonCriteria("eq", idCol, id as SqlValue))
+          .limit(1);
+      }
 
       const query = builder.build();
       const conn = await dataSource.getConnection();
@@ -574,8 +645,14 @@ export function createDerivedRepository<T, ID>(
           }
           const rs = await stmt.executeQuery();
           if (await rs.next()) {
-            const result = rowMapper.mapRow(rs);
-            if (metadata.oneToOneRelations.length > 0) {
+            const result = joinFetchSpecs.length > 0
+              ? mapJoinRow(rs.getRow())
+              : rowMapper.mapRow(rs);
+            // Load non-JOIN-fetched OneToOne relations (SELECT strategy)
+            const selectOneToOnes = metadata.oneToOneRelations.filter(
+              (r) => r.fetchStrategy !== "JOIN",
+            );
+            if (selectOneToOnes.length > 0) {
               await loadOneToOneRelations(result, conn);
             }
             await invokeLifecycleCallbacks(result, "PostLoad");
@@ -658,8 +735,16 @@ export function createDerivedRepository<T, ID>(
       }
 
       const spec = specOrProjection as Specification<T> | undefined;
-      const builder = new SelectBuilder(metadata.tableName)
-        .columns(...metadata.fields.map((f: FieldMapping) => f.columnName));
+      const useJoinFetch = joinFetchSpecs.length > 0;
+      const builder = new SelectBuilder(metadata.tableName);
+
+      if (useJoinFetch) {
+        const joinCols = buildJoinColumns(metadata.tableName, metadata.fields, joinFetchSpecs);
+        builder.rawColumns(...joinCols);
+        addJoins(builder, metadata.tableName, joinFetchSpecs);
+      } else {
+        builder.columns(...metadata.fields.map((f: FieldMapping) => f.columnName));
+      }
 
       if (spec) {
         builder.where(spec.toPredicate(metadata));
@@ -687,8 +772,14 @@ export function createDerivedRepository<T, ID>(
           const rs = await stmt.executeQuery();
           const results: T[] = [];
           while (await rs.next()) {
-            const entity = rowMapper.mapRow(rs);
-            if (metadata.oneToOneRelations.length > 0) {
+            const entity = useJoinFetch
+              ? mapJoinRow(rs.getRow())
+              : rowMapper.mapRow(rs);
+            // Load non-JOIN-fetched OneToOne relations (SELECT strategy)
+            const selectOneToOnes = metadata.oneToOneRelations.filter(
+              (r) => r.fetchStrategy !== "JOIN",
+            );
+            if (selectOneToOnes.length > 0) {
               await loadOneToOneRelations(entity, conn);
             }
             await invokeLifecycleCallbacks(entity, "PostLoad");
