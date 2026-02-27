@@ -163,6 +163,26 @@ export function createDerivedRepository<T, ID>(
     return entity;
   }
 
+  /**
+   * Copies relation fields from the source entity to the target entity.
+   * Called after rowMapper.mapRow() on RETURNING * to preserve relation objects
+   * that aren't in metadata.fields (e.g. @OneToOne, @ManyToOne).
+   */
+  function copyRelationFields(target: T, source: T): void {
+    const rec = target as Record<string | symbol, unknown>;
+    const src = source as Record<string | symbol, unknown>;
+    for (const relation of metadata.oneToOneRelations) {
+      if (src[relation.fieldName] !== undefined) {
+        rec[relation.fieldName] = src[relation.fieldName];
+      }
+    }
+    for (const relation of metadata.manyToOneRelations) {
+      if (src[relation.fieldName] !== undefined) {
+        rec[relation.fieldName] = src[relation.fieldName];
+      }
+    }
+  }
+
   function getOneToOneFkValue(entity: T, relation: OneToOneRelation): SqlValue | undefined {
     if (!relation.isOwning || !relation.joinColumn) return undefined;
     const relatedEntity = (entity as Record<string | symbol, unknown>)[relation.fieldName];
@@ -392,6 +412,7 @@ export function createDerivedRepository<T, ID>(
         const rs = await stmt.executeQuery();
         if (await rs.next()) {
           const saved = rowMapper.mapRow(rs);
+          copyRelationFields(saved, entity);
           await invokeLifecycleCallbacks(saved, "PostUpdate");
           changeTracker.snapshot(saved);
           entityCache.put(entityClass, getEntityId(saved), saved);
@@ -479,6 +500,7 @@ export function createDerivedRepository<T, ID>(
         const rs = await stmt.executeQuery();
         if (await rs.next()) {
           const saved = rowMapper.mapRow(rs);
+          copyRelationFields(saved, entity);
           await invokeLifecycleCallbacks(saved, "PostPersist");
           changeTracker.snapshot(saved);
           entityCache.put(entityClass, getEntityId(saved), saved);
