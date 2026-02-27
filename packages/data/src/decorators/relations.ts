@@ -11,12 +11,31 @@ function parseFetch(fetch?: FetchType | FetchOptions): { fetchStrategy: FetchTyp
   return { fetchStrategy: fetch.strategy, batchSize: fetch.batchSize ?? 25 };
 }
 
+export type CascadeType = "persist" | "merge" | "remove" | "refresh" | "all";
+
+const ALL_CASCADE_TYPES: ReadonlySet<CascadeType> = new Set(["persist", "merge", "remove", "refresh"]);
+
+function parseCascade(cascade?: CascadeType | CascadeType[]): Set<CascadeType> {
+  if (!cascade) return new Set();
+  const types = Array.isArray(cascade) ? cascade : [cascade];
+  const result = new Set<CascadeType>();
+  for (const t of types) {
+    if (t === "all") {
+      for (const ct of ALL_CASCADE_TYPES) result.add(ct);
+    } else {
+      result.add(t);
+    }
+  }
+  return result;
+}
+
 export interface ManyToOneOptions {
   target: () => new (...args: any[]) => any;
   joinColumn?: string;
   nullable?: boolean;
   fetch?: FetchType | FetchOptions;
   lazy?: boolean;
+  cascade?: CascadeType | CascadeType[];
 }
 
 export interface ManyToOneRelation {
@@ -27,6 +46,7 @@ export interface ManyToOneRelation {
   fetchStrategy: FetchType;
   batchSize: number;
   lazy: boolean;
+  cascade: Set<CascadeType>;
 }
 
 const manyToOneMetadata = new WeakMap<object, Map<string | symbol, ManyToOneRelation>>();
@@ -41,6 +61,7 @@ export function ManyToOne(options: ManyToOneOptions) {
     const nullable = options.nullable ?? true;
     const { fetchStrategy, batchSize } = parseFetch(options.fetch);
     const lazy = options.lazy ?? false;
+    const cascade = parseCascade(options.cascade);
 
     context.addInitializer(function (this: T) {
       const constructor = (this as object).constructor;
@@ -55,6 +76,7 @@ export function ManyToOne(options: ManyToOneOptions) {
         fetchStrategy,
         batchSize,
         lazy,
+        cascade,
       });
     });
   };
@@ -71,6 +93,7 @@ export interface OneToManyOptions {
   mappedBy: string;
   fetch?: FetchType | FetchOptions;
   lazy?: boolean;
+  cascade?: CascadeType | CascadeType[];
 }
 
 export interface OneToManyRelation {
@@ -80,6 +103,7 @@ export interface OneToManyRelation {
   fetchStrategy: FetchType;
   batchSize: number;
   lazy: boolean;
+  cascade: Set<CascadeType>;
 }
 
 const oneToManyMetadata = new WeakMap<object, Map<string | symbol, OneToManyRelation>>();
@@ -92,6 +116,7 @@ export function OneToMany(options: OneToManyOptions) {
     const fieldName = context.name;
     const { fetchStrategy, batchSize } = parseFetch(options.fetch);
     const lazy = options.lazy ?? false;
+    const cascade = parseCascade(options.cascade);
 
     context.addInitializer(function (this: T) {
       const constructor = (this as object).constructor;
@@ -105,6 +130,7 @@ export function OneToMany(options: OneToManyOptions) {
         fetchStrategy,
         batchSize,
         lazy,
+        cascade,
       });
     });
   };
@@ -128,6 +154,7 @@ export interface ManyToManyOptions {
   mappedBy?: string;
   fetch?: FetchType | FetchOptions;
   lazy?: boolean;
+  cascade?: CascadeType | CascadeType[];
 }
 
 export interface ManyToManyRelation {
@@ -139,6 +166,7 @@ export interface ManyToManyRelation {
   fetchStrategy: FetchType;
   batchSize: number;
   lazy: boolean;
+  cascade: Set<CascadeType>;
 }
 
 const manyToManyMetadata = new WeakMap<object, Map<string | symbol, ManyToManyRelation>>();
@@ -152,6 +180,7 @@ export function ManyToMany(options: ManyToManyOptions) {
     const isOwning = options.joinTable !== undefined;
     const { fetchStrategy, batchSize } = parseFetch(options.fetch);
     const lazy = options.lazy ?? false;
+    const cascade = parseCascade(options.cascade);
 
     context.addInitializer(function (this: T) {
       const constructor = (this as object).constructor;
@@ -167,6 +196,7 @@ export function ManyToMany(options: ManyToManyOptions) {
         fetchStrategy,
         batchSize,
         lazy,
+        cascade,
       });
     });
   };
@@ -186,6 +216,7 @@ export interface OneToOneOptions {
   orphanRemoval?: boolean;
   fetch?: FetchType | FetchOptions;
   lazy?: boolean;
+  cascade?: CascadeType | CascadeType[];
 }
 
 export interface OneToOneRelation {
@@ -199,6 +230,7 @@ export interface OneToOneRelation {
   fetchStrategy: FetchType;
   batchSize: number;
   lazy: boolean;
+  cascade: Set<CascadeType>;
 }
 
 const oneToOneMetadata = new WeakMap<object, Map<string | symbol, OneToOneRelation>>();
@@ -217,6 +249,7 @@ export function OneToOne(options: OneToOneOptions) {
     const orphanRemoval = options.orphanRemoval ?? false;
     const { fetchStrategy, batchSize } = parseFetch(options.fetch);
     const lazy = options.lazy ?? false;
+    const cascade = parseCascade(options.cascade);
 
     context.addInitializer(function (this: T) {
       const constructor = (this as object).constructor;
@@ -234,6 +267,7 @@ export function OneToOne(options: OneToOneOptions) {
         fetchStrategy,
         batchSize,
         lazy,
+        cascade,
       });
     });
   };

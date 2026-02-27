@@ -63,8 +63,11 @@ export function createLazySingleProxy<T extends object>(initializer: LazyInitial
 
       // Thenable: allow `await entity.relation` to trigger load
       if (prop === "then") {
+        // Eagerly call ensureInitialized so the initializer runs synchronously
+        // when `then` is first accessed (before the microtask scheduler calls it).
+        const promise = ensureInitialized();
         return (resolve: (value: T | null) => void, reject: (reason: unknown) => void) => {
-          ensureInitialized().then(resolve, reject);
+          promise.then(resolve, reject);
         };
       }
 
@@ -158,8 +161,9 @@ export function createLazyCollectionProxy<T>(initializer: LazyInitializer<T[]>):
 
       // Thenable: allow `await entity.collection` to trigger load
       if (prop === "then") {
+        const promise = ensureInitialized();
         return (resolve: (value: T[]) => void, reject: (reason: unknown) => void) => {
-          ensureInitialized().then(resolve, reject);
+          promise.then(resolve, reject);
         };
       }
 
@@ -238,8 +242,8 @@ export function isInitialized(obj: unknown): boolean {
  */
 export async function initializeProxy<T>(proxy: T): Promise<T> {
   if (!isLazyProxy(proxy)) return proxy;
-  const initializer = (proxy as unknown as Record<symbol, unknown>)[LAZY_INITIALIZER] as LazyInitializer<T>;
-  const value = await initializer();
-  // The proxy state is updated by the initializer's then() handler
+  // Trigger the proxy's own then() handler, which calls ensureInitialized()
+  // and updates the proxy's internal state.
+  const value = await (proxy as unknown as PromiseLike<T>);
   return value;
 }

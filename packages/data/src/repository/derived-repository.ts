@@ -503,12 +503,351 @@ export function createDerivedRepository<T, ID>(
     return field ? field.columnName : undefined;
   }
 
+  /**
+   * Saves an arbitrary entity (possibly of a different class than T) using the
+   * same connection. Used by cascade persist/merge to save related entities.
+   * Returns the saved entity.
+   */
+  async function cascadeSaveRelatedEntity(
+    relatedEntity: unknown,
+    relatedClass: new (...args: any[]) => any,
+    conn: Connection,
+    saving: Set<unknown>,
+  ): Promise<unknown> {
+    if (saving.has(relatedEntity)) return relatedEntity;
+    saving.add(relatedEntity);
+    try {
+      const relMeta = getEntityMetadata(relatedClass);
+      const relIdField = relMeta.idField;
+      const relIdValue = (relatedEntity as Record<string | symbol, unknown>)[relIdField];
+      const relRowMapper = createRowMapper(relatedClass, relMeta);
+
+      const relIdFieldMapping = relMeta.fields.find((f) => f.fieldName === relIdField);
+      const relIdCol = relIdFieldMapping ? relIdFieldMapping.columnName : String(relIdField);
+      const relVersionField = relMeta.versionField;
+      const relVersionCol = relVersionField
+        ? relMeta.fields.find((f) => f.fieldName === relVersionField)?.columnName
+        : undefined;
+
+      if (relIdValue != null) {
+        // Update existing related entity
+        const updateBuilder = new UpdateBuilder(relMeta.tableName);
+        if (relVersionField && relVersionCol) {
+          const currentVersion = (relatedEntity as Record<string | symbol, unknown>)[relVersionField] as number;
+          const newVersion = (currentVersion ?? 0) + 1;
+          updateBuilder.where(
+            new LogicalCriteria(
+              "and",
+              new ComparisonCriteria("eq", relIdCol, relIdValue as SqlValue),
+              new ComparisonCriteria("eq", relVersionCol, currentVersion as SqlValue),
+            ),
+          );
+          updateBuilder.set(relVersionCol, newVersion as SqlValue);
+          for (const field of relMeta.fields) {
+            if (field.fieldName === relIdField || field.fieldName === relVersionField) continue;
+            const value = getFieldValue(relatedEntity as Record<string | symbol, unknown>, field.fieldName) as SqlValue;
+            updateBuilder.set(field.columnName, value);
+          }
+        } else {
+          updateBuilder.where(new ComparisonCriteria("eq", relIdCol, relIdValue as SqlValue));
+          for (const field of relMeta.fields) {
+            if (field.fieldName === relIdField) continue;
+            const value = getFieldValue(relatedEntity as Record<string | symbol, unknown>, field.fieldName) as SqlValue;
+            updateBuilder.set(field.columnName, value);
+          }
+        }
+        // Include FK columns for owning @OneToOne relations on the related entity
+        for (const rel of relMeta.oneToOneRelations) {
+          if (!rel.isOwning || !rel.joinColumn) continue;
+          const relEntity = (relatedEntity as Record<string | symbol, unknown>)[rel.fieldName];
+          if (relEntity == null) {
+            updateBuilder.set(rel.joinColumn, null as SqlValue);
+          } else {
+            const targetIdField = getIdField(rel.target());
+            if (targetIdField) {
+              const fk = (relEntity as Record<string | symbol, unknown>)[targetIdField] as SqlValue;
+              updateBuilder.set(rel.joinColumn, fk);
+            }
+          }
+        }
+        // Include FK columns for @ManyToOne relations on the related entity
+        for (const rel of relMeta.manyToOneRelations) {
+          const mtoEntity = (relatedEntity as Record<string | symbol, unknown>)[rel.fieldName];
+          if (mtoEntity == null) {
+            updateBuilder.set(rel.joinColumn, null as SqlValue);
+          } else {
+            const targetIdField = getIdField(rel.target());
+            if (targetIdField) {
+              const fk = (mtoEntity as Record<string | symbol, unknown>)[targetIdField] as SqlValue;
+              updateBuilder.set(rel.joinColumn, fk);
+            }
+          }
+        }
+        updateBuilder.returning("*");
+        const query = updateBuilder.build();
+        const stmt = conn.prepareStatement(query.sql);
+        try {
+          for (let i = 0; i < query.params.length; i++) {
+            stmt.setParameter(i + 1, query.params[i]);
+          }
+          const rs = await stmt.executeQuery();
+          if (await rs.next()) {
+            return relRowMapper.mapRow(rs);
+          }
+        } finally {
+          await stmt.close().catch(() => {});
+        }
+        return relatedEntity;
+      } else {
+        // Insert new related entity
+        const insertBuilder = new InsertBuilder(relMeta.tableName);
+        for (const field of relMeta.fields) {
+          if (field.fieldName === relIdField) continue;
+          if (relVersionField && field.fieldName === relVersionField) {
+            insertBuilder.set(field.columnName, 1 as SqlValue);
+          } else {
+            const value = getFieldValue(relatedEntity as Record<string | symbol, unknown>, field.fieldName) as SqlValue;
+            insertBuilder.set(field.columnName, value);
+          }
+        }
+        // Include FK columns for owning @OneToOne relations on the related entity
+        for (const rel of relMeta.oneToOneRelations) {
+          if (!rel.isOwning || !rel.joinColumn) continue;
+          const relEntity = (relatedEntity as Record<string | symbol, unknown>)[rel.fieldName];
+          if (relEntity == null) {
+            if (!rel.nullable) continue;
+            insertBuilder.set(rel.joinColumn, null as SqlValue);
+          } else {
+            const targetIdField = getIdField(rel.target());
+            if (targetIdField) {
+              const fk = (relEntity as Record<string | symbol, unknown>)[targetIdField] as SqlValue;
+              insertBuilder.set(rel.joinColumn, fk);
+            }
+          }
+        }
+        // Include FK columns for @ManyToOne relations on the related entity
+        for (const rel of relMeta.manyToOneRelations) {
+          const mtoEntity = (relatedEntity as Record<string | symbol, unknown>)[rel.fieldName];
+          if (mtoEntity == null) {
+            if (!rel.nullable) continue;
+            insertBuilder.set(rel.joinColumn, null as SqlValue);
+          } else {
+            const targetIdField = getIdField(rel.target());
+            if (targetIdField) {
+              const fk = (mtoEntity as Record<string | symbol, unknown>)[targetIdField] as SqlValue;
+              insertBuilder.set(rel.joinColumn, fk);
+            }
+          }
+        }
+        insertBuilder.returning("*");
+        const query = insertBuilder.build();
+        const stmt = conn.prepareStatement(query.sql);
+        try {
+          for (let i = 0; i < query.params.length; i++) {
+            stmt.setParameter(i + 1, query.params[i]);
+          }
+          const rs = await stmt.executeQuery();
+          if (await rs.next()) {
+            const saved = relRowMapper.mapRow(rs);
+            // Copy generated ID back to the original entity
+            (relatedEntity as Record<string | symbol, unknown>)[relIdField] =
+              (saved as Record<string | symbol, unknown>)[relIdField];
+            return saved;
+          }
+        } finally {
+          await stmt.close().catch(() => {});
+        }
+        return relatedEntity;
+      }
+    } finally {
+      saving.delete(relatedEntity);
+    }
+  }
+
+  /**
+   * Handles cascade persist/merge for all relation types on an entity.
+   * - "pre" phase: saves @ManyToOne and owning @OneToOne related entities BEFORE the parent
+   *   (because the parent needs the FK value from the related entity)
+   * - "post" phase: saves @OneToMany and @ManyToMany related entities AFTER the parent
+   *   (because the children need the parent's generated ID)
+   */
+  async function cascadePreSave(entity: T, conn: Connection, saving: Set<unknown>): Promise<void> {
+    const rec = entity as Record<string | symbol, unknown>;
+
+    // @ManyToOne: save related entity first if cascade includes persist/merge
+    for (const relation of metadata.manyToOneRelations) {
+      const cascadeType = relation.cascade;
+      if (cascadeType.size === 0) continue;
+      const relatedEntity = rec[relation.fieldName];
+      if (relatedEntity == null || isLazyProxy(relatedEntity)) continue;
+
+      const targetClass = relation.target();
+      const targetIdField = getIdField(targetClass);
+      if (!targetIdField) continue;
+      const relatedId = (relatedEntity as Record<string | symbol, unknown>)[targetIdField];
+
+      // persist: save if new (no ID), merge: save if existing (has ID)
+      if (relatedId == null && cascadeType.has("persist")) {
+        await cascadeSaveRelatedEntity(relatedEntity, targetClass, conn, saving);
+      } else if (relatedId != null && cascadeType.has("merge")) {
+        await cascadeSaveRelatedEntity(relatedEntity, targetClass, conn, saving);
+      }
+    }
+
+    // Owning @OneToOne: save related entity first if cascade includes persist/merge
+    for (const relation of metadata.oneToOneRelations) {
+      if (!relation.isOwning) continue;
+      const cascadeType = relation.cascade;
+      if (cascadeType.size === 0) continue;
+      const relatedEntity = rec[relation.fieldName];
+      if (relatedEntity == null || isLazyProxy(relatedEntity)) continue;
+
+      const targetClass = relation.target();
+      const targetIdField = getIdField(targetClass);
+      if (!targetIdField) continue;
+      const relatedId = (relatedEntity as Record<string | symbol, unknown>)[targetIdField];
+
+      if (relatedId == null && cascadeType.has("persist")) {
+        await cascadeSaveRelatedEntity(relatedEntity, targetClass, conn, saving);
+      } else if (relatedId != null && cascadeType.has("merge")) {
+        await cascadeSaveRelatedEntity(relatedEntity, targetClass, conn, saving);
+      }
+    }
+  }
+
+  async function cascadePostSave(entity: T, conn: Connection, saving: Set<unknown>): Promise<void> {
+    const rec = entity as Record<string | symbol, unknown>;
+    const parentId = getEntityId(entity) as SqlValue;
+
+    // Inverse @OneToOne: save related entity after parent (child FK points to parent)
+    for (const relation of metadata.oneToOneRelations) {
+      if (relation.isOwning) continue;
+      const cascadeType = relation.cascade;
+      if (cascadeType.size === 0) continue;
+      const relatedEntity = rec[relation.fieldName];
+      if (relatedEntity == null || isLazyProxy(relatedEntity)) continue;
+
+      const targetClass = relation.target();
+      const targetIdField = getIdField(targetClass);
+      if (!targetIdField) continue;
+
+      // Set the FK on the child entity pointing back to the parent
+      if (relation.mappedBy) {
+        const targetMeta = getEntityMetadata(targetClass);
+        const owningRel = targetMeta.oneToOneRelations.find(
+          r => r.isOwning && String(r.fieldName) === relation.mappedBy,
+        );
+        if (owningRel) {
+          // Set the parent entity reference on the child so FK is derived
+          (relatedEntity as Record<string | symbol, unknown>)[owningRel.fieldName] = entity;
+        }
+      }
+
+      const relatedId = (relatedEntity as Record<string | symbol, unknown>)[targetIdField];
+      if (relatedId == null && cascadeType.has("persist")) {
+        await cascadeSaveRelatedEntity(relatedEntity, targetClass, conn, saving);
+      } else if (relatedId != null && cascadeType.has("merge")) {
+        await cascadeSaveRelatedEntity(relatedEntity, targetClass, conn, saving);
+      }
+    }
+
+    // @OneToMany: save each child after parent
+    for (const relation of metadata.oneToManyRelations) {
+      const cascadeType = relation.cascade;
+      if (cascadeType.size === 0) continue;
+      const children = rec[relation.fieldName];
+      if (!Array.isArray(children)) continue;
+
+      const targetClass = relation.target();
+      const targetIdField = getIdField(targetClass);
+      if (!targetIdField) continue;
+      const targetMeta = getEntityMetadata(targetClass);
+
+      // Find the owning @ManyToOne on the child that corresponds to mappedBy
+      const owningRel = targetMeta.manyToOneRelations.find(
+        (r) => String(r.fieldName) === relation.mappedBy,
+      );
+
+      for (const child of children) {
+        if (child == null || isLazyProxy(child)) continue;
+
+        // Set the @ManyToOne reference on the child to point to the parent
+        if (owningRel) {
+          (child as Record<string | symbol, unknown>)[owningRel.fieldName] = entity;
+        }
+
+        const childId = (child as Record<string | symbol, unknown>)[targetIdField];
+        if (childId == null && cascadeType.has("persist")) {
+          await cascadeSaveRelatedEntity(child, targetClass, conn, saving);
+        } else if (childId != null && cascadeType.has("merge")) {
+          await cascadeSaveRelatedEntity(child, targetClass, conn, saving);
+        }
+      }
+    }
+
+    // @ManyToMany (owning side): save children, then insert join table rows
+    for (const relation of metadata.manyToManyRelations) {
+      if (!relation.isOwning || !relation.joinTable) continue;
+      const cascadeType = relation.cascade;
+      if (cascadeType.size === 0) continue;
+      const children = rec[relation.fieldName];
+      if (!Array.isArray(children)) continue;
+
+      const targetClass = relation.target();
+      const targetIdField = getIdField(targetClass);
+      if (!targetIdField) continue;
+      const jt = relation.joinTable;
+
+      for (const child of children) {
+        if (child == null || isLazyProxy(child)) continue;
+        const childId = (child as Record<string | symbol, unknown>)[targetIdField];
+
+        if (childId == null && cascadeType.has("persist")) {
+          await cascadeSaveRelatedEntity(child, targetClass, conn, saving);
+        } else if (childId != null && cascadeType.has("merge")) {
+          await cascadeSaveRelatedEntity(child, targetClass, conn, saving);
+        }
+
+        // Insert join table row (use INSERT ... ON CONFLICT DO NOTHING for idempotency)
+        const savedChildId = (child as Record<string | symbol, unknown>)[targetIdField] as SqlValue;
+        if (savedChildId != null) {
+          const insertJt = new InsertBuilder(jt.name);
+          insertJt.set(jt.joinColumn, parentId);
+          insertJt.set(jt.inverseJoinColumn, savedChildId);
+          const jtQuery = insertJt.build();
+          // Append ON CONFLICT DO NOTHING
+          const jtSql = jtQuery.sql + " ON CONFLICT DO NOTHING";
+          const jtStmt = conn.prepareStatement(jtSql);
+          try {
+            for (let i = 0; i < jtQuery.params.length; i++) {
+              jtStmt.setParameter(i + 1, jtQuery.params[i]);
+            }
+            await jtStmt.executeUpdate();
+          } finally {
+            await jtStmt.close().catch(() => {});
+          }
+        }
+      }
+    }
+  }
+
+  // Cycle detection set for cascade operations (shared across a save call tree)
+  const cascadeSaving = new Set<unknown>();
+
   async function saveWithConnection(entity: T, conn: Connection): Promise<T> {
     const idField = metadata.idField;
     const idValue = (entity as Record<string | symbol, unknown>)[idField] as SqlValue;
     const idCol = getIdColumn();
     const versionCol = getVersionColumn();
     const versionField = metadata.versionField;
+
+    // Cycle detection: if this entity is already being cascade-saved, skip
+    if (cascadeSaving.has(entity)) return entity;
+    cascadeSaving.add(entity);
+
+    try {
+    // Cascade pre-save: save @ManyToOne and owning @OneToOne relations first
+    await cascadePreSave(entity, conn, cascadeSaving);
 
     if (idValue != null) {
       // Update
@@ -618,6 +957,8 @@ export function createDerivedRepository<T, ID>(
         if (await rs.next()) {
           const saved = rowMapper.mapRow(rs);
           copyRelationFields(saved, entity);
+          // Cascade post-save: save @OneToMany, inverse @OneToOne, @ManyToMany
+          await cascadePostSave(saved, conn, cascadeSaving);
           await invokeLifecycleCallbacks(saved, "PostUpdate");
           changeTracker.snapshot(saved);
           entityCache.put(entityClass, getEntityId(saved), saved);
@@ -706,6 +1047,8 @@ export function createDerivedRepository<T, ID>(
         if (await rs.next()) {
           const saved = rowMapper.mapRow(rs);
           copyRelationFields(saved, entity);
+          // Cascade post-save: save @OneToMany, inverse @OneToOne, @ManyToMany
+          await cascadePostSave(saved, conn, cascadeSaving);
           await invokeLifecycleCallbacks(saved, "PostPersist");
           changeTracker.snapshot(saved);
           entityCache.put(entityClass, getEntityId(saved), saved);
@@ -724,6 +1067,9 @@ export function createDerivedRepository<T, ID>(
       } finally {
         await stmt.close().catch(() => {});
       }
+    }
+    } finally {
+      cascadeSaving.delete(entity);
     }
   }
 
