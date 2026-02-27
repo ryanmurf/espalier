@@ -1,7 +1,21 @@
+export type FetchType = "JOIN" | "SUBSELECT" | "BATCH" | "SELECT";
+
+export interface FetchOptions {
+  strategy: FetchType;
+  batchSize?: number;
+}
+
+function parseFetch(fetch?: FetchType | FetchOptions): { fetchStrategy: FetchType; batchSize: number } {
+  if (!fetch) return { fetchStrategy: "SELECT", batchSize: 25 };
+  if (typeof fetch === "string") return { fetchStrategy: fetch, batchSize: 25 };
+  return { fetchStrategy: fetch.strategy, batchSize: fetch.batchSize ?? 25 };
+}
+
 export interface ManyToOneOptions {
   target: () => new (...args: any[]) => any;
   joinColumn?: string;
   nullable?: boolean;
+  fetch?: FetchType | FetchOptions;
 }
 
 export interface ManyToOneRelation {
@@ -9,6 +23,8 @@ export interface ManyToOneRelation {
   target: () => new (...args: any[]) => any;
   joinColumn: string;
   nullable: boolean;
+  fetchStrategy: FetchType;
+  batchSize: number;
 }
 
 const manyToOneMetadata = new WeakMap<object, Map<string | symbol, ManyToOneRelation>>();
@@ -21,6 +37,7 @@ export function ManyToOne(options: ManyToOneOptions) {
     const fieldName = context.name;
     const joinColumn = options.joinColumn ?? `${String(fieldName)}_id`;
     const nullable = options.nullable ?? true;
+    const { fetchStrategy, batchSize } = parseFetch(options.fetch);
 
     context.addInitializer(function (this: T) {
       const constructor = (this as object).constructor;
@@ -32,6 +49,8 @@ export function ManyToOne(options: ManyToOneOptions) {
         target: options.target,
         joinColumn,
         nullable,
+        fetchStrategy,
+        batchSize,
       });
     });
   };
@@ -46,12 +65,15 @@ export function getManyToOneRelations(target: object): ManyToOneRelation[] {
 export interface OneToManyOptions {
   target: () => new (...args: any[]) => any;
   mappedBy: string;
+  fetch?: FetchType | FetchOptions;
 }
 
 export interface OneToManyRelation {
   fieldName: string | symbol;
   target: () => new (...args: any[]) => any;
   mappedBy: string;
+  fetchStrategy: FetchType;
+  batchSize: number;
 }
 
 const oneToManyMetadata = new WeakMap<object, Map<string | symbol, OneToManyRelation>>();
@@ -62,6 +84,7 @@ export function OneToMany(options: OneToManyOptions) {
     context: ClassFieldDecoratorContext<T>,
   ): void {
     const fieldName = context.name;
+    const { fetchStrategy, batchSize } = parseFetch(options.fetch);
 
     context.addInitializer(function (this: T) {
       const constructor = (this as object).constructor;
@@ -72,6 +95,8 @@ export function OneToMany(options: OneToManyOptions) {
         fieldName,
         target: options.target,
         mappedBy: options.mappedBy,
+        fetchStrategy,
+        batchSize,
       });
     });
   };
@@ -93,6 +118,7 @@ export interface ManyToManyOptions {
   target: () => new (...args: any[]) => any;
   joinTable?: JoinTableConfig;
   mappedBy?: string;
+  fetch?: FetchType | FetchOptions;
 }
 
 export interface ManyToManyRelation {
@@ -101,6 +127,8 @@ export interface ManyToManyRelation {
   joinTable?: JoinTableConfig;
   mappedBy?: string;
   isOwning: boolean;
+  fetchStrategy: FetchType;
+  batchSize: number;
 }
 
 const manyToManyMetadata = new WeakMap<object, Map<string | symbol, ManyToManyRelation>>();
@@ -112,6 +140,7 @@ export function ManyToMany(options: ManyToManyOptions) {
   ): void {
     const fieldName = context.name;
     const isOwning = options.joinTable !== undefined;
+    const { fetchStrategy, batchSize } = parseFetch(options.fetch);
 
     context.addInitializer(function (this: T) {
       const constructor = (this as object).constructor;
@@ -124,6 +153,8 @@ export function ManyToMany(options: ManyToManyOptions) {
         joinTable: options.joinTable,
         mappedBy: options.mappedBy,
         isOwning,
+        fetchStrategy,
+        batchSize,
       });
     });
   };
@@ -141,6 +172,7 @@ export interface OneToOneOptions {
   mappedBy?: string;
   nullable?: boolean;
   orphanRemoval?: boolean;
+  fetch?: FetchType | FetchOptions;
 }
 
 export interface OneToOneRelation {
@@ -151,6 +183,8 @@ export interface OneToOneRelation {
   nullable: boolean;
   isOwning: boolean;
   orphanRemoval: boolean;
+  fetchStrategy: FetchType;
+  batchSize: number;
 }
 
 const oneToOneMetadata = new WeakMap<object, Map<string | symbol, OneToOneRelation>>();
@@ -167,6 +201,7 @@ export function OneToOne(options: OneToOneOptions) {
       : undefined;
     const nullable = options.nullable ?? true;
     const orphanRemoval = options.orphanRemoval ?? false;
+    const { fetchStrategy, batchSize } = parseFetch(options.fetch);
 
     context.addInitializer(function (this: T) {
       const constructor = (this as object).constructor;
@@ -181,6 +216,8 @@ export function OneToOne(options: OneToOneOptions) {
         nullable,
         isOwning,
         orphanRemoval,
+        fetchStrategy,
+        batchSize,
       });
     });
   };
