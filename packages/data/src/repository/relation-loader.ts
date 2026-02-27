@@ -186,8 +186,13 @@ export async function batchLoadOneToMany(
   const batchSize = relation.batchSize;
   for (let i = 0; i < parentIds.length; i += batchSize) {
     const batch = parentIds.slice(i, i + batchSize);
+    // Include all @Column fields plus the FK column (which may not be a @Column)
+    const fieldColumns = targetMetadata.fields.map((f) => f.columnName);
+    if (!fieldColumns.includes(fkColumn)) {
+      fieldColumns.push(fkColumn);
+    }
     const builder = new SelectBuilder(targetMetadata.tableName)
-      .columns(...targetMetadata.fields.map((f) => f.columnName));
+      .columns(...fieldColumns);
     builder.where(new InCriteria(fkColumn, batch));
 
     const query = builder.build();
