@@ -25,6 +25,10 @@ import type { StreamOptions } from "./streaming.js";
 import type { EventBus } from "../events/event-bus.js";
 import type { EntityPersistedEvent, EntityUpdatedEvent, EntityRemovedEvent, EntityLoadedEvent } from "../events/entity-events.js";
 import { ENTITY_EVENTS } from "../events/entity-events.js";
+import type { OneToOneRelation } from "../decorators/relations.js";
+import { getTableName } from "../decorators/table.js";
+import { getIdField } from "../decorators/id.js";
+import { getColumnMappings } from "../decorators/column.js";
 
 function isProjectionClass(arg: unknown): arg is new (...args: any[]) => any {
   return typeof arg === "function" && getProjectionMetadata(arg) !== undefined;
@@ -99,6 +103,105 @@ export function createDerivedRepository<T, ID>(
     return (entity as Record<string | symbol, unknown>)[metadata.idField];
   }
 
+  function getOneToOneFkValue(entity: T, relation: OneToOneRelation): SqlValue | undefined {
+    if (!relation.isOwning || !relation.joinColumn) return undefined;
+    const relatedEntity = (entity as Record<string | symbol, unknown>)[relation.fieldName];
+    if (relatedEntity == null) return null;
+    const targetClass = relation.target();
+    const targetIdField = getIdField(targetClass);
+    if (!targetIdField) return undefined;
+    return (relatedEntity as Record<string | symbol, unknown>)[targetIdField] as SqlValue;
+  }
+
+  async function loadOneToOneRelations(entity: T, conn: Connection): Promise<void> {
+    for (const relation of metadata.oneToOneRelations) {
+      const targetClass = relation.target();
+      const targetMetadata = getEntityMetadata(targetClass);
+      const targetRowMapper = createRowMapper(targetClass, targetMetadata);
+
+      if (relation.isOwning && relation.joinColumn) {
+        // Owner side: FK is on this entity's row. We need to read it from the raw row data.
+        // The join column value was loaded as part of the SELECT but not mapped to a field.
+        // We need a separate query by FK value.
+        // Actually, the FK column is NOT in metadata.fields (it's not a @Column field).
+        // We need to load it. Let's query the FK column directly.
+        const idCol = getIdColumn();
+        const entityId = getEntityId(entity) as SqlValue;
+        const fkQuery = new SelectBuilder(metadata.tableName)
+          .columns(relation.joinColumn)
+          .where(new ComparisonCriteria("eq", idCol, entityId))
+          .limit(1)
+          .build();
+
+        const fkStmt = conn.prepareStatement(fkQuery.sql);
+        try {
+          for (let i = 0; i < fkQuery.params.length; i++) {
+            fkStmt.setParameter(i + 1, fkQuery.params[i]);
+          }
+          const fkRs = await fkStmt.executeQuery();
+          if (await fkRs.next()) {
+            const row = fkRs.getRow();
+            const fkValue = Object.values(row)[0] as SqlValue;
+            if (fkValue != null) {
+              const targetIdField = getIdField(targetClass);
+              if (!targetIdField) continue;
+              const targetColumnMappings = getColumnMappings(targetClass);
+              const targetPkColumn = targetColumnMappings.get(targetIdField) ?? String(targetIdField);
+
+              const relQuery = new SelectBuilder(targetMetadata.tableName)
+                .columns(...targetMetadata.fields.map(f => f.columnName))
+                .where(new ComparisonCriteria("eq", targetPkColumn, fkValue))
+                .limit(1)
+                .build();
+
+              const relStmt = conn.prepareStatement(relQuery.sql);
+              try {
+                for (let i = 0; i < relQuery.params.length; i++) {
+                  relStmt.setParameter(i + 1, relQuery.params[i]);
+                }
+                const relRs = await relStmt.executeQuery();
+                if (await relRs.next()) {
+                  (entity as Record<string | symbol, unknown>)[relation.fieldName] = targetRowMapper.mapRow(relRs);
+                }
+              } finally {
+                await relStmt.close().catch(() => {});
+              }
+            }
+          }
+        } finally {
+          await fkStmt.close().catch(() => {});
+        }
+      } else if (relation.mappedBy) {
+        // Inverse side: the FK is on the target table
+        // Find the owning relation on the target to get the join column
+        const owningRelation = targetMetadata.oneToOneRelations.find(
+          r => r.isOwning && String(r.fieldName) === relation.mappedBy,
+        );
+        if (!owningRelation || !owningRelation.joinColumn) continue;
+
+        const entityId = getEntityId(entity) as SqlValue;
+        const relQuery = new SelectBuilder(targetMetadata.tableName)
+          .columns(...targetMetadata.fields.map(f => f.columnName))
+          .where(new ComparisonCriteria("eq", owningRelation.joinColumn, entityId))
+          .limit(1)
+          .build();
+
+        const relStmt = conn.prepareStatement(relQuery.sql);
+        try {
+          for (let i = 0; i < relQuery.params.length; i++) {
+            relStmt.setParameter(i + 1, relQuery.params[i]);
+          }
+          const relRs = await relStmt.executeQuery();
+          if (await relRs.next()) {
+            (entity as Record<string | symbol, unknown>)[relation.fieldName] = targetRowMapper.mapRow(relRs);
+          }
+        } finally {
+          await relStmt.close().catch(() => {});
+        }
+      }
+    }
+  }
+
   async function invokeLifecycleCallbacks(entity: T, event: LifecycleEvent): Promise<void> {
     const methods = metadata.lifecycleCallbacks.get(event);
     if (!methods) return;
@@ -167,11 +270,25 @@ export function createDerivedRepository<T, ID>(
               updateBuilder.set(field.columnName, value);
             }
           }
+          // Include FK columns for owning @OneToOne relations
+          for (const relation of metadata.oneToOneRelations) {
+            const fkValue = getOneToOneFkValue(entity, relation);
+            if (fkValue !== undefined && relation.joinColumn) {
+              updateBuilder.set(relation.joinColumn, fkValue);
+            }
+          }
         } else {
           updateBuilder.set(versionCol, newVersion as SqlValue);
           for (const change of dirtyFields) {
             if (change.field === idField || change.field === versionField) continue;
             updateBuilder.set(change.columnName, change.newValue as SqlValue);
+          }
+          // Include FK columns for owning @OneToOne relations (always include in partial updates)
+          for (const relation of metadata.oneToOneRelations) {
+            const fkValue = getOneToOneFkValue(entity, relation);
+            if (fkValue !== undefined && relation.joinColumn) {
+              updateBuilder.set(relation.joinColumn, fkValue);
+            }
           }
         }
       } else {
@@ -183,10 +300,24 @@ export function createDerivedRepository<T, ID>(
             const value = (entity as Record<string | symbol, unknown>)[field.fieldName] as SqlValue;
             updateBuilder.set(field.columnName, value);
           }
+          // Include FK columns for owning @OneToOne relations
+          for (const relation of metadata.oneToOneRelations) {
+            const fkValue = getOneToOneFkValue(entity, relation);
+            if (fkValue !== undefined && relation.joinColumn) {
+              updateBuilder.set(relation.joinColumn, fkValue);
+            }
+          }
         } else {
           for (const change of dirtyFields) {
             if (change.field === idField) continue;
             updateBuilder.set(change.columnName, change.newValue as SqlValue);
+          }
+          // Include FK columns for owning @OneToOne relations (always include in partial updates)
+          for (const relation of metadata.oneToOneRelations) {
+            const fkValue = getOneToOneFkValue(entity, relation);
+            if (fkValue !== undefined && relation.joinColumn) {
+              updateBuilder.set(relation.joinColumn, fkValue);
+            }
           }
         }
       }
@@ -268,6 +399,15 @@ export function createDerivedRepository<T, ID>(
           insertBuilder.set(field.columnName, value);
         }
       }
+
+      // Include FK columns for owning @OneToOne relations
+      for (const relation of metadata.oneToOneRelations) {
+        const fkValue = getOneToOneFkValue(entity, relation);
+        if (fkValue !== undefined && relation.joinColumn) {
+          insertBuilder.set(relation.joinColumn, fkValue);
+        }
+      }
+
       insertBuilder.returning("*");
 
       const query = insertBuilder.build();
@@ -434,6 +574,9 @@ export function createDerivedRepository<T, ID>(
           const rs = await stmt.executeQuery();
           if (await rs.next()) {
             const result = rowMapper.mapRow(rs);
+            if (metadata.oneToOneRelations.length > 0) {
+              await loadOneToOneRelations(result, conn);
+            }
             await invokeLifecycleCallbacks(result, "PostLoad");
             changeTracker.snapshot(result);
             entityCache.put(entityClass, id, result);
@@ -544,6 +687,9 @@ export function createDerivedRepository<T, ID>(
           const results: T[] = [];
           while (await rs.next()) {
             const entity = rowMapper.mapRow(rs);
+            if (metadata.oneToOneRelations.length > 0) {
+              await loadOneToOneRelations(entity, conn);
+            }
             await invokeLifecycleCallbacks(entity, "PostLoad");
             changeTracker.snapshot(entity);
             entityCache.put(entityClass, getEntityId(entity), entity);
