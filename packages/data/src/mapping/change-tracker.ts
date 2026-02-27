@@ -1,6 +1,7 @@
 import type { EntityMetadata, FieldMapping } from "./entity-metadata.js";
 import { getGlobalLogger, LogLevel } from "espalier-jdbc";
 import { getFieldValue } from "./field-access.js";
+import { getIdField } from "../decorators/id.js";
 
 export interface FieldChange {
   field: string | symbol;
@@ -120,12 +121,48 @@ export class EntityChangeTracker<T> {
     this.metadata = metadata;
   }
 
+  /** Extract FK value (related entity's ID) for an owning @OneToOne relation. */
+  private getRelationFkValue(entity: T, relation: { fieldName: string | symbol; target: () => new (...args: any[]) => any; joinColumn?: string; isOwning: boolean }): unknown {
+    if (!relation.isOwning || !relation.joinColumn) return undefined;
+    const related = (entity as Record<string | symbol, unknown>)[relation.fieldName];
+    if (related == null) return null;
+    const targetClass = relation.target();
+    const targetIdField = getIdField(targetClass);
+    if (!targetIdField) return undefined;
+    return (related as Record<string | symbol, unknown>)[targetIdField];
+  }
+
+  /** Synthetic snapshot key for a relation FK. */
+  private relationFkKey(relation: { joinColumn?: string }): string {
+    return `__fk__${relation.joinColumn}`;
+  }
+
   snapshot(entity: T): void {
     const snap: Record<string | symbol, unknown> = {};
     for (const field of this.metadata.fields) {
       snap[field.fieldName] = cloneValue(
         getFieldValue(entity as Record<string | symbol, unknown>, field.fieldName),
       );
+    }
+    // Snapshot FK values for owning @OneToOne relations
+    for (const relation of this.metadata.oneToOneRelations) {
+      if (!relation.isOwning || !relation.joinColumn) continue;
+      const fkKey = this.relationFkKey(relation);
+      snap[fkKey] = this.getRelationFkValue(entity, relation);
+    }
+    // Snapshot FK values for @ManyToOne relations
+    for (const relation of this.metadata.manyToOneRelations) {
+      const fkKey = `__fk__${relation.joinColumn}`;
+      const related = (entity as Record<string | symbol, unknown>)[relation.fieldName];
+      if (related == null) {
+        snap[fkKey] = null;
+      } else {
+        const targetClass = relation.target();
+        const targetIdField = getIdField(targetClass);
+        if (targetIdField) {
+          snap[fkKey] = (related as Record<string | symbol, unknown>)[targetIdField];
+        }
+      }
     }
     this.snapshots.set(entity as object, snap);
   }
@@ -136,6 +173,31 @@ export class EntityChangeTracker<T> {
     for (const field of this.metadata.fields) {
       const current = getFieldValue(entity as Record<string | symbol, unknown>, field.fieldName);
       if (!deepEqual(current, snap[field.fieldName])) {
+        return true;
+      }
+    }
+    // Check owning @OneToOne FK changes
+    for (const relation of this.metadata.oneToOneRelations) {
+      if (!relation.isOwning || !relation.joinColumn) continue;
+      const fkKey = this.relationFkKey(relation);
+      const currentFk = this.getRelationFkValue(entity, relation);
+      if (!deepEqual(currentFk, snap[fkKey])) {
+        return true;
+      }
+    }
+    // Check @ManyToOne FK changes
+    for (const relation of this.metadata.manyToOneRelations) {
+      const fkKey = `__fk__${relation.joinColumn}`;
+      const related = (entity as Record<string | symbol, unknown>)[relation.fieldName];
+      let currentFk: unknown = null;
+      if (related != null) {
+        const targetClass = relation.target();
+        const targetIdField = getIdField(targetClass);
+        if (targetIdField) {
+          currentFk = (related as Record<string | symbol, unknown>)[targetIdField];
+        }
+      }
+      if (!deepEqual(currentFk, snap[fkKey])) {
         return true;
       }
     }
@@ -155,6 +217,43 @@ export class EntityChangeTracker<T> {
           columnName: field.columnName,
           oldValue: old,
           newValue: current,
+        });
+      }
+    }
+    // Check owning @OneToOne FK changes
+    for (const relation of this.metadata.oneToOneRelations) {
+      if (!relation.isOwning || !relation.joinColumn) continue;
+      const fkKey = this.relationFkKey(relation);
+      const currentFk = this.getRelationFkValue(entity, relation);
+      const oldFk = snap[fkKey];
+      if (!deepEqual(currentFk, oldFk)) {
+        changes.push({
+          field: relation.fieldName,
+          columnName: relation.joinColumn,
+          oldValue: oldFk,
+          newValue: currentFk,
+        });
+      }
+    }
+    // Check @ManyToOne FK changes
+    for (const relation of this.metadata.manyToOneRelations) {
+      const fkKey = `__fk__${relation.joinColumn}`;
+      const related = (entity as Record<string | symbol, unknown>)[relation.fieldName];
+      let currentFk: unknown = null;
+      if (related != null) {
+        const targetClass = relation.target();
+        const targetIdField = getIdField(targetClass);
+        if (targetIdField) {
+          currentFk = (related as Record<string | symbol, unknown>)[targetIdField];
+        }
+      }
+      const oldFk = snap[fkKey];
+      if (!deepEqual(currentFk, oldFk)) {
+        changes.push({
+          field: relation.fieldName,
+          columnName: relation.joinColumn,
+          oldValue: oldFk,
+          newValue: currentFk,
         });
       }
     }
