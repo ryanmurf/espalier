@@ -361,14 +361,17 @@ export function createDerivedRepository<T, ID>(
           }
         } else {
           updateBuilder.set(versionCol, newVersion as SqlValue);
+          const dirtyColumnNames = new Set(dirtyFields.map((c) => c.columnName));
           for (const change of dirtyFields) {
             if (change.field === idField || change.field === versionField) continue;
             updateBuilder.set(change.columnName, change.newValue as SqlValue);
           }
-          // Include FK columns for owning @OneToOne relations (always include in partial updates)
+          // Include FK columns for owning @OneToOne relations not already in dirty fields
           for (const relation of metadata.oneToOneRelations) {
+            if (!relation.isOwning || !relation.joinColumn) continue;
+            if (dirtyColumnNames.has(relation.joinColumn)) continue;
             const fkValue = getOneToOneFkValue(entity, relation);
-            if (fkValue !== undefined && relation.joinColumn) {
+            if (fkValue !== undefined) {
               updateBuilder.set(relation.joinColumn, fkValue);
             }
           }
@@ -390,14 +393,17 @@ export function createDerivedRepository<T, ID>(
             }
           }
         } else {
+          const dirtyColumnNames = new Set(dirtyFields.map((c) => c.columnName));
           for (const change of dirtyFields) {
             if (change.field === idField) continue;
             updateBuilder.set(change.columnName, change.newValue as SqlValue);
           }
-          // Include FK columns for owning @OneToOne relations (always include in partial updates)
+          // Include FK columns for owning @OneToOne relations not already in dirty fields
           for (const relation of metadata.oneToOneRelations) {
+            if (!relation.isOwning || !relation.joinColumn) continue;
+            if (dirtyColumnNames.has(relation.joinColumn)) continue;
             const fkValue = getOneToOneFkValue(entity, relation);
-            if (fkValue !== undefined && relation.joinColumn) {
+            if (fkValue !== undefined) {
               updateBuilder.set(relation.joinColumn, fkValue);
             }
           }
