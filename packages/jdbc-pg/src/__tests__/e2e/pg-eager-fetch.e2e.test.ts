@@ -167,8 +167,8 @@ describe.skipIf(!canConnect)("Eager fetch adversarial: repository E2E (Postgres)
 
   // ─── Bug Documentation: @ManyToOne FK not persisted ───
 
-  describe("Bug 4: save() does not persist @ManyToOne FK columns", () => {
-    it("save() with @ManyToOne relation does not write FK column to DB", async () => {
+  describe("Bug 4 FIXED: save() now persists @ManyToOne FK columns", () => {
+    it("save() with @ManyToOne relation writes FK column to DB", async () => {
       await clearAllData();
 
       const deptRepo = createRepository<EfDepartment, number>(EfDepartment, ds);
@@ -178,8 +178,6 @@ describe.skipIf(!canConnect)("Eager fetch adversarial: repository E2E (Postgres)
       const emp = newEntity(EfEmployee, { empName: "Alice", department: dept });
       const savedEmp = await empRepo.save(emp);
 
-      // Verify: dept_id should be set, but due to Bug 4, it's NULL
-      const stmt = conn.createStatement();
       const ps = conn.prepareStatement(
         `SELECT dept_id FROM e2e_ef_employees WHERE id = $1`,
       );
@@ -189,11 +187,11 @@ describe.skipIf(!canConnect)("Eager fetch adversarial: repository E2E (Postgres)
       const row = rs.getRow();
       await ps.close();
 
-      // BUG: dept_id is null — save() ignores @ManyToOne FK columns
-      expect(row["dept_id"]).toBeNull();
+      // Bug 4 fixed: dept_id is now correctly set
+      expect(row["dept_id"]).toBe(dept.id);
     });
 
-    it("save() with @ManyToOne on child entity — FK column not written", async () => {
+    it("save() with @ManyToOne on child entity writes FK column", async () => {
       await clearAllData();
 
       const itemRepo = createRepository<EfItem, number>(EfItem, ds);
@@ -203,7 +201,6 @@ describe.skipIf(!canConnect)("Eager fetch adversarial: repository E2E (Postgres)
       const comment = newEntity(EfComment, { body: "Hello", item });
       const savedComment = await commentRepo.save(comment);
 
-      // Verify: item_id should be set, but due to Bug 4, it's NULL
       const ps = conn.prepareStatement(
         `SELECT item_id FROM e2e_ef_comments WHERE id = $1`,
       );
@@ -213,8 +210,8 @@ describe.skipIf(!canConnect)("Eager fetch adversarial: repository E2E (Postgres)
       const row = rs.getRow();
       await ps.close();
 
-      // BUG: item_id is null
-      expect(row["item_id"]).toBeNull();
+      // Bug 4 fixed: item_id is now correctly set
+      expect(row["item_id"]).toBe(item.id);
     });
   });
 
@@ -344,11 +341,10 @@ describe.skipIf(!canConnect)("Eager fetch adversarial: repository E2E (Postgres)
 
   // ─── Bug Documentation: BATCH @OneToMany FK not selected ───
 
-  describe("Bug 5: batchLoadOneToMany doesn't select FK column", () => {
-    it("BATCH @OneToMany returns empty even when children exist (FK column not in SELECT)", async () => {
+  describe("Bug 5 FIXED: batchLoadOneToMany now selects FK column", () => {
+    it("BATCH @OneToMany correctly loads children grouped by parent FK", async () => {
       await clearAllData();
 
-      // Insert item + comments with FK set via raw SQL (workaround Bug 4)
       const itemRepo = createRepository<EfItem, number>(EfItem, ds);
       const item = await itemRepo.save(newEntity(EfItem, { title: "BatchItem" }));
 
@@ -366,14 +362,15 @@ describe.skipIf(!canConnect)("Eager fetch adversarial: repository E2E (Postgres)
       await ps.close();
       expect(Number(count)).toBe(3);
 
-      // BUG: batchLoadOneToMany selects only @Column fields (id, body) but not item_id.
-      // It then reads row["item_id"] which is undefined, so children can't be grouped by parent.
+      // Bug 5 fixed: batchLoadOneToMany now includes FK column in SELECT
       const freshRepo = createRepository<EfItem, number>(EfItem, ds);
       const loaded = await freshRepo.findById(item.id);
       expect(loaded).not.toBeNull();
       expect(loaded!.title).toBe("BatchItem");
-      // BUG: comments is empty because FK column is not selected
-      expect(loaded!.comments).toEqual([]);
+      // Now correctly loads 3 comments
+      expect(loaded!.comments.length).toBe(3);
+      const bodies = loaded!.comments.map(c => c.body).sort();
+      expect(bodies).toEqual(["C1", "C2", "C3"]);
     });
   });
 
@@ -485,11 +482,11 @@ describe.skipIf(!canConnect)("Eager fetch adversarial: repository E2E (Postgres)
 
       const item = await itemRepo.save(newEntity(EfItem, { title: "MixedItem" }));
 
-      // Workaround Bug 4: set dept FK via raw SQL
+      // Set dept FK via save with relation (Bug 4 fixed)
       const rawStmt = conn.createStatement();
       await rawStmt.executeUpdate(`UPDATE e2e_ef_items SET dept_id = ${dept.id} WHERE id = ${item.id}`);
 
-      // Insert comment via raw SQL (workaround Bug 4 for child FK)
+      // Insert comment via raw SQL
       await rawStmt.executeUpdate(
         `INSERT INTO e2e_ef_comments (body, item_id) VALUES ('Mixed comment', ${item.id})`,
       );
@@ -504,14 +501,15 @@ describe.skipIf(!canConnect)("Eager fetch adversarial: repository E2E (Postgres)
       expect(loaded).not.toBeNull();
       expect(loaded!.title).toBe("MixedItem");
 
-      // JOIN-fetched department — works with FK workaround
+      // JOIN-fetched department
       expect(loaded!.department).not.toBeNull();
       expect(loaded!.department!.name).toBe("QA");
 
-      // BATCH-fetched comments — blocked by Bug 5 (FK column not in SELECT)
-      expect(loaded!.comments).toEqual([]);
+      // BATCH-fetched comments — Bug 5 fixed, now loads correctly
+      expect(loaded!.comments).toHaveLength(1);
+      expect(loaded!.comments[0].body).toBe("Mixed comment");
 
-      // BATCH-fetched tags — works (ManyToMany uses join table, not FK column)
+      // BATCH-fetched tags — works (ManyToMany uses join table)
       expect(loaded!.tags).toHaveLength(1);
       expect(loaded!.tags[0].label).toBe("Important");
     });

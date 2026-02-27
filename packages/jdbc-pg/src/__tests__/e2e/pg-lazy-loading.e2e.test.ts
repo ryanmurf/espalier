@@ -452,14 +452,14 @@ describe.skipIf(!canConnect)("Lazy loading adversarial: repository E2E (Postgres
 
   // ─── Lazy @OneToMany (affected by Bug 5) ───
 
-  describe("lazy @OneToMany (Bug 5: FK column not selected)", () => {
-    it("lazy @OneToMany returns empty due to Bug 5", async () => {
+  describe("lazy @OneToMany (Bug 5 FIXED)", () => {
+    it("lazy @OneToMany loads children correctly", async () => {
       await clearAllData();
 
       const itemRepo = createRepository<LzItem, number>(LzItem, ds);
       const item = await itemRepo.save(newEntity(LzItem, { title: "WithComments" }));
 
-      // Insert comments with FK via raw SQL (workaround Bug 4)
+      // Insert comments with FK via raw SQL
       const rawStmt = conn.createStatement();
       await rawStmt.executeUpdate(
         `INSERT INTO e2e_lz_comments (body, item_id) VALUES ('C1', ${item.id}), ('C2', ${item.id})`,
@@ -469,10 +469,11 @@ describe.skipIf(!canConnect)("Lazy loading adversarial: repository E2E (Postgres
       const loaded = await freshRepo.findById(item.id);
 
       expect(isLazyProxy(loaded!.comments)).toBe(true);
-      // BUG 5: batchLoadOneToMany doesn't select the FK column,
-      // so children can't be grouped by parent — empty array returned
+      // Bug 5 fixed: batchLoadOneToMany now selects FK column
       const comments = await loaded!.comments;
-      expect(comments).toEqual([]);
+      expect(comments.length).toBe(2);
+      const bodies = comments.map((c: any) => c.body).sort();
+      expect(bodies).toEqual(["C1", "C2"]);
     });
 
     it("lazy @OneToMany with no children returns empty array", async () => {
@@ -526,10 +527,10 @@ describe.skipIf(!canConnect)("Lazy loading adversarial: repository E2E (Postgres
       expect(isLazyProxy(loaded!.children)).toBe(true);
       expect(isInitialized(loaded!.children)).toBe(false);
 
-      // Await to load — Bug 5 will cause this to be empty
+      // Await to load — Bug 5 fixed, children load correctly
       const children = await loaded!.children;
-      // Bug 5: batchLoadOneToMany doesn't select FK column
-      expect(children).toEqual([]);
+      expect(children.length).toBe(1);
+      expect((children[0] as any).label).toBe("Child1");
     });
   });
 
