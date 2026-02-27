@@ -177,6 +177,7 @@ function createTestMetadata(): EntityMetadata {
     manyToOneRelations: [],
     oneToManyRelations: [],
     manyToManyRelations: [],
+    oneToOneRelations: [],
     lifecycleCallbacks: new Map(),
   };
 }

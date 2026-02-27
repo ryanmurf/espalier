@@ -8,8 +8,8 @@ export {
   getCreatedDateField,
   getLastModifiedDateField,
 } from "./decorators/auditing.js";
-export { ManyToOne, getManyToOneRelations, OneToMany, getOneToManyRelations, ManyToMany, getManyToManyRelations } from "./decorators/relations.js";
-export type { ManyToOneOptions, ManyToOneRelation, OneToManyOptions, OneToManyRelation, ManyToManyOptions, ManyToManyRelation, JoinTableConfig } from "./decorators/relations.js";
+export { ManyToOne, getManyToOneRelations, OneToMany, getOneToManyRelations, ManyToMany, getManyToManyRelations, OneToOne, getOneToOneRelations } from "./decorators/relations.js";
+export type { ManyToOneOptions, ManyToOneRelation, OneToManyOptions, OneToManyRelation, ManyToManyOptions, ManyToManyRelation, JoinTableConfig, OneToOneOptions, OneToOneRelation } from "./decorators/relations.js";
 export { Projection, getProjectionMetadata } from "./decorators/projection.js";
 export type { ProjectionOptions } from "./decorators/projection.js";
 export { Version, getVersionField } from "./decorators/version.js";

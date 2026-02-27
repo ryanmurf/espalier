@@ -26,6 +26,7 @@ const metadata: EntityMetadata = {
   manyToOneRelations: [],
   oneToManyRelations: [],
   manyToManyRelations: [],
+  oneToOneRelations: [],
   lifecycleCallbacks: new Map(),
 };
 

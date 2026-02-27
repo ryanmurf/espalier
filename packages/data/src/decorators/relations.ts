@@ -134,3 +134,60 @@ export function getManyToManyRelations(target: object): ManyToManyRelation[] {
   if (!map) return [];
   return Array.from(map.values());
 }
+
+export interface OneToOneOptions {
+  target: () => new (...args: any[]) => any;
+  joinColumn?: string;
+  mappedBy?: string;
+  nullable?: boolean;
+  orphanRemoval?: boolean;
+}
+
+export interface OneToOneRelation {
+  fieldName: string | symbol;
+  target: () => new (...args: any[]) => any;
+  joinColumn?: string;
+  mappedBy?: string;
+  nullable: boolean;
+  isOwning: boolean;
+  orphanRemoval: boolean;
+}
+
+const oneToOneMetadata = new WeakMap<object, Map<string | symbol, OneToOneRelation>>();
+
+export function OneToOne(options: OneToOneOptions) {
+  return function <T>(
+    _target: undefined,
+    context: ClassFieldDecoratorContext<T>,
+  ): void {
+    const fieldName = context.name;
+    const isOwning = options.mappedBy === undefined;
+    const joinColumn = isOwning
+      ? (options.joinColumn ?? `${String(fieldName)}_id`)
+      : undefined;
+    const nullable = options.nullable ?? true;
+    const orphanRemoval = options.orphanRemoval ?? false;
+
+    context.addInitializer(function (this: T) {
+      const constructor = (this as object).constructor;
+      if (!oneToOneMetadata.has(constructor)) {
+        oneToOneMetadata.set(constructor, new Map());
+      }
+      oneToOneMetadata.get(constructor)!.set(fieldName, {
+        fieldName,
+        target: options.target,
+        joinColumn,
+        mappedBy: options.mappedBy,
+        nullable,
+        isOwning,
+        orphanRemoval,
+      });
+    });
+  };
+}
+
+export function getOneToOneRelations(target: object): OneToOneRelation[] {
+  const map = oneToOneMetadata.get(target);
+  if (!map) return [];
+  return Array.from(map.values());
+}

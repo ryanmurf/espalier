@@ -19,6 +19,7 @@ const userMetadata: EntityMetadata = {
   manyToOneRelations: [],
   oneToManyRelations: [],
   manyToManyRelations: [],
+  oneToOneRelations: [],
   lifecycleCallbacks: new Map(),
 };
 
@@ -32,6 +33,7 @@ const objMetadata: EntityMetadata = {
   manyToOneRelations: [],
   oneToManyRelations: [],
   manyToManyRelations: [],
+  oneToOneRelations: [],
   lifecycleCallbacks: new Map(),
 };
 
@@ -112,6 +114,7 @@ describe("ChangeTracker adversarial: symbol field names", () => {
     manyToOneRelations: [],
     oneToManyRelations: [],
     manyToManyRelations: [],
+    oneToOneRelations: [],
     lifecycleCallbacks: new Map(),
   };
 
@@ -305,6 +308,7 @@ describe("ChangeTracker adversarial: partial revert edge cases", () => {
       manyToOneRelations: [],
       oneToManyRelations: [],
       manyToManyRelations: [],
+      oneToOneRelations: [],
       lifecycleCallbacks: new Map(),
     };
     const tracker = new EntityChangeTracker(arrayMeta);
@@ -329,6 +333,7 @@ describe("ChangeTracker adversarial: partial revert edge cases", () => {
       manyToOneRelations: [],
       oneToManyRelations: [],
       manyToManyRelations: [],
+      oneToOneRelations: [],
       lifecycleCallbacks: new Map(),
     };
     const tracker = new EntityChangeTracker(dateMeta);

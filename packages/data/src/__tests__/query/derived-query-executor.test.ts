@@ -18,6 +18,7 @@ const metadata: EntityMetadata = {
   manyToOneRelations: [],
   oneToManyRelations: [],
   manyToManyRelations: [],
+  oneToOneRelations: [],
   lifecycleCallbacks: new Map(),
 };
 
@@ -235,6 +236,7 @@ describe("buildDerivedQuery", () => {
         manyToOneRelations: [],
         oneToManyRelations: [],
         manyToManyRelations: [],
+        oneToOneRelations: [],
         lifecycleCallbacks: new Map(),
       };
 
