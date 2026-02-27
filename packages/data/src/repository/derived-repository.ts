@@ -876,8 +876,17 @@ export function createDerivedRepository<T, ID>(
       const dirtyFields = hasSnapshot ? changeTracker.getDirtyFields(entity) : [];
       const isFullUpdate = !hasSnapshot;
 
-      // If entity is clean (no dirty fields) and no version bumping needed, skip UPDATE
+      // If entity is clean (no dirty fields), skip the UPDATE SQL.
+      // But still run cascade if any relations have cascade persist/merge configured.
       if (hasSnapshot && dirtyFields.length === 0) {
+        const hasCascadeRelations =
+          metadata.oneToManyRelations.some(r => r.cascade.has("persist") || r.cascade.has("merge")) ||
+          metadata.manyToManyRelations.some(r => r.cascade.has("persist") || r.cascade.has("merge")) ||
+          metadata.oneToOneRelations.some(r => r.cascade.has("persist") || r.cascade.has("merge")) ||
+          metadata.manyToOneRelations.some(r => r.cascade.has("persist") || r.cascade.has("merge"));
+        if (hasCascadeRelations) {
+          await cascadePostSave(entity, conn, cascadeSaving);
+        }
         return entity;
       }
 
