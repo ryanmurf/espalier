@@ -200,6 +200,15 @@ export function createDerivedRepository<T, ID>(
     return (relatedEntity as Record<string | symbol, unknown>)[targetIdField] as SqlValue;
   }
 
+  function getManyToOneFkValue(entity: T, relation: import("../decorators/relations.js").ManyToOneRelation): SqlValue {
+    const relatedEntity = (entity as Record<string | symbol, unknown>)[relation.fieldName];
+    if (relatedEntity == null) return null as SqlValue;
+    const targetClass = relation.target();
+    const targetIdField = getIdField(targetClass);
+    if (!targetIdField) return null as SqlValue;
+    return (relatedEntity as Record<string | symbol, unknown>)[targetIdField] as SqlValue;
+  }
+
   async function loadOneToOneRelations(entity: T, conn: Connection): Promise<void> {
     for (const relation of metadata.oneToOneRelations) {
       // Skip lazy relations — they are handled by lazy proxies
@@ -895,6 +904,11 @@ export function createDerivedRepository<T, ID>(
               updateBuilder.set(relation.joinColumn, fkValue);
             }
           }
+          // Include FK columns for @ManyToOne relations
+          for (const relation of metadata.manyToOneRelations) {
+            const fkValue = getManyToOneFkValue(entity, relation);
+            updateBuilder.set(relation.joinColumn, fkValue);
+          }
         } else {
           updateBuilder.set(versionCol, newVersion as SqlValue);
           const dirtyColumnNames = new Set(dirtyFields.map((c) => c.columnName));
@@ -910,6 +924,12 @@ export function createDerivedRepository<T, ID>(
             if (fkValue !== undefined) {
               updateBuilder.set(relation.joinColumn, fkValue);
             }
+          }
+          // Include FK columns for @ManyToOne relations not already in dirty fields
+          for (const relation of metadata.manyToOneRelations) {
+            if (dirtyColumnNames.has(relation.joinColumn)) continue;
+            const fkValue = getManyToOneFkValue(entity, relation);
+            updateBuilder.set(relation.joinColumn, fkValue);
           }
         }
       } else {
@@ -928,6 +948,11 @@ export function createDerivedRepository<T, ID>(
               updateBuilder.set(relation.joinColumn, fkValue);
             }
           }
+          // Include FK columns for @ManyToOne relations
+          for (const relation of metadata.manyToOneRelations) {
+            const fkValue = getManyToOneFkValue(entity, relation);
+            updateBuilder.set(relation.joinColumn, fkValue);
+          }
         } else {
           const dirtyColumnNames = new Set(dirtyFields.map((c) => c.columnName));
           for (const change of dirtyFields) {
@@ -942,6 +967,12 @@ export function createDerivedRepository<T, ID>(
             if (fkValue !== undefined) {
               updateBuilder.set(relation.joinColumn, fkValue);
             }
+          }
+          // Include FK columns for @ManyToOne relations not already in dirty fields
+          for (const relation of metadata.manyToOneRelations) {
+            if (dirtyColumnNames.has(relation.joinColumn)) continue;
+            const fkValue = getManyToOneFkValue(entity, relation);
+            updateBuilder.set(relation.joinColumn, fkValue);
           }
         }
       }
@@ -1033,6 +1064,12 @@ export function createDerivedRepository<T, ID>(
         if (fkValue !== undefined && relation.joinColumn) {
           insertBuilder.set(relation.joinColumn, fkValue);
         }
+      }
+
+      // Include FK columns for @ManyToOne relations
+      for (const relation of metadata.manyToOneRelations) {
+        const fkValue = getManyToOneFkValue(entity, relation);
+        insertBuilder.set(relation.joinColumn, fkValue);
       }
 
       insertBuilder.returning("*");
