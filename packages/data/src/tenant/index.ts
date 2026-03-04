@@ -11,3 +11,5 @@ export { RoutingDataSource, TenantRoutingDataSource, RoutingError } from "./rout
 
 export type { LoadBalancer, ReadReplicaDataSourceOptions } from "./read-replica-datasource.js";
 export { ReadWriteContext, ReadReplicaDataSource, RoundRobinBalancer, RandomBalancer } from "./read-replica-datasource.js";
+
+export { TenantSchemaManager } from "./tenant-schema-manager.js";

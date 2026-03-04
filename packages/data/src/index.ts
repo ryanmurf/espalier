@@ -144,3 +144,5 @@ export { RoutingDataSource, TenantRoutingDataSource, RoutingError } from "./tena
 
 export type { LoadBalancer, ReadReplicaDataSourceOptions } from "./tenant/index.js";
 export { ReadWriteContext, ReadReplicaDataSource, RoundRobinBalancer, RandomBalancer } from "./tenant/index.js";
+
+export { TenantSchemaManager } from "./tenant/index.js";

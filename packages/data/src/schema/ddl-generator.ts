@@ -1,4 +1,4 @@
-import { quoteIdentifier } from "espalier-jdbc";
+import { quoteIdentifier, validateIdentifier } from "espalier-jdbc";
 import { getEntityMetadata } from "../mapping/entity-metadata.js";
 import { getColumnMetadataEntries } from "../decorators/column.js";
 import type { ColumnMetadataEntry } from "../decorators/column.js";
@@ -28,11 +28,24 @@ function validateDefaultValue(val: string): string {
 export interface DdlOptions {
   ifNotExists?: boolean;
   dialect?: "postgres" | "generic";
+  /** PostgreSQL schema to qualify table names with. Validated as safe identifier. */
+  schema?: string;
 }
 
 export interface DropTableOptions {
   ifExists?: boolean;
   cascade?: boolean;
+  /** PostgreSQL schema to qualify table names with. Validated as safe identifier. */
+  schema?: string;
+}
+
+/**
+ * Qualifies a table name with a schema prefix if provided.
+ */
+function qualifyTableName(tableName: string, schema?: string): string {
+  if (!schema) return quoteIdentifier(tableName);
+  validateIdentifier(schema, "schema");
+  return `${quoteIdentifier(schema)}.${quoteIdentifier(tableName)}`;
 }
 
 function resolveColumnType(
@@ -179,7 +192,8 @@ export class DdlGenerator {
       columns.push(`  ${parts.join(" ")}`);
     }
 
-    return `CREATE TABLE ${ifNotExists}${quoteIdentifier(metadata.tableName)} (\n${columns.join(",\n")}\n)`;
+    const qualifiedTable = qualifyTableName(metadata.tableName, options?.schema);
+    return `CREATE TABLE ${ifNotExists}${qualifiedTable} (\n${columns.join(",\n")}\n)`;
   }
 
   generateJoinTables(
@@ -242,7 +256,8 @@ export class DdlGenerator {
 
     const ifNotExists = options?.ifNotExists ? "IF NOT EXISTS " : "";
     const indexName = `idx_${metadata.tableName}_${field.columnName}`;
-    return `CREATE INDEX ${ifNotExists}${quoteIdentifier(indexName)} ON ${quoteIdentifier(metadata.tableName)} (${quoteIdentifier(field.columnName)})`;
+    const qualifiedTable = qualifyTableName(metadata.tableName, options?.schema);
+    return `CREATE INDEX ${ifNotExists}${quoteIdentifier(indexName)} ON ${qualifiedTable} (${quoteIdentifier(field.columnName)})`;
   }
 
   generateDropTable(
@@ -252,6 +267,7 @@ export class DdlGenerator {
     const metadata = getEntityMetadata(entityClass);
     const ifExists = options?.ifExists ? "IF EXISTS " : "";
     const cascade = options?.cascade ? " CASCADE" : "";
-    return `DROP TABLE ${ifExists}${quoteIdentifier(metadata.tableName)}${cascade}`;
+    const qualifiedTable = qualifyTableName(metadata.tableName, options?.schema);
+    return `DROP TABLE ${ifExists}${qualifiedTable}${cascade}`;
   }
 }
