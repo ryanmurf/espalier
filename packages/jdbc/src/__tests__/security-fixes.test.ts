@@ -326,13 +326,12 @@ describe("#57: QueryStatisticsCollector redacts identifiers when enabled", () =>
     collector.record("SELECT * FROM orders JOIN users ON orders.user_id = users.id", 10);
 
     const stats = collector.getStatistics();
-    // BUG: Table names in ON clause conditions are NOT redacted.
-    // The regex only replaces names after FROM/JOIN/INTO/UPDATE/TABLE keywords,
-    // but table-qualified column refs (orders.user_id, users.id) leak table names.
+    // Dev fixed this: table-qualified column refs in ON clauses are now also redacted.
     expect(stats[0].pattern).toContain("FROM [TABLE]");
     expect(stats[0].pattern).toContain("JOIN [TABLE]");
-    // These SHOULD be redacted but currently are NOT:
-    expect(stats[0].pattern).toContain("orders.user_id"); // BUG: leaks table name
+    // Table names in ON clause are now redacted:
+    expect(stats[0].pattern).not.toContain("orders");
+    expect(stats[0].pattern).not.toContain("users");
   });
 
   it("INSERT INTO table names are redacted", () => {

@@ -235,13 +235,12 @@ describe("#54: setGlobalTracerProvider rejects null/undefined", () => {
     expect(() => setGlobalTracerProvider(duck as unknown as TracerProvider)).not.toThrow();
   });
 
-  it("does not reject 0 or empty string (non-null falsy values that are not TracerProvider)", () => {
-    // 0 == null is false, so 0 should not be caught by the null check.
-    // But 0 is not a valid TracerProvider — still, the current guard only checks == null
-    // This tests the exact behavior of the guard: `provider == null` catches null and undefined only
-    expect(() => setGlobalTracerProvider(0 as unknown as TracerProvider)).not.toThrow();
-    expect(() => setGlobalTracerProvider("" as unknown as TracerProvider)).not.toThrow();
-    expect(() => setGlobalTracerProvider(false as unknown as TracerProvider)).not.toThrow();
+  it("rejects 0, empty string, and false (non-TracerProvider falsy values)", () => {
+    // Dev fixed this: setGlobalTracerProvider now validates that the provider
+    // implements getTracer(), so all non-TracerProvider values are rejected.
+    expect(() => setGlobalTracerProvider(0 as unknown as TracerProvider)).toThrow();
+    expect(() => setGlobalTracerProvider("" as unknown as TracerProvider)).toThrow();
+    expect(() => setGlobalTracerProvider(false as unknown as TracerProvider)).toThrow();
   });
 });
 
