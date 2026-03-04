@@ -81,7 +81,6 @@ describe("RoutingDataSource — error cases", () => {
 
     await expect(router.getConnection()).rejects.toThrow(RoutingError);
     await expect(router.getConnection()).rejects.toThrow(/No route resolved/);
-    await expect(router.getConnection()).rejects.toThrow(/Available routes/);
   });
 
   it("throws RoutingError when route not found in map", async () => {
@@ -92,10 +91,9 @@ describe("RoutingDataSource — error cases", () => {
 
     await expect(router.getConnection()).rejects.toThrow(RoutingError);
     await expect(router.getConnection()).rejects.toThrow(/No DataSource found/);
-    await expect(router.getConnection()).rejects.toThrow(/nonexistent/);
   });
 
-  it("error message lists available routes", async () => {
+  it("error message does not leak route keys", async () => {
     const router = new RoutingDataSource({
       dataSources: new Map([
         ["alpha", mockDataSource("A")],
@@ -109,8 +107,9 @@ describe("RoutingDataSource — error cases", () => {
       expect.fail("should have thrown");
     } catch (err: unknown) {
       const e = err as Error;
-      expect(e.message).toContain("alpha");
-      expect(e.message).toContain("beta");
+      expect(e.message).not.toContain("alpha");
+      expect(e.message).not.toContain("beta");
+      expect(e.message).not.toContain("gamma");
     }
   });
 

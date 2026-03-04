@@ -3,6 +3,7 @@ import type { NamedPreparedStatement, ResultSet, SqlValue } from "espalier-jdbc"
 import { QueryError, DatabaseErrorCode, parseNamedParams } from "espalier-jdbc";
 import type { ParsedNamedQuery } from "espalier-jdbc";
 import { PgResultSet } from "./pg-result-set.js";
+import { traceQuery } from "./trace-query.js";
 
 function mapPgErrorCode(err: unknown): DatabaseErrorCode {
   if (err == null) return DatabaseErrorCode.QUERY_FAILED;
@@ -41,34 +42,38 @@ export class PgNamedPreparedStatement implements NamedPreparedStatement {
   async executeQuery(sql?: string): Promise<ResultSet> {
     const queryText = sql ?? this.parsed.sql;
     const params = this.collectParameters();
-    try {
-      const result = await this.client.query(queryText, params);
-      return new PgResultSet(result);
-    } catch (err) {
-      throw new QueryError(
-        `Failed to execute named query: ${(err as Error).message}`,
-        queryText,
-        err as Error,
-        mapPgErrorCode(err),
-      );
-    }
+    return traceQuery("db.query", queryText, async () => {
+      try {
+        const result = await this.client.query(queryText, params);
+        return new PgResultSet(result);
+      } catch (err) {
+        throw new QueryError(
+          `Failed to execute named query: ${(err as Error).message}`,
+          queryText,
+          err as Error,
+          mapPgErrorCode(err),
+        );
+      }
+    });
   }
 
   async executeUpdate(): Promise<number>;
   async executeUpdate(sql?: string): Promise<number> {
     const queryText = sql ?? this.parsed.sql;
     const params = this.collectParameters();
-    try {
-      const result = await this.client.query(queryText, params);
-      return result.rowCount ?? 0;
-    } catch (err) {
-      throw new QueryError(
-        `Failed to execute named update: ${(err as Error).message}`,
-        queryText,
-        err as Error,
-        mapPgErrorCode(err),
-      );
-    }
+    return traceQuery("db.query", queryText, async () => {
+      try {
+        const result = await this.client.query(queryText, params);
+        return result.rowCount ?? 0;
+      } catch (err) {
+        throw new QueryError(
+          `Failed to execute named update: ${(err as Error).message}`,
+          queryText,
+          err as Error,
+          mapPgErrorCode(err),
+        );
+      }
+    });
   }
 
   async close(): Promise<void> {

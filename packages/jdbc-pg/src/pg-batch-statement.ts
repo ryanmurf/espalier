@@ -1,6 +1,7 @@
 import type { PoolClient } from "pg";
 import type { BatchStatement, SqlValue } from "espalier-jdbc";
 import { QueryError, DatabaseErrorCode } from "espalier-jdbc";
+import { traceQuery } from "./trace-query.js";
 
 function mapPgErrorCode(err: unknown): DatabaseErrorCode {
   if (err == null) return DatabaseErrorCode.QUERY_FAILED;
@@ -48,11 +49,12 @@ export class PgBatchStatement implements BatchStatement {
       return [];
     }
 
-    if (this.isInsert()) {
-      return this.executeMultiRowInsert();
-    }
-
-    return this.executeIndividual();
+    return traceQuery("db.batch", this.sql, async () => {
+      if (this.isInsert()) {
+        return this.executeMultiRowInsert();
+      }
+      return this.executeIndividual();
+    });
   }
 
   async close(): Promise<void> {
