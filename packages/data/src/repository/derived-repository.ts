@@ -124,6 +124,18 @@ export function createDerivedRepository<T, ID>(
   }
 
   /**
+   * Returns a tenant-qualified cache key for an entity ID.
+   * For @TenantId entities, the cache key includes the current tenant to prevent
+   * cross-tenant cache leaks. For non-tenant entities, returns the id as-is.
+   */
+  function tenantCacheKey(id: unknown): unknown {
+    if (!tenantColumn) return id;
+    const tid = TenantContext.current();
+    if (tid === undefined) return id;
+    return `__tenant:${tid}:${String(id)}`;
+  }
+
+  /**
    * Returns a Criteria for tenant filtering, or undefined if not applicable.
    * Used to pass extra criteria to buildDerivedQuery.
    */
@@ -1066,7 +1078,7 @@ export function createDerivedRepository<T, ID>(
           await cascadePostSave(saved, conn, cascadeSaving);
           await invokeLifecycleCallbacks(saved, "PostUpdate");
           changeTracker.snapshot(saved);
-          entityCache.put(entityClass, getEntityId(saved), saved);
+          entityCache.put(entityClass, tenantCacheKey(getEntityId(saved)), saved);
           queryCache.invalidate(entityClass);
           await emitEntityEvent(ENTITY_EVENTS.UPDATED, `${ENTITY_EVENTS.UPDATED}:${entityName}`, {
             type: "updated",
@@ -1081,7 +1093,7 @@ export function createDerivedRepository<T, ID>(
         }
         // No rows returned — if versioned, this is an optimistic lock conflict
         if (versionField && versionCol && currentVersion !== undefined) {
-          entityCache.evict(entityClass, idValue);
+          entityCache.evict(entityClass, tenantCacheKey(idValue));
           let actualVersion: number | null = null;
           const checkQuery = new SelectBuilder(metadata.tableName)
             .columns(versionCol)
@@ -1110,7 +1122,7 @@ export function createDerivedRepository<T, ID>(
           );
         }
         // No rows returned for unversioned entity — entity was deleted
-        entityCache.evict(entityClass, idValue);
+        entityCache.evict(entityClass, tenantCacheKey(idValue));
         queryCache.invalidate(entityClass);
         changeTracker.clearSnapshot(entity);
         throw new EntityNotFoundException(entityClass.name, idValue);
@@ -1169,7 +1181,7 @@ export function createDerivedRepository<T, ID>(
           await cascadePostSave(saved, conn, cascadeSaving);
           await invokeLifecycleCallbacks(saved, "PostPersist");
           changeTracker.snapshot(saved);
-          entityCache.put(entityClass, getEntityId(saved), saved);
+          entityCache.put(entityClass, tenantCacheKey(getEntityId(saved)), saved);
           queryCache.invalidate(entityClass);
           await emitEntityEvent(ENTITY_EVENTS.PERSISTED, `${ENTITY_EVENTS.PERSISTED}:${entityName}`, {
             type: "persisted",
@@ -1399,7 +1411,7 @@ export function createDerivedRepository<T, ID>(
         timestamp: new Date(),
       } satisfies EntityRemovedEvent<T>);
       changeTracker.clearSnapshot(entity);
-      entityCache.evict(entityClass, idValue);
+      entityCache.evict(entityClass, tenantCacheKey(idValue));
       queryCache.invalidate(entityClass);
     } finally {
       await stmt.close().catch(() => {});
@@ -1444,7 +1456,7 @@ export function createDerivedRepository<T, ID>(
       }
 
       // Check cache first
-      const cached = entityCache.get(entityClass, id);
+      const cached = entityCache.get(entityClass, tenantCacheKey(id));
       if (cached !== undefined) {
         return cached;
       }
@@ -1505,7 +1517,7 @@ export function createDerivedRepository<T, ID>(
             attachLazyProxies(result);
             await invokeLifecycleCallbacks(result, "PostLoad");
             changeTracker.snapshot(result);
-            entityCache.put(entityClass, id, result);
+            entityCache.put(entityClass, tenantCacheKey(id), result);
             await emitEntityEvent(ENTITY_EVENTS.LOADED, `${ENTITY_EVENTS.LOADED}:${entityName}`, {
               type: "loaded",
               entityClass,
@@ -1527,7 +1539,7 @@ export function createDerivedRepository<T, ID>(
 
     async existsById(id: ID): Promise<boolean> {
       // Short-circuit: if entity is already in cache, it exists
-      const cached = entityCache.get(entityClass, id);
+      const cached = entityCache.get(entityClass, tenantCacheKey(id));
       if (cached !== undefined) return true;
 
       const idCol = getIdColumn();
@@ -1608,7 +1620,7 @@ export function createDerivedRepository<T, ID>(
       const cachedResults = queryCache.get(cacheKey);
       if (cachedResults !== undefined) {
         for (const entity of cachedResults as T[]) {
-          entityCache.put(entityClass, getEntityId(entity), entity);
+          entityCache.put(entityClass, tenantCacheKey(getEntityId(entity)), entity);
         }
         return cachedResults as T[];
       }
@@ -1664,7 +1676,7 @@ export function createDerivedRepository<T, ID>(
             attachLazyProxies(entity);
             await invokeLifecycleCallbacks(entity, "PostLoad");
             changeTracker.snapshot(entity);
-            entityCache.put(entityClass, getEntityId(entity), entity);
+            entityCache.put(entityClass, tenantCacheKey(getEntityId(entity)), entity);
             await emitEntityEvent(ENTITY_EVENTS.LOADED, `${ENTITY_EVENTS.LOADED}:${entityName}`, {
               type: "loaded",
               entityClass,
@@ -1760,7 +1772,7 @@ export function createDerivedRepository<T, ID>(
             stmt.setParameter(i + 1, query.params[i]);
           }
           await stmt.executeUpdate();
-          entityCache.evict(entityClass, id);
+          entityCache.evict(entityClass, tenantCacheKey(id));
           queryCache.invalidate(entityClass);
         } finally {
           await stmt.close().catch(() => {});
@@ -1857,7 +1869,7 @@ export function createDerivedRepository<T, ID>(
       }
 
       // Evict from caches to force a fresh load
-      entityCache.evict(entityClass, id);
+      entityCache.evict(entityClass, tenantCacheKey(id));
       queryCache.invalidate(entityClass);
       changeTracker.clearSnapshot(entity);
 
@@ -2006,7 +2018,7 @@ export function createDerivedRepository<T, ID>(
 
           await invokeLifecycleCallbacks(entity, "PostLoad");
           changeTracker.snapshot(entity);
-          entityCache.put(entityClass, id, entity);
+          entityCache.put(entityClass, tenantCacheKey(id), entity);
 
           return entity;
         } finally {
@@ -2244,7 +2256,7 @@ export function createDerivedRepository<T, ID>(
           }
           // find action — re-populate entity cache from query cache results
           for (const entity of cachedResult as T[]) {
-            entityCache.put(entityClass, getEntityId(entity), entity);
+            entityCache.put(entityClass, tenantCacheKey(getEntityId(entity)), entity);
           }
           if (descriptor.limit === 1) {
             return (cachedResult as any[])[0] ?? null;
