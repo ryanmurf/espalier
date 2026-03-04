@@ -129,3 +129,6 @@ export type {
   MigrationRunner,
 } from "./migration/migration.js";
 export { DEFAULT_MIGRATION_TABLE, DEFAULT_SCHEMA } from "./migration/migration.js";
+
+export type { TenantIdentifier } from "./tenant/index.js";
+export { TenantContext, NoTenantException } from "./tenant/index.js";
