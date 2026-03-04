@@ -952,10 +952,13 @@ export function createDerivedRepository<T, ID>(
     }
   }
 
-  // Cycle detection set for cascade operations (shared across a save call tree)
-  const cascadeSaving = new Set<unknown>();
-
   async function saveWithConnection(entity: T, conn: Connection): Promise<T> {
+    // Create a fresh cycle-detection set per top-level save call
+    const cascadeSaving = new Set<unknown>();
+    return saveWithConnectionInternal(entity, conn, cascadeSaving);
+  }
+
+  async function saveWithConnectionInternal(entity: T, conn: Connection, cascadeSaving: Set<unknown>): Promise<T> {
     const idField = metadata.idField;
     const idValue = (entity as Record<string | symbol, unknown>)[idField] as SqlValue;
     const idCol = getIdColumn();
@@ -1378,10 +1381,10 @@ export function createDerivedRepository<T, ID>(
     }
   }
 
-  // Cycle detection set for cascade delete operations
-  const cascadeDeleting = new Set<unknown>();
-
   async function deleteWithConnection(entity: T, conn: Connection): Promise<void> {
+    // Create a fresh cycle-detection set per top-level delete call
+    const cascadeDeleting = new Set<unknown>();
+
     await invokeLifecycleCallbacks(entity, "PreRemove");
     const idField = metadata.idField;
     const idValue = (entity as Record<string | symbol, unknown>)[idField] as SqlValue;
