@@ -1,6 +1,7 @@
 import type { EventBus } from "../events/event-bus.js";
 import type { EntityMetadata } from "../mapping/entity-metadata.js";
 import { getEntityMetadata } from "../mapping/entity-metadata.js";
+import type { MiddlewareFn } from "./middleware.js";
 import type { Plugin, PluginContext, PluginHook, HookContext, HookType } from "./plugin.js";
 
 /**
@@ -9,6 +10,7 @@ import type { Plugin, PluginContext, PluginHook, HookContext, HookType } from ".
 export class PluginManager {
   private readonly plugins = new Map<string, Plugin>();
   private readonly hooks = new Map<HookType, PluginHook[]>();
+  private readonly middlewares: MiddlewareFn[] = [];
   private readonly eventBus: EventBus;
   private initialized = false;
 
@@ -60,6 +62,7 @@ export class PluginManager {
     }
 
     this.hooks.clear();
+    this.middlewares.length = 0;
     this.plugins.clear();
     this.initialized = false;
   }
@@ -82,6 +85,13 @@ export class PluginManager {
     }
 
     return hookContext;
+  }
+
+  /**
+   * Get the registered middleware chain.
+   */
+  getMiddlewares(): readonly MiddlewareFn[] {
+    return this.middlewares;
   }
 
   /**
@@ -118,6 +128,9 @@ export class PluginManager {
           this.hooks.set(hook.type, list);
         }
         list.push(hook);
+      },
+      addMiddleware: (middleware: MiddlewareFn): void => {
+        this.middlewares.push(middleware);
       },
     };
   }

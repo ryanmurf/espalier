@@ -1,5 +1,6 @@
 import type { EventBus } from "../events/event-bus.js";
 import type { EntityMetadata } from "../mapping/entity-metadata.js";
+import type { MiddlewareFn } from "./middleware.js";
 
 /**
  * Context provided to plugins during initialization.
@@ -12,6 +13,8 @@ export interface PluginContext {
   getEntityMetadata(entityClass: new (...args: any[]) => any): EntityMetadata;
   /** Register a hook that runs on all repositories. */
   addHook(hook: PluginHook): void;
+  /** Register middleware that wraps repository operations. */
+  addMiddleware(middleware: MiddlewareFn): void;
 }
 
 /**
