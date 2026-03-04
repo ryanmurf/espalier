@@ -5,3 +5,7 @@ export { mountExpressRoutes } from "./express-adapter.js";
 export { createFastifyPlugin } from "./fastify-adapter.js";
 export type { RestPluginConfig } from "./rest-plugin.js";
 export { RestPlugin } from "./rest-plugin.js";
+export type { OpenApiSpec, OpenApiOperation, OpenApiParameter, OpenApiSchema, OpenApiSchemaRef, OpenApiGeneratorOptions } from "./openapi-generator.js";
+export { OpenApiGenerator } from "./openapi-generator.js";
+export type { EntityRouteConfig } from "./route-customizer.js";
+export { customizeRoutes, addHateoasLinks } from "./route-customizer.js";
