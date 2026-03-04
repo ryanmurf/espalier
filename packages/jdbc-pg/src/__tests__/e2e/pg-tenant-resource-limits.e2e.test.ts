@@ -483,69 +483,24 @@ describe.skipIf(!canConnect)("TenantSchemaManager — resource limits (#48)", { 
       }
     });
 
-    it("negative maxTenants behaves like zero (no schemas allowed)", async () => {
-      const mgr = new TenantSchemaManager({ maxTenants: -1 });
-
-      // existing.length >= -1 is always true since length >= 0
-      await expect(
-        mgr.provisionTenant(ds, "neg", [RlItem], resolver),
-      ).rejects.toThrow(TenantLimitExceededError);
+    it("FIXED: negative maxTenants rejected at construction", () => {
+      expect(() => new TenantSchemaManager({ maxTenants: -1 }))
+        .toThrow(/non-negative integer/);
     });
 
-    it("BUG: NaN maxTenants bypasses limit entirely", async () => {
-      // NaN !== undefined is true, so the limit check path is taken.
-      // But existing.length >= NaN is always false, so the limit never triggers.
-      const mgr = new TenantSchemaManager({ maxTenants: NaN });
-
-      // These should all succeed because NaN comparison always returns false
-      await mgr.provisionTenant(ds, "nan_a", [RlItem], resolver);
-      await mgr.provisionTenant(ds, "nan_b", [RlItem], resolver);
-      await mgr.provisionTenant(ds, "nan_c", [RlItem], resolver);
-
-      const conn = await ds.getConnection();
-      try {
-        const schemas = await mgr.listTenantSchemas(conn, PREFIX);
-        const nanSchemas = schemas.filter(s => s.startsWith(`${PREFIX}nan_`));
-        // CONFIRMED BUG: NaN bypasses limit — all 3 schemas created
-        expect(nanSchemas).toHaveLength(3);
-      } finally {
-        await conn.close();
-      }
+    it("FIXED: NaN maxTenants rejected at construction", () => {
+      expect(() => new TenantSchemaManager({ maxTenants: NaN }))
+        .toThrow(/non-negative integer/);
     });
 
-    it("BUG: fractional maxTenants silently accepted", async () => {
-      // maxTenants=1.5: the check is existing.length >= 1.5
-      // 0 >= 1.5 => false (allowed), 1 >= 1.5 => false (allowed), 2 >= 1.5 => true (blocked)
-      // So 1.5 effectively allows 2 tenants, which is surprising.
-      const limit = baselineSchemaCount + 1.5;
-      const mgr = new TenantSchemaManager({ maxTenants: limit });
-
-      await mgr.provisionTenant(ds, "frac_a", [RlItem], resolver);
-      // Second provision: count = baseline+1, baseline+1 >= baseline+1.5 is false => allowed
-      await mgr.provisionTenant(ds, "frac_b", [RlItem], resolver);
-
-      const conn = await ds.getConnection();
-      try {
-        const schemas = await mgr.listTenantSchemas(conn, PREFIX);
-        const fracSchemas = schemas.filter(s => s.startsWith(`${PREFIX}frac_`));
-        // CONFIRMED: fractional maxTenants allows more than the integer floor
-        expect(fracSchemas).toHaveLength(2);
-      } finally {
-        await conn.close();
-      }
+    it("FIXED: fractional maxTenants rejected at construction", () => {
+      expect(() => new TenantSchemaManager({ maxTenants: 1.5 }))
+        .toThrow(/non-negative integer/);
     });
 
-    it("Infinity maxTenants effectively means unlimited", async () => {
-      const mgr = new TenantSchemaManager({ maxTenants: Infinity });
-
-      await mgr.provisionTenant(ds, "inf_a", [RlItem], resolver);
-      const conn = await ds.getConnection();
-      try {
-        const schemas = await mgr.listTenantSchemas(conn, PREFIX);
-        expect(schemas).toContain(`${PREFIX}inf_a`);
-      } finally {
-        await conn.close();
-      }
+    it("FIXED: Infinity maxTenants rejected at construction", () => {
+      expect(() => new TenantSchemaManager({ maxTenants: Infinity }))
+        .toThrow(/non-negative integer/);
     });
   });
 });
