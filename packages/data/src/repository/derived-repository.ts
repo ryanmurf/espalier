@@ -28,7 +28,7 @@ import { ENTITY_EVENTS } from "../events/entity-events.js";
 import type { OneToOneRelation } from "../decorators/relations.js";
 import { getTableName } from "../decorators/table.js";
 import { getColumnMappings, getColumnTypeMappings } from "../decorators/column.js";
-import { getFieldValue } from "../mapping/field-access.js";
+import { getFieldValue, setFieldValue } from "../mapping/field-access.js";
 import {
   getJoinFetchSpecs,
   buildJoinColumns,
@@ -2005,8 +2005,11 @@ export function createDerivedRepository<T, ID>(
 
           // Copy refreshed values back to the original entity
           for (const field of metadata.fields) {
-            (entity as Record<string | symbol, unknown>)[field.fieldName] =
-              (freshEntity as Record<string | symbol, unknown>)[field.fieldName];
+            setFieldValue(
+              entity as Record<string | symbol, unknown>,
+              field.fieldName,
+              getFieldValue(freshEntity as Record<string | symbol, unknown>, field.fieldName),
+            );
           }
           // Copy relation fields
           for (const relation of metadata.manyToOneRelations) {
