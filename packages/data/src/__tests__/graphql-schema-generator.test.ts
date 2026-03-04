@@ -37,126 +37,126 @@ import { GraphQLPlugin } from "../graphql/graphql-plugin.js";
 class User {
   @Id
   @Column({ type: "SERIAL" })
-  accessor id: number = 0;
+  id: number = 0;
 
   @Column({ type: "VARCHAR" })
-  accessor name: string = "";
+  name: string = "";
 
   @Column({ type: "VARCHAR" })
-  accessor email: string = "";
+  email: string = "";
 
   @Column({ type: "BOOLEAN" })
-  accessor active: boolean = true;
+  active: boolean = true;
 
   @Column({ type: "INTEGER" })
-  accessor age: number = 0;
+  age: number = 0;
 
   @Version
-  accessor version: number = 0;
+  version: number = 0;
 
   @CreatedDate
   @Column({ type: "TIMESTAMP" })
-  accessor createdAt: Date = new Date();
+  createdAt: Date = new Date();
 
   @LastModifiedDate
   @Column({ type: "TIMESTAMP" })
-  accessor updatedAt: Date = new Date();
+  updatedAt: Date = new Date();
 
   @OneToMany({ target: () => Post, mappedBy: "author" })
-  accessor posts: Post[] = [];
+  posts: Post[] = [];
 
   @OneToOne({ target: () => Profile })
-  accessor profile: Profile | null = null;
+  profile: Profile | null = null;
 }
 
 @Table("posts")
 class Post {
   @Id
   @Column({ type: "SERIAL" })
-  accessor id: number = 0;
+  id: number = 0;
 
   @Column({ type: "VARCHAR" })
-  accessor title: string = "";
+  title: string = "";
 
   @Column({ type: "TEXT" })
-  accessor content: string = "";
+  content: string = "";
 
   @Column({ type: "TIMESTAMP" })
-  accessor publishedAt: Date | null = null;
+  publishedAt: Date | null = null;
 
   @ManyToOne({ target: () => User })
-  accessor author: User | null = null;
+  author: User | null = null;
 
   @ManyToMany({
     target: () => Tag,
     joinTable: { name: "post_tags", joinColumn: "post_id", inverseJoinColumn: "tag_id" },
   })
-  accessor tags: Tag[] = [];
+  tags: Tag[] = [];
 }
 
 @Table("tags")
 class Tag {
   @Id
   @Column({ type: "SERIAL" })
-  accessor id: number = 0;
+  id: number = 0;
 
   @Column({ type: "VARCHAR" })
-  accessor name: string = "";
+  name: string = "";
 
   @ManyToMany({ target: () => Post, mappedBy: "tags" })
-  accessor posts: Post[] = [];
+  posts: Post[] = [];
 }
 
 @Table("profiles")
 class Profile {
   @Id
   @Column({ type: "SERIAL" })
-  accessor id: number = 0;
+  id: number = 0;
 
   @Column({ type: "TEXT" })
-  accessor bio: string = "";
+  bio: string = "";
 
   @Column({ type: "VARCHAR" })
-  accessor avatarUrl: string = "";
+  avatarUrl: string = "";
 }
 
 @Embeddable
 class Address {
   @Column()
-  accessor street: string = "";
+  street: string = "";
 
   @Column()
-  accessor city: string = "";
+  city: string = "";
 
   @Column()
-  accessor zip: string = "";
+  zip: string = "";
 }
 
 @Table("companies")
 class Company {
   @Id
   @Column({ type: "SERIAL" })
-  accessor id: number = 0;
+  id: number = 0;
 
   @Column({ type: "VARCHAR" })
-  accessor name: string = "";
+  name: string = "";
 
   @Embedded({ target: () => Address, prefix: "addr_" })
-  accessor address: Address = new Address();
+  address: Address = new Address();
 }
 
 @Table("tenant_items")
 class TenantItem {
   @Id
   @Column({ type: "UUID" })
-  accessor id: string = "";
+  id: string = "";
 
   @Column({ type: "VARCHAR" })
-  accessor name: string = "";
+  name: string = "";
 
   @TenantId
   @Column({ type: "VARCHAR" })
-  accessor tenantId: string = "";
+  tenantId: string = "";
 }
 
 // Minimal entity — only @Id
@@ -164,7 +164,7 @@ class TenantItem {
 class MinimalEntity {
   @Id
   @Column({ type: "SERIAL" })
-  accessor id: number = 0;
+  id: number = 0;
 }
 
 // Entity with diverse column types for type mapping tests
@@ -172,64 +172,64 @@ class MinimalEntity {
 class TypedEntity {
   @Id
   @Column({ type: "UUID" })
-  accessor id: string = "";
+  id: string = "";
 
   @Column({ type: "INTEGER" })
-  accessor intCol: number = 0;
+  intCol: number = 0;
 
   @Column({ type: "BIGINT" })
-  accessor bigintCol: number = 0;
+  bigintCol: number = 0;
 
   @Column({ type: "SMALLINT" })
-  accessor smallintCol: number = 0;
+  smallintCol: number = 0;
 
   @Column({ type: "FLOAT" })
-  accessor floatCol: number = 0;
+  floatCol: number = 0;
 
   @Column({ type: "DOUBLE PRECISION" })
-  accessor doubleCol: number = 0;
+  doubleCol: number = 0;
 
   @Column({ type: "DECIMAL(10,2)" })
-  accessor decimalCol: number = 0;
+  decimalCol: number = 0;
 
   @Column({ type: "NUMERIC" })
-  accessor numericCol: number = 0;
+  numericCol: number = 0;
 
   @Column({ type: "REAL" })
-  accessor realCol: number = 0;
+  realCol: number = 0;
 
   @Column({ type: "BOOLEAN" })
-  accessor boolCol: boolean = false;
+  boolCol: boolean = false;
 
   @Column({ type: "BIT" })
-  accessor bitCol: boolean = false;
+  bitCol: boolean = false;
 
   @Column({ type: "TEXT" })
-  accessor textCol: string = "";
+  textCol: string = "";
 
   @Column({ type: "VARCHAR" })
-  accessor varcharCol: string = "";
+  varcharCol: string = "";
 
   @Column({ type: "JSON" })
-  accessor jsonCol: unknown = null;
+  jsonCol: unknown = null;
 
   @Column({ type: "JSONB" })
-  accessor jsonbCol: unknown = null;
+  jsonbCol: unknown = null;
 
   @Column({ type: "TIMESTAMP" })
-  accessor tsCol: Date = new Date();
+  tsCol: Date = new Date();
 
   @Column({ type: "DATE" })
-  accessor dateCol: Date = new Date();
+  dateCol: Date = new Date();
 
   @Column({ type: "TIME" })
-  accessor timeCol: string = "";
+  timeCol: string = "";
 
   @Column({ type: "BYTEA" })
-  accessor bytesCol: Uint8Array = new Uint8Array();
+  bytesCol: Uint8Array = new Uint8Array();
 
   @Column()
-  accessor noTypeCol: string = "";
+  noTypeCol: string = "";
 }
 
 // ══════════════════════════════════════════════════
