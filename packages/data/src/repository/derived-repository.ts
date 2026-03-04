@@ -133,20 +133,26 @@ export function createDerivedRepository<T, ID>(
   }
 
   /**
-   * Returns the current tenant ID for read filtering, or undefined if
-   * the entity has no @TenantId or no tenant is set (reads are allowed without tenant).
+   * Returns the current tenant ID for read filtering.
+   * Throws NoTenantException if the entity has @TenantId but no tenant context is set.
+   * Returns undefined for entities without @TenantId.
    */
-  function currentTenantForRead(): string | undefined {
+  function requireTenantForRead(): string | undefined {
     if (!tenantColumn) return undefined;
-    return TenantContext.current();
+    const tid = TenantContext.current();
+    if (tid === undefined) {
+      throw new NoTenantException();
+    }
+    return tid;
   }
 
   /**
    * Applies tenant filtering to a SELECT, UPDATE, or DELETE builder.
    * Uses `.and()` to compose with existing WHERE criteria.
+   * Throws NoTenantException if the entity has @TenantId but no tenant context is set.
    */
   function applyTenantFilter(builder: { and(criteria: import("../query/criteria.js").Criteria): unknown }): void {
-    const tid = currentTenantForRead();
+    const tid = requireTenantForRead();
     if (!tid || !tenantColumn) return;
     builder.and(new ComparisonCriteria("eq", tenantColumn, tid as SqlValue));
   }
@@ -168,7 +174,7 @@ export function createDerivedRepository<T, ID>(
    * Used to pass extra criteria to buildDerivedQuery.
    */
   function getTenantCriteria(): import("../query/criteria.js").Criteria | undefined {
-    const tid = currentTenantForRead();
+    const tid = requireTenantForRead();
     if (!tid || !tenantColumn) return undefined;
     return new ComparisonCriteria("eq", tenantColumn, tid as SqlValue);
   }
