@@ -135,18 +135,32 @@ export class TenantAwareDataSource implements DataSource {
 
 /**
  * Error thrown when setting the search_path for a tenant schema fails.
+ * The generic message avoids leaking tenant IDs or schema names.
+ * Use the schema/tenantId fields for internal logging only.
  */
 export class SchemaSetupError extends Error {
+  /** @internal */
   readonly schema: string;
+  /** @internal */
   readonly tenantId: string | undefined;
 
   constructor(schema: string, tenantId: string | undefined, cause: unknown) {
-    const msg = tenantId !== undefined
-      ? `Failed to set search_path to schema "${schema}" for tenant "${tenantId}". The schema may not exist.`
-      : `Failed to set search_path to schema "${schema}". The schema may not exist.`;
-    super(msg, { cause });
+    super("Failed to configure tenant schema. The schema may not exist.", { cause });
     this.name = "SchemaSetupError";
     this.schema = schema;
     this.tenantId = tenantId;
+  }
+
+  /** Returns a generic message safe for external API responses. */
+  toSafeString(): string {
+    return "Failed to configure tenant schema";
+  }
+
+  /** Omits schema and tenant details from JSON serialization. */
+  toJSON(): Record<string, unknown> {
+    return {
+      name: this.name,
+      message: this.toSafeString(),
+    };
   }
 }
