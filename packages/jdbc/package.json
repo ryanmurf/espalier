@@ -1,6 +1,6 @@
 {
   "name": "espalier-jdbc",
-  "version": "0.11.0",
+  "version": "1.0.0",
   "description": "JDBC-like unified database driver abstraction for TypeScript",
   "type": "module",
   "main": "./dist/index.cjs",
