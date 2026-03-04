@@ -59,7 +59,7 @@ export interface ObservabilityHandle {
 }
 
 function isMonitoredPool(ds: DataSource): ds is MonitoredPooledDataSource {
-  return "getPoolStats" in ds && typeof (ds as any).getPoolStats === "function";
+  return ds != null && "getPoolStats" in ds && typeof (ds as any).getPoolStats === "function";
 }
 
 /**
