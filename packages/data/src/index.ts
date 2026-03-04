@@ -132,3 +132,6 @@ export { DEFAULT_MIGRATION_TABLE, DEFAULT_SCHEMA } from "./migration/migration.j
 
 export type { TenantIdentifier } from "./tenant/index.js";
 export { TenantContext, NoTenantException } from "./tenant/index.js";
+
+export type { TenantAwareDataSourceOptions } from "./tenant/index.js";
+export { TenantAwareDataSource, SchemaSetupError } from "./tenant/index.js";
