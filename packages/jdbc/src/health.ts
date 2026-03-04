@@ -41,7 +41,17 @@ export class HealthCheckRegistry {
   async checkAll(): Promise<HealthCheckResult[]> {
     const results: HealthCheckResult[] = [];
     for (const check of this.checks.values()) {
-      results.push(await check.check());
+      try {
+        results.push(await check.check());
+      } catch (err) {
+        results.push({
+          status: "DOWN",
+          name: check.name,
+          details: { error: err instanceof Error ? err.message : String(err) },
+          checkedAt: new Date(),
+          durationMs: 0,
+        });
+      }
     }
     return results;
   }
@@ -77,7 +87,17 @@ export class CompositeHealthCheck implements HealthCheck {
     const start = Date.now();
     const results: HealthCheckResult[] = [];
     for (const c of this.checks) {
-      results.push(await c.check());
+      try {
+        results.push(await c.check());
+      } catch (err) {
+        results.push({
+          status: "DOWN",
+          name: c.name,
+          details: { error: err instanceof Error ? err.message : String(err) },
+          checkedAt: new Date(),
+          durationMs: Date.now() - start,
+        });
+      }
     }
 
     let worstStatus: HealthStatus = "UP";
