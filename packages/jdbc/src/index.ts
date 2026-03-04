@@ -90,3 +90,4 @@ export {
   setGlobalTracerProvider,
   getGlobalTracerProvider,
 } from "./tracing.js";
+export type { PlanNode, QueryPlan, ExplainOptions, QueryPlanAnalyzer } from "./query-plan.js";
