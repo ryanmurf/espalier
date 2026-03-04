@@ -34,17 +34,15 @@ export class RoutingDataSource implements DataSource {
     const route = this.routeResolver() ?? this.defaultRoute;
 
     if (route === undefined) {
-      const available = [...this.dataSources.keys()].join(", ");
       throw new RoutingError(
-        `No route resolved and no default route configured. Available routes: [${available}]`,
+        "No route resolved and no default route configured",
       );
     }
 
     const ds = this.dataSources.get(route);
     if (!ds) {
-      const available = [...this.dataSources.keys()].join(", ");
       throw new RoutingError(
-        `No DataSource found for route "${route}". Available routes: [${available}]`,
+        "No DataSource found for the resolved route",
       );
     }
 
@@ -60,7 +58,7 @@ export class RoutingDataSource implements DataSource {
         errors.push(
           err instanceof Error
             ? err
-            : new Error(`Failed to close DataSource "${key}": ${String(err)}`),
+            : new Error("Failed to close a routed DataSource"),
         );
       }
     }
@@ -113,10 +111,24 @@ export class TenantRoutingDataSource extends RoutingDataSource {
 
 /**
  * Error thrown when connection routing fails.
+ * Messages are kept generic to avoid leaking internal route topology.
  */
 export class RoutingError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "RoutingError";
+  }
+
+  /** Returns a generic message safe for external API responses. */
+  toSafeString(): string {
+    return "Connection routing failed";
+  }
+
+  /** Omits internal details from JSON serialization. */
+  toJSON(): Record<string, unknown> {
+    return {
+      name: this.name,
+      message: this.toSafeString(),
+    };
   }
 }
