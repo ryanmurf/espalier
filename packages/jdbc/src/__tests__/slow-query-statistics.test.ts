@@ -182,14 +182,12 @@ describe("SlowQueryDetector", () => {
       expect(captured!.sql).toBe("");
     });
 
-    it("NaN duration — BUG: triggers callback because NaN < threshold is false", () => {
+    it("NaN duration is silently ignored (not treated as slow)", () => {
       const cb = vi.fn();
       const detector = new SlowQueryDetector({ thresholdMs: 100, callback: cb });
       detector.record("SELECT 1", NaN);
-      // BUG: NaN < 100 is false, so the early-return guard is skipped.
-      // NaN durations should NOT be considered "slow", but they are.
-      expect(cb).toHaveBeenCalledTimes(1);
-      expect(cb.mock.calls[0][0].durationMs).toBeNaN();
+      // NaN is not finite, so it's filtered out by the Number.isFinite guard.
+      expect(cb).not.toHaveBeenCalled();
     });
   });
 });

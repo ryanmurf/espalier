@@ -164,16 +164,12 @@ describe("ReplicaLagHealthCheck (unit)", () => {
     expect(result.status).toBe("DEGRADED");
   });
 
-  it("NaN lag — BUG: NaN >= maxLag is false, NaN >= degradedLag is false → UP", async () => {
-    // If replay timestamp query returns NaN somehow
+  it("NaN lag returns DOWN (guarded by Number.isNaN check)", async () => {
     const ds = makeReplicaDs(true, NaN);
     const check = new ReplicaLagHealthCheck("replica", ds);
 
     const result = await check.check();
-    // typeof NaN === "number" is true, so lagSeconds = NaN
-    // NaN >= 30 is false, NaN >= 10 is false → status = UP
-    // BUG: NaN lag should be treated as error, not as UP
-    expect(result.status).toBe("UP");
+    expect(result.status).toBe("DOWN");
     expect(result.details.lagSeconds).toBeNaN();
   });
 
@@ -258,14 +254,12 @@ describe("TenantSchemaHealthCheck (unit)", () => {
     expect((result.details.missingSchemas as string[]).length).toBe(2);
   });
 
-  it("empty expected list — BUG: returns DOWN instead of UP (0 === 0 triggers DOWN)", async () => {
+  it("empty expected list returns UP (vacuous truth)", async () => {
     const ds = makeSchemaDs(["public"]);
     const check = new TenantSchemaHealthCheck("tenants", ds, []);
 
     const result = await check.check();
-    // BUG: missing.length (0) === expectedTenantIds.length (0) → true → DOWN
-    // Should be UP since there are no expected tenants to be missing
-    expect(result.status).toBe("DOWN");
+    expect(result.status).toBe("UP");
     expect(result.details.expectedCount).toBe(0);
   });
 

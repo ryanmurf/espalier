@@ -356,7 +356,7 @@ describe("HealthCheckRegistry", () => {
     expect(results[0].status).toBe("DOWN");
   });
 
-  it("check that throws returns result from the check (not caught by registry)", async () => {
+  it("check that throws returns DOWN result (caught by registry)", async () => {
     const throwingCheck: HealthCheck = {
       name: "bomb",
       async check(): Promise<HealthCheckResult> {
@@ -365,9 +365,10 @@ describe("HealthCheckRegistry", () => {
     };
     registry.register(throwingCheck);
 
-    // BUG: Registry doesn't catch errors from checks — it propagates them.
-    // A well-designed registry would wrap in try/catch and return DOWN.
-    await expect(registry.checkAll()).rejects.toThrow("explosion");
+    const results = await registry.checkAll();
+    const bombResult = results.find((r) => r.name === "bomb")!;
+    expect(bombResult.status).toBe("DOWN");
+    expect(bombResult.details.error).toBe("explosion");
   });
 });
 
@@ -450,7 +451,7 @@ describe("CompositeHealthCheck", () => {
     expect(result.durationMs).toBeGreaterThanOrEqual(0);
   });
 
-  it("BUG: throwing child propagates — composite doesn't catch", async () => {
+  it("throwing child returns DOWN (caught by composite)", async () => {
     const throwingCheck: HealthCheck = {
       name: "bomb",
       async check(): Promise<HealthCheckResult> {
@@ -462,8 +463,12 @@ describe("CompositeHealthCheck", () => {
       throwingCheck,
     ]);
 
-    // BUG: CompositeHealthCheck doesn't wrap child check() in try/catch
-    await expect(composite.check()).rejects.toThrow("child explosion");
+    const result = await composite.check();
+    expect(result.status).toBe("DOWN");
+    const checks = result.details.checks as HealthCheckResult[];
+    const bombResult = checks.find((r) => r.name === "bomb")!;
+    expect(bombResult.status).toBe("DOWN");
+    expect(bombResult.details.error).toBe("child explosion");
   });
 });
 

@@ -382,10 +382,9 @@ describe("configureObservability", () => {
       expect(wireStats).toHaveBeenCalledTimes(1);
     });
 
-    it("null dataSource — BUG: crashes during configure, not lazily", () => {
-      // isMonitoredPool uses `"getPoolStats" in ds` which throws on null
-      // Should guard with a null check before the `in` operator
-      expect(() => configureObservability(null as any)).toThrow(TypeError);
+    it("null dataSource — does not crash during configure", () => {
+      // isMonitoredPool guards with null check before the `in` operator
+      expect(() => configureObservability(null as any)).not.toThrow();
     });
   });
 });

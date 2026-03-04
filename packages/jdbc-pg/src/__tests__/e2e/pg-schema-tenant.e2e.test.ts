@@ -555,23 +555,22 @@ describe.skipIf(!canConnect)("TenantAwareDataSource — E2E", () => {
   // ══════════════════════════════════════════════════
 
   describe("SchemaSetupError", () => {
-    it("contains schema name and tenant ID in error", async () => {
-      // Force a SchemaSetupError by using a schema resolver that returns
-      // a valid identifier but the SET somehow fails. This is hard to trigger
-      // with PG since SET search_path doesn't fail for non-existent schemas.
-      // Instead, test the error class directly.
+    it("does not leak schema name or tenant ID in error message", async () => {
       const err = new SchemaSetupError("my_schema", "tenant_x", new Error("pg error"));
       expect(err.name).toBe("SchemaSetupError");
       expect(err.schema).toBe("my_schema");
       expect(err.tenantId).toBe("tenant_x");
-      expect(err.message).toContain("my_schema");
-      expect(err.message).toContain("tenant_x");
+      // Message should NOT contain sensitive schema/tenant info
+      expect(err.message).not.toContain("my_schema");
+      expect(err.message).not.toContain("tenant_x");
+      expect(err.message).toContain("Failed to configure tenant schema");
       expect(err.cause).toBeInstanceOf(Error);
     });
 
-    it("SchemaSetupError without tenantId still has meaningful message", () => {
+    it("SchemaSetupError without tenantId still has meaningful generic message", () => {
       const err = new SchemaSetupError("my_schema", undefined, new Error("pg error"));
-      expect(err.message).toContain("my_schema");
+      expect(err.message).not.toContain("my_schema");
+      expect(err.message).toContain("Failed to configure tenant schema");
       expect(err.tenantId).toBeUndefined();
     });
   });

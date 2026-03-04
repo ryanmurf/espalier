@@ -395,9 +395,9 @@ describe.skipIf(!canConnect)("E2E: Database Tracing Instrumentation", { timeout:
       expect(recorded.length).toBeLessThanOrEqual(210); // 200 + "..."
     });
 
-    it("BUG POTENTIAL: SQL with credentials in span", async () => {
+    it("SQL with credentials in span is redacted", async () => {
       // If someone writes SQL with embedded credentials (bad practice but possible),
-      // the span records it. traceQuery truncates to 200 chars but doesn't redact.
+      // the span should not contain sensitive values after redaction.
       const sensitiveSQL = `SELECT * FROM ${TABLE} WHERE name = 'password=s3cret&key=abc123'`;
       const conn = await ds.getConnection();
       const stmt = conn.createStatement();
@@ -411,8 +411,8 @@ describe.skipIf(!canConnect)("E2E: Database Tracing Instrumentation", { timeout:
       const querySpans = provider.getSpans().filter(s => s.spanName === "db.query");
       const lastSpan = querySpans[querySpans.length - 1];
       const recorded = String(lastSpan?.attributes[DbAttributes.STATEMENT] ?? "");
-      // The credential is present in the span — no automatic redaction
-      expect(recorded).toContain("s3cret");
+      // Credentials should be redacted from the span
+      expect(recorded).not.toContain("s3cret");
     });
   });
 

@@ -1,6 +1,6 @@
 {
   "name": "espalier-data",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "description": "Spring Data Relational-like repository and entity mapping layer for TypeScript",
   "type": "module",
   "main": "./dist/index.cjs",
