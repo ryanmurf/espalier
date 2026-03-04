@@ -138,3 +138,6 @@ export { TenantAwareDataSource, SchemaSetupError } from "./tenant/index.js";
 export { tenantFilter } from "./tenant/index.js";
 
 export { TenantId, getTenantIdField } from "./decorators/tenant.js";
+
+export type { RoutingDataSourceOptions } from "./tenant/index.js";
+export { RoutingDataSource, TenantRoutingDataSource, RoutingError } from "./tenant/index.js";
