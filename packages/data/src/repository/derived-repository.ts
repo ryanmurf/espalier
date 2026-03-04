@@ -993,6 +993,10 @@ export function createDerivedRepository<T, ID>(
 
     if (!isNewEntity) {
       // Update
+      // Auto-populate lastModifiedDate on UPDATE
+      if (metadata.lastModifiedDateField) {
+        (entity as Record<string | symbol, unknown>)[metadata.lastModifiedDateField] = new Date();
+      }
       await invokeLifecycleCallbacks(entity, "PreUpdate");
 
       // Dirty checking: if entity has a snapshot, only update changed fields
@@ -1201,6 +1205,18 @@ export function createDerivedRepository<T, ID>(
           (entity as Record<string | symbol, unknown>)[tenantIdField] = tid;
         }
       }
+      // Auto-populate audit timestamps on INSERT
+      const now = new Date();
+      if (metadata.createdDateField) {
+        const currentVal = (entity as Record<string | symbol, unknown>)[metadata.createdDateField];
+        if (currentVal === undefined || currentVal === null) {
+          (entity as Record<string | symbol, unknown>)[metadata.createdDateField] = now;
+        }
+      }
+      if (metadata.lastModifiedDateField) {
+        (entity as Record<string | symbol, unknown>)[metadata.lastModifiedDateField] = now;
+      }
+
       await invokeLifecycleCallbacks(entity, "PrePersist");
       const insertBuilder = new InsertBuilder(metadata.tableName);
 

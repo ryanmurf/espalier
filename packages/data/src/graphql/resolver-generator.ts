@@ -90,7 +90,7 @@ export class ResolverGenerator {
       if (this.options.mutations) {
         mutation[`create${typeName}`] = this.createSaveResolver(repository, metadata, entityClass);
         mutation[`update${typeName}`] = this.createUpdateResolver(repository, metadata, entityClass);
-        mutation[`delete${typeName}`] = this.createDeleteResolver(repository);
+        mutation[`delete${typeName}`] = this.createDeleteResolver(repository, metadata, entityClass);
       }
     }
 
@@ -183,8 +183,15 @@ export class ResolverGenerator {
 
   private createDeleteResolver(
     repository: CrudRepository<any, any>,
+    metadata: EntityMetadata,
+    entityClass: new (...args: any[]) => any,
   ): ResolverFn {
-    return async (_parent: any, args: { id: any }) => {
+    return async (_parent: any, args: { id: any }, context: any) => {
+      this.applyTenantContext(context, metadata, entityClass);
+      const existing = await repository.findById(args.id);
+      if (!existing) {
+        return false;
+      }
       await repository.deleteById(args.id);
       return true;
     };

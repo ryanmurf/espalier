@@ -253,14 +253,13 @@ describe("ResolverGenerator — mutation resolvers", () => {
     expect(repo.deleteById).toHaveBeenCalledWith(1);
   });
 
-  it("delete mutation returns true even for non-existent entity (no guard)", async () => {
-    // BUG CANDIDATE: deleteById does not check existence first — returns true regardless
+  it("delete mutation returns false for non-existent entity", async () => {
     const repo = createMockRepo<Item, number>([]);
     const gen = new ResolverGenerator();
     const resolvers = gen.generate([{ entityClass: Item, repository: repo }]);
     const result = await resolvers.Mutation.deleteItem(null, { id: 999 }, {}, {});
-    expect(result).toBe(true);
-    expect(repo.deleteById).toHaveBeenCalledWith(999);
+    expect(result).toBe(false);
+    expect(repo.deleteById).not.toHaveBeenCalled();
   });
 });
 
@@ -503,14 +502,13 @@ describe("ResolverGenerator — error handling", () => {
     }
   });
 
-  it("delete does not throw for non-existent id (silent delete)", async () => {
+  it("delete returns false for non-existent id", async () => {
     const repo = createMockRepo<Item, number>([]);
     const gen = new ResolverGenerator();
     const resolvers = gen.generate([{ entityClass: Item, repository: repo }]);
-    // BUG CANDIDATE: no existence check — deleteById doesn't verify entity exists
     await expect(
       resolvers.Mutation.deleteItem(null, { id: 999 }, {}, {}),
-    ).resolves.toBe(true);
+    ).resolves.toBe(false);
   });
 
   it("findById does not throw for non-existent id (returns null)", async () => {

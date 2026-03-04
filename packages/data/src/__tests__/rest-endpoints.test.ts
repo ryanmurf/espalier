@@ -808,7 +808,7 @@ describe("RestPlugin", () => {
 // ══════════════════════════════════════════════════
 
 describe("RouteGenerator — security", () => {
-  it("OptimisticLockException error message is exposed (potential info leak)", async () => {
+  it("OptimisticLockException error uses safe message (no info leak)", async () => {
     const existing = { id: 1, name: "X", price: 1 };
     const repo = mockRepo<Widget, number>([existing]);
     (repo.save as any).mockRejectedValue(
@@ -821,15 +821,13 @@ describe("RouteGenerator — security", () => {
       makeReq({ params: { id: "1" }, body: { name: "Y" } }),
     );
     expect(res.status).toBe(409);
-    // BUG CANDIDATE: err.message is used directly, which includes entity name,
-    // id, and version numbers. Should use err.toSafeString() instead.
     const errorBody = JSON.stringify(res.body);
-    // The error message contains internal details
-    expect(errorBody).toContain("Widget");
-    expect(errorBody).toContain("version");
+    // Should use toSafeString() — no entity name, id, or version in response
+    expect(errorBody).not.toContain("Widget");
+    expect(errorBody).toContain("concurrently modified");
   });
 
-  it("EntityNotFoundException error includes entity details (potential info leak)", async () => {
+  it("EntityNotFoundException error uses generic message (no info leak)", async () => {
     const existing = { id: 1, name: "X", price: 1 };
     const repo = mockRepo<Widget, number>([existing]);
     (repo.save as any).mockRejectedValue(
@@ -842,8 +840,9 @@ describe("RouteGenerator — security", () => {
       makeReq({ params: { id: "1" }, body: { name: "Y" } }),
     );
     expect(res.status).toBe(404);
-    // Error message includes entity name and id
     const errorBody = JSON.stringify(res.body);
-    expect(errorBody).toContain("Widget");
+    // Should not include entity name or id in response
+    expect(errorBody).not.toContain("Widget");
+    expect(errorBody).toContain("Entity not found");
   });
 });

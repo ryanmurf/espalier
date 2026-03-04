@@ -256,10 +256,10 @@ export class RouteGenerator {
 
 function handleError(err: unknown): RestResponse {
   if (err instanceof OptimisticLockException) {
-    return { status: 409, body: { error: err.message } };
+    return { status: 409, body: { error: err.toSafeString() } };
   }
   if (err instanceof EntityNotFoundException) {
-    return { status: 404, body: { error: err.message } };
+    return { status: 404, body: { error: "Entity not found" } };
   }
   throw err;
 }
