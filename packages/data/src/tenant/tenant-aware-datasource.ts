@@ -95,6 +95,7 @@ export class TenantAwareDataSource implements DataSource {
     const originalClose = connection.close.bind(connection);
     const wrapped: Connection = Object.create(connection);
     wrapped.close = async () => {
+      let resetFailed = false;
       try {
         const stmt = connection.createStatement();
         try {
@@ -102,8 +103,30 @@ export class TenantAwareDataSource implements DataSource {
         } finally {
           await stmt.close();
         }
+      } catch {
+        resetFailed = true;
+        // search_path reset failed — attempt DISCARD ALL to prevent
+        // returning a contaminated connection to the pool
+        try {
+          const discardStmt = connection.createStatement();
+          try {
+            await discardStmt.executeUpdate("DISCARD ALL");
+          } finally {
+            await discardStmt.close();
+          }
+        } catch {
+          // DISCARD ALL also failed — connection is likely broken.
+          // Release it anyway; broken connections are typically
+          // detected and evicted by pool health checks.
+        }
       } finally {
         await originalClose();
+      }
+      if (resetFailed) {
+        throw new Error(
+          "Failed to reset search_path on connection release. " +
+          "A DISCARD ALL was attempted as a fallback.",
+        );
       }
     };
     return wrapped;
