@@ -14,12 +14,9 @@
  * - Update with non-existent entity throws
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { Table, Column, Id, TenantId } from "../decorators/table.js";
 import { ResolverGenerator, createFilterSpec } from "../graphql/resolver-generator.js";
 import type { CrudRepository } from "../repository/crud-repository.js";
 import type { Page, Pageable } from "../repository/paging.js";
-
-// Fix import paths — use individual decorator files
 import { Table as TableDec } from "../decorators/table.js";
 import { Column as ColumnDec } from "../decorators/column.js";
 import { Id as IdDec } from "../decorators/id.js";
