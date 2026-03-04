@@ -150,3 +150,7 @@ export { TenantSchemaManager, TenantLimitExceededError } from "./tenant/index.js
 
 export type { ObservabilityConfig, ObservabilityHandle } from "./observability/index.js";
 export { configureObservability } from "./observability/index.js";
+
+export type { Plugin, PluginContext, PluginHook, PluginDependency, HookType, HookContext } from "./plugin/index.js";
+export { PluginManager } from "./plugin/index.js";
+export { PluginDecorator, getPluginMetadata, getDiscoveredPlugins } from "./plugin/index.js";
