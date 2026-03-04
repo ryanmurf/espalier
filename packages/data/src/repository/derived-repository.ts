@@ -696,6 +696,13 @@ export function createDerivedRepository<T, ID>(
             }
           }
         }
+        // Multi-tenancy: add tenant filter to cascade UPDATE WHERE clause
+        const relTenantCol = getTenantColumn(relMeta);
+        if (relTenantCol) {
+          const tid = TenantContext.current();
+          if (tid === undefined) throw new NoTenantException();
+          updateBuilder.and(new ComparisonCriteria("eq", relTenantCol, tid as SqlValue));
+        }
         updateBuilder.returning("*");
         const query = updateBuilder.build();
         const stmt = conn.prepareStatement(query.sql);
@@ -713,6 +720,14 @@ export function createDerivedRepository<T, ID>(
         return relatedEntity;
       } else {
         // Insert new related entity
+        // Multi-tenancy: auto-set @TenantId from context on cascade INSERT
+        const relTenantIdField = relMeta.tenantIdField;
+        const relTenantColInsert = getTenantColumn(relMeta);
+        if (relTenantIdField && relTenantColInsert) {
+          const tid = TenantContext.current();
+          if (tid === undefined) throw new NoTenantException();
+          (relatedEntity as Record<string | symbol, unknown>)[relTenantIdField] = tid;
+        }
         const insertBuilder = new InsertBuilder(relMeta.tableName);
         for (const field of relMeta.fields) {
           if (field.fieldName === relIdField) continue;
@@ -1274,6 +1289,13 @@ export function createDerivedRepository<T, ID>(
 
       const builder = new DeleteBuilder(relMeta.tableName)
         .where(new ComparisonCriteria("eq", relIdCol, relIdValue));
+      // Multi-tenancy: add tenant filter to cascade DELETE WHERE clause
+      const relTenantCol = getTenantColumn(relMeta);
+      if (relTenantCol) {
+        const tid = TenantContext.current();
+        if (tid === undefined) throw new NoTenantException();
+        builder.and(new ComparisonCriteria("eq", relTenantCol, tid as SqlValue));
+      }
 
       const query = builder.build();
       const stmt = conn.prepareStatement(query.sql);
