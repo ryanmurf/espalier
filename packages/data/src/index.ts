@@ -147,3 +147,6 @@ export { ReadWriteContext, ReadReplicaDataSource, RoundRobinBalancer, RandomBala
 
 export type { TenantSchemaManagerOptions } from "./tenant/index.js";
 export { TenantSchemaManager, TenantLimitExceededError } from "./tenant/index.js";
+
+export type { ObservabilityConfig, ObservabilityHandle } from "./observability/index.js";
+export { configureObservability } from "./observability/index.js";
