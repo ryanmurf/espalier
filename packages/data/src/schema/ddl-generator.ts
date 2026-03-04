@@ -226,6 +226,25 @@ export class DdlGenerator {
     return results;
   }
 
+  /**
+   * Generates a CREATE INDEX statement for the @TenantId column, if present.
+   * Returns undefined if the entity has no @TenantId field.
+   */
+  generateTenantIndex(
+    entityClass: new (...args: any[]) => any,
+    options?: DdlOptions,
+  ): string | undefined {
+    const metadata = getEntityMetadata(entityClass);
+    if (!metadata.tenantIdField) return undefined;
+
+    const field = metadata.fields.find(f => f.fieldName === metadata.tenantIdField);
+    if (!field) return undefined;
+
+    const ifNotExists = options?.ifNotExists ? "IF NOT EXISTS " : "";
+    const indexName = `idx_${metadata.tableName}_${field.columnName}`;
+    return `CREATE INDEX ${ifNotExists}${quoteIdentifier(indexName)} ON ${quoteIdentifier(metadata.tableName)} (${quoteIdentifier(field.columnName)})`;
+  }
+
   generateDropTable(
     entityClass: new (...args: any[]) => any,
     options?: DropTableOptions,

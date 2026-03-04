@@ -44,6 +44,8 @@ import {
   createLazyCollectionProxy,
   isLazyProxy,
 } from "./lazy-proxy.js";
+import { TenantContext, NoTenantException } from "../tenant/tenant-context.js";
+import { getTenantColumn } from "../tenant/tenant-filter.js";
 
 function isProjectionClass(arg: unknown): arg is new (...args: any[]) => any {
   return typeof arg === "function" && getProjectionMetadata(arg) !== undefined;
@@ -83,6 +85,53 @@ export function createDerivedRepository<T, ID>(
   const joinFetchSpecs = getJoinFetchSpecs(metadata);
   const entityName = entityClass.name;
   const repoLogger: Logger = getGlobalLogger().child("repository");
+
+  // Multi-tenancy: detect @TenantId on the entity
+  const tenantColumn = getTenantColumn(metadata);
+  const tenantIdField = metadata.tenantIdField;
+
+  /**
+   * Returns the current tenant ID if the entity has @TenantId.
+   * Throws NoTenantException on write operations when no tenant is set.
+   * Returns undefined for entities without @TenantId.
+   */
+  function requireTenantForWrite(): string | undefined {
+    if (!tenantColumn) return undefined;
+    const tid = TenantContext.current();
+    if (tid === undefined) {
+      throw new NoTenantException();
+    }
+    return tid;
+  }
+
+  /**
+   * Returns the current tenant ID for read filtering, or undefined if
+   * the entity has no @TenantId or no tenant is set (reads are allowed without tenant).
+   */
+  function currentTenantForRead(): string | undefined {
+    if (!tenantColumn) return undefined;
+    return TenantContext.current();
+  }
+
+  /**
+   * Applies tenant filtering to a SELECT, UPDATE, or DELETE builder.
+   * Uses `.and()` to compose with existing WHERE criteria.
+   */
+  function applyTenantFilter(builder: { and(criteria: import("../query/criteria.js").Criteria): unknown }): void {
+    const tid = currentTenantForRead();
+    if (!tid || !tenantColumn) return;
+    builder.and(new ComparisonCriteria("eq", tenantColumn, tid as SqlValue));
+  }
+
+  /**
+   * Returns a Criteria for tenant filtering, or undefined if not applicable.
+   * Used to pass extra criteria to buildDerivedQuery.
+   */
+  function getTenantCriteria(): import("../query/criteria.js").Criteria | undefined {
+    const tid = currentTenantForRead();
+    if (!tid || !tenantColumn) return undefined;
+    return new ComparisonCriteria("eq", tenantColumn, tid as SqlValue);
+  }
 
   async function emitEntityEvent(genericEvent: string, specificEvent: string, payload: unknown): Promise<void> {
     if (!eventBus) return;
@@ -994,6 +1043,13 @@ export function createDerivedRepository<T, ID>(
           }
         }
       }
+      // Multi-tenancy: add tenant filter to UPDATE WHERE clause
+      if (tenantColumn) {
+        const tid = requireTenantForWrite();
+        if (tid !== undefined) {
+          updateBuilder.and(new ComparisonCriteria("eq", tenantColumn, tid as SqlValue));
+        }
+      }
       updateBuilder.returning("*");
 
       const query = updateBuilder.build();
@@ -1063,6 +1119,13 @@ export function createDerivedRepository<T, ID>(
       }
     } else {
       // Insert
+      // Multi-tenancy: auto-set tenant_id from context on INSERT
+      if (tenantIdField && tenantColumn) {
+        const tid = requireTenantForWrite();
+        if (tid !== undefined) {
+          (entity as Record<string | symbol, unknown>)[tenantIdField] = tid;
+        }
+      }
       await invokeLifecycleCallbacks(entity, "PrePersist");
       const insertBuilder = new InsertBuilder(metadata.tableName);
 
@@ -1287,6 +1350,7 @@ export function createDerivedRepository<T, ID>(
     } else {
       builder.where(new ComparisonCriteria("eq", idCol, idValue));
     }
+    applyTenantFilter(builder);
 
     const query = builder.build();
     const stmt = conn.prepareStatement(query.sql);
@@ -1356,6 +1420,7 @@ export function createDerivedRepository<T, ID>(
           .columns(...projMapper.columns)
           .where(new ComparisonCriteria("eq", idCol, id as SqlValue))
           .limit(1);
+        applyTenantFilter(builder);
 
         const query = builder.build();
         const conn = await dataSource.getConnection();
@@ -1400,6 +1465,7 @@ export function createDerivedRepository<T, ID>(
           .where(new ComparisonCriteria("eq", idCol, id as SqlValue))
           .limit(1);
       }
+      applyTenantFilter(builder);
 
       const query = builder.build();
       const conn = await dataSource.getConnection();
@@ -1469,6 +1535,7 @@ export function createDerivedRepository<T, ID>(
         .columns("1")
         .where(new ComparisonCriteria("eq", idCol, id as SqlValue))
         .limit(1);
+      applyTenantFilter(builder);
 
       const query = builder.build();
       const conn = await dataSource.getConnection();
@@ -1496,6 +1563,7 @@ export function createDerivedRepository<T, ID>(
         const projMapper = getCachedProjectionMapper(specOrProjection);
         const builder = new SelectBuilder(metadata.tableName)
           .columns(...projMapper.columns);
+        applyTenantFilter(builder);
 
         const query = builder.build();
         const conn = await dataSource.getConnection();
@@ -1531,6 +1599,7 @@ export function createDerivedRepository<T, ID>(
       if (spec) {
         builder.where(spec.toPredicate(metadata));
       }
+      applyTenantFilter(builder);
 
       const query = builder.build();
       const cacheKey = { sql: query.sql, params: query.params as unknown[] };
@@ -1680,6 +1749,7 @@ export function createDerivedRepository<T, ID>(
       const idCol = getIdColumn();
       const builder = new DeleteBuilder(metadata.tableName)
         .where(new ComparisonCriteria("eq", idCol, id as SqlValue));
+      applyTenantFilter(builder);
 
       const query = builder.build();
       const conn = await dataSource.getConnection();
@@ -1707,6 +1777,7 @@ export function createDerivedRepository<T, ID>(
       if (options?.where) {
         builder.where(options.where.toPredicate(metadata));
       }
+      applyTenantFilter(builder);
 
       const query = builder.build();
 
@@ -1809,6 +1880,7 @@ export function createDerivedRepository<T, ID>(
             .where(new ComparisonCriteria("eq", idCol, id as SqlValue))
             .limit(1);
         }
+        applyTenantFilter(builder);
 
         const query = builder.build();
         const stmt = conn.prepareStatement(query.sql);
@@ -1954,6 +2026,7 @@ export function createDerivedRepository<T, ID>(
       if (spec) {
         builder.where(spec.toPredicate(metadata));
       }
+      applyTenantFilter(builder);
 
       const query = builder.build();
       const cacheKey = { sql: query.sql, params: query.params as unknown[] };
@@ -2054,7 +2127,7 @@ export function createDerivedRepository<T, ID>(
         const baseName = prop.slice(0, -"Stream".length);
         return (...args: unknown[]) => {
           const descriptor = getCachedDescriptor(baseName);
-          const builtQuery = buildDerivedQuery(descriptor, metadata, args);
+          const builtQuery = buildDerivedQuery(descriptor, metadata, args, getTenantCriteria());
 
           return {
             [Symbol.asyncIterator](): AsyncIterator<any> {
@@ -2136,7 +2209,7 @@ export function createDerivedRepository<T, ID>(
           queryArgs = args.slice(0, -1);
         }
 
-        const query = buildDerivedQuery(descriptor, metadata, queryArgs);
+        const query = buildDerivedQuery(descriptor, metadata, queryArgs, getTenantCriteria());
 
         if (descriptor.action === "delete") {
           const conn = await dataSource.getConnection();

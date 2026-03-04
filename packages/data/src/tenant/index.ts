@@ -3,3 +3,5 @@ export { TenantContext, NoTenantException } from "./tenant-context.js";
 
 export type { TenantAwareDataSourceOptions } from "./tenant-aware-datasource.js";
 export { TenantAwareDataSource, SchemaSetupError } from "./tenant-aware-datasource.js";
+
+export { tenantFilter } from "./tenant-filter.js";

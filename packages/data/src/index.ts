@@ -135,3 +135,6 @@ export { TenantContext, NoTenantException } from "./tenant/index.js";
 
 export type { TenantAwareDataSourceOptions } from "./tenant/index.js";
 export { TenantAwareDataSource, SchemaSetupError } from "./tenant/index.js";
+export { tenantFilter } from "./tenant/index.js";
+
+export { TenantId, getTenantIdField } from "./decorators/tenant.js";

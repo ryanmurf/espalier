@@ -115,6 +115,7 @@ export function buildDerivedQuery(
   descriptor: DerivedQueryDescriptor,
   metadata: EntityMetadata,
   args: unknown[],
+  extraCriteria?: Criteria,
 ): BuiltQuery {
   // Build criteria from property expressions
   const criteriaList: Criteria[] = [];
@@ -127,7 +128,10 @@ export function buildDerivedQuery(
     argOffset += expr.paramCount;
   }
 
-  const where = combineCriteria(criteriaList, descriptor.connector);
+  let where = combineCriteria(criteriaList, descriptor.connector);
+  if (extraCriteria) {
+    where = new LogicalCriteria("and", where, extraCriteria);
+  }
 
   if (descriptor.action === "delete") {
     const builder = new DeleteBuilder(metadata.tableName).where(where);

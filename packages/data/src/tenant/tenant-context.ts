@@ -39,7 +39,7 @@ export class TenantContext {
    * Nested calls use the innermost tenant.
    */
   static run<T>(tenantId: string, fn: () => T | Promise<T>): Promise<T> {
-    return storage.run({ tenantId }, () => Promise.resolve(fn()));
+    return storage.run({ tenantId }, async () => fn());
   }
 
   /**
@@ -49,7 +49,7 @@ export class TenantContext {
     identifier: TenantIdentifier,
     fn: () => T | Promise<T>,
   ): Promise<T> {
-    return storage.run(identifier, () => Promise.resolve(fn()));
+    return storage.run(identifier, async () => fn());
   }
 
   /**

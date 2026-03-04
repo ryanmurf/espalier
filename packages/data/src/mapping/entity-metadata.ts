@@ -12,6 +12,7 @@ import { getLifecycleCallbacks } from "../decorators/lifecycle.js";
 import type { LifecycleEvent } from "../decorators/lifecycle.js";
 import { getEmbeddedFields, isEmbeddable } from "../decorators/embeddable.js";
 import type { EmbeddedField } from "../decorators/embeddable.js";
+import { getTenantIdField } from "../decorators/tenant.js";
 
 export interface FieldMapping {
   fieldName: string | symbol;
@@ -29,6 +30,7 @@ export interface EntityMetadata {
   oneToManyRelations: OneToManyRelation[];
   manyToManyRelations: ManyToManyRelation[];
   oneToOneRelations: OneToOneRelation[];
+  tenantIdField?: string | symbol;
   embeddedFields: EmbeddedField[];
   lifecycleCallbacks: Map<LifecycleEvent, (string | symbol)[]>;
 }
@@ -104,6 +106,7 @@ export function getEntityMetadata(
     oneToManyRelations: getOneToManyRelations(entityClass),
     manyToManyRelations: getManyToManyRelations(entityClass),
     oneToOneRelations: getOneToOneRelations(entityClass),
+    tenantIdField: getTenantIdField(entityClass),
     embeddedFields,
     lifecycleCallbacks: getLifecycleCallbacks(entityClass),
   };
