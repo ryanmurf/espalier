@@ -179,19 +179,13 @@ describe("TenantContext — concurrent isolation", () => {
 // ══════════════════════════════════════════════════
 
 describe("TenantContext — error handling", () => {
-  it("BUG: run() does not catch synchronous throws as rejections", async () => {
-    // run() signature returns Promise<T>, so callers expect to handle errors
-    // via .catch() / await. But because the implementation does:
-    //   storage.run(id, () => Promise.resolve(fn()))
-    // fn() is called eagerly and a sync throw escapes the Promise chain.
-    // This means `await TenantContext.run(...)` throws synchronously
-    // instead of producing a rejected promise. Filed as a bug.
-    expect(() =>
+  it("run() propagates synchronous errors from callback as rejection", async () => {
+    await expect(
       TenantContext.run("fail", () => {
         throw new Error("boom");
       }),
-    ).toThrow("boom");
-    // Context is still cleaned up by AsyncLocalStorage
+    ).rejects.toThrow("boom");
+    // Context is cleaned up by AsyncLocalStorage
     expect(TenantContext.current()).toBeUndefined();
   });
 
