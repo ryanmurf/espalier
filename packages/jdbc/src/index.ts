@@ -97,3 +97,5 @@ export type { QueryStatistics } from "./query-statistics.js";
 export { QueryStatisticsCollector } from "./query-statistics.js";
 export type { PlanWarning, PlanWarningSeverity, PlanAdvisorConfig } from "./plan-advisor.js";
 export { PlanAdvisor } from "./plan-advisor.js";
+export type { HealthStatus, HealthCheckResult, HealthCheck } from "./health.js";
+export { HealthCheckRegistry, CompositeHealthCheck, PoolHealthCheck, ConnectivityHealthCheck } from "./health.js";
