@@ -1,3 +1,15 @@
+/**
+ * Converts a camelCase string to snake_case for column name generation.
+ * Examples: "firstName" -> "first_name", "createdAt" -> "created_at",
+ * "HTMLParser" -> "html_parser", "userID" -> "user_id"
+ */
+function camelToSnakeCase(str: string): string {
+  return str
+    .replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2")
+    .replace(/([a-z\d])([A-Z])/g, "$1_$2")
+    .toLowerCase();
+}
+
 export interface ColumnOptions {
   name?: string;
   type?: string;
@@ -24,7 +36,7 @@ export function Column(options?: ColumnOptions | string) {
     context: ClassFieldDecoratorContext<T>,
   ): void {
     const opts = typeof options === "string" ? { name: options } : (options ?? {});
-    const columnName = opts.name ?? String(context.name);
+    const columnName = opts.name ?? camelToSnakeCase(String(context.name));
 
     const entry: ColumnMetadataEntry = {
       columnName,
