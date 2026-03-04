@@ -15,6 +15,12 @@ export class TenantLimitExceededError extends Error {
 export interface TenantSchemaManagerOptions {
   /** Maximum number of tenant schemas allowed. Undefined means no limit. */
   maxTenants?: number;
+  /**
+   * Schema name prefix used for counting managed tenant schemas.
+   * When set, only schemas matching this prefix are counted toward the limit.
+   * This prevents foreign schemas from inflating the count.
+   */
+  schemaPrefix?: string;
 }
 
 /**
@@ -25,9 +31,16 @@ export interface TenantSchemaManagerOptions {
 export class TenantSchemaManager {
   private readonly ddl = new DdlGenerator();
   private readonly maxTenants: number | undefined;
+  private readonly schemaPrefix: string | undefined;
 
   constructor(options?: TenantSchemaManagerOptions) {
+    if (options?.maxTenants !== undefined) {
+      if (!Number.isFinite(options.maxTenants) || options.maxTenants < 0 || !Number.isInteger(options.maxTenants)) {
+        throw new Error("maxTenants must be a non-negative integer");
+      }
+    }
     this.maxTenants = options?.maxTenants;
+    this.schemaPrefix = options?.schemaPrefix;
   }
 
   /**
@@ -73,9 +86,27 @@ export class TenantSchemaManager {
     const conn = await dataSource.getConnection();
     try {
       if (this.maxTenants !== undefined) {
-        const existing = await this.listTenantSchemas(conn);
-        if (existing.length >= this.maxTenants) {
-          throw new TenantLimitExceededError(existing.length, this.maxTenants);
+        // Use advisory lock to prevent TOCTOU race on concurrent provisioning
+        const lockStmt = conn.createStatement();
+        try {
+          await lockStmt.executeUpdate("SELECT pg_advisory_lock(hashtext('espalier_tenant_provision'))");
+        } finally {
+          await lockStmt.close();
+        }
+        try {
+          const existing = await this.listTenantSchemas(conn, this.schemaPrefix);
+          // Exclude the target schema from the count (allows idempotent re-provisioning)
+          const count = existing.includes(schemaName) ? existing.length - 1 : existing.length;
+          if (count >= this.maxTenants) {
+            throw new TenantLimitExceededError(count, this.maxTenants);
+          }
+        } finally {
+          const unlockStmt = conn.createStatement();
+          try {
+            await unlockStmt.executeUpdate("SELECT pg_advisory_unlock(hashtext('espalier_tenant_provision'))");
+          } finally {
+            await unlockStmt.close();
+          }
         }
       }
 
