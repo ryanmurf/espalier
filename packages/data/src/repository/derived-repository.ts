@@ -1088,7 +1088,7 @@ export function createDerivedRepository<T, ID>(
           await cascadePostSave(saved, conn, cascadeSaving);
           await invokeLifecycleCallbacks(saved, "PostUpdate");
           changeTracker.snapshot(saved);
-          entityCache.put(entityClass, tenantCacheKey(getEntityId(saved)), saved);
+          entityCache.evict(entityClass, tenantCacheKey(getEntityId(saved)));
           queryCache.invalidate(entityClass);
           await emitEntityEvent(ENTITY_EVENTS.UPDATED, `${ENTITY_EVENTS.UPDATED}:${entityName}`, {
             type: "updated",
@@ -1191,7 +1191,7 @@ export function createDerivedRepository<T, ID>(
           await cascadePostSave(saved, conn, cascadeSaving);
           await invokeLifecycleCallbacks(saved, "PostPersist");
           changeTracker.snapshot(saved);
-          entityCache.put(entityClass, tenantCacheKey(getEntityId(saved)), saved);
+          entityCache.evict(entityClass, tenantCacheKey(getEntityId(saved)));
           queryCache.invalidate(entityClass);
           await emitEntityEvent(ENTITY_EVENTS.PERSISTED, `${ENTITY_EVENTS.PERSISTED}:${entityName}`, {
             type: "persisted",
