@@ -71,3 +71,22 @@ export {
   getGlobalLogger,
   createConsoleLogger,
 } from "./logger.js";
+export type {
+  Span,
+  Tracer,
+  TracerProvider,
+  SpanEvent,
+  SpanAttributeValue,
+  SpanStatus,
+  SpanOptions,
+} from "./tracing.js";
+export {
+  SpanKind,
+  SpanStatusCode,
+  DbAttributes,
+  NoopSpan,
+  NoopTracer,
+  NoopTracerProvider,
+  setGlobalTracerProvider,
+  getGlobalTracerProvider,
+} from "./tracing.js";
