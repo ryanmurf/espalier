@@ -16,3 +16,5 @@ export {
   setQueryStatisticsCollector,
   getQueryStatisticsCollector,
 } from "./trace-query.js";
+export type { ReplicaLagConfig } from "./pg-replica-health.js";
+export { ReplicaLagHealthCheck, TenantSchemaHealthCheck } from "./pg-replica-health.js";
