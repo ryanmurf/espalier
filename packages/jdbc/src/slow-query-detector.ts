@@ -46,7 +46,7 @@ export class SlowQueryDetector {
    * Records a query execution. If duration exceeds the threshold, logs and invokes callback.
    */
   record(sql: string, durationMs: number, parameterCount = 0, connectionId?: string): void {
-    if (durationMs < this.thresholdMs) return;
+    if (!Number.isFinite(durationMs) || durationMs < this.thresholdMs) return;
 
     const truncatedSql = sql.length > 200 ? sql.slice(0, 200) + "..." : sql;
     const event: SlowQueryEvent = {
