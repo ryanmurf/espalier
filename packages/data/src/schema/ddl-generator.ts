@@ -260,6 +260,37 @@ export class DdlGenerator {
     return `CREATE INDEX ${ifNotExists}${quoteIdentifier(indexName)} ON ${qualifiedTable} (${quoteIdentifier(field.columnName)})`;
   }
 
+  /**
+   * Generates CREATE TABLE for the entity plus any @ManyToMany join tables
+   * owned by the entity. Returns an array of DDL statements.
+   */
+  generateCreateTableWithJoinTables(
+    entityClass: new (...args: any[]) => any,
+    options?: DdlOptions,
+  ): string[] {
+    const statements = [this.generateCreateTable(entityClass, options)];
+    const joinTableStatements = this.generateJoinTables([entityClass], options);
+    statements.push(...joinTableStatements);
+    return statements;
+  }
+
+  /**
+   * Generates all DDL for a set of entity classes: CREATE TABLE for each entity,
+   * plus all @ManyToMany join tables. Join tables are deduplicated.
+   */
+  generateAllDdl(
+    entityClasses: (new (...args: any[]) => any)[],
+    options?: DdlOptions,
+  ): string[] {
+    const statements: string[] = [];
+    for (const entityClass of entityClasses) {
+      statements.push(this.generateCreateTable(entityClass, options));
+    }
+    const joinTableStatements = this.generateJoinTables(entityClasses, options);
+    statements.push(...joinTableStatements);
+    return statements;
+  }
+
   generateDropTable(
     entityClass: new (...args: any[]) => any,
     options?: DropTableOptions,
