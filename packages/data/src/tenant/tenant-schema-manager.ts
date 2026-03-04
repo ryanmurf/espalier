@@ -120,16 +120,23 @@ export class TenantSchemaManager {
    * Excludes system schemas (pg_*, information_schema).
    */
   async listTenantSchemas(connection: Connection, prefix?: string): Promise<string[]> {
-    const stmt = connection.createStatement();
-    try {
-      let sql = `SELECT schema_name FROM information_schema.schemata WHERE schema_name NOT LIKE 'pg_%' AND schema_name != 'information_schema' AND schema_name != 'public'`;
-      if (prefix) {
-        validateIdentifier(prefix, "schema prefix");
-        sql += ` AND schema_name LIKE '${prefix}%'`;
-      }
-      sql += ` ORDER BY schema_name`;
+    let sql = `SELECT schema_name FROM information_schema.schemata WHERE schema_name NOT LIKE 'pg_%' AND schema_name != 'information_schema' AND schema_name != 'public'`;
+    const params: string[] = [];
+    if (prefix) {
+      validateIdentifier(prefix, "schema prefix");
+      // Escape LIKE wildcard characters (%, _) in the prefix value
+      const escapedPrefix = prefix.replace(/[%_\\]/g, "\\$&");
+      sql += ` AND schema_name LIKE $1 ESCAPE '\\'`;
+      params.push(`${escapedPrefix}%`);
+    }
+    sql += ` ORDER BY schema_name`;
 
-      const rs = await stmt.executeQuery(sql);
+    const stmt = connection.prepareStatement(sql);
+    try {
+      for (let i = 0; i < params.length; i++) {
+        stmt.setParameter(i + 1, params[i]);
+      }
+      const rs = await stmt.executeQuery();
       const schemas: string[] = [];
       while (await rs.next()) {
         const row = rs.getRow();
