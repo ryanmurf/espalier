@@ -11,7 +11,8 @@ import {
   RoundRobinBalancer,
   RandomBalancer,
 } from "../../index.js";
-import type { DataSource, Connection, LoadBalancer } from "espalier-jdbc";
+import type { DataSource, Connection } from "espalier-jdbc";
+import type { LoadBalancer } from "../../index.js";
 
 // ══════════════════════════════════════════════════
 // Mock DataSource factory

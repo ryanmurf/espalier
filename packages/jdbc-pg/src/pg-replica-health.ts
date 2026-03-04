@@ -68,7 +68,9 @@ export class ReplicaLagHealthCheck implements HealthCheck {
       }
 
       let status: HealthStatus = "UP";
-      if (lagSeconds >= this.maxLag) {
+      if (Number.isNaN(lagSeconds)) {
+        status = "DOWN";
+      } else if (lagSeconds >= this.maxLag) {
         status = "DOWN";
       } else if (lagSeconds >= this.degradedLag) {
         status = "DEGRADED";
@@ -153,7 +155,7 @@ export class TenantSchemaHealthCheck implements HealthCheck {
       }
 
       let status: HealthStatus = "UP";
-      if (missing.length === this.expectedTenantIds.length) {
+      if (this.expectedTenantIds.length > 0 && missing.length === this.expectedTenantIds.length) {
         status = "DOWN";
       } else if (missing.length > 0) {
         status = "DEGRADED";
