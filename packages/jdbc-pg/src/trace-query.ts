@@ -36,8 +36,23 @@ function parseOperation(sql: string): string {
   return match ? match[1].toUpperCase() : "UNKNOWN";
 }
 
+/**
+ * Redacts known sensitive patterns from SQL before recording in spans.
+ * Masks passwords, connection strings, tokens, and key/secret values.
+ */
+function redactSensitive(sql: string): string {
+  return sql
+    // PASSWORD 'xxx' or PASSWORD "xxx"
+    .replace(/PASSWORD\s*[=:]?\s*(['"])[^'"]*\1/gi, "PASSWORD '[REDACTED]'")
+    // password=xxx in connection strings
+    .replace(/password\s*=\s*\S+/gi, "password=[REDACTED]")
+    // token/secret/key=xxx patterns
+    .replace(/((?:token|secret|api_?key|auth)\s*[=:]\s*)(?:'[^']*'|"[^"]*"|\S+)/gi, "$1[REDACTED]");
+}
+
 function truncate(sql: string, maxLen = 200): string {
-  return sql.length > maxLen ? sql.slice(0, maxLen) + "..." : sql;
+  const redacted = redactSensitive(sql);
+  return redacted.length > maxLen ? redacted.slice(0, maxLen) + "..." : redacted;
 }
 
 /**
