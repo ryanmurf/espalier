@@ -8,3 +8,6 @@ export { tenantFilter } from "./tenant-filter.js";
 
 export type { RoutingDataSourceOptions } from "./routing-datasource.js";
 export { RoutingDataSource, TenantRoutingDataSource, RoutingError } from "./routing-datasource.js";
+
+export type { LoadBalancer, ReadReplicaDataSourceOptions } from "./read-replica-datasource.js";
+export { ReadWriteContext, ReadReplicaDataSource, RoundRobinBalancer, RandomBalancer } from "./read-replica-datasource.js";
