@@ -22,6 +22,10 @@ import {
   DEFAULT_MAX_PING_RETRIES,
   getGlobalLogger,
   LogLevel,
+  getGlobalTracerProvider,
+  SpanKind,
+  SpanStatusCode,
+  DbAttributes,
 } from "espalier-jdbc";
 import { PgConnection } from "./pg-connection.js";
 
@@ -128,6 +132,12 @@ export class PgDataSource implements MonitoredPooledDataSource {
       );
     }
 
+    const tracer = getGlobalTracerProvider().getTracer("espalier-jdbc-pg");
+    const acquireSpan = tracer.startSpan("db.connection.acquire", {
+      kind: SpanKind.CLIENT,
+      attributes: { [DbAttributes.SYSTEM]: "postgresql" },
+    });
+
     const logger = getGlobalLogger().child("pg-pool");
     const maxRetries = this.prePingConfig ? DEFAULT_MAX_PING_RETRIES : 1;
 
@@ -144,6 +154,7 @@ export class PgDataSource implements MonitoredPooledDataSource {
           : DatabaseErrorCode.CONNECTION_FAILED;
 
         if (code === DatabaseErrorCode.CONNECTION_TIMEOUT) {
+          acquireSpan.addEvent("timeout", { "wait_time_ms": waitTimeMs });
           this.metrics.emitTimeout({
             timestamp: new Date(),
             poolStats: this.getPoolStats(),
@@ -157,6 +168,9 @@ export class PgDataSource implements MonitoredPooledDataSource {
             context: "acquire",
           });
         }
+
+        acquireSpan.setStatus({ code: SpanStatusCode.ERROR, message: (err as Error).message });
+        acquireSpan.end();
 
         throw new ConnectionError(
           `Failed to get connection: ${(err as Error).message}`,
@@ -231,6 +245,12 @@ export class PgDataSource implements MonitoredPooledDataSource {
         }
       }
 
+      acquireSpan.setAttribute("db.pool.total", stats.total);
+      acquireSpan.setAttribute("db.pool.idle", stats.idle);
+      acquireSpan.setAttribute("db.pool.acquire_time_ms", acquireTimeMs);
+      acquireSpan.setStatus({ code: SpanStatusCode.OK });
+      acquireSpan.end();
+
       const conn = new PgConnection(client, this.typeConverters, stmtCache);
 
       // Wrap close to emit release event and log
@@ -261,6 +281,8 @@ export class PgDataSource implements MonitoredPooledDataSource {
     }
 
     // All retries exhausted (pre-ping failures)
+    acquireSpan.setStatus({ code: SpanStatusCode.ERROR, message: "All pre-ping retries exhausted" });
+    acquireSpan.end();
     throw new ConnectionError(
       "Failed to acquire a healthy connection after multiple retries",
       undefined,

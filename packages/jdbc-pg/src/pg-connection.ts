@@ -8,6 +8,10 @@ import {
   DatabaseErrorCode,
   getGlobalLogger,
   LogLevel,
+  getGlobalTracerProvider,
+  SpanKind,
+  SpanStatusCode,
+  DbAttributes,
 } from "espalier-jdbc";
 import { PgStatement, PgPreparedStatement } from "./pg-statement.js";
 import { PgNamedPreparedStatement } from "./pg-named-statement.js";
@@ -65,6 +69,15 @@ export class PgConnection implements TypeAwareConnection, CacheableConnection {
   async beginTransaction(isolation?: IsolationLevel): Promise<Transaction> {
     this.ensureOpen();
     const txLogger = getGlobalLogger().child("pg-transaction");
+    const tracer = getGlobalTracerProvider().getTracer("espalier-jdbc-pg");
+    const txSpan = tracer.startSpan("db.transaction", {
+      kind: SpanKind.CLIENT,
+      attributes: {
+        [DbAttributes.SYSTEM]: "postgresql",
+        "db.transaction.isolation": isolation ?? "default",
+      },
+    });
+
     try {
       await this.client.query("BEGIN");
       if (isolation) {
@@ -73,6 +86,8 @@ export class PgConnection implements TypeAwareConnection, CacheableConnection {
         );
       }
     } catch (err) {
+      txSpan.setStatus({ code: SpanStatusCode.ERROR, message: (err as Error).message });
+      txSpan.end();
       throw new TransactionError(
         `Failed to begin transaction: ${(err as Error).message}`,
         err as Error,
@@ -92,12 +107,17 @@ export class PgConnection implements TypeAwareConnection, CacheableConnection {
           if (txLogger.isEnabled(LogLevel.DEBUG)) {
             txLogger.debug("transaction committed");
           }
+          txSpan.setAttribute("db.transaction.outcome", "commit");
+          txSpan.setStatus({ code: SpanStatusCode.OK });
         } catch (err) {
+          txSpan.setStatus({ code: SpanStatusCode.ERROR, message: (err as Error).message });
           throw new TransactionError(
             `Failed to commit: ${(err as Error).message}`,
             err as Error,
             DatabaseErrorCode.TX_COMMIT_FAILED,
           );
+        } finally {
+          txSpan.end();
         }
       },
       async rollback(): Promise<void> {
@@ -106,12 +126,17 @@ export class PgConnection implements TypeAwareConnection, CacheableConnection {
           if (txLogger.isEnabled(LogLevel.DEBUG)) {
             txLogger.debug("transaction rolled back");
           }
+          txSpan.setAttribute("db.transaction.outcome", "rollback");
+          txSpan.setStatus({ code: SpanStatusCode.OK });
         } catch (err) {
+          txSpan.setStatus({ code: SpanStatusCode.ERROR, message: (err as Error).message });
           throw new TransactionError(
             `Failed to rollback: ${(err as Error).message}`,
             err as Error,
             DatabaseErrorCode.TX_ROLLBACK_FAILED,
           );
+        } finally {
+          txSpan.end();
         }
       },
       async setSavepoint(name: string): Promise<void> {
@@ -127,6 +152,7 @@ export class PgConnection implements TypeAwareConnection, CacheableConnection {
           if (txLogger.isEnabled(LogLevel.DEBUG)) {
             txLogger.debug("savepoint set", { savepoint: name });
           }
+          txSpan.addEvent("savepoint", { "db.savepoint.name": name });
         } catch (err) {
           throw new TransactionError(
             `Failed to set savepoint: ${(err as Error).message}`,
@@ -148,6 +174,7 @@ export class PgConnection implements TypeAwareConnection, CacheableConnection {
           if (txLogger.isEnabled(LogLevel.DEBUG)) {
             txLogger.debug("rolled back to savepoint", { savepoint: name });
           }
+          txSpan.addEvent("rollback_to_savepoint", { "db.savepoint.name": name });
         } catch (err) {
           throw new TransactionError(
             `Failed to rollback to savepoint: ${(err as Error).message}`,
