@@ -136,11 +136,7 @@ describe.skipIf(!canConnect)("@TenantId discriminator — E2E", () => {
       });
     });
 
-    it("BUG: findById for a product belonging to another tenant returns cached entity (entity cache bypass)", async () => {
-      // BUG: Entity cache is keyed by (entityClass, id) without tenant context.
-      // When acme saves an entity and it's cached, globex calling findById with
-      // the same ID gets the cached entity — cross-tenant data leak.
-      // The SQL query DOES have tenant filtering, but the cache short-circuits it.
+    it("findById for a product belonging to another tenant returns null", async () => {
       let acmeId: number;
       await TenantContext.run("acme", async () => {
         const p = new Product();
@@ -152,9 +148,7 @@ describe.skipIf(!canConnect)("@TenantId discriminator — E2E", () => {
 
       await TenantContext.run("globex", async () => {
         const found = await repo.findById(acmeId!);
-        // SHOULD be null, but entity cache returns acme's entity
-        // When this bug is fixed, change to: expect(found).toBeNull();
-        expect(found).not.toBeNull();
+        expect(found).toBeNull();
       });
     });
 
@@ -168,8 +162,7 @@ describe.skipIf(!canConnect)("@TenantId discriminator — E2E", () => {
       // They should be different since we inserted different products
     });
 
-    it("BUG: existsById returns true for another tenant's entity (entity cache bypass)", async () => {
-      // BUG: Same entity cache issue as findById — cache hit bypasses tenant filter.
+    it("existsById returns false for another tenant's entity", async () => {
       let acmeId: number;
       await TenantContext.run("acme", async () => {
         const products = await repo.findAll();
@@ -178,9 +171,7 @@ describe.skipIf(!canConnect)("@TenantId discriminator — E2E", () => {
 
       await TenantContext.run("globex", async () => {
         const exists = await repo.existsById(acmeId!);
-        // SHOULD be false, but entity cache returns true
-        // When this bug is fixed, change to: expect(exists).toBe(false);
-        expect(exists).toBe(true);
+        expect(exists).toBe(false);
       });
     });
   });

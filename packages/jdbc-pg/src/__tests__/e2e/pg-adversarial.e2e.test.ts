@@ -196,7 +196,7 @@ describe.skipIf(!canConnect)("E2E: Adversarial Tests", { timeout: 15000 }, () =>
   // Edge case: save with id=0
   // ──────────────────────────────────────────────
 
-  it("entity with id=0 is treated as update (not insert)", async () => {
+  it("entity with id=0 is treated as insert (not update)", async () => {
     const repo = createRepo();
     const entity = Object.assign(Object.create(AdvUser.prototype), {
       id: 0,
@@ -205,14 +205,12 @@ describe.skipIf(!canConnect)("E2E: Adversarial Tests", { timeout: 15000 }, () =>
       age: 1,
     }) as AdvUser;
 
-    // id=0 is truthy check: `if (idValue != null)` -- 0 != null is TRUE
-    // So save() will try to UPDATE where id=0, not INSERT
-    // FIXED #46: save() now detects UPDATE matched 0 rows and throws
-    await expect(repo.save(entity)).rejects.toThrow(/not found/);
-
-    // Verify it didn't actually get inserted
-    const found = await repo.findById(0);
-    expect(found).toBeNull();
+    // FIXED #24: save() now treats id=0 the same as id=undefined (INSERT).
+    // Previously, `if (idValue != null)` treated 0 as truthy and tried UPDATE.
+    const saved = await repo.save(entity);
+    expect(saved.id).toBeDefined();
+    expect(saved.id).not.toBe(0);
+    expect(saved.name).toBe("ZeroId");
   });
 
   // ──────────────────────────────────────────────
