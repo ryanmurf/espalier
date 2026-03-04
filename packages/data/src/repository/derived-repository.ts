@@ -1,5 +1,5 @@
-import type { DataSource, Connection, SqlValue, Logger } from "espalier-jdbc";
-import { getGlobalLogger, LogLevel, quoteIdentifier } from "espalier-jdbc";
+import type { DataSource, Connection, SqlValue, Logger, Span } from "espalier-jdbc";
+import { getGlobalLogger, LogLevel, quoteIdentifier, getGlobalTracerProvider, SpanKind, SpanStatusCode } from "espalier-jdbc";
 import type { CrudRepository } from "./crud-repository.js";
 import type { Pageable, Page } from "./paging.js";
 import { createPage } from "./paging.js";
@@ -2294,6 +2294,12 @@ export function createDerivedRepository<T, ID>(
     "getDirtyFields",
   ]);
 
+  // Methods that should be instrumented with tracing spans
+  const tracedMethods = new Set<string>([
+    "findById", "existsById", "findAll", "save", "saveAll",
+    "delete", "deleteAll", "deleteById", "refresh", "count",
+  ]);
+
   (crudMethods as any).getEntityCache = () => entityCache;
   (crudMethods as any).getQueryCache = () => queryCache;
   (crudMethods as any).getChangeTracker = () => changeTracker;
@@ -2327,7 +2333,27 @@ export function createDerivedRepository<T, ID>(
       }
 
       if (knownMethods.has(prop)) {
-        return Reflect.get(target, prop, receiver);
+        const method = Reflect.get(target, prop, receiver);
+        if (tracedMethods.has(prop) && typeof method === "function") {
+          return (...args: any[]) => {
+            const tracer = getGlobalTracerProvider().getTracer("espalier-data");
+            const span = tracer.startSpan(`repository.${prop}`, {
+              kind: SpanKind.INTERNAL,
+              attributes: { "repository.entity": entityName, "repository.operation": prop },
+            });
+            const result = (method as Function).apply(target, args);
+            if (result && typeof result === "object" && typeof result.then === "function") {
+              return result.then(
+                (val: any) => { span.setStatus({ code: SpanStatusCode.OK }); span.end(); return val; },
+                (err: any) => { span.setStatus({ code: SpanStatusCode.ERROR, message: err instanceof Error ? err.message : String(err) }); span.end(); throw err; },
+              );
+            }
+            span.setStatus({ code: SpanStatusCode.OK });
+            span.end();
+            return result;
+          };
+        }
+        return method;
       }
 
       // Pass through well-known non-query properties to avoid
