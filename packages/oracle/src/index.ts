@@ -275,14 +275,37 @@ export function quoteOracleIdentifier(identifier: string): string {
  * Convert LIMIT/OFFSET to Oracle FETCH FIRST syntax (12c+).
  */
 export function oraclePagination(offset: number, limit: number): string {
+  validatePagination(offset, limit);
   return `OFFSET ${offset} ROWS FETCH FIRST ${limit} ROWS ONLY`;
 }
 
 /**
  * Convert LIMIT/OFFSET to Oracle ROWNUM syntax (legacy).
+ * innerSql must be a trusted query — this function validates it contains
+ * only a single SELECT statement to prevent SQL injection via subquery breakout.
  */
 export function oracleRownumPagination(offset: number, limit: number, innerSql: string): string {
-  return `SELECT * FROM (SELECT a.*, ROWNUM rnum FROM (${innerSql}) a WHERE ROWNUM <= ${offset + limit}) WHERE rnum > ${offset}`;
+  validatePagination(offset, limit);
+  // Validate innerSql is a single SELECT statement
+  const trimmed = innerSql.trim();
+  if (!/^SELECT\s/i.test(trimmed)) {
+    throw new Error("oracleRownumPagination: innerSql must be a SELECT statement");
+  }
+  // Reject multiple statements (semicolons outside string literals)
+  const withoutStrings = trimmed.replace(/'(?:[^'\\]|\\.)*'/g, "");
+  if (withoutStrings.includes(";")) {
+    throw new Error("oracleRownumPagination: innerSql must not contain multiple statements");
+  }
+  return `SELECT * FROM (SELECT a.*, ROWNUM rnum FROM (${trimmed}) a WHERE ROWNUM <= ${offset + limit}) WHERE rnum > ${offset}`;
+}
+
+function validatePagination(offset: number, limit: number): void {
+  if (!Number.isFinite(offset) || offset < 0) {
+    throw new Error(`Invalid offset: ${offset}. Must be a non-negative integer.`);
+  }
+  if (!Number.isFinite(limit) || limit < 1) {
+    throw new Error(`Invalid limit: ${limit}. Must be a positive integer.`);
+  }
 }
 
 /**

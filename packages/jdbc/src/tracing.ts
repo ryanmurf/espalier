@@ -146,6 +146,9 @@ export function setGlobalTracerProvider(provider: TracerProvider): void {
   if (provider == null) {
     throw new Error("TracerProvider must not be null or undefined");
   }
+  if (typeof (provider as any).getTracer !== "function") {
+    throw new Error("TracerProvider must implement getTracer()");
+  }
   globalTracerProvider = provider;
 }
 

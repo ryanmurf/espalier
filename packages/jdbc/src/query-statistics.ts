@@ -39,6 +39,8 @@ function normalizeSql(sql: string, redactIdentifiers = false): string {
   let normalized = sql
     // Replace string literals (handles escaped quotes)
     .replace(/'(?:[^'\\]|\\.)*'/g, "'?'")
+    // Replace hex literals (0xDEADBEEF)
+    .replace(/\b0x[0-9a-f]+\b/gi, "?")
     // Replace numeric literals (integers and decimals)
     .replace(/\b\d+(\.\d+)?\b/g, "?")
     // Collapse whitespace
@@ -50,6 +52,8 @@ function normalizeSql(sql: string, redactIdentifiers = false): string {
     normalized = normalized
       .replace(/\b(FROM|JOIN|INTO|UPDATE|TABLE)\s+(?:\w+\.)*(\w+)/gi, "$1 [TABLE]")
       .replace(/\b(SET\s+search_path\s+TO)\s+\S+/gi, "$1 [SCHEMA]");
+    // Replace table-qualified column references (e.g., orders.user_id -> [TABLE].user_id)
+    normalized = normalized.replace(/\b(\w+)\.(\w+)\b/g, "[TABLE].$2");
   }
 
   return normalized;

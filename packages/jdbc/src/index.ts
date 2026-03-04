@@ -99,5 +99,5 @@ export type { PlanWarning, PlanWarningSeverity, PlanAdvisorConfig } from "./plan
 export { PlanAdvisor } from "./plan-advisor.js";
 export type { HealthStatus, HealthCheckResult, HealthCheck } from "./health.js";
 export { HealthCheckRegistry, CompositeHealthCheck, PoolHealthCheck, ConnectivityHealthCheck } from "./health.js";
-export type { AdapterComplianceOptions } from "./adapter-compliance.js";
+export type { AdapterComplianceOptions, VitestRunner } from "./adapter-compliance.js";
 export { runAdapterComplianceTests } from "./adapter-compliance.js";

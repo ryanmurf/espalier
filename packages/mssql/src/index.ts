@@ -276,6 +276,12 @@ export function quoteMssqlIdentifier(identifier: string): string {
  * Convert OFFSET/LIMIT to MSSQL OFFSET-FETCH syntax.
  */
 export function mssqlPagination(offset: number, limit: number): string {
+  if (!Number.isFinite(offset) || offset < 0) {
+    throw new Error(`Invalid offset: ${offset}. Must be a non-negative integer.`);
+  }
+  if (!Number.isFinite(limit) || limit < 1) {
+    throw new Error(`Invalid limit: ${limit}. Must be a positive integer.`);
+  }
   return `OFFSET ${offset} ROWS FETCH NEXT ${limit} ROWS ONLY`;
 }
 

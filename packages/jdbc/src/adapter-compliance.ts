@@ -3,6 +3,18 @@ import type { Connection } from "./connection.js";
 import { IsolationLevel } from "./transaction.js";
 
 /**
+ * Vitest test runner utilities needed by the compliance suite.
+ */
+export interface VitestRunner {
+  describe: (name: string, fn: () => void) => void;
+  it: (name: string, fn: () => void | Promise<void>) => void;
+  expect: (value: unknown) => any;
+  beforeAll: (fn: () => void | Promise<void>) => void;
+  afterAll: (fn: () => void | Promise<void>) => void;
+  beforeEach: (fn: () => void | Promise<void>) => void;
+}
+
+/**
  * Options for the adapter compliance test suite.
  */
 export interface AdapterComplianceOptions {
@@ -24,6 +36,8 @@ export interface AdapterComplianceOptions {
   supportsNamedParams?: boolean;
   /** Isolation levels supported (defaults to all). */
   supportedIsolationLevels?: IsolationLevel[];
+  /** Vitest runner utilities. Pass { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest". */
+  runner?: VitestRunner;
 }
 
 /**
@@ -48,8 +62,13 @@ export interface AdapterComplianceOptions {
  * ```
  */
 export function runAdapterComplianceTests(options: AdapterComplianceOptions): void {
-  // We import vitest at runtime to avoid requiring it in production builds
-  const { describe, it, expect, beforeAll, afterAll, beforeEach } = require("vitest") as typeof import("vitest");
+  if (!options.runner) {
+    throw new Error(
+      "AdapterComplianceOptions.runner is required. " +
+      "Pass { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest'.",
+    );
+  }
+  const { describe, it, expect, beforeAll, afterAll, beforeEach } = options.runner;
 
   let ds: DataSource;
 
