@@ -35,15 +35,24 @@ interface PatternStats {
  * Normalizes SQL by replacing literal values with placeholders.
  * Groups queries by their structural pattern.
  */
-function normalizeSql(sql: string): string {
-  return sql
-    // Replace string literals
-    .replace(/'[^']*'/g, "'?'")
+function normalizeSql(sql: string, redactIdentifiers = false): string {
+  let normalized = sql
+    // Replace string literals (handles escaped quotes)
+    .replace(/'(?:[^'\\]|\\.)*'/g, "'?'")
     // Replace numeric literals (integers and decimals)
     .replace(/\b\d+(\.\d+)?\b/g, "?")
     // Collapse whitespace
     .replace(/\s+/g, " ")
     .trim();
+
+  if (redactIdentifiers) {
+    // Replace schema-qualified or plain table names after SQL keywords
+    normalized = normalized
+      .replace(/\b(FROM|JOIN|INTO|UPDATE|TABLE)\s+(?:\w+\.)*(\w+)/gi, "$1 [TABLE]")
+      .replace(/\b(SET\s+search_path\s+TO)\s+\S+/gi, "$1 [SCHEMA]");
+  }
+
+  return normalized;
 }
 
 function percentile(sorted: number[], p: number): number {
@@ -59,17 +68,19 @@ export class QueryStatisticsCollector {
   private readonly stats = new Map<string, PatternStats>();
   private readonly maxPatterns: number;
   private readonly maxDurations: number;
+  private readonly redactIdentifiers: boolean;
 
-  constructor(maxPatterns = 1000, maxDurations = 1000) {
+  constructor(maxPatterns = 1000, maxDurations = 1000, redactIdentifiers = false) {
     this.maxPatterns = maxPatterns;
     this.maxDurations = maxDurations;
+    this.redactIdentifiers = redactIdentifiers;
   }
 
   /**
    * Records a query execution.
    */
   record(sql: string, durationMs: number): void {
-    const pattern = normalizeSql(sql);
+    const pattern = normalizeSql(sql, this.redactIdentifiers);
     let entry = this.stats.get(pattern);
 
     if (!entry) {

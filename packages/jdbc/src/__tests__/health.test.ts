@@ -86,9 +86,8 @@ describe("PoolHealthCheck", () => {
     const result = await check.check();
     expect(result.status).toBe("UP");
     expect(result.name).toBe("pool");
-    expect(result.details.total).toBe(5);
-    expect(result.details.idle).toBe(3);
-    expect(result.details.waiting).toBe(0);
+    expect(result.details.utilizationPercent).toBe(25); // 5/20 * 100
+    expect(result.details.hasWaiters).toBe(false);
     expect(result.checkedAt).toBeInstanceOf(Date);
     expect(result.durationMs).toBeGreaterThanOrEqual(0);
   });
@@ -164,20 +163,24 @@ describe("PoolHealthCheck", () => {
     expect(result.status).toBe("DOWN"); // total >= 5 && idle === 0
   });
 
-  it("details include maxConnections", async () => {
+  it("details include utilization and hasWaiters", async () => {
     const ds = mockPoolDataSource({ total: 3, idle: 1, waiting: 0 });
     const check = new PoolHealthCheck("pool", ds, 42);
 
     const result = await check.check();
-    expect(result.details.maxConnections).toBe(42);
+    expect(result.details.utilizationPercent).toBe(7); // 3/42 * 100 rounded
+    expect(result.details.hasWaiters).toBe(false);
   });
 
-  it("default maxConnections is 20", async () => {
+  it("details do not expose raw pool internals", async () => {
     const ds = mockPoolDataSource({ total: 3, idle: 1, waiting: 0 });
     const check = new PoolHealthCheck("pool", ds);
 
     const result = await check.check();
-    expect(result.details.maxConnections).toBe(20);
+    expect(result.details).not.toHaveProperty("total");
+    expect(result.details).not.toHaveProperty("idle");
+    expect(result.details).not.toHaveProperty("waiting");
+    expect(result.details).not.toHaveProperty("maxConnections");
   });
 });
 
@@ -235,15 +238,21 @@ describe("ConnectivityHealthCheck", () => {
     expect(result.details.timeoutMs).toBe(50);
   });
 
-  it("custom query option is used", async () => {
+  it("custom allowed query option is used", async () => {
     const rs = mockResultSet();
     const stmt = mockStatement(rs);
     const conn = mockConnection(stmt);
     const ds = mockDataSource(conn);
-    const check = new ConnectivityHealthCheck("db", ds, { query: "SELECT 42" });
+    const check = new ConnectivityHealthCheck("db", ds, { query: "SELECT version()" });
 
     await check.check();
-    expect(stmt.executeQuery).toHaveBeenCalledWith("SELECT 42");
+    expect(stmt.executeQuery).toHaveBeenCalledWith("SELECT version()");
+  });
+
+  it("disallowed query throws on construction", () => {
+    const ds = mockDataSource();
+    expect(() => new ConnectivityHealthCheck("db", ds, { query: "DROP TABLE users" }))
+      .toThrow("Health check query must be one of");
   });
 
   it("connection and statement are closed after check", async () => {

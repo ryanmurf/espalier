@@ -122,7 +122,7 @@ describe("SlowQueryDetector", () => {
         callback: (e) => { captured = e; },
       });
       detector.record("SELECT 1", 10);
-      expect(captured!.sql).toBe("SELECT 1");
+      expect(captured!.sql).toBe("SELECT ?");
     });
   });
 

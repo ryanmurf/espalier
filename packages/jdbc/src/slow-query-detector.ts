@@ -1,10 +1,24 @@
 import { getGlobalLogger, LogLevel } from "./logger.js";
 
 /**
+ * Redacts literal values from SQL for safe logging/callbacks.
+ */
+function redactSql(sql: string): string {
+  return sql
+    // Remove string literals (handles escaped quotes)
+    .replace(/'(?:[^'\\]|\\.)*'/g, "'?'")
+    // Remove numeric literals
+    .replace(/\b\d+(\.\d+)?\b/g, "?")
+    // Collapse whitespace
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
  * Event emitted when a query exceeds the slow query threshold.
  */
 export interface SlowQueryEvent {
-  /** SQL text (truncated to 200 chars). */
+  /** Redacted SQL text (literals replaced, truncated to 200 chars). */
   sql: string;
   /** Execution duration in milliseconds. */
   durationMs: number;
@@ -48,7 +62,8 @@ export class SlowQueryDetector {
   record(sql: string, durationMs: number, parameterCount = 0, connectionId?: string): void {
     if (!Number.isFinite(durationMs) || durationMs < this.thresholdMs) return;
 
-    const truncatedSql = sql.length > 200 ? sql.slice(0, 200) + "..." : sql;
+    const redacted = redactSql(sql);
+    const truncatedSql = redacted.length > 200 ? redacted.slice(0, 200) + "..." : redacted;
     const event: SlowQueryEvent = {
       sql: truncatedSql,
       durationMs,

@@ -29,6 +29,12 @@ export interface HealthCheck {
  */
 export class HealthCheckRegistry {
   private readonly checks = new Map<string, HealthCheck>();
+  private readonly minIntervalMs: number;
+  private readonly lastCheckTime = new Map<string, number>();
+
+  constructor(options?: { minIntervalMs?: number }) {
+    this.minIntervalMs = options?.minIntervalMs ?? 0;
+  }
 
   register(check: HealthCheck): void {
     this.checks.set(check.name, check);
@@ -36,12 +42,36 @@ export class HealthCheckRegistry {
 
   unregister(name: string): void {
     this.checks.delete(name);
+    this.lastCheckTime.delete(name);
+  }
+
+  private isRateLimited(name: string): boolean {
+    if (this.minIntervalMs <= 0) return false;
+    const last = this.lastCheckTime.get(name);
+    return last !== undefined && (Date.now() - last) < this.minIntervalMs;
+  }
+
+  private recordCheck(name: string): void {
+    if (this.minIntervalMs > 0) {
+      this.lastCheckTime.set(name, Date.now());
+    }
   }
 
   async checkAll(): Promise<HealthCheckResult[]> {
     const results: HealthCheckResult[] = [];
     for (const check of this.checks.values()) {
+      if (this.isRateLimited(check.name)) {
+        results.push({
+          status: "UP",
+          name: check.name,
+          details: { rateLimited: true },
+          checkedAt: new Date(),
+          durationMs: 0,
+        });
+        continue;
+      }
       try {
+        this.recordCheck(check.name);
         results.push(await check.check());
       } catch (err) {
         results.push({
@@ -67,7 +97,17 @@ export class HealthCheckRegistry {
         durationMs: 0,
       };
     }
+    if (this.isRateLimited(name)) {
+      return {
+        status: "UP",
+        name,
+        details: { rateLimited: true },
+        checkedAt: new Date(),
+        durationMs: 0,
+      };
+    }
     try {
+      this.recordCheck(name);
       return await check.check();
     } catch (err) {
       return {
@@ -152,14 +192,16 @@ export class PoolHealthCheck implements HealthCheck {
         status = "DEGRADED";
       }
 
+      const utilization = this.maxConnections > 0
+        ? Math.round((stats.total / this.maxConnections) * 100)
+        : 0;
+
       return {
         status,
         name: this.name,
         details: {
-          total: stats.total,
-          idle: stats.idle,
-          waiting: stats.waiting,
-          maxConnections: this.maxConnections,
+          utilizationPercent: utilization,
+          hasWaiters: stats.waiting > 0,
         },
         checkedAt: new Date(),
         durationMs: Date.now() - start,
@@ -185,11 +227,24 @@ export class ConnectivityHealthCheck implements HealthCheck {
   private readonly timeoutMs: number;
   private readonly query: string;
 
+  private static readonly ALLOWED_QUERIES = new Set([
+    "SELECT 1",
+    "SELECT 1 AS health",
+    "SELECT current_timestamp",
+    "SELECT version()",
+  ]);
+
   constructor(name: string, dataSource: DataSource, options?: { timeoutMs?: number; query?: string }) {
     this.name = name;
     this.dataSource = dataSource;
     this.timeoutMs = options?.timeoutMs ?? 5000;
-    this.query = options?.query ?? "SELECT 1";
+    const q = options?.query ?? "SELECT 1";
+    if (!ConnectivityHealthCheck.ALLOWED_QUERIES.has(q.trim().replace(/\s+/g, " "))) {
+      throw new Error(
+        `Health check query must be one of: ${[...ConnectivityHealthCheck.ALLOWED_QUERIES].join(", ")}`,
+      );
+    }
+    this.query = q;
   }
 
   async check(): Promise<HealthCheckResult> {

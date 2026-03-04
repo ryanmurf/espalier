@@ -39,15 +39,27 @@ function parseOperation(sql: string): string {
 /**
  * Redacts known sensitive patterns from SQL before recording in spans.
  * Masks passwords, connection strings, tokens, and key/secret values.
+ * Handles escaped quotes, SQL comments, and Unicode bypasses.
  */
 function redactSensitive(sql: string): string {
-  return sql
-    // PASSWORD 'xxx' or PASSWORD "xxx"
-    .replace(/PASSWORD\s*[=:]?\s*(['"])[^'"]*\1/gi, "PASSWORD '[REDACTED]'")
+  // First strip SQL comments which could hide sensitive values
+  let cleaned = sql
+    .replace(/--[^\n]*/g, "-- [REDACTED]")
+    .replace(/\/\*[\s\S]*?\*\//g, "/* [REDACTED] */");
+
+  return cleaned
+    // PASSWORD with single/double quotes (handles escaped quotes)
+    .replace(/PASSWORD\s*[=:]?\s*'(?:[^'\\]|\\.)*'/gi, "PASSWORD '[REDACTED]'")
+    .replace(/PASSWORD\s*[=:]?\s*"(?:[^"\\]|\\.)*"/gi, 'PASSWORD "[REDACTED]"')
+    // PASSWORD without quotes (connection string style)
+    .replace(/PASSWORD\s*=\s*\S+/gi, "PASSWORD=[REDACTED]")
     // password=xxx in connection strings
     .replace(/password\s*=\s*\S+/gi, "password=[REDACTED]")
-    // token/secret/key=xxx patterns
-    .replace(/((?:token|secret|api_?key|auth)\s*[=:]\s*)(?:'[^']*'|"[^"]*"|\S+)/gi, "$1[REDACTED]");
+    // token/secret/key/auth patterns with quotes (handles escaped quotes)
+    .replace(/((?:token|secret|api_?key|auth|credential|bearer)\s*[=:]\s*)'(?:[^'\\]|\\.)*'/gi, "$1'[REDACTED]'")
+    .replace(/((?:token|secret|api_?key|auth|credential|bearer)\s*[=:]\s*)"(?:[^"\\]|\\.)*"/gi, '$1"[REDACTED]"')
+    // token/secret/key/auth patterns without quotes
+    .replace(/((?:token|secret|api_?key|auth|credential|bearer)\s*[=:]\s*)\S+/gi, "$1[REDACTED]");
 }
 
 function truncate(sql: string, maxLen = 200): string {

@@ -165,8 +165,8 @@ export class TenantSchemaHealthCheck implements HealthCheck {
         status,
         name: this.name,
         details: {
-          presentSchemas: present,
-          missingSchemas: missing,
+          presentCount: present.length,
+          missingCount: missing.length,
           expectedCount: this.expectedTenantIds.length,
         },
         checkedAt: new Date(),

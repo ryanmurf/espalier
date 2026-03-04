@@ -10,6 +10,16 @@ export class PgQueryPlanAnalyzer implements QueryPlanAnalyzer {
     params?: SqlValue[],
     options?: ExplainOptions,
   ): Promise<QueryPlan> {
+    // Guard: EXPLAIN ANALYZE actually executes the query, so restrict to SELECT
+    if (options?.analyze) {
+      const trimmed = sql.trimStart().toUpperCase();
+      if (!trimmed.startsWith("SELECT") && !trimmed.startsWith("WITH")) {
+        throw new Error(
+          "EXPLAIN ANALYZE is only allowed on SELECT/WITH queries to prevent side effects",
+        );
+      }
+    }
+
     const explainParts = ["EXPLAIN (FORMAT JSON"];
     if (options?.analyze) explainParts.push(", ANALYZE");
     if (options?.buffers) explainParts.push(", BUFFERS");
