@@ -7,6 +7,7 @@ export interface CrudRepository<T, ID> extends Repository<T, ID> {
   findAll(): Promise<T[]>;
   findAll(spec: Specification<T>): Promise<T[]>;
   findAll<P>(projectionClass: new (...args: any[]) => P): Promise<P[]>;
+  findAll(pageable: Pageable): Promise<Page<T>>;
   findAllStream(options?: StreamOptions<T>): AsyncIterable<T>;
   findById(id: ID): Promise<T | null>;
   findById<P>(id: ID, projectionClass: new (...args: any[]) => P): Promise<P | null>;

@@ -1,6 +1,8 @@
 import type { DataSource, Connection, SqlValue, Logger } from "espalier-jdbc";
 import { getGlobalLogger, LogLevel, quoteIdentifier } from "espalier-jdbc";
 import type { CrudRepository } from "./crud-repository.js";
+import type { Pageable, Page } from "./paging.js";
+import { createPage } from "./paging.js";
 import type { EntityMetadata, FieldMapping } from "../mapping/entity-metadata.js";
 import { getEntityMetadata } from "../mapping/entity-metadata.js";
 import { createRowMapper } from "../mapping/row-mapper.js";
@@ -1604,12 +1606,141 @@ export function createDerivedRepository<T, ID>(
       }
     },
 
-    async findAll(specOrProjection?: Specification<T> | (new (...args: any[]) => any)): Promise<any[]> {
+    async findAll(specOrProjectionOrPageable?: Specification<T> | (new (...args: any[]) => any) | Pageable): Promise<any> {
       if (repoLogger.isEnabled(LogLevel.DEBUG)) {
         repoLogger.debug("findAll", { operation: "findAll", entityType: entityName });
       }
-      if (specOrProjection && isProjectionClass(specOrProjection)) {
-        const projMapper = getCachedProjectionMapper(specOrProjection);
+
+      // Detect Pageable: plain object with page and size number properties
+      if (
+        specOrProjectionOrPageable != null &&
+        typeof specOrProjectionOrPageable === "object" &&
+        !("toPredicate" in specOrProjectionOrPageable) &&
+        "page" in specOrProjectionOrPageable &&
+        "size" in specOrProjectionOrPageable &&
+        typeof (specOrProjectionOrPageable as Pageable).page === "number" &&
+        typeof (specOrProjectionOrPageable as Pageable).size === "number"
+      ) {
+        const pageable = specOrProjectionOrPageable as Pageable;
+
+        // Count total elements
+        const countBuilder = new SelectBuilder(metadata.tableName).columns("COUNT(*)");
+        applyTenantFilter(countBuilder);
+        const countQuery = countBuilder.build();
+
+        const conn = await dataSource.getConnection();
+        try {
+          let totalElements = 0;
+          const countStmt = conn.prepareStatement(countQuery.sql);
+          try {
+            for (let i = 0; i < countQuery.params.length; i++) {
+              countStmt.setParameter(i + 1, countQuery.params[i]);
+            }
+            const countRs = await countStmt.executeQuery();
+            if (await countRs.next()) {
+              const row = countRs.getRow();
+              const val = Object.values(row)[0];
+              totalElements = typeof val === "number" ? val : Number(val);
+            }
+          } finally {
+            await countStmt.close().catch(() => {});
+          }
+
+          // Build paginated SELECT
+          const useJoinFetch = joinFetchSpecs.length > 0;
+          const builder = new SelectBuilder(metadata.tableName);
+
+          if (useJoinFetch) {
+            const joinCols = buildJoinColumns(metadata.tableName, metadata.fields, joinFetchSpecs);
+            builder.rawColumns(...joinCols);
+            addJoins(builder, metadata.tableName, joinFetchSpecs);
+          } else {
+            builder.columns(...metadata.fields.map((f: FieldMapping) => f.columnName));
+          }
+
+          applyTenantFilter(builder);
+
+          // Apply sort
+          if (pageable.sort) {
+            for (const s of pageable.sort) {
+              const fieldMapping = metadata.fields.find((f) => f.fieldName === s.property);
+              const colName = fieldMapping ? fieldMapping.columnName : s.property;
+              builder.orderBy(colName, s.direction);
+            }
+          }
+
+          builder.limit(pageable.size);
+          builder.offset(pageable.page * pageable.size);
+
+          const query = builder.build();
+          const stmt = conn.prepareStatement(query.sql);
+          try {
+            for (let i = 0; i < query.params.length; i++) {
+              stmt.setParameter(i + 1, query.params[i]);
+            }
+            const rs = await stmt.executeQuery();
+            const results: T[] = [];
+            while (await rs.next()) {
+              const entity = useJoinFetch
+                ? mapJoinRow(rs.getRow())
+                : rowMapper.mapRow(rs);
+              const selectOneToOnes = metadata.oneToOneRelations.filter(
+                (r) => r.fetchStrategy !== "JOIN",
+              );
+              if (selectOneToOnes.length > 0) {
+                await loadOneToOneRelations(entity, conn);
+              }
+              results.push(entity);
+            }
+
+            // BATCH fetch: load collection relations for all parent entities at once
+            if (results.length > 0) {
+              const parentIds = results.map((e) => getEntityId(e) as SqlValue);
+              for (const relation of metadata.oneToManyRelations) {
+                if (relation.fetchStrategy !== "BATCH" || relation.lazy) continue;
+                const childMap = await batchLoadOneToMany(conn, parentIds, relation, metadata);
+                for (const entity of results) {
+                  const id = getEntityId(entity);
+                  (entity as Record<string | symbol, unknown>)[relation.fieldName] =
+                    childMap.get(id) ?? [];
+                }
+              }
+              for (const relation of metadata.manyToManyRelations) {
+                if (relation.fetchStrategy !== "BATCH" || relation.lazy) continue;
+                const childMap = await batchLoadManyToMany(conn, parentIds, relation);
+                for (const entity of results) {
+                  const id = getEntityId(entity);
+                  (entity as Record<string | symbol, unknown>)[relation.fieldName] =
+                    childMap.get(id) ?? [];
+                }
+              }
+            }
+
+            for (const entity of results) {
+              attachLazyProxies(entity);
+              await invokeLifecycleCallbacks(entity, "PostLoad");
+              changeTracker.snapshot(entity);
+              entityCache.put(entityClass, tenantCacheKey(getEntityId(entity)), entity);
+              await emitEntityEvent(ENTITY_EVENTS.LOADED, `${ENTITY_EVENTS.LOADED}:${entityName}`, {
+                type: "loaded",
+                entityClass,
+                entityName,
+                entity,
+                id: getEntityId(entity),
+                timestamp: new Date(),
+              } satisfies EntityLoadedEvent<T>);
+            }
+            return createPage(results, pageable, totalElements);
+          } finally {
+            await stmt.close().catch(() => {});
+          }
+        } finally {
+          await conn.close();
+        }
+      }
+
+      if (specOrProjectionOrPageable && isProjectionClass(specOrProjectionOrPageable as any)) {
+        const projMapper = getCachedProjectionMapper(specOrProjectionOrPageable as new (...args: any[]) => any);
         const builder = new SelectBuilder(metadata.tableName)
           .columns(...projMapper.columns);
         applyTenantFilter(builder);
@@ -1633,7 +1764,7 @@ export function createDerivedRepository<T, ID>(
         }
       }
 
-      const spec = specOrProjection as Specification<T> | undefined;
+      const spec = specOrProjectionOrPageable as Specification<T> | undefined;
       const useJoinFetch = joinFetchSpecs.length > 0;
       const builder = new SelectBuilder(metadata.tableName);
 
