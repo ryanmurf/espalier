@@ -67,7 +67,17 @@ export class HealthCheckRegistry {
         durationMs: 0,
       };
     }
-    return check.check();
+    try {
+      return await check.check();
+    } catch (err) {
+      return {
+        status: "DOWN",
+        name,
+        details: { error: err instanceof Error ? err.message : String(err) },
+        checkedAt: new Date(),
+        durationMs: 0,
+      };
+    }
   }
 }
 
