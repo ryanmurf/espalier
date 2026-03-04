@@ -157,3 +157,6 @@ export { PluginManager } from "./plugin/index.js";
 export { PluginDecorator, getPluginMetadata, getDiscoveredPlugins } from "./plugin/index.js";
 export { composeMiddleware } from "./plugin/index.js";
 export { createPluginDecorator } from "./plugin/index.js";
+
+export type { GraphQLSchemaOptions, GeneratedGraphQLSchema, GraphQLPluginConfig } from "./graphql/index.js";
+export { GraphQLSchemaGenerator, GraphQLPlugin } from "./graphql/index.js";
