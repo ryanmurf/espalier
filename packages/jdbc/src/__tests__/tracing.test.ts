@@ -229,12 +229,14 @@ describe("OTel Tracing Interfaces", () => {
       expect(getGlobalTracerProvider()).toBe(p2);
     });
 
-    it("setting null/undefined provider — does not crash", () => {
-      // If the code doesn't validate, this could cause runtime errors later
-      setGlobalTracerProvider(null as unknown as TracerProvider);
-      const provider = getGlobalTracerProvider();
-      // The provider is now null — calling getTracer will throw
-      expect(provider).toBeNull();
+    it("setting null provider throws", () => {
+      expect(() => setGlobalTracerProvider(null as unknown as TracerProvider))
+        .toThrow("TracerProvider must not be null or undefined");
+    });
+
+    it("setting undefined provider throws", () => {
+      expect(() => setGlobalTracerProvider(undefined as unknown as TracerProvider))
+        .toThrow("TracerProvider must not be null or undefined");
     });
   });
 

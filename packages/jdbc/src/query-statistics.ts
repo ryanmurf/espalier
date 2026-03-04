@@ -25,8 +25,10 @@ interface PatternStats {
   totalTime: number;
   maxTime: number;
   minTime: number;
-  /** Sorted array of durations for percentile calculation. */
+  /** Sorted array of durations for percentile calculation (capped). */
   durations: number[];
+  /** Last access timestamp for LRU eviction. */
+  lastAccess: number;
 }
 
 /**
@@ -56,9 +58,11 @@ function percentile(sorted: number[], p: number): number {
 export class QueryStatisticsCollector {
   private readonly stats = new Map<string, PatternStats>();
   private readonly maxPatterns: number;
+  private readonly maxDurations: number;
 
-  constructor(maxPatterns = 1000) {
+  constructor(maxPatterns = 1000, maxDurations = 1000) {
     this.maxPatterns = maxPatterns;
+    this.maxDurations = maxDurations;
   }
 
   /**
@@ -69,8 +73,10 @@ export class QueryStatisticsCollector {
     let entry = this.stats.get(pattern);
 
     if (!entry) {
-      if (this.stats.size >= this.maxPatterns) return; // prevent unbounded growth
-      entry = { count: 0, totalTime: 0, maxTime: 0, minTime: Infinity, durations: [] };
+      if (this.stats.size >= this.maxPatterns) {
+        this.evictLru();
+      }
+      entry = { count: 0, totalTime: 0, maxTime: 0, minTime: Infinity, durations: [], lastAccess: Date.now() };
       this.stats.set(pattern, entry);
     }
 
@@ -78,10 +84,32 @@ export class QueryStatisticsCollector {
     entry.totalTime += durationMs;
     entry.maxTime = Math.max(entry.maxTime, durationMs);
     entry.minTime = Math.min(entry.minTime, durationMs);
+    entry.lastAccess = Date.now();
 
     // Insert into sorted position for percentile calculation
     const insertIdx = binarySearchInsert(entry.durations, durationMs);
     entry.durations.splice(insertIdx, 0, durationMs);
+
+    // Cap durations array to prevent per-pattern unbounded growth
+    if (entry.durations.length > this.maxDurations) {
+      // Remove from the middle to preserve extremes for min/max accuracy
+      const removeIdx = Math.floor(entry.durations.length / 2);
+      entry.durations.splice(removeIdx, 1);
+    }
+  }
+
+  private evictLru(): void {
+    let oldestKey: string | undefined;
+    let oldestTime = Infinity;
+    for (const [key, entry] of this.stats) {
+      if (entry.lastAccess < oldestTime) {
+        oldestTime = entry.lastAccess;
+        oldestKey = key;
+      }
+    }
+    if (oldestKey !== undefined) {
+      this.stats.delete(oldestKey);
+    }
   }
 
   /**

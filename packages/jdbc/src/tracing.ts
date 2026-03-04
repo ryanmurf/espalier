@@ -143,6 +143,9 @@ let globalTracerProvider: TracerProvider = new NoopTracerProvider();
 
 /** Set the global TracerProvider for database instrumentation. */
 export function setGlobalTracerProvider(provider: TracerProvider): void {
+  if (provider == null) {
+    throw new Error("TracerProvider must not be null or undefined");
+  }
   globalTracerProvider = provider;
 }
 

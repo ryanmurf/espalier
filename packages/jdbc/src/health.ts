@@ -194,13 +194,21 @@ export class ConnectivityHealthCheck implements HealthCheck {
 
   async check(): Promise<HealthCheckResult> {
     const start = Date.now();
+    const abort = { aborted: false };
+    let pendingConn: { close(): Promise<void> } | undefined;
+
     try {
       const result = await Promise.race([
-        this.executeProbe(),
+        this.executeProbe(abort, (c) => { pendingConn = c; }),
         this.timeout(),
       ]);
 
       if (result === "timeout") {
+        abort.aborted = true;
+        // Release the connection if it was acquired before timeout
+        if (pendingConn) {
+          pendingConn.close().catch(() => {});
+        }
         return {
           status: "DOWN",
           name: this.name,
@@ -228,8 +236,16 @@ export class ConnectivityHealthCheck implements HealthCheck {
     }
   }
 
-  private async executeProbe(): Promise<"ok"> {
+  private async executeProbe(
+    abort: { aborted: boolean },
+    onConnection: (conn: { close(): Promise<void> }) => void,
+  ): Promise<"ok"> {
     const conn = await this.dataSource.getConnection();
+    onConnection(conn);
+    if (abort.aborted) {
+      await conn.close();
+      return "ok";
+    }
     try {
       const stmt = conn.createStatement();
       try {
