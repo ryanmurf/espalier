@@ -1,0 +1,323 @@
+import type { EntityMetadata } from "../mapping/entity-metadata.js";
+import { getEntityMetadata } from "../mapping/entity-metadata.js";
+import { getIdField } from "../decorators/id.js";
+import { getColumnTypeMappings } from "../decorators/column.js";
+import { getCreatedDateField, getLastModifiedDateField } from "../decorators/auditing.js";
+import { getVersionField } from "../decorators/version.js";
+
+/**
+ * Maps TypeScript/SQL types to GraphQL scalar types.
+ */
+function toGraphQLType(sqlType: string | undefined, fieldName: string): string {
+  if (!sqlType) {
+    // Infer from field name conventions
+    if (fieldName === "id") return "ID";
+    return "String";
+  }
+
+  const normalized = sqlType.toUpperCase();
+
+  if (normalized.includes("INT") || normalized === "SERIAL" || normalized === "BIGSERIAL") {
+    return fieldName === "id" ? "ID" : "Int";
+  }
+  if (normalized.includes("FLOAT") || normalized.includes("DOUBLE") || normalized.includes("DECIMAL") || normalized.includes("NUMERIC") || normalized.includes("REAL")) {
+    return "Float";
+  }
+  if (normalized.includes("BOOL") || normalized === "BIT") {
+    return "Boolean";
+  }
+  if (normalized.includes("DATE") || normalized.includes("TIME") || normalized.includes("TIMESTAMP")) {
+    return "DateTime";
+  }
+  if (normalized.includes("JSON")) {
+    return "JSON";
+  }
+  if (normalized.includes("UUID")) {
+    return "ID";
+  }
+  return "String";
+}
+
+/**
+ * Convert a class name to a GraphQL type name.
+ */
+function toTypeName(entityClass: new (...args: any[]) => any): string {
+  return entityClass.name;
+}
+
+/**
+ * Options for GraphQL schema generation.
+ */
+export interface GraphQLSchemaOptions {
+  /** Custom scalar definitions to include. Default: DateTime. */
+  customScalars?: string[];
+  /** Whether to generate mutation types. Default: true. */
+  mutations?: boolean;
+  /** Whether to generate pagination types. Default: true. */
+  pagination?: boolean;
+  /** Fields to exclude from input types (auto-generated). */
+  excludeFromInput?: string[];
+}
+
+/**
+ * Generated GraphQL schema output.
+ */
+export interface GeneratedGraphQLSchema {
+  /** Complete SDL string. */
+  sdl: string;
+  /** Individual type definitions. */
+  types: Map<string, string>;
+  /** Individual input type definitions. */
+  inputTypes: Map<string, string>;
+  /** Query type fields. */
+  queryFields: string[];
+  /** Mutation type fields. */
+  mutationFields: string[];
+}
+
+/**
+ * Generates GraphQL SDL from entity metadata.
+ * No runtime dependency on graphql library — produces pure SDL strings.
+ */
+export class GraphQLSchemaGenerator {
+  private readonly options: Required<GraphQLSchemaOptions>;
+
+  constructor(options?: GraphQLSchemaOptions) {
+    this.options = {
+      customScalars: options?.customScalars ?? ["DateTime"],
+      mutations: options?.mutations ?? true,
+      pagination: options?.pagination ?? true,
+      excludeFromInput: options?.excludeFromInput ?? [],
+    };
+  }
+
+  /**
+   * Generate GraphQL SDL from an array of entity classes.
+   */
+  generate(entityClasses: Array<new (...args: any[]) => any>): GeneratedGraphQLSchema {
+    const types = new Map<string, string>();
+    const inputTypes = new Map<string, string>();
+    const queryFields: string[] = [];
+    const mutationFields: string[] = [];
+
+    for (const entityClass of entityClasses) {
+      const typeName = toTypeName(entityClass);
+      const metadata = getEntityMetadata(entityClass);
+      const idField = getIdField(entityClass);
+
+      // Generate object type
+      types.set(typeName, this.generateObjectType(entityClass, metadata, typeName));
+
+      // Generate input type
+      if (this.options.mutations) {
+        inputTypes.set(`${typeName}Input`, this.generateInputType(entityClass, metadata, typeName));
+        inputTypes.set(`${typeName}UpdateInput`, this.generateUpdateInputType(entityClass, metadata, typeName));
+      }
+
+      // Generate query fields
+      if (idField) {
+        queryFields.push(`  ${camelCase(typeName)}(id: ID!): ${typeName}`);
+      }
+      if (this.options.pagination) {
+        queryFields.push(`  ${camelCase(typeName)}s(page: Int = 0, size: Int = 20, sort: String): ${typeName}Connection!`);
+      } else {
+        queryFields.push(`  ${camelCase(typeName)}s: [${typeName}!]!`);
+      }
+      queryFields.push(`  ${camelCase(typeName)}Count: Int!`);
+
+      // Generate mutation fields
+      if (this.options.mutations) {
+        mutationFields.push(`  create${typeName}(input: ${typeName}Input!): ${typeName}!`);
+        if (idField) {
+          mutationFields.push(`  update${typeName}(id: ID!, input: ${typeName}UpdateInput!): ${typeName}!`);
+          mutationFields.push(`  delete${typeName}(id: ID!): Boolean!`);
+        }
+      }
+    }
+
+    const sdl = this.assembleSdl(types, inputTypes, queryFields, mutationFields);
+
+    return { sdl, types, inputTypes, queryFields, mutationFields };
+  }
+
+  private generateObjectType(
+    entityClass: new (...args: any[]) => any,
+    metadata: EntityMetadata,
+    typeName: string,
+  ): string {
+    const fields: string[] = [];
+    const typeMappings = getColumnTypeMappings(entityClass);
+
+    for (const mapping of metadata.fields) {
+      const fieldName = String(mapping.fieldName);
+      const sqlType = typeMappings.get(mapping.fieldName);
+      const gqlType = toGraphQLType(sqlType, fieldName);
+      const nullable = mapping.fieldName === getIdField(entityClass) ? "!" : "";
+      fields.push(`  ${fieldName}: ${gqlType}${nullable}`);
+    }
+
+    // Relations
+    for (const rel of metadata.manyToOneRelations) {
+      const relTypeName = toTypeName(rel.target());
+      fields.push(`  ${String(rel.fieldName)}: ${relTypeName}`);
+    }
+
+    for (const rel of metadata.oneToManyRelations) {
+      const relTypeName = toTypeName(rel.target());
+      fields.push(`  ${String(rel.fieldName)}: [${relTypeName}!]!`);
+    }
+
+    for (const rel of metadata.manyToManyRelations) {
+      const relTypeName = toTypeName(rel.target());
+      fields.push(`  ${String(rel.fieldName)}: [${relTypeName}!]!`);
+    }
+
+    for (const rel of metadata.oneToOneRelations) {
+      const relTypeName = toTypeName(rel.target());
+      fields.push(`  ${String(rel.fieldName)}: ${relTypeName}`);
+    }
+
+    // Embedded fields
+    for (const emb of metadata.embeddedFields) {
+      const embTypeName = emb.target().name;
+      fields.push(`  ${String(emb.fieldName)}: ${embTypeName}`);
+    }
+
+    return `type ${typeName} {\n${fields.join("\n")}\n}`;
+  }
+
+  private generateInputType(
+    entityClass: new (...args: any[]) => any,
+    metadata: EntityMetadata,
+    typeName: string,
+  ): string {
+    const fields: string[] = [];
+    const idField = getIdField(entityClass);
+    const createdDateField = getCreatedDateField(entityClass);
+    const lastModifiedDateField = getLastModifiedDateField(entityClass);
+    const versionField = getVersionField(entityClass);
+
+    const exclude = new Set<string | symbol>(
+      [idField, createdDateField, lastModifiedDateField, versionField].filter(
+        (v): v is string | symbol => v != null,
+      ),
+    );
+    for (const e of this.options.excludeFromInput) {
+      exclude.add(e);
+    }
+
+    const typeMappings = getColumnTypeMappings(entityClass);
+
+    for (const mapping of metadata.fields) {
+      if (exclude.has(mapping.fieldName)) continue;
+      const fieldName = String(mapping.fieldName);
+      const sqlType = typeMappings.get(mapping.fieldName);
+      const gqlType = toGraphQLType(sqlType, fieldName);
+      fields.push(`  ${fieldName}: ${gqlType}`);
+    }
+
+    return `input ${typeName}Input {\n${fields.join("\n")}\n}`;
+  }
+
+  private generateUpdateInputType(
+    entityClass: new (...args: any[]) => any,
+    metadata: EntityMetadata,
+    typeName: string,
+  ): string {
+    const fields: string[] = [];
+    const idField = getIdField(entityClass);
+    const createdDateField = getCreatedDateField(entityClass);
+    const lastModifiedDateField = getLastModifiedDateField(entityClass);
+    const versionField = getVersionField(entityClass);
+
+    const exclude = new Set<string | symbol>(
+      [idField, createdDateField, lastModifiedDateField, versionField].filter(
+        (v): v is string | symbol => v != null,
+      ),
+    );
+    for (const e of this.options.excludeFromInput) {
+      exclude.add(e);
+    }
+
+    const typeMappings = getColumnTypeMappings(entityClass);
+
+    for (const mapping of metadata.fields) {
+      if (exclude.has(mapping.fieldName)) continue;
+      const fieldName = String(mapping.fieldName);
+      const sqlType = typeMappings.get(mapping.fieldName);
+      const gqlType = toGraphQLType(sqlType, fieldName);
+      // All update fields are optional
+      fields.push(`  ${fieldName}: ${gqlType}`);
+    }
+
+    return `input ${typeName}UpdateInput {\n${fields.join("\n")}\n}`;
+  }
+
+  private assembleSdl(
+    types: Map<string, string>,
+    inputTypes: Map<string, string>,
+    queryFields: string[],
+    mutationFields: string[],
+  ): string {
+    const parts: string[] = [];
+
+    // Custom scalars
+    for (const scalar of this.options.customScalars) {
+      parts.push(`scalar ${scalar}`);
+    }
+    parts.push("");
+
+    // Pagination types
+    if (this.options.pagination) {
+      parts.push(`type PageInfo {
+  hasNextPage: Boolean!
+  hasPreviousPage: Boolean!
+  totalElements: Int!
+  totalPages: Int!
+  page: Int!
+  size: Int!
+}`);
+      parts.push("");
+    }
+
+    // Object types
+    for (const typeDef of types.values()) {
+      parts.push(typeDef);
+      parts.push("");
+
+      // Connection type for pagination
+      if (this.options.pagination) {
+        const typeName = typeDef.split(" ")[1];
+        parts.push(`type ${typeName}Connection {
+  content: [${typeName}!]!
+  pageInfo: PageInfo!
+}`);
+        parts.push("");
+      }
+    }
+
+    // Input types
+    for (const inputDef of inputTypes.values()) {
+      parts.push(inputDef);
+      parts.push("");
+    }
+
+    // Query type
+    if (queryFields.length > 0) {
+      parts.push(`type Query {\n${queryFields.join("\n")}\n}`);
+      parts.push("");
+    }
+
+    // Mutation type
+    if (mutationFields.length > 0) {
+      parts.push(`type Mutation {\n${mutationFields.join("\n")}\n}`);
+      parts.push("");
+    }
+
+    return parts.join("\n").trim() + "\n";
+  }
+}
+
+function camelCase(str: string): string {
+  return str.charAt(0).toLowerCase() + str.slice(1);
+}
