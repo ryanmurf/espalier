@@ -3,12 +3,32 @@ import { validateIdentifier, quoteIdentifier } from "espalier-jdbc";
 import { DdlGenerator } from "../schema/ddl-generator.js";
 
 /**
+ * Thrown when provisioning a tenant would exceed the configured maxTenants limit.
+ */
+export class TenantLimitExceededError extends Error {
+  constructor(current: number, max: number) {
+    super(`Tenant limit exceeded: ${current} tenants already provisioned (max: ${max})`);
+    this.name = "TenantLimitExceededError";
+  }
+}
+
+export interface TenantSchemaManagerOptions {
+  /** Maximum number of tenant schemas allowed. Undefined means no limit. */
+  maxTenants?: number;
+}
+
+/**
  * Manages PostgreSQL schemas for multi-tenant deployments.
  * Provides utilities for creating, dropping, and provisioning
  * per-tenant schemas with entity tables.
  */
 export class TenantSchemaManager {
   private readonly ddl = new DdlGenerator();
+  private readonly maxTenants: number | undefined;
+
+  constructor(options?: TenantSchemaManagerOptions) {
+    this.maxTenants = options?.maxTenants;
+  }
 
   /**
    * Creates a PostgreSQL schema if it does not exist.
@@ -52,6 +72,13 @@ export class TenantSchemaManager {
 
     const conn = await dataSource.getConnection();
     try {
+      if (this.maxTenants !== undefined) {
+        const existing = await this.listTenantSchemas(conn);
+        if (existing.length >= this.maxTenants) {
+          throw new TenantLimitExceededError(existing.length, this.maxTenants);
+        }
+      }
+
       await this.createTenantSchema(conn, schemaName);
 
       for (const entity of entities) {
