@@ -91,3 +91,7 @@ export {
   getGlobalTracerProvider,
 } from "./tracing.js";
 export type { PlanNode, QueryPlan, ExplainOptions, QueryPlanAnalyzer } from "./query-plan.js";
+export type { SlowQueryEvent, SlowQueryConfig } from "./slow-query-detector.js";
+export { SlowQueryDetector } from "./slow-query-detector.js";
+export type { QueryStatistics } from "./query-statistics.js";
+export { QueryStatisticsCollector } from "./query-statistics.js";

@@ -1,4 +1,4 @@
-import type { Span } from "espalier-jdbc";
+import type { Span, SlowQueryDetector, QueryStatisticsCollector } from "espalier-jdbc";
 import {
   getGlobalTracerProvider,
   SpanKind,
@@ -7,6 +7,29 @@ import {
 } from "espalier-jdbc";
 
 const TRACER_NAME = "espalier-jdbc-pg";
+
+let globalSlowQueryDetector: SlowQueryDetector | undefined;
+let globalQueryStatsCollector: QueryStatisticsCollector | undefined;
+
+/** Set a global SlowQueryDetector for all PG queries. */
+export function setSlowQueryDetector(detector: SlowQueryDetector | undefined): void {
+  globalSlowQueryDetector = detector;
+}
+
+/** Get the current global SlowQueryDetector. */
+export function getSlowQueryDetector(): SlowQueryDetector | undefined {
+  return globalSlowQueryDetector;
+}
+
+/** Set a global QueryStatisticsCollector for all PG queries. */
+export function setQueryStatisticsCollector(collector: QueryStatisticsCollector | undefined): void {
+  globalQueryStatsCollector = collector;
+}
+
+/** Get the current global QueryStatisticsCollector. */
+export function getQueryStatisticsCollector(): QueryStatisticsCollector | undefined {
+  return globalQueryStatsCollector;
+}
 
 function parseOperation(sql: string): string {
   const match = sql.trimStart().match(/^(\w+)/);
@@ -20,6 +43,7 @@ function truncate(sql: string, maxLen = 200): string {
 /**
  * Wraps a database operation in a tracing span.
  * When tracing is disabled (NoopTracerProvider), this adds negligible overhead.
+ * Also records to slow query detector and statistics collector if configured.
  */
 export async function traceQuery<T>(
   spanName: string,
@@ -36,6 +60,7 @@ export async function traceQuery<T>(
     },
   });
 
+  const startTime = Date.now();
   try {
     const result = await fn(span);
     span.setStatus({ code: SpanStatusCode.OK });
@@ -51,6 +76,11 @@ export async function traceQuery<T>(
     });
     throw err;
   } finally {
+    const durationMs = Date.now() - startTime;
     span.end();
+
+    // Record to slow query detector and stats collector
+    globalSlowQueryDetector?.record(sql, durationMs);
+    globalQueryStatsCollector?.record(sql, durationMs);
   }
 }

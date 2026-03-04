@@ -10,3 +10,9 @@ export { PgCursorResultSet } from "./pg-cursor-result-set.js";
 export { PgSchemaIntrospector } from "./pg-schema-introspector.js";
 export { PgMigrationRunner, computeChecksum } from "./pg-migration-runner.js";
 export { PgQueryPlanAnalyzer } from "./pg-query-plan.js";
+export {
+  setSlowQueryDetector,
+  getSlowQueryDetector,
+  setQueryStatisticsCollector,
+  getQueryStatisticsCollector,
+} from "./trace-query.js";
