@@ -2,6 +2,10 @@ import type { DataSource } from "espalier-jdbc";
 import type { OutboxOptions, OutboxEntry } from "../types.js";
 import { OutboxStore } from "./outbox-store.js";
 
+// Ambient timer globals (available in Node, Bun, Deno, browsers)
+declare function setInterval(callback: (...args: unknown[]) => void, ms: number): unknown;
+declare function clearInterval(handle: unknown): void;
+
 export type OutboxPublishFn = (entries: OutboxEntry[]) => Promise<void>;
 
 /**
@@ -12,7 +16,7 @@ export class OutboxPublisher {
   private readonly store: OutboxStore;
   private readonly pollIntervalMs: number;
   private readonly batchSize: number;
-  private timer: ReturnType<typeof setInterval> | null = null;
+  private timer: unknown = null;
   private running = false;
   private publishFn: OutboxPublishFn | null = null;
 

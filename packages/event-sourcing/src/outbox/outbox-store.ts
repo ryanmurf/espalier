@@ -1,6 +1,11 @@
 import type { Connection } from "espalier-jdbc";
 import type { OutboxEntry, OutboxOptions, DomainEvent } from "../types.js";
 
+// Access Web Crypto API available in Node 19+, Bun, Deno, and browsers
+const _crypto = (globalThis as Record<string, unknown>)["crypto"] as {
+  randomUUID(): string;
+};
+
 export class OutboxStore {
   private readonly tableName: string;
   private readonly schemaName?: string;
@@ -35,7 +40,7 @@ export class OutboxStore {
     let paramIndex = 1;
 
     for (const event of events) {
-      const id = crypto.randomUUID();
+      const id = _crypto.randomUUID();
       const now = new Date();
 
       rowPlaceholders.push(
