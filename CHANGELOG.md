@@ -1,5 +1,27 @@
 # Changelog
 
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/).
+
+## [Unreleased]
+
+### Changed
+
+#### BREAKING: Health check response shapes (espalier-jdbc, espalier-jdbc-pg)
+
+- **`PoolHealthCheck`** (`packages/jdbc/src/health.ts`): The `details` object returned by `check()` changed from `{ total: number; idle: number }` to `{ utilizationPercent: number; hasWaiters: boolean }`. Consumers that read `details.total` or `details.idle` must migrate to `details.utilizationPercent` (0-100 percentage) and `details.hasWaiters` (boolean).
+
+- **`TenantSchemaHealthCheck`** (`packages/jdbc-pg/src/pg-replica-health.ts`): The `details` object returned by `check()` changed from `{ presentSchemas: string[]; missingSchemas: string[] }` to `{ presentCount: number; missingCount: number; expectedCount: number }`. Consumers that iterated over schema name arrays must migrate to the count-based fields.
+
+### Fixed
+
+- Adapter stubs (MSSQL, Oracle) now throw a clear error on `getConnection()` instead of returning connections with null drivers that produce misleading errors downstream.
+
+### Refactored
+
+- Replaced `Buffer.from()` with `Uint8Array` passthrough in SQLite adapter for portability. `better-sqlite3` accepts `Uint8Array` natively.
+
 ## 0.8.0 — Y2 Q4
 
 ### espalier-cli (new package)

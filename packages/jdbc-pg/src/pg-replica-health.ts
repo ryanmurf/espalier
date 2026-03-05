@@ -104,6 +104,10 @@ export class ReplicaLagHealthCheck implements HealthCheck {
 
 /**
  * Health check that validates expected tenant schemas exist.
+ *
+ * @since 1.0.1 - Breaking change: `details` shape changed from
+ * `{ presentSchemas: string[]; missingSchemas: string[] }` to
+ * `{ presentCount: number; missingCount: number; expectedCount: number }`.
  */
 export class TenantSchemaHealthCheck implements HealthCheck {
   readonly name: string;

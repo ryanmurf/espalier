@@ -168,6 +168,9 @@ export class CompositeHealthCheck implements HealthCheck {
 
 /**
  * Health check for a connection pool.
+ *
+ * @since 1.0.1 - Breaking change: `details` shape changed from
+ * `{ total: number; idle: number }` to `{ utilizationPercent: number; hasWaiters: boolean }`.
  */
 export class PoolHealthCheck implements HealthCheck {
   readonly name: string;
