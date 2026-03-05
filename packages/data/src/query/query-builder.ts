@@ -7,6 +7,15 @@ import type { EntityMetadata, FieldMapping } from "../mapping/entity-metadata.js
 export type JoinType = "INNER" | "LEFT" | "RIGHT";
 export type SortDirection = "ASC" | "DESC";
 
+/**
+ * Interface for expression-based ORDER BY clauses (e.g. vector distance).
+ * The expression generates parameterized SQL given a starting param offset.
+ */
+export interface OrderByExpressionArg {
+  toSql(paramOffset: number): { sql: string; params: SqlValue[] };
+  direction: "ASC" | "DESC";
+}
+
 export interface BuiltQuery {
   sql: string;
   params: SqlValue[];
@@ -36,6 +45,9 @@ export class SelectBuilder {
   private _offset: number | undefined;
   private _distinct = false;
   private _rawColumns = false;
+  private _extraRawColumns: Array<{ expression: string; alias: string }> = [];
+  private _rawOrderBys: Array<{ expression: string; direction: SortDirection }> = [];
+  private _expressionOrderBys: OrderByExpressionArg[] = [];
   private _cacheable = false;
   private _cacheTtlMs: number | undefined;
 
@@ -58,6 +70,15 @@ export class SelectBuilder {
   rawColumns(...columns: string[]): SelectBuilder {
     this._columns = columns;
     this._rawColumns = true;
+    return this;
+  }
+
+  /**
+   * Add a raw SQL expression as a column with an alias.
+   * Example: `addRawColumn('("embedding" <-> $1)', 'distance')`
+   */
+  addRawColumn(expression: string, alias: string): SelectBuilder {
+    this._extraRawColumns.push({ expression, alias });
     return this;
   }
 
@@ -95,6 +116,28 @@ export class SelectBuilder {
       throw new Error(`Invalid sort direction: ${direction}. Must be "ASC" or "DESC".`);
     }
     this._orderBy.push({ column, direction: normalized as SortDirection });
+    return this;
+  }
+
+  /**
+   * Add a raw ORDER BY expression that will not be quoted as an identifier.
+   * Example: `orderByRaw('("embedding" <-> $1)', 'ASC')`
+   */
+  orderByRaw(expression: string, direction: SortDirection): SelectBuilder {
+    const normalized = String(direction).toUpperCase();
+    if (normalized !== "ASC" && normalized !== "DESC") {
+      throw new Error(`Invalid sort direction: ${direction}. Must be "ASC" or "DESC".`);
+    }
+    this._rawOrderBys.push({ expression, direction: normalized as SortDirection });
+    return this;
+  }
+
+  /**
+   * Add an expression-based ORDER BY clause that generates parameterized SQL.
+   * The expression's params are merged into the query at the correct offset.
+   */
+  orderByExpression(expression: OrderByExpressionArg): SelectBuilder {
+    this._expressionOrderBys.push(expression);
     return this;
   }
 
@@ -139,10 +182,16 @@ export class SelectBuilder {
     let paramIdx = 1;
     const parts: string[] = [];
 
-    const colList = this._rawColumns
+    const baseColList = this._rawColumns
       ? this._columns.join(", ")
       : this._columns.map(c => quoteIdentifier(c)).join(", ");
-    parts.push(`SELECT ${this._distinct ? "DISTINCT " : ""}${colList}`);
+    const extraCols = this._extraRawColumns.map(
+      rc => `${rc.expression} AS ${quoteIdentifier(rc.alias)}`
+    );
+    const allCols = extraCols.length > 0
+      ? [baseColList, ...extraCols].join(", ")
+      : baseColList;
+    parts.push(`SELECT ${this._distinct ? "DISTINCT " : ""}${allCols}`);
     parts.push(`FROM ${quoteIdentifier(this._from)}`);
 
     for (const join of this._joins) {
@@ -170,9 +219,30 @@ export class SelectBuilder {
       paramIdx += result.params.length;
     }
 
-    if (this._orderBy.length > 0) {
-      const clauses = this._orderBy.map((o) => `${quoteIdentifier(o.column)} ${o.direction}`);
-      parts.push(`ORDER BY ${clauses.join(", ")}`);
+    // Build ORDER BY: regular + raw + expression-based
+    const hasAnyOrderBy = this._orderBy.length > 0
+      || this._rawOrderBys.length > 0
+      || this._expressionOrderBys.length > 0;
+
+    if (hasAnyOrderBy) {
+      const orderClauses: string[] = [];
+
+      for (const o of this._orderBy) {
+        orderClauses.push(`${quoteIdentifier(o.column)} ${o.direction}`);
+      }
+
+      for (const ro of this._rawOrderBys) {
+        orderClauses.push(`${ro.expression} ${ro.direction}`);
+      }
+
+      for (const expr of this._expressionOrderBys) {
+        const result = expr.toSql(paramIdx);
+        orderClauses.push(`${result.sql} ${expr.direction}`);
+        params.push(...result.params);
+        paramIdx += result.params.length;
+      }
+
+      parts.push(`ORDER BY ${orderClauses.join(", ")}`);
     }
 
     if (this._limit !== undefined) {
