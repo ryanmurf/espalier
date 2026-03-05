@@ -190,6 +190,9 @@ export { N1Detector, N1DetectionError } from "./observability/index.js";
 export type { IndexType, IndexSuggestion, IndexAdvisorConfig } from "./observability/index.js";
 export { IndexAdvisor } from "./observability/index.js";
 
+export type { DiagnosticError, ErrorContext as DiagnosticErrorContext } from "./errors/error-diagnostics.js";
+export { enhanceError, diagnose } from "./errors/error-diagnostics.js";
+
 export type { Plugin, PluginContext, PluginHook, PluginDependency, HookType, HookContext } from "./plugin/index.js";
 export type { MiddlewareContext, MiddlewareFn } from "./plugin/index.js";
 export { PluginManager } from "./plugin/index.js";
