@@ -13,6 +13,7 @@ import type { LifecycleEvent } from "../decorators/lifecycle.js";
 import { getEmbeddedFields, isEmbeddable } from "../decorators/embeddable.js";
 import type { EmbeddedField } from "../decorators/embeddable.js";
 import { getTenantIdField } from "../decorators/tenant.js";
+import { enhanceError } from "../errors/error-diagnostics.js";
 
 export interface FieldMapping {
   fieldName: string | symbol;
@@ -44,17 +45,17 @@ export function getEntityMetadata(
 
   const tableName = getTableName(entityClass);
   if (!tableName) {
-    throw new Error(
-      `No @Table decorator found on ${entityClass.name}. ` +
-        `Ensure the class is decorated with @Table.`,
+    throw enhanceError(
+      new Error(`No @Table decorator found on ${entityClass.name}.`),
+      { entityName: entityClass.name },
     );
   }
 
   const idField = getIdField(entityClass);
   if (!idField) {
-    throw new Error(
-      `No @Id decorator found on ${entityClass.name}. ` +
-        `Ensure a field is decorated with @Id.`,
+    throw enhanceError(
+      new Error(`No @Id decorator found on ${entityClass.name}.`),
+      { entityName: entityClass.name },
     );
   }
 
