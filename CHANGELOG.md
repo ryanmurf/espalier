@@ -1,5 +1,30 @@
 # Changelog
 
+## [1.11.0] - Y6 Q3 — Temporal Data & Event Sourcing Advanced
+
+### Features
+- **@Temporal Decorator**: Class decorator for temporal tables with automatic history tracking. Supports uni-temporal (valid time) and bi-temporal (valid time + transaction time) with configurable column names.
+- **TemporalQueryBuilder**: `findAsOf(date)`, `findHistory(id)`, `findHistoryById(id, from, to)` for point-in-time and range queries against temporal entities.
+- **Temporal DDL Generation**: `generateTemporalDdl()` creates history tables, row-version triggers, and temporal indexes automatically.
+- **@Projection Decorator**: Marks classes as event sourcing read-model projections with event type subscriptions.
+- **ProjectionRunner**: Batched event processing engine for rebuilding and incrementally updating projections with configurable batch size.
+- **SnapshotStore**: Aggregate snapshot persistence with save/load/delete operations and DDL generation. Uses UPSERT for efficient snapshot updates.
+- **EventReplayer**: Batched event replay with filtering by aggregate type, timestamp range, and version. Includes infinite-loop safety checks.
+
+### Security
+- @Temporal decorator validates all column name options against identifier regex (prevents SQL injection)
+- SnapshotStore validates table/schema names against identifier pattern
+- ProjectionRunner and EventReplayer include sequence-stuck safety checks to prevent infinite loops
+- SnapshotStore removes unsafe type casts for timestamp parameters
+
+### Bug Fixes
+- EventReplayer now tracks sequence advancement to prevent infinite loops on stuck sequences
+- ProjectionRunner processes events in batches instead of loading all into memory (prevents OOM)
+- Y6Q2 test ColumnInfo type completeness fixed
+
+### Tests
+- 75 adversarial tests across 2 test files (temporal decorator/query/DDL, projections/snapshots/replay)
+
 ## [1.10.0] - Y6 Q2 — Advanced Migrations
 
 ### Features
