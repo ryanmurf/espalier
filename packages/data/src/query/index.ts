@@ -34,6 +34,10 @@ export { parseDerivedQueryMethod } from "./derived-query-parser.js";
 
 export { buildDerivedQuery } from "./derived-query-executor.js";
 
+export type { CompiledQuery, ParamBinding, QueryMetadata } from "./compiled-query.js";
+export { bindCompiledQuery } from "./compiled-query.js";
+export { QueryCompiler } from "./query-compiler.js";
+
 export type { Specification } from "./specification.js";
 export {
   Specifications,

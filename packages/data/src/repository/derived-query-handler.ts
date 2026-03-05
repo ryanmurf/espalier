@@ -15,6 +15,9 @@ import type { EventBus } from "../events/event-bus.js";
 import type { EntityLoadedEvent } from "../events/entity-events.js";
 import { ENTITY_EVENTS } from "../events/entity-events.js";
 import type { Criteria } from "../query/criteria.js";
+import type { CompiledQuery } from "../query/compiled-query.js";
+import { bindCompiledQuery } from "../query/compiled-query.js";
+import { QueryCompiler } from "../query/query-compiler.js";
 
 function isProjectionClass(arg: unknown): arg is new (...args: any[]) => any {
   return typeof arg === "function" && getProjectionMetadata(arg) !== undefined;
@@ -51,6 +54,8 @@ export class DerivedQueryHandler<T> {
   private readonly emitEntityEvent: (genericEvent: string, specificEvent: string, payload: unknown) => Promise<void>;
   private readonly entityName: string;
   private readonly descriptorCache = new Map<string, DerivedQueryDescriptor>();
+  private readonly compiledQueryCache = new Map<string, CompiledQuery>();
+  private readonly queryCompiler = new QueryCompiler();
   private readonly projectionMapperCache = new Map<new (...args: any[]) => any, ProjectionMapper<any>>();
 
   constructor(deps: DerivedQueryHandlerDeps<T>) {
@@ -76,6 +81,30 @@ export class DerivedQueryHandler<T> {
       this.descriptorCache.set(methodName, descriptor);
     }
     return descriptor;
+  }
+
+  /**
+   * Returns a compiled query for the given method name.
+   * Compiles on first access, then caches for subsequent calls.
+   */
+  getCompiledQuery(methodName: string): CompiledQuery {
+    let compiled = this.compiledQueryCache.get(methodName);
+    if (!compiled) {
+      const descriptor = this.getCachedDescriptor(methodName);
+      compiled = this.queryCompiler.compile(descriptor, this.metadata);
+      this.compiledQueryCache.set(methodName, compiled);
+    }
+    return compiled;
+  }
+
+  /**
+   * Pre-compile a list of derived method names at repository creation time.
+   * This shifts the parsing + SQL generation cost to startup instead of first call.
+   */
+  precompile(methodNames: string[]): void {
+    for (const name of methodNames) {
+      this.getCompiledQuery(name);
+    }
   }
 
   getCachedProjectionMapper<P>(projectionClass: new (...args: any[]) => P): ProjectionMapper<P> {
@@ -144,9 +173,14 @@ export class DerivedQueryHandler<T> {
   createDerivedStreamMethod(prop: string): (...args: unknown[]) => AsyncIterable<any> {
     const baseName = prop.slice(0, -"Stream".length);
     const handler = this;
+    // Pre-compile the query for this stream method
+    const compiled = handler.getCompiledQuery(baseName);
     return (...args: unknown[]) => {
       const descriptor = handler.getCachedDescriptor(baseName);
-      const builtQuery = buildDerivedQuery(descriptor, handler.metadata, args, handler.getTenantCriteria());
+      const tenantCriteria = handler.getTenantCriteria();
+      const builtQuery = tenantCriteria
+        ? buildDerivedQuery(descriptor, handler.metadata, args, tenantCriteria)
+        : bindCompiledQuery(compiled, args);
 
       return {
         [Symbol.asyncIterator](): AsyncIterator<any> {
@@ -208,6 +242,8 @@ export class DerivedQueryHandler<T> {
 
   createDerivedMethod(prop: string): (...args: unknown[]) => Promise<any> {
     const handler = this;
+    // Pre-compile the query for this method
+    const compiled = handler.getCompiledQuery(prop);
     return async (...args: unknown[]) => {
       const descriptor = handler.getCachedDescriptor(prop);
 
@@ -219,7 +255,11 @@ export class DerivedQueryHandler<T> {
         queryArgs = args.slice(0, -1);
       }
 
-      const query = buildDerivedQuery(descriptor, handler.metadata, queryArgs, handler.getTenantCriteria());
+      // Use compiled query fast path when no tenant criteria is active
+      const tenantCriteria = handler.getTenantCriteria();
+      const query = tenantCriteria
+        ? buildDerivedQuery(descriptor, handler.metadata, queryArgs, tenantCriteria)
+        : bindCompiledQuery(compiled, queryArgs);
 
       if (descriptor.action === "delete") {
         const conn = await handler.dataSource.getConnection();

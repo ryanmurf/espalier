@@ -1416,6 +1416,9 @@ export function createDerivedRepository<T, ID>(
     "toLocaleString",
   ]);
 
+  // Cache derived method closures to avoid re-creating on every proxy access
+  const derivedMethodCache = new Map<string, (...args: any[]) => any>();
+
   return new Proxy(crudMethods as CrudRepository<T, ID> & Record<string, (...args: any[]) => Promise<any>>, {
     get(target, prop, receiver) {
       if (typeof prop === "symbol") {
@@ -1450,13 +1453,21 @@ export function createDerivedRepository<T, ID>(
         return Reflect.get(target, prop, receiver);
       }
 
+      // Check derived method cache first
+      const cached = derivedMethodCache.get(prop);
+      if (cached) return cached;
+
       // Derived streaming query
       if (prop.endsWith("Stream") && prop.startsWith("find")) {
-        return derivedQueryHandler.createDerivedStreamMethod(prop);
+        const method = derivedQueryHandler.createDerivedStreamMethod(prop);
+        derivedMethodCache.set(prop, method);
+        return method;
       }
 
-      // Derived query method
-      return derivedQueryHandler.createDerivedMethod(prop);
+      // Derived query method — compile and cache
+      const method = derivedQueryHandler.createDerivedMethod(prop);
+      derivedMethodCache.set(prop, method);
+      return method;
     },
   });
 }
