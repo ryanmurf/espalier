@@ -173,6 +173,12 @@ export type {
 } from "./migration/migration.js";
 export { DEFAULT_MIGRATION_TABLE, DEFAULT_SCHEMA } from "./migration/migration.js";
 
+export type { DeprecatedOptions } from "./decorators/deprecated.js";
+export { Deprecated, getDeprecatedFields, isDeprecatedField } from "./decorators/deprecated.js";
+
+export type { ExpandContractMigration } from "./migration/expand-contract.js";
+export { generateExpandContractMigration } from "./migration/expand-contract.js";
+
 export type { TenantIdentifier } from "./tenant/index.js";
 export { TenantContext, NoTenantException } from "./tenant/index.js";
 
