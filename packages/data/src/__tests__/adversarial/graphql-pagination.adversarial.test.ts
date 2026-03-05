@@ -21,7 +21,7 @@ describe("OffsetPaginationAdapter — adversarial", () => {
   describe("generateSharedTypes", () => {
     it("produces PageInfo type with required fields", () => {
       const sdl = adapter.generateSharedTypes();
-      expect(sdl).toContain("type PageInfo");
+      expect(sdl).toContain("type OffsetPageInfo");
       expect(sdl).toContain("hasNextPage: Boolean!");
       expect(sdl).toContain("hasPreviousPage: Boolean!");
       expect(sdl).toContain("totalElements: Int!");
@@ -36,7 +36,7 @@ describe("OffsetPaginationAdapter — adversarial", () => {
       const sdl = adapter.generateConnectionType("User");
       expect(sdl).toContain("type UserOffsetConnection");
       expect(sdl).toContain("content: [User!]!");
-      expect(sdl).toContain("pageInfo: PageInfo!");
+      expect(sdl).toContain("pageInfo: OffsetPageInfo!");
     });
 
     it("works with any type name", () => {
@@ -307,9 +307,9 @@ describe("KeysetPaginationAdapter — adversarial", () => {
       expect(() => adapter.mapResolverArgs({})).toThrow("sortColumn is required");
     });
 
-    it("invalid sortDirection — uppercased but not validated", () => {
-      const result = adapter.mapResolverArgs({ sortColumn: "x", sortDirection: "INVALID" });
-      expect(result.sortDirection).toBe("INVALID");
+    it("invalid sortDirection — throws validation error", () => {
+      expect(() => adapter.mapResolverArgs({ sortColumn: "x", sortDirection: "INVALID" }))
+        .toThrow("Invalid sortDirection");
     });
   });
 
@@ -397,9 +397,9 @@ describe("Cross-adapter SDL — adversarial", () => {
     const offsetSdl = offset.generateSharedTypes();
     const relaySdl = relay.generateSharedTypes();
     // Verify they use different type names
-    expect(offsetSdl).toContain("type PageInfo");
+    expect(offsetSdl).toContain("type OffsetPageInfo");
     expect(relaySdl).toContain("type RelayPageInfo");
-    expect(relaySdl).not.toContain("type PageInfo {");
+    expect(relaySdl).not.toContain("type OffsetPageInfo");
   });
 
   it("offset OffsetConnection vs relay Connection — no collision", () => {

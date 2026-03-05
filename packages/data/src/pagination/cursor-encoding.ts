@@ -48,14 +48,47 @@ export function encodeCursor(payload: CursorPayload): string {
  * Decode a base64 cursor string back to a CursorPayload.
  * @throws Error if the cursor is invalid.
  */
+function isPrimitive(value: unknown): boolean {
+  if (value === null) return true;
+  const t = typeof value;
+  return t === "string" || t === "number" || t === "boolean";
+}
+
 export function decodeCursor(cursor: string): CursorPayload {
   try {
     const json = base64ToUtf8(cursor);
     const parsed = JSON.parse(json);
-    if (!parsed || !Array.isArray(parsed.values) || parsed.id === undefined) {
+
+    // Must be a plain object (not array, null, primitive)
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
       throw new Error("Invalid cursor structure");
     }
-    return parsed as CursorPayload;
+
+    // Only allow known keys to prevent prototype pollution
+    const keys = Object.keys(parsed);
+    for (const key of keys) {
+      if (key !== "values" && key !== "id") {
+        throw new Error("Invalid cursor structure");
+      }
+    }
+
+    if (!Array.isArray(parsed.values)) {
+      throw new Error("Invalid cursor structure");
+    }
+
+    // Values must be an array of primitives (no nested objects)
+    for (const v of parsed.values) {
+      if (!isPrimitive(v)) {
+        throw new Error("Invalid cursor structure");
+      }
+    }
+
+    // id must be present and a primitive (or null)
+    if (!("id" in parsed) || !isPrimitive(parsed.id)) {
+      throw new Error("Invalid cursor structure");
+    }
+
+    return { values: parsed.values, id: parsed.id };
   } catch (err) {
     if (err instanceof Error && err.message === "Invalid cursor structure") {
       throw err;

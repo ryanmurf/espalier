@@ -41,13 +41,14 @@ describe("OffsetPaginationStrategy — adversarial", () => {
       expect(q.params).toContain(size);
     });
 
-    it("page size of MAX_SAFE_INTEGER does not throw", () => {
+    it("page size of MAX_SAFE_INTEGER is clamped to maxPageSize", () => {
       const builder = new SelectBuilder("t").columns("id");
       expect(() => {
         strategy.applyToQuery(builder, createPageable(0, Number.MAX_SAFE_INTEGER));
       }).not.toThrow();
       const q = builder.build();
-      expect(q.params).toContain(Number.MAX_SAFE_INTEGER);
+      // Clamped to default maxPageSize of 1000
+      expect(q.params).toContain(1000);
     });
 
     it("sort with empty array produces no ORDER BY", () => {

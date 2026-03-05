@@ -57,8 +57,9 @@ interface ConnectionCache {
  * PreparedStatement is reused instead of creating a new one. When the cache exceeds
  * maxStatementsPerConnection, the least recently used statement is evicted and closed.
  *
- * This pool tracks connections via WeakRef to avoid memory leaks. Dead connections
- * are cleaned up lazily during metric collection or explicit cleanup.
+ * This pool tracks connections via a strong-reference Map keyed by Connection.
+ * Callers must use clearConnection() or clearAll() to release entries when
+ * connections are closed, to avoid retaining stale references.
  */
 export class PreparedStatementPool {
   private readonly maxSize: number;

@@ -14,6 +14,14 @@ export interface KeysetStrategyOptions {
    * Default: "id".
    */
   idField?: string;
+  /** Maximum allowed page size. Default: 1000. */
+  maxPageSize?: number;
+  /**
+   * Allowlist of sort column names. If provided, sortColumn is validated
+   * against this set. If not provided, sortColumn is validated to contain
+   * only alphanumeric and underscore characters.
+   */
+  allowedSortColumns?: Set<string>;
 }
 
 /**
@@ -35,14 +43,19 @@ export class KeysetPaginationStrategy
 
   private readonly idColumn: string;
   private readonly idField: string;
+  private readonly maxPageSize: number;
+  private readonly allowedSortColumns: Set<string> | undefined;
 
   constructor(options: KeysetStrategyOptions) {
     this.idColumn = options.idColumn;
     this.idField = options.idField ?? "id";
+    this.maxPageSize = options.maxPageSize ?? 1000;
+    this.allowedSortColumns = options.allowedSortColumns;
   }
 
   applyToQuery(builder: SelectBuilder, request: KeysetPageable): void {
     const sortCol = request.sortColumn;
+    this.validateSortColumn(sortCol);
     const sortDir = request.sortDirection;
 
     if (request.afterValue != null && request.afterId != null) {
@@ -61,14 +74,28 @@ export class KeysetPaginationStrategy
       builder.orderBy(this.idColumn, sortDir);
     }
 
-    // Fetch one extra row to determine hasNext
-    builder.limit(request.size + 1);
+    // Fetch one extra row to determine hasNext; clamp to maxPageSize
+    const size = Math.min(request.size, this.maxPageSize);
+    builder.limit(size + 1);
+  }
+
+  private validateSortColumn(sortColumn: string): void {
+    if (this.allowedSortColumns) {
+      if (!this.allowedSortColumns.has(sortColumn)) {
+        throw new Error(`Invalid sortColumn: ${JSON.stringify(sortColumn)}`);
+      }
+    } else {
+      if (!sortColumn || !/^[a-zA-Z0-9_]+$/.test(sortColumn)) {
+        throw new Error(`Invalid sortColumn: ${JSON.stringify(sortColumn)}`);
+      }
+    }
   }
 
   buildResult<T>(rows: T[], request: KeysetPageable, _totalCount: number): KeysetPage<T> {
-    const hasNext = rows.length > request.size;
+    const size = Math.min(request.size, this.maxPageSize);
+    const hasNext = rows.length > size;
     if (hasNext) {
-      rows = rows.slice(0, request.size);
+      rows = rows.slice(0, size);
     }
 
     const lastRow = rows.length > 0 ? rows[rows.length - 1] : null;
@@ -81,7 +108,7 @@ export class KeysetPaginationStrategy
 
     return {
       content: rows,
-      size: request.size,
+      size,
       hasNext,
       lastValue,
       lastId,

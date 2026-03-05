@@ -88,10 +88,12 @@ export function bindCompiledQuery(
       const arr = args[binding.argIndex] as SqlValue[];
       const arrLen = Array.isArray(arr) ? arr.length : 0;
 
-      // Find the placeholder pattern "IN ($N)" using the TEMPLATE index
-      const placeholderPattern = `IN ($${templateParamIdx})`;
-      const idx = sql.indexOf(placeholderPattern, lastPos);
-      if (idx !== -1) {
+      // Use regex to match exactly "IN ($N)" without matching $N0, $N1, etc.
+      const inPattern = new RegExp(`IN \\(\\$${templateParamIdx}\\)`, "g");
+      inPattern.lastIndex = lastPos;
+      const inMatch = inPattern.exec(sql);
+      if (inMatch !== null) {
+        const idx = inMatch.index;
         segments.push(sql.slice(lastPos, idx));
         if (arrLen === 0) {
           segments.push("IN (NULL)");
@@ -101,16 +103,18 @@ export function bindCompiledQuery(
           params.push(...arr);
           outputParamIdx += arrLen;
         }
-        lastPos = idx + placeholderPattern.length;
+        lastPos = idx + inMatch[0].length;
       }
     } else {
-      // For non-spread bindings, replace the template placeholder with output index
-      const templatePlaceholder = `$${templateParamIdx}`;
-      const idx = sql.indexOf(templatePlaceholder, lastPos);
-      if (idx !== -1) {
+      // Use regex to match exactly $N without matching $N0, $N1, etc.
+      const paramPattern = new RegExp(`\\$${templateParamIdx}(?!\\d)`, "g");
+      paramPattern.lastIndex = lastPos;
+      const paramMatch = paramPattern.exec(sql);
+      if (paramMatch !== null) {
+        const idx = paramMatch.index;
         segments.push(sql.slice(lastPos, idx));
         segments.push(`$${outputParamIdx}`);
-        lastPos = idx + templatePlaceholder.length;
+        lastPos = idx + paramMatch[0].length;
       }
       params.push(applyTransform(args[binding.argIndex], binding.transform));
       outputParamIdx++;
@@ -127,6 +131,17 @@ export function bindCompiledQuery(
   return { sql, params };
 }
 
+/**
+ * Escape LIKE metacharacters in a user-supplied value.
+ * Prevents wildcard injection by escaping %, _, and \.
+ */
+function escapeLikeValue(value: unknown): string {
+  return String(value)
+    .replace(/\\/g, "\\\\")
+    .replace(/%/g, "\\%")
+    .replace(/_/g, "\\_");
+}
+
 function applyTransform(
   arg: unknown,
   transform: ParamBinding["transform"],
@@ -135,11 +150,11 @@ function applyTransform(
     case "identity":
       return arg as SqlValue;
     case "prefix-wildcard":
-      return `%${arg}` as SqlValue;
+      return `%${escapeLikeValue(arg)}` as SqlValue;
     case "suffix-wildcard":
-      return `${arg}%` as SqlValue;
+      return `${escapeLikeValue(arg)}%` as SqlValue;
     case "wrap-wildcard":
-      return `%${arg}%` as SqlValue;
+      return `%${escapeLikeValue(arg)}%` as SqlValue;
     case "spread":
       // Should not reach here in the fast path
       return arg as SqlValue;

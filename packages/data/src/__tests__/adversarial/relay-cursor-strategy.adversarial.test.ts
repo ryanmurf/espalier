@@ -50,10 +50,10 @@ describe("cursor encoding — adversarial", () => {
     expect(decoded.id).toBe(99);
   });
 
-  it("round-trips payload with nested object values", () => {
-    const payload: CursorPayload = { values: [{ nested: true }], id: 1 };
-    const decoded = decodeCursor(encodeCursor(payload));
-    expect(decoded.values[0]).toEqual({ nested: true });
+  it("rejects payload with nested object values", () => {
+    const payload: CursorPayload = { values: [{ nested: true }] as any, id: 1 };
+    const cursor = encodeCursor(payload);
+    expect(() => decodeCursor(cursor)).toThrow("Invalid cursor structure");
   });
 
   it("round-trips payload with unicode string values", () => {
@@ -123,13 +123,10 @@ describe("cursor encoding — adversarial", () => {
     // This is expected — no tamper detection
   });
 
-  it("cursor with extra fields — accepted (no strict schema)", () => {
+  it("cursor with extra fields — rejected (strict validation)", () => {
     const payload = { values: [1], id: 1, evil: "injection" };
     const encoded = Buffer.from(JSON.stringify(payload), "utf-8").toString("base64");
-    const decoded = decodeCursor(encoded);
-    expect(decoded.values).toEqual([1]);
-    expect(decoded.id).toBe(1);
-    expect((decoded as any).evil).toBe("injection");
+    expect(() => decodeCursor(encoded)).toThrow("Invalid cursor structure");
   });
 });
 

@@ -317,7 +317,7 @@ describe("GraphQL pagination adapter + strategy integration", () => {
     const conn = adapter.generateConnectionType("User");
     const args = adapter.generateQueryArgs();
 
-    expect(shared).toContain("type PageInfo");
+    expect(shared).toContain("type OffsetPageInfo");
     expect(conn).toContain("type UserOffsetConnection");
     expect(conn).toContain("content: [User!]!");
     expect(args).toContain("page: Int = 0");

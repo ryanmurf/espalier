@@ -276,7 +276,7 @@ describe("GraphQLSchemaGenerator — basic schema", () => {
 
   it("generates pagination types by default", () => {
     const schema = generator.generate([MinimalEntity]);
-    expect(schema.sdl).toContain("type PageInfo");
+    expect(schema.sdl).toContain("type OffsetPageInfo");
     expect(schema.sdl).toContain("type MinimalEntityOffsetConnection");
   });
 });
@@ -812,6 +812,6 @@ describe("GraphQLSchemaGenerator — SDL structure", () => {
   it("Connection type has content and pageInfo", () => {
     const schema = generator.generate([MinimalEntity]);
     expect(schema.sdl).toContain("content: [MinimalEntity!]!");
-    expect(schema.sdl).toContain("pageInfo: PageInfo!");
+    expect(schema.sdl).toContain("pageInfo: OffsetPageInfo!");
   });
 });

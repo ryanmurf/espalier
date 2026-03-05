@@ -147,7 +147,14 @@ export class GraphQLSchemaGenerator {
         const adapter = this.getAdapterForEntity(entityClass);
         entityAdapters.set(typeName, adapter);
         const args = adapter.generateQueryArgs();
-        const resultType = adapter.name === "keyset" ? `${typeName}KeysetPage` : `${typeName}Connection`;
+        let resultType: string;
+        if (adapter.name === "keyset") {
+          resultType = `${typeName}KeysetPage`;
+        } else if (adapter.name === "offset") {
+          resultType = `${typeName}OffsetConnection`;
+        } else {
+          resultType = `${typeName}Connection`;
+        }
         queryFields.push(`  ${camelCase(typeName)}s(${args}): ${resultType}!`);
       } else {
         queryFields.push(`  ${camelCase(typeName)}s: [${typeName}!]!`);

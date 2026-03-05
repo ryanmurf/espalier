@@ -10,6 +10,7 @@ export type {
 } from "./types.js";
 
 export { OffsetPaginationStrategy } from "./offset-strategy.js";
+export type { OffsetStrategyOptions } from "./offset-strategy.js";
 
 export { encodeCursor, decodeCursor } from "./cursor-encoding.js";
 export type { CursorPayload } from "./cursor-encoding.js";

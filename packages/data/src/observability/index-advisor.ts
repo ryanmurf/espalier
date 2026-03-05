@@ -1,5 +1,5 @@
 import type { QueryPlan, PlanNode, PlanWarning } from "espalier-jdbc";
-import { PlanAdvisor } from "espalier-jdbc";
+import { PlanAdvisor, quoteIdentifier } from "espalier-jdbc";
 import type { PlanAdvisorConfig } from "espalier-jdbc";
 
 /**
@@ -35,6 +35,8 @@ export interface IndexAdvisorConfig extends PlanAdvisorConfig {
   minRowsForSuggestion?: number;
   /** Known existing indexes to skip (table.column format). */
   existingIndexes?: Set<string>;
+  /** Maximum cached suggestions before dropping oldest. Default: 500. */
+  maxCachedSuggestions?: number;
 }
 
 /**
@@ -48,11 +50,13 @@ export class IndexAdvisor {
   private readonly minRows: number;
   private readonly existingIndexes: Set<string>;
   private readonly cachedSuggestions: IndexSuggestion[] = [];
+  private readonly maxCachedSuggestions: number;
 
   constructor(config?: IndexAdvisorConfig) {
     this.planAdvisor = new PlanAdvisor(config);
     this.minRows = config?.minRowsForSuggestion ?? 1000;
     this.existingIndexes = config?.existingIndexes ?? new Set();
+    this.maxCachedSuggestions = config?.maxCachedSuggestions ?? 500;
   }
 
   /**
@@ -86,7 +90,14 @@ export class IndexAdvisor {
       }
     }
 
-    this.cachedSuggestions.push(...unique);
+    // Enforce max cache size — drop oldest entries if needed
+    const available = this.maxCachedSuggestions - this.cachedSuggestions.length;
+    if (available <= 0) {
+      // Cache is full, don't accumulate more
+      return unique;
+    }
+    const toAdd = unique.slice(0, available);
+    this.cachedSuggestions.push(...toAdd);
     return unique;
   }
 
@@ -230,9 +241,9 @@ export class IndexAdvisor {
     estimatedImprovement: string,
   ): IndexSuggestion {
     const indexName = `idx_${table}_${columns.join("_")}`;
-    const colList = columns.map((c) => `"${c}"`).join(", ");
+    const colList = columns.map((c) => quoteIdentifier(c)).join(", ");
     const usingClause = indexType !== "btree" ? ` USING ${indexType}` : "";
-    const ddl = `CREATE INDEX IF NOT EXISTS "${indexName}" ON "${table}"${usingClause} (${colList});`;
+    const ddl = `CREATE INDEX IF NOT EXISTS ${quoteIdentifier(indexName)} ON ${quoteIdentifier(table)}${usingClause} (${colList});`;
 
     return { table, columns, indexType, severity, reason, estimatedImprovement, ddl };
   }

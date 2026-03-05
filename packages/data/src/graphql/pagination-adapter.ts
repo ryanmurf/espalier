@@ -38,8 +38,14 @@ export interface GraphQLPaginationAdapter {
 export class OffsetPaginationAdapter implements GraphQLPaginationAdapter {
   readonly name = "offset";
 
+  private readonly maxPageSize: number;
+
+  constructor(options?: { maxPageSize?: number }) {
+    this.maxPageSize = options?.maxPageSize ?? 1000;
+  }
+
   generateSharedTypes(): string {
-    return `type PageInfo {
+    return `type OffsetPageInfo {
   hasNextPage: Boolean!
   hasPreviousPage: Boolean!
   totalElements: Int!
@@ -52,7 +58,7 @@ export class OffsetPaginationAdapter implements GraphQLPaginationAdapter {
   generateConnectionType(typeName: string): string {
     return `type ${typeName}OffsetConnection {
   content: [${typeName}!]!
-  pageInfo: PageInfo!
+  pageInfo: OffsetPageInfo!
 }`;
   }
 
@@ -66,13 +72,14 @@ export class OffsetPaginationAdapter implements GraphQLPaginationAdapter {
     sort?: string;
   } {
     const page = args.page != null ? Number(args.page) : 0;
-    const size = args.size != null ? Number(args.size) : 20;
+    let size = args.size != null ? Number(args.size) : 20;
     if (!Number.isFinite(page) || page < 0) {
       throw new Error(`Invalid page: ${JSON.stringify(args.page)}`);
     }
     if (!Number.isFinite(size) || size < 1) {
       throw new Error(`Invalid size: ${JSON.stringify(args.size)}`);
     }
+    size = Math.min(size, this.maxPageSize);
     return {
       page,
       size,
@@ -110,6 +117,12 @@ export class OffsetPaginationAdapter implements GraphQLPaginationAdapter {
  */
 export class RelayCursorPaginationAdapter implements GraphQLPaginationAdapter {
   readonly name = "cursor";
+
+  private readonly maxPageSize: number;
+
+  constructor(options?: { maxPageSize?: number }) {
+    this.maxPageSize = options?.maxPageSize ?? 1000;
+  }
 
   generateSharedTypes(): string {
     return `type RelayPageInfo {
@@ -150,9 +163,9 @@ type ${typeName}Connection {
       throw new Error(`Invalid last: ${JSON.stringify(args.last)}`);
     }
     return {
-      first: args.first != null ? Number(args.first) : undefined,
+      first: args.first != null ? Math.min(Number(args.first), this.maxPageSize) : undefined,
       after: args.after as string | undefined,
-      last: args.last != null ? Number(args.last) : undefined,
+      last: args.last != null ? Math.min(Number(args.last), this.maxPageSize) : undefined,
       before: args.before as string | undefined,
     };
   }
@@ -168,6 +181,12 @@ type ${typeName}Connection {
  */
 export class KeysetPaginationAdapter implements GraphQLPaginationAdapter {
   readonly name = "keyset";
+
+  private readonly maxPageSize: number;
+
+  constructor(options?: { maxPageSize?: number }) {
+    this.maxPageSize = options?.maxPageSize ?? 1000;
+  }
 
   generateSharedTypes(): string {
     return ""; // No shared types needed beyond entity-specific ones
@@ -194,17 +213,22 @@ export class KeysetPaginationAdapter implements GraphQLPaginationAdapter {
     afterValue?: string;
     afterId?: string;
   } {
-    const size = args.size != null ? Number(args.size) : 20;
+    let size = args.size != null ? Number(args.size) : 20;
     if (!Number.isFinite(size) || size < 1) {
       throw new Error(`Invalid size: ${JSON.stringify(args.size)}`);
     }
+    size = Math.min(size, this.maxPageSize);
     if (!args.sortColumn || typeof args.sortColumn !== "string") {
       throw new Error(`sortColumn is required and must be a string`);
+    }
+    const sortDirection = ((args.sortDirection as string) ?? "ASC").toUpperCase();
+    if (sortDirection !== "ASC" && sortDirection !== "DESC") {
+      throw new Error(`Invalid sortDirection: ${JSON.stringify(args.sortDirection)}`);
     }
     return {
       size,
       sortColumn: args.sortColumn,
-      sortDirection: ((args.sortDirection as string) ?? "ASC").toUpperCase() as "ASC" | "DESC",
+      sortDirection: sortDirection as "ASC" | "DESC",
       afterValue: args.afterValue as string | undefined,
       afterId: args.afterId as string | undefined,
     };
