@@ -5,7 +5,7 @@ export interface ParsedArgs {
   flags: Record<string, string | boolean>;
 }
 
-const VALUED_FLAGS = new Set(["config", "dir", "to"]);
+const VALUED_FLAGS = new Set(["config", "dir", "to", "env"]);
 
 export function parseArgs(argv: string[]): ParsedArgs {
   // Skip node and script path
@@ -55,9 +55,15 @@ Commands:
   migrate down [steps]     Roll back migrations
   migrate status           Show migration status
 
+  seed run                 Run all pending seeds
+  seed status              Show seed execution status
+  seed reset               Reset seed tracking and re-run all
+
 Options:
   --config <path>          Path to config file (default: espalier.config.json)
-  --dir <path>             Migrations directory override
+  --dir <path>             Migrations/seeds directory override
+  --env <env>              Environment for seed filtering (default: development)
+  --reset                  Reset seed tracking before running
   --help                   Show this help message
 `;
 }

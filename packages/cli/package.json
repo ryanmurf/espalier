@@ -35,12 +35,14 @@
   "peerDependencies": {
     "espalier-jdbc-pg": "workspace:*",
     "espalier-jdbc-mysql": "workspace:*",
-    "espalier-jdbc-sqlite": "workspace:*"
+    "espalier-jdbc-sqlite": "workspace:*",
+    "espalier-testing": "workspace:*"
   },
   "peerDependenciesMeta": {
     "espalier-jdbc-pg": { "optional": true },
     "espalier-jdbc-mysql": { "optional": true },
-    "espalier-jdbc-sqlite": { "optional": true }
+    "espalier-jdbc-sqlite": { "optional": true },
+    "espalier-testing": { "optional": true }
   },
   "devDependencies": {
     "@types/node": "^25.0.0",

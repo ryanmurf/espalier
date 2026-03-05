@@ -9,8 +9,15 @@
 export { EntityFactory, createFactory } from "./factory/entity-factory.js";
 export type { FactoryOptions, PersistFn } from "./factory/entity-factory.js";
 
-// Seeding framework (placeholder)
-export { Seeder } from "./seeding/seeder.js";
+// Seeding framework
+export {
+  SeedRunner,
+  defineSeed,
+  getRegisteredSeeds,
+  clearSeedRegistry,
+  runSeeds,
+} from "./seeding/seeder.js";
+export type { SeedContext, SeedDefinition, SeedRecord, SeedRunResult } from "./seeding/seeder.js";
 
 // Test isolation
 export { withTestTransaction, withNestedTransaction } from "./isolation/test-transaction.js";
