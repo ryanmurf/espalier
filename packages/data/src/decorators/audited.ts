@@ -32,9 +32,12 @@ export function Audited(options?: AuditedOptions) {
     target: TClass,
     _context: ClassDecoratorContext<TClass>,
   ): TClass {
-    auditedMetadata.set(target, {
-      fields: options?.fields,
-    });
+    // Normalize: empty array → undefined (audit all), dedupe field names
+    const rawFields = options?.fields;
+    const fields = rawFields && rawFields.length > 0
+      ? [...new Set(rawFields)]
+      : undefined;
+    auditedMetadata.set(target, { fields });
     return target;
   };
 }
@@ -45,7 +48,8 @@ export function Audited(options?: AuditedOptions) {
 export function getAuditedMetadata(
   target: object,
 ): AuditedMetadataEntry | undefined {
-  return auditedMetadata.get(target);
+  const entry = auditedMetadata.get(target);
+  return entry ? { fields: entry.fields ? [...entry.fields] : undefined } : undefined;
 }
 
 /**

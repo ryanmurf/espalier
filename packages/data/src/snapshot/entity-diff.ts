@@ -21,20 +21,40 @@ export interface DiffResult {
   readonly snapshotB: Date;
 }
 
-function deepEqual(a: unknown, b: unknown): boolean {
+function deepEqual(a: unknown, b: unknown, seen = new Set<object>()): boolean {
   if (a === b) return true;
   if (typeof a === "number" && typeof b === "number" && Number.isNaN(a) && Number.isNaN(b)) return true;
-  if (a == null || b == null) return false;
+  if (a == null || b == null) return a === b;
   if (typeof a !== typeof b) return false;
-
   if (typeof a !== "object") return false;
 
-  // For objects/arrays, use JSON comparison as a pragmatic deep equality check
-  try {
-    return JSON.stringify(a) === JSON.stringify(b);
-  } catch {
-    return false;
+  // Date comparison
+  if (a instanceof Date && b instanceof Date) return a.getTime() === b.getTime();
+
+  // Circular reference guard
+  const objA = a as object;
+  const objB = b as object;
+  if (seen.has(objA)) return true; // treat circular as equal to prevent infinite loop
+  seen.add(objA);
+
+  // Array comparison
+  if (Array.isArray(a)) {
+    if (!Array.isArray(b) || a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+      if (!deepEqual(a[i], b[i], seen)) return false;
+    }
+    return true;
   }
+
+  // Object comparison — handles undefined values correctly (unlike JSON.stringify)
+  const keysA = Object.keys(objA as Record<string, unknown>);
+  const keysB = Object.keys(objB as Record<string, unknown>);
+  if (keysA.length !== keysB.length) return false;
+  for (const key of keysA) {
+    if (!Object.prototype.hasOwnProperty.call(objB, key)) return false;
+    if (!deepEqual((objA as any)[key], (objB as any)[key], seen)) return false;
+  }
+  return true;
 }
 
 /**

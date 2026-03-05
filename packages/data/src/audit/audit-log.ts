@@ -47,20 +47,26 @@ VALUES ($1, $2, $3, $4, $5, $6)`;
  * Writes audit entries to the `espalier_audit_log` table.
  */
 export class AuditLogWriter {
-  private tableEnsured = false;
+  private tableEnsuredPromise: Promise<void> | undefined;
 
   /**
    * Creates the audit log table if it does not already exist.
+   * Uses promise deduplication to prevent redundant DDL under concurrency.
    */
   async ensureTable(conn: Connection): Promise<void> {
-    if (this.tableEnsured) return;
-    const stmt = conn.prepareStatement(CREATE_TABLE_SQL);
-    try {
-      await stmt.executeUpdate();
-      this.tableEnsured = true;
-    } finally {
-      await stmt.close().catch(() => {});
-    }
+    if (this.tableEnsuredPromise) return this.tableEnsuredPromise;
+    this.tableEnsuredPromise = (async () => {
+      const stmt = conn.prepareStatement(CREATE_TABLE_SQL);
+      try {
+        await stmt.executeUpdate();
+      } catch (err) {
+        this.tableEnsuredPromise = undefined; // Allow retry on failure
+        throw err;
+      } finally {
+        await stmt.close().catch(() => {});
+      }
+    })();
+    return this.tableEnsuredPromise;
   }
 
   /**

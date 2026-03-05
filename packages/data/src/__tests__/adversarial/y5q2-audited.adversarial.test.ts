@@ -83,19 +83,14 @@ describe("@Audited decorator — metadata", () => {
   // 2. @Audited with empty fields array
   // ══════════════════════════════════════════════════════
 
-  it("empty fields array: metadata stores empty array (ambiguous — audit nothing?)", () => {
+  it("empty fields array: normalized to undefined (audit all)", () => {
     @Audited({ fields: [] })
     class EmptyFieldsEntity {}
 
     const meta = getAuditedMetadata(EmptyFieldsEntity);
     expect(meta).toBeDefined();
-    // BUG: Empty array is stored as-is. Downstream code that checks
-    // `meta.fields === undefined` to mean "audit all" would treat
-    // empty array as "audit only these (zero) fields" — i.e., audit NOTHING.
-    // But the code never validates or warns about this edge case.
-    // Whether this is intentional or a bug depends on design intent.
-    expect(meta!.fields).toEqual([]);
-    expect(meta!.fields).not.toBeUndefined();
+    // FIXED: Empty array is normalized to undefined, meaning "audit all fields"
+    expect(meta!.fields).toBeUndefined();
   });
 
   // ══════════════════════════════════════════════════════
@@ -632,14 +627,13 @@ describe("@Audited edge cases", () => {
     expect(meta!.fields).toBeUndefined();
   });
 
-  it("@Audited fields with duplicate entries: stored as-is (no dedup)", () => {
+  it("@Audited fields with duplicate entries: deduplicated", () => {
     @Audited({ fields: ["name", "name", "name"] })
     class DupFields {}
 
     const meta = getAuditedMetadata(DupFields);
-    expect(meta!.fields).toEqual(["name", "name", "name"]);
-    // BUG (minor): No deduplication of field names. This could cause
-    // the same field to be audited multiple times in downstream code.
+    // FIXED: Duplicates are now removed at registration time
+    expect(meta!.fields).toEqual(["name"]);
   });
 
   it("@Audited fields with special characters: stored as-is", () => {
