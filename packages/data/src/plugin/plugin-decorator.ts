@@ -33,3 +33,11 @@ export function getPluginMetadata(target: new (...args: any[]) => any): PluginMe
 export function getDiscoveredPlugins(): ReadonlySet<new (...args: any[]) => any> {
   return discoveredPlugins;
 }
+
+/**
+ * Clear all discovered plugins. Useful for test cleanup to prevent state leaking
+ * across test modules.
+ */
+export function clearDiscoveredPlugins(): void {
+  discoveredPlugins.clear();
+}

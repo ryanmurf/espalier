@@ -11,6 +11,8 @@ export class PluginManager {
   private readonly plugins = new Map<string, Plugin>();
   private readonly hooks = new Map<HookType, PluginHook[]>();
   private readonly middlewares: MiddlewareFn[] = [];
+  private readonly pluginHooks = new Map<string, PluginHook[]>();
+  private readonly pluginMiddlewares = new Map<string, MiddlewareFn[]>();
   private readonly eventBus: EventBus;
   private initialized = false;
 
@@ -42,10 +44,11 @@ export class PluginManager {
     const ordered = this.resolveDependencyOrder();
 
     for (const plugin of ordered) {
-      const context = this.createContext();
+      const context = this.createContext(plugin.name);
       await plugin.init(context);
     }
 
+    this.rebuildMergedCollections();
     this.initialized = true;
   }
 
@@ -63,6 +66,8 @@ export class PluginManager {
 
     this.hooks.clear();
     this.middlewares.length = 0;
+    this.pluginHooks.clear();
+    this.pluginMiddlewares.clear();
     this.plugins.clear();
     this.initialized = false;
   }
@@ -115,24 +120,58 @@ export class PluginManager {
     return this.initialized;
   }
 
-  private createContext(): PluginContext {
+  /**
+   * Remove a single plugin and its hooks/middleware. Calls plugin.destroy() if available.
+   */
+  async removePlugin(name: string): Promise<void> {
+    const plugin = this.plugins.get(name);
+    if (!plugin) return;
+
+    await plugin.destroy?.();
+    this.plugins.delete(name);
+    this.pluginHooks.delete(name);
+    this.pluginMiddlewares.delete(name);
+    this.rebuildMergedCollections();
+  }
+
+  private createContext(pluginName: string): PluginContext {
+    const perPluginHooks: PluginHook[] = [];
+    const perPluginMiddlewares: MiddlewareFn[] = [];
+    this.pluginHooks.set(pluginName, perPluginHooks);
+    this.pluginMiddlewares.set(pluginName, perPluginMiddlewares);
+
     return {
       eventBus: this.eventBus,
       getEntityMetadata: (entityClass: new (...args: any[]) => any): EntityMetadata => {
         return getEntityMetadata(entityClass);
       },
       addHook: (hook: PluginHook): void => {
+        perPluginHooks.push(hook);
+      },
+      addMiddleware: (middleware: MiddlewareFn): void => {
+        perPluginMiddlewares.push(middleware);
+      },
+    };
+  }
+
+  private rebuildMergedCollections(): void {
+    this.hooks.clear();
+    this.middlewares.length = 0;
+
+    for (const hooks of this.pluginHooks.values()) {
+      for (const hook of hooks) {
         let list = this.hooks.get(hook.type);
         if (!list) {
           list = [];
           this.hooks.set(hook.type, list);
         }
         list.push(hook);
-      },
-      addMiddleware: (middleware: MiddlewareFn): void => {
-        this.middlewares.push(middleware);
-      },
-    };
+      }
+    }
+
+    for (const mws of this.pluginMiddlewares.values()) {
+      this.middlewares.push(...mws);
+    }
   }
 
   /**

@@ -30,7 +30,9 @@ export function createPluginDecorator<TOptions = void>(
       // Called as @Decorator (no args)
       const context = contextOrUndefined as ClassFieldDecoratorContext;
       const fieldName = String(context.name);
-      // Class fields — we need to find the class via context.metadata or addInitializer
+      // TC39 field decorator addInitializer runs on instantiation (not decoration time).
+      // This is by spec — field decorators don't have access to the class constructor
+      // at decoration time. Metadata is populated on first instantiation.
       context.addInitializer(function (this: any) {
         const map = getOrCreateMap(this.constructor);
         map.set(fieldName, undefined as unknown as TOptions);
@@ -42,6 +44,7 @@ export function createPluginDecorator<TOptions = void>(
     return (target: unknown, context: ClassFieldDecoratorContext | ClassDecoratorContext) => {
       if (context.kind === "field") {
         const fieldName = String(context.name);
+        // TC39 field decorator addInitializer runs on instantiation — see comment above.
         context.addInitializer(function (this: any) {
           const map = getOrCreateMap(this.constructor);
           map.set(fieldName, options);
