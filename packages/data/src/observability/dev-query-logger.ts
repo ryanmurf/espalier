@@ -17,7 +17,11 @@ declare const process: {
 export interface DevLoggerOptions {
   /** Enable ANSI color output. Default: true (respects NO_COLOR env var). */
   colorize?: boolean;
-  /** Show parameter values interpolated into SQL. Default: true. */
+  /**
+   * Show parameter values interpolated into SQL. Default: false.
+   * @warning Enabling this in production may expose sensitive data (passwords,
+   * PII, secrets) in logs. Only enable for local development debugging.
+   */
   showParams?: boolean;
   /** Show query execution duration. Default: true. */
   showDuration?: boolean;
@@ -109,7 +113,7 @@ export class DevQueryLogger implements Logger {
 
   constructor(options?: DevLoggerOptions) {
     this.colorize = options?.colorize ?? !isNoColor();
-    this.showParams = options?.showParams ?? true;
+    this.showParams = options?.showParams ?? false;
     this.showDuration = options?.showDuration ?? true;
     this.minDurationMs = options?.minDurationMs ?? 0;
     this.level = options?.level ?? LogLevel.DEBUG;

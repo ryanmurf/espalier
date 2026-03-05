@@ -20,7 +20,7 @@ export {
 export type { SeedContext, SeedDefinition, SeedRecord, SeedRunResult } from "./seeding/seeder.js";
 
 // Test isolation
-export { withTestTransaction, withNestedTransaction } from "./isolation/test-transaction.js";
+export { withTestTransaction, withNestedTransaction, BoundEntityFactory } from "./isolation/test-transaction.js";
 export type { TestTransactionContext, TestTransactionOptions } from "./isolation/test-transaction.js";
 
 // Query log capture and assertions

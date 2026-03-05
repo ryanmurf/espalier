@@ -365,7 +365,7 @@ describe("EntityFactory — transient attributes", () => {
     const user = factory.build();
     expect(user).toBeInstanceOf(User);
     // Transient fields should not appear
-    expect((user as Record<string, unknown>)["tempField"]).toBeUndefined();
+    expect((user as unknown as Record<string, unknown>)["tempField"]).toBeUndefined();
   });
 });
 
@@ -400,9 +400,9 @@ describe("EntityFactory — afterBuild hooks", () => {
   it("multiple afterBuild hooks run in order", () => {
     const order: number[] = [];
     const factory = createFactory(User)
-      .afterBuild(() => order.push(1))
-      .afterBuild(() => order.push(2))
-      .afterBuild(() => order.push(3));
+      .afterBuild(() => { order.push(1); })
+      .afterBuild(() => { order.push(2); })
+      .afterBuild(() => { order.push(3); });
     factory.build();
     expect(order).toEqual([1, 2, 3]);
   });
@@ -686,7 +686,7 @@ describe("EntityFactory — edge cases", () => {
   it("passing extra properties in overrides (not on entity) still assigns them", () => {
     const factory = createFactory(User);
     const user = factory.build({ extraField: "value" } as Partial<User>);
-    expect((user as Record<string, unknown>)["extraField"]).toBe("value");
+    expect((user as unknown as Record<string, unknown>)["extraField"]).toBe("value");
   });
 
   it("factory defaults from options are applied", () => {

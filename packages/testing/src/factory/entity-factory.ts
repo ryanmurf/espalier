@@ -3,22 +3,33 @@ import type { EntityMetadata } from "espalier-data";
 import { getColumnMetadataEntries } from "espalier-data";
 import type { ColumnMetadataEntry } from "espalier-data";
 
-let _counter = 0;
-
 /**
- * Generate a UUID using globalThis.generateUUID() (available in
- * Node 19+, Bun, Deno, Cloudflare Workers), with a counter-based
- * fallback for environments where it's unavailable.
+ * Generate a UUID v4 using the Web Crypto API (available in Node 19+,
+ * Bun, Deno, and Cloudflare Workers). Falls back to getRandomValues-based
+ * UUID v4 construction, and as a last resort uses Math.random (test-only).
  */
+// Typed accessor for the Web Crypto API present in Node 19+, Bun, Deno, browsers
+const _crypto = (globalThis as Record<string, unknown>)['crypto'] as {
+  randomUUID?: () => string;
+  getRandomValues?: (buf: Uint8Array) => Uint8Array;
+} | undefined;
+
 function generateUUID(): string {
-  try {
-    return (globalThis as any).generateUUID();
-  } catch {
-    // Fallback: deterministic test-friendly UUID
-    _counter++;
-    const hex = _counter.toString(16).padStart(12, "0");
-    return `00000000-0000-4000-8000-${hex}`;
+  if (typeof _crypto?.randomUUID === 'function') {
+    return _crypto.randomUUID();
   }
+  // Fallback: crypto.getRandomValues-based UUID v4
+  const bytes = new Uint8Array(16);
+  if (typeof _crypto?.getRandomValues === 'function') {
+    _crypto.getRandomValues(bytes);
+  } else {
+    // Last resort: Math.random (test-only environments without Web Crypto)
+    for (let i = 0; i < 16; i++) bytes[i] = Math.floor(Math.random() * 256);
+  }
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`;
 }
 
 /**
@@ -85,6 +96,11 @@ export class EntityFactory<T> {
   private readonly _afterBuildHooks: Array<(entity: T) => void | Promise<void>>;
   private readonly _afterCreateHooks: Array<(entity: T) => void | Promise<void>>;
   private _globalCounter = 0;
+  /**
+   * Optional default persist function set by subclasses (e.g. BoundEntityFactory).
+   * When set, create() will use this function if no explicit persistFn is provided.
+   */
+  protected _defaultPersistFn?: PersistFn<T>;
 
   constructor(
     entityClass: new (...args: unknown[]) => T,
@@ -161,6 +177,10 @@ export class EntityFactory<T> {
   /**
    * Build a single entity without persisting. Applies defaults, sequences,
    * traits, associations, overrides, and afterBuild hooks.
+   *
+   * Synchronous — afterBuild hooks that return Promises are started but not
+   * awaited. Use `buildAsync()` if you need async hooks to be properly awaited,
+   * or use `create()` which calls `buildAsync()` internally.
    */
   build(overrides?: Partial<T>, ...traitNames: string[]): T {
     this._globalCounter++;
@@ -190,7 +210,7 @@ export class EntityFactory<T> {
       (entity as Record<string, unknown>)[fieldName] = seqDef.generator(counter);
     }
 
-    // 5. Apply associations
+    // 5. Apply associations (sync build — associations with async hooks require buildAsync)
     for (const assoc of this._associations) {
       (entity as Record<string, unknown>)[assoc.fieldName] = assoc.factory.build(
         assoc.overrides,
@@ -202,7 +222,7 @@ export class EntityFactory<T> {
       Object.assign(entity as object, overrides);
     }
 
-    // 7. Run afterBuild hooks (synchronous — async hooks are best-effort sync here)
+    // 7. Run afterBuild hooks synchronously (async return values are not awaited here)
     for (const hook of this._afterBuildHooks) {
       hook(entity);
     }
@@ -211,7 +231,59 @@ export class EntityFactory<T> {
   }
 
   /**
-   * Build a list of entities.
+   * Async variant of build() — awaits all afterBuild hooks so async hooks are
+   * not silently dropped. Used internally by create().
+   */
+  async buildAsync(overrides?: Partial<T>, ...traitNames: string[]): Promise<T> {
+    this._globalCounter++;
+    const entity = new this._entityClass();
+
+    // 1. Apply auto-generated defaults from metadata
+    this._applyAutoDefaults(entity);
+
+    // 2. Apply factory-level defaults
+    Object.assign(entity as object, this._defaults);
+
+    // 3. Apply traits in order
+    for (const traitName of traitNames) {
+      const traitDef = this._traits.get(traitName);
+      if (!traitDef) {
+        throw new Error(
+          `Unknown trait "${traitName}" for factory of ${this._entityClass.name}`,
+        );
+      }
+      Object.assign(entity as object, traitDef.overrides);
+    }
+
+    // 4. Apply sequences
+    for (const [fieldName, seqDef] of this._sequences) {
+      const counter = (this._sequenceCounters.get(fieldName) ?? 0) + 1;
+      this._sequenceCounters.set(fieldName, counter);
+      (entity as Record<string, unknown>)[fieldName] = seqDef.generator(counter);
+    }
+
+    // 5. Apply associations (using async build so nested async hooks are awaited)
+    for (const assoc of this._associations) {
+      (entity as Record<string, unknown>)[assoc.fieldName] = await assoc.factory.buildAsync(
+        assoc.overrides,
+      );
+    }
+
+    // 6. Apply explicit overrides (highest priority)
+    if (overrides) {
+      Object.assign(entity as object, overrides);
+    }
+
+    // 7. Run afterBuild hooks — awaited so async hooks are not silently dropped
+    for (const hook of this._afterBuildHooks) {
+      await hook(entity);
+    }
+
+    return entity;
+  }
+
+  /**
+   * Build a list of entities (synchronous).
    */
   buildList(count: number, overrides?: Partial<T>, ...traitNames: string[]): T[] {
     const entities: T[] = [];
@@ -223,14 +295,25 @@ export class EntityFactory<T> {
 
   /**
    * Build and persist a single entity using the provided persist function.
+   * Internally uses buildAsync() so async afterBuild hooks are properly awaited.
+   *
+   * If no persistFn is provided and a default persist function has been set
+   * (e.g. by BoundEntityFactory), the default is used. Otherwise throws.
    */
   async create(
-    persistFn: PersistFn<T>,
+    persistFn?: PersistFn<T>,
     overrides?: Partial<T>,
     ...traitNames: string[]
   ): Promise<T> {
-    const entity = this.build(overrides, ...traitNames);
-    const persisted = await persistFn(entity);
+    const fn = persistFn ?? this._defaultPersistFn;
+    if (!fn) {
+      throw new Error(
+        `EntityFactory.create() requires a persist function. ` +
+        `Pass a persistFn, or use ctx.factory() inside withTestTransaction to get a pre-bound factory.`,
+      );
+    }
+    const entity = await this.buildAsync(overrides, ...traitNames);
+    const persisted = await fn(entity);
 
     for (const hook of this._afterCreateHooks) {
       await hook(persisted);

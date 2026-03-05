@@ -49,16 +49,21 @@ export interface SeedRunResult {
 const SEED_TABLE = "_espalier_seeds";
 
 /**
- * Compute a simple checksum for a seed (based on its name + run function source).
+ * Return the seed name as the idempotency marker stored in the tracking table.
+ *
+ * The `seed.name` field is the sole idempotency key: a seed is considered
+ * "already run" if its name appears in the `_espalier_seeds` table, regardless
+ * of whether the seed content has changed. This avoids two problems with the
+ * previous djb2 checksum approach:
+ *   1. djb2 has too many collisions for a reliable integrity signal.
+ *   2. `fn.toString()` produces different output in dev vs compiled/minified
+ *      builds, causing seeds to re-run spuriously after a production build.
+ *
+ * Developers MUST ensure `seed.name` is unique and stable across builds.
+ * To force a seed to re-run, rename it (e.g. append a version suffix).
  */
-function computeChecksum(seed: SeedDefinition): string {
-  const source = seed.run.toString();
-  let hash = 0;
-  for (let i = 0; i < source.length; i++) {
-    const chr = source.charCodeAt(i);
-    hash = ((hash << 5) - hash + chr) | 0;
-  }
-  return Math.abs(hash).toString(36);
+function getSeedIdempotencyKey(seed: SeedDefinition): string {
+  return seed.name;
 }
 
 /**
@@ -203,7 +208,7 @@ export class SeedRunner {
 
         await seed.run(ctx);
 
-        const checksum = computeChecksum(seed);
+        const checksum = getSeedIdempotencyKey(seed);
         await this.recordSeed(conn, seed.name, checksum);
         result.executed.push(seed.name);
       }

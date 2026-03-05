@@ -3,10 +3,43 @@ import type { Connection, DataSource, Transaction } from "espalier-jdbc";
 declare const console: { warn(...args: unknown[]): void };
 import { createRepository } from "espalier-data";
 import type { CrudRepository } from "espalier-data";
-import { EntityFactory, createFactory } from "../factory/entity-factory.js";
-import type { FactoryOptions } from "../factory/entity-factory.js";
+import { EntityFactory } from "../factory/entity-factory.js";
+import type { FactoryOptions, PersistFn } from "../factory/entity-factory.js";
 
-let savepointCounter = 0;
+/**
+ * Generate a short unique ID for savepoint names using crypto.randomUUID()
+ * (or a Math.random fallback). This avoids collisions in parallel test execution
+ * since there is no shared global counter.
+ */
+function randomSavepointId(): string {
+  const crypto = (globalThis as Record<string, unknown>)['crypto'] as
+    | { randomUUID?: () => string }
+    | undefined;
+  if (typeof crypto?.randomUUID === 'function') {
+    return crypto.randomUUID().replace(/-/g, '').slice(0, 8);
+  }
+  return Math.floor(Math.random() * 0xffffffff).toString(16).padStart(8, '0');
+}
+
+/**
+ * EntityFactory subclass that pre-binds .create() to a transactional DataSource.
+ *
+ * Calling `.create()` without an explicit persist function will persist the entity
+ * via the active test transaction, so it is automatically rolled back at the end
+ * of the test. Pass an explicit persist function to override this behavior.
+ */
+export class BoundEntityFactory<T> extends EntityFactory<T> {
+  constructor(
+    entityClass: new (...args: unknown[]) => T,
+    txDataSource: DataSource,
+    options?: FactoryOptions<T>,
+  ) {
+    super(entityClass, options);
+    // Pre-bind the default persist fn to the transactional repository
+    const repo = createRepository<T, unknown>(entityClass, txDataSource);
+    this._defaultPersistFn = (entity) => (repo as any).save(entity);
+  }
+}
 
 /**
  * A DataSource wrapper that always returns the same transactional connection.
@@ -43,12 +76,15 @@ export interface TestTransactionContext {
   ): CrudRepository<T, ID>;
 
   /**
-   * Create an EntityFactory whose .create() auto-persists via the transactional connection.
+   * Create an EntityFactory bound to the transactional connection.
+   * Call `.create()` (with no explicit persistFn) to persist via the transaction —
+   * entities are automatically rolled back at the end of the test.
+   * Pass an explicit persistFn to `.create()` to override the transactional default.
    */
   factory<T>(
     entityClass: new (...args: unknown[]) => T,
     options?: FactoryOptions<T>,
-  ): EntityFactory<T>;
+  ): BoundEntityFactory<T>;
 
   /**
    * Explicitly commit the transaction. Issues a console warning since this
@@ -106,7 +142,8 @@ export async function withTestTransaction<R>(
       entityClass: new (...args: unknown[]) => T,
       factoryOptions?: FactoryOptions<T>,
     ): EntityFactory<T> {
-      return createFactory(entityClass, factoryOptions);
+      // Use BoundEntityFactory so .create() persists via the transactional connection
+      return new BoundEntityFactory(entityClass, txDataSource, factoryOptions);
     },
 
     async commit(): Promise<void> {
@@ -143,7 +180,7 @@ export async function withNestedTransaction<R>(
   ctx: TestTransactionContext,
   callback: (nestedCtx: TestTransactionContext) => Promise<R>,
 ): Promise<R> {
-  const savepointName = `espalier_test_sp_${++savepointCounter}`;
+  const savepointName = `espalier_test_sp_${randomSavepointId()}`;
   await ctx.transaction.setSavepoint(savepointName);
 
   try {
