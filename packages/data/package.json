@@ -6,6 +6,7 @@
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "sideEffects": false,
   "exports": {
     ".": {
       "import": {
@@ -15,6 +16,76 @@
       "require": {
         "types": "./dist/index.d.cts",
         "default": "./dist/index.cjs"
+      }
+    },
+    "./core": {
+      "import": {
+        "types": "./dist/core.d.ts",
+        "default": "./dist/core.js"
+      },
+      "require": {
+        "types": "./dist/core.d.cts",
+        "default": "./dist/core.cjs"
+      }
+    },
+    "./relations": {
+      "import": {
+        "types": "./dist/relations.d.ts",
+        "default": "./dist/relations.js"
+      },
+      "require": {
+        "types": "./dist/relations.d.cts",
+        "default": "./dist/relations.cjs"
+      }
+    },
+    "./tenant": {
+      "import": {
+        "types": "./dist/tenant-entry.d.ts",
+        "default": "./dist/tenant-entry.js"
+      },
+      "require": {
+        "types": "./dist/tenant-entry.d.cts",
+        "default": "./dist/tenant-entry.cjs"
+      }
+    },
+    "./observability": {
+      "import": {
+        "types": "./dist/observability-entry.d.ts",
+        "default": "./dist/observability-entry.js"
+      },
+      "require": {
+        "types": "./dist/observability-entry.d.cts",
+        "default": "./dist/observability-entry.cjs"
+      }
+    },
+    "./graphql": {
+      "import": {
+        "types": "./dist/graphql-entry.d.ts",
+        "default": "./dist/graphql-entry.js"
+      },
+      "require": {
+        "types": "./dist/graphql-entry.d.cts",
+        "default": "./dist/graphql-entry.cjs"
+      }
+    },
+    "./rest": {
+      "import": {
+        "types": "./dist/rest-entry.d.ts",
+        "default": "./dist/rest-entry.js"
+      },
+      "require": {
+        "types": "./dist/rest-entry.d.cts",
+        "default": "./dist/rest-entry.cjs"
+      }
+    },
+    "./plugins": {
+      "import": {
+        "types": "./dist/plugins-entry.d.ts",
+        "default": "./dist/plugins-entry.js"
+      },
+      "require": {
+        "types": "./dist/plugins-entry.d.cts",
+        "default": "./dist/plugins-entry.cjs"
       }
     }
   },
