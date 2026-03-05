@@ -1,4 +1,5 @@
 import { type SqlValue, quoteIdentifier } from "espalier-jdbc";
+import { toVectorLiteral } from "../vector/vector-utils.js";
 
 export type CriteriaType =
   | "eq"
@@ -185,19 +186,27 @@ const vectorOperatorMap: Record<VectorMetric, string> = {
 
 export class VectorDistanceCriteria implements Criteria {
   readonly type = "vectorDistance" as const;
+  readonly queryVector: number[];
+  readonly threshold: number;
 
   constructor(
     readonly column: string,
-    readonly queryVector: number[],
+    queryVector: number[],
     readonly metric: VectorMetric,
     readonly operator: "lt" | "lte",
-    readonly threshold: number,
-  ) {}
+    threshold: number,
+  ) {
+    this.queryVector = [...queryVector];
+    if (!Number.isFinite(threshold) || threshold < 0) {
+      throw new Error(`Vector distance threshold must be a non-negative finite number, got: ${threshold}`);
+    }
+    this.threshold = threshold;
+  }
 
   toSql(paramOffset: number): { sql: string; params: SqlValue[] } {
     const distOp = vectorOperatorMap[this.metric];
     const cmpOp = this.operator === "lt" ? "<" : "<=";
-    const vectorLiteral = `[${this.queryVector.join(",")}]`;
+    const vectorLiteral = toVectorLiteral(this.queryVector);
     return {
       sql: `(${quoteIdentifier(this.column)} ${distOp} $${paramOffset}) ${cmpOp} $${paramOffset + 1}`,
       params: [vectorLiteral, this.threshold],
@@ -206,18 +215,22 @@ export class VectorDistanceCriteria implements Criteria {
 }
 
 export class VectorOrderExpression {
+  readonly queryVector: number[];
+
   constructor(
     readonly column: string,
-    readonly queryVector: number[],
+    queryVector: number[],
     readonly metric: VectorMetric,
     readonly direction: "ASC" | "DESC",
-  ) {}
+  ) {
+    this.queryVector = [...queryVector];
+  }
 
   toSql(paramOffset: number): { sql: string; params: SqlValue[] } {
     const distOp = vectorOperatorMap[this.metric];
-    const vectorLiteral = `[${this.queryVector.join(",")}]`;
+    const vectorLiteral = toVectorLiteral(this.queryVector);
     return {
-      sql: `(${quoteIdentifier(this.column)} ${distOp} $${paramOffset}) ${this.direction}`,
+      sql: `(${quoteIdentifier(this.column)} ${distOp} $${paramOffset})`,
       params: [vectorLiteral],
     };
   }

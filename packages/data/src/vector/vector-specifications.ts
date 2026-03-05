@@ -3,6 +3,7 @@ import { quoteIdentifier } from "espalier-jdbc";
 import type { Criteria, VectorMetric } from "../query/criteria.js";
 import { VectorDistanceCriteria } from "../query/criteria.js";
 import type { OrderByExpressionArg } from "../query/query-builder.js";
+import { toVectorLiteral } from "./vector-utils.js";
 
 const vectorOperatorMap: Record<VectorMetric, string> = {
   l2: "<->",
@@ -32,7 +33,7 @@ export function similarTo(
   threshold: number,
   metric: VectorMetric = "cosine",
 ): Criteria {
-  return new VectorDistanceCriteria(column, vector, metric, "lt", threshold);
+  return new VectorDistanceCriteria(column, vector, metric, "lte", threshold);
 }
 
 /**
@@ -76,7 +77,7 @@ export function nearestTo(
   threshold?: number,
 ): NearestToResult {
   const distOp = vectorOperatorMap[metric];
-  const vectorLiteral = `[${vector.join(",")}]`;
+  const vectorLiteral = toVectorLiteral(vector);
 
   const orderBy: OrderByExpressionArg = {
     direction: "ASC" as const,
@@ -89,7 +90,7 @@ export function nearestTo(
   };
 
   const criteria = threshold !== undefined
-    ? new VectorDistanceCriteria(column, vector, metric, "lt", threshold)
+    ? new VectorDistanceCriteria(column, vector, metric, "lte", threshold)
     : undefined;
 
   return { criteria, orderBy, limit };

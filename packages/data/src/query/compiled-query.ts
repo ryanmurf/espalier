@@ -1,4 +1,5 @@
 import type { SqlValue } from "espalier-jdbc";
+import { toVectorLiteral } from "../vector/vector-utils.js";
 
 /**
  * Describes how a single method argument maps to SQL parameters.
@@ -167,7 +168,7 @@ function applyTransform(
     case "vector-literal": {
       // Convert number[] to pgvector string format '[0.1,0.2,...]'
       const vec = arg as number[];
-      return `[${vec.join(",")}]` as SqlValue;
+      return toVectorLiteral(vec) as SqlValue;
     }
     default: {
       const _exhaustive: never = transform;

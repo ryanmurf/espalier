@@ -21,3 +21,5 @@ export { createEmbeddingHook, registerEmbeddingHook } from "./embedding-hook.js"
 
 export type { NearestToResult } from "./vector-specifications.js";
 export { similarTo, nearestTo } from "./vector-specifications.js";
+
+export { toVectorLiteral } from "./vector-utils.js";

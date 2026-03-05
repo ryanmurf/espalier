@@ -34,12 +34,19 @@ function makeMetadata(overrides?: Partial<EntityMetadata>): EntityMetadata {
     { fieldName: "secondEmbedding", columnName: "second_embedding", type: "string" },
   ] as FieldMapping[];
 
+  // Provide vector field metadata so SimilarTo can look up the correct metric
+  const vectorFields = new Map<string | symbol, any>([
+    ["embedding", { fieldName: "embedding", columnName: "embedding", dimensions: 3, metric: "cosine", indexType: "hnsw" }],
+    ["secondEmbedding", { fieldName: "secondEmbedding", columnName: "second_embedding", dimensions: 3, metric: "cosine", indexType: "hnsw" }],
+  ]);
+
   return {
     tableName: "documents",
     entityClass: class {} as any,
     idField: "id",
     fields,
     relations: [],
+    vectorFields,
     ...overrides,
   } as EntityMetadata;
 }
@@ -467,19 +474,16 @@ describe("bindCompiledQuery: vector-literal transform", () => {
     expect(literal).toBe("[-0.5,0,1e-10,-10000000000]");
   });
 
-  it("vector with NaN and Infinity — preserves JS serialization", () => {
-    // This is a boundary condition — pgvector may reject these,
-    // but the serialization should not crash
+  it("vector with NaN and Infinity — throws validation error", () => {
+    // toVectorLiteral now validates that all elements are finite numbers
     const compiled: CompiledQuery = {
       sql: 'SELECT * FROM "documents" ORDER BY ("embedding" <=> $1) ASC',
       paramBindings: [{ argIndex: 0, transform: "vector-literal" }],
       metadata: { action: "find", expectedArgCount: 1, distinct: false },
     };
 
-    const result = bindCompiledQuery(compiled, [[NaN, Infinity, -Infinity]]);
-    const literal = result.params[0] as string;
-    // JS join produces "NaN,Infinity,-Infinity"
-    expect(literal).toBe("[NaN,Infinity,-Infinity]");
+    expect(() => bindCompiledQuery(compiled, [[NaN, Infinity, -Infinity]]))
+      .toThrow(/finite number/);
   });
 });
 

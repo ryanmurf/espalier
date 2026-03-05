@@ -92,7 +92,7 @@ export function Vector(options: VectorOptions) {
 export function getVectorFields(
   target: object,
 ): Map<string | symbol, VectorMetadataEntry> {
-  return vectorMetadata.get(target) ?? new Map();
+  return new Map(vectorMetadata.get(target) ?? []);
 }
 
 /**

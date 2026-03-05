@@ -14,6 +14,7 @@ import { ComparisonCriteria, RawComparisonCriteria, LogicalCriteria, VectorDista
 import type { Criteria, VectorMetric } from "../query/criteria.js";
 import { getVectorFields } from "../decorators/vector.js";
 import type { VectorMetadataEntry } from "../decorators/vector.js";
+import { toVectorLiteral } from "../vector/vector-utils.js";
 import type { Specification } from "../query/specification.js";
 import { EntityNotFoundException } from "./entity-not-found.js";
 import { EntityCache } from "../cache/entity-cache.js";
@@ -1793,11 +1794,16 @@ export function createDerivedRepository<T, ID>(
     options?: SimilarityOptions,
   ): Promise<T[]> => {
     const vecMeta = resolveVectorField(fieldName);
+    if (vector.length !== vecMeta.dimensions) {
+      throw new Error(
+        `Vector dimension mismatch for field "${fieldName}": expected ${vecMeta.dimensions}, got ${vector.length}`,
+      );
+    }
     const metric = options?.metric ?? vecMeta.metric;
-    const limit = options?.limit ?? 10;
+    const limit = Math.min(Math.max(options?.limit ?? 10, 1), 1000);
     const maxDistance = options?.maxDistance;
     const distOp = vectorOperators[metric];
-    const vectorLiteral = `[${vector.join(",")}]`;
+    const vectorLiteral = toVectorLiteral(vector);
 
     const builder = new SelectBuilder(metadata.tableName)
       .columns(...metadata.fields.map((f: FieldMapping) => f.columnName));
@@ -1866,11 +1872,16 @@ export function createDerivedRepository<T, ID>(
     options?: SimilarityOptions,
   ): Promise<SimilarityResult<T>[]> => {
     const vecMeta = resolveVectorField(fieldName);
+    if (vector.length !== vecMeta.dimensions) {
+      throw new Error(
+        `Vector dimension mismatch for field "${fieldName}": expected ${vecMeta.dimensions}, got ${vector.length}`,
+      );
+    }
     const metric = options?.metric ?? vecMeta.metric;
-    const limit = options?.limit ?? 10;
+    const limit = Math.min(Math.max(options?.limit ?? 10, 1), 1000);
     const maxDistance = options?.maxDistance;
     const distOp = vectorOperators[metric];
-    const vectorLiteral = `[${vector.join(",")}]`;
+    const vectorLiteral = toVectorLiteral(vector);
 
     // Use rawColumns for the SELECT list so we can include the distance expression
     const entityCols = metadata.fields.map((f: FieldMapping) =>

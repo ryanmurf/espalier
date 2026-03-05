@@ -1,8 +1,9 @@
 import { type SqlValue, quoteIdentifier } from "espalier-jdbc";
+import { toVectorLiteral } from "../vector/vector-utils.js";
 import type { EntityMetadata, FieldMapping } from "../mapping/entity-metadata.js";
 import type { DerivedQueryDescriptor, PropertyExpression } from "./derived-query-parser.js";
 import type { BuiltQuery } from "./query-builder.js";
-import type { Criteria } from "./criteria.js";
+import type { Criteria, VectorMetric } from "./criteria.js";
 import {
   ComparisonCriteria,
   InCriteria,
@@ -11,6 +12,17 @@ import {
   LogicalCriteria,
 } from "./criteria.js";
 import { SelectBuilder, DeleteBuilder } from "./query-builder.js";
+
+/**
+ * Escape LIKE metacharacters in a user-supplied value.
+ * Prevents wildcard injection by escaping %, _, and \.
+ */
+function escapeLikeValue(value: unknown): string {
+  return String(value)
+    .replace(/\\/g, "\\\\")
+    .replace(/%/g, "\\%")
+    .replace(/_/g, "\\_");
+}
 
 function resolveColumn(
   property: string,
@@ -49,11 +61,11 @@ function buildCriteriaForExpression(
     case "Like":
       return new ComparisonCriteria("like", columnName, args[argOffset] as SqlValue);
     case "StartingWith":
-      return new ComparisonCriteria("like", columnName, `${args[argOffset]}%` as SqlValue);
+      return new ComparisonCriteria("like", columnName, `${escapeLikeValue(args[argOffset])}%` as SqlValue);
     case "EndingWith":
-      return new ComparisonCriteria("like", columnName, `%${args[argOffset]}` as SqlValue);
+      return new ComparisonCriteria("like", columnName, `%${escapeLikeValue(args[argOffset])}` as SqlValue);
     case "Containing":
-      return new ComparisonCriteria("like", columnName, `%${args[argOffset]}%` as SqlValue);
+      return new ComparisonCriteria("like", columnName, `%${escapeLikeValue(args[argOffset])}%` as SqlValue);
     case "GreaterThan":
       return new ComparisonCriteria("gt", columnName, args[argOffset] as SqlValue);
     case "GreaterThanEqual":
@@ -122,16 +134,27 @@ export function buildDerivedQuery(
   args: unknown[],
   extraCriteria?: Criteria,
 ): BuiltQuery {
+  // Map from VectorMetric to pgvector distance operator
+  const vectorOperatorMap: Record<VectorMetric, string> = {
+    l2: "<->",
+    cosine: "<=>",
+    inner_product: "<#>",
+  };
+
   // Build criteria from property expressions, tracking SimilarTo separately
   const criteriaList: Criteria[] = [];
-  const similarToExprs: Array<{ columnName: string; vector: number[] }> = [];
+  const similarToExprs: Array<{ columnName: string; vector: number[]; distOp: string }> = [];
   let argOffset = 0;
 
   for (const expr of descriptor.properties) {
     const columnName = resolveColumn(expr.property, metadata);
     if (expr.operator === "SimilarTo") {
+      // Look up the vector field's configured metric; default to cosine if not found
+      const vectorMeta = metadata.vectorFields.get(expr.property);
+      const metric: VectorMetric = vectorMeta?.metric ?? "cosine";
+      const distOp = vectorOperatorMap[metric];
       // SimilarTo contributes ORDER BY, not WHERE
-      similarToExprs.push({ columnName, vector: args[argOffset] as number[] });
+      similarToExprs.push({ columnName, vector: args[argOffset] as number[], distOp });
       argOffset += expr.paramCount;
       continue;
     }
@@ -158,14 +181,14 @@ export function buildDerivedQuery(
 
   if (descriptor.action === "count") {
     const builder = new SelectBuilder(metadata.tableName)
-      .columns("COUNT(*)");
+      .rawColumns("COUNT(*)");
     if (where) builder.where(where);
     return builder.build();
   }
 
   if (descriptor.action === "exists") {
     const builder = new SelectBuilder(metadata.tableName)
-      .columns("1")
+      .rawColumns("1")
       .limit(1);
     if (where) builder.where(where);
     return builder.build();
@@ -183,13 +206,14 @@ export function buildDerivedQuery(
     builder.distinct();
   }
 
-  // Add vector similarity ORDER BY (cosine distance ASC) before explicit orderBy
+  // Add vector similarity ORDER BY (distance ASC) before explicit orderBy
   for (const sim of similarToExprs) {
-    const vectorLiteral = `[${sim.vector.join(",")}]`;
+    const vectorLiteral = toVectorLiteral(sim.vector);
+    const distOp = sim.distOp;
     builder.orderByExpression({
       toSql(paramOffset: number) {
         return {
-          sql: `(${quoteIdentifier(sim.columnName)} <=> $${paramOffset})`,
+          sql: `(${quoteIdentifier(sim.columnName)} ${distOp} $${paramOffset})`,
           params: [vectorLiteral as SqlValue],
         };
       },

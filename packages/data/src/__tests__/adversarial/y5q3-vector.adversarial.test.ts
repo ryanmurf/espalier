@@ -111,7 +111,7 @@ describe("@Vector decorator — adversarial", () => {
       expect(meta2!.metric).toBe("cosine");
     });
 
-    it("getVectorFields returns the internal map — BUG PROBE: mutations to the returned map affect stored metadata", () => {
+    it("getVectorFields returns a defensive copy — mutations do not affect stored metadata", () => {
       @Table("map_mut_test")
       class MapMutEntity {
         @Id @Column() id!: string;
@@ -122,16 +122,11 @@ describe("@Vector decorator — adversarial", () => {
       const fields = getVectorFields(inst.constructor);
       expect(fields.size).toBe(1);
 
-      // NOTE: getVectorFields returns the LIVE map, not a copy.
-      // This is a potential bug — external code can delete entries.
-      const sizeBefore = fields.size;
+      // getVectorFields now returns a defensive copy.
+      // Deleting from the returned map should NOT affect stored metadata.
       fields.delete("vec");
       const fieldsAfter = getVectorFields(inst.constructor);
-      // If it returns the same map reference, deletion persists — BUG.
-      // If it returns a copy, deletion is harmless.
-      // We document the actual behavior:
-      expect(fieldsAfter.size).toBe(sizeBefore - 1);
-      // ^^ This proves getVectorFields returns the live map, which is a bug.
+      expect(fieldsAfter.size).toBe(1);
     });
   });
 
@@ -255,16 +250,14 @@ describe("VectorDistanceCriteria — adversarial", () => {
       expect(result.params[0]).toBe("[]");
     });
 
-    it("vector with NaN produces [NaN]", () => {
-      const c = new VectorDistanceCriteria("col", [NaN], "cosine", "lt", 0.5);
-      const result = c.toSql(1);
-      expect(result.params[0]).toBe("[NaN]");
+    it("vector with NaN throws validation error", () => {
+      expect(() => new VectorDistanceCriteria("col", [NaN], "cosine", "lt", 0.5).toSql(1))
+        .toThrow(/finite number/);
     });
 
-    it("vector with Infinity produces [Infinity]", () => {
-      const c = new VectorDistanceCriteria("col", [Infinity, -Infinity], "cosine", "lt", 0.5);
-      const result = c.toSql(1);
-      expect(result.params[0]).toBe("[Infinity,-Infinity]");
+    it("vector with Infinity throws validation error", () => {
+      expect(() => new VectorDistanceCriteria("col", [Infinity, -Infinity], "cosine", "lt", 0.5).toSql(1))
+        .toThrow(/finite number/);
     });
 
     it("huge vector (10000 elements) produces valid literal", () => {
@@ -284,10 +277,9 @@ describe("VectorDistanceCriteria — adversarial", () => {
       expect(result.params[1]).toBe(0);
     });
 
-    it("negative threshold is accepted (no validation)", () => {
-      const c = new VectorDistanceCriteria("col", [1, 2], "cosine", "lt", -1);
-      const result = c.toSql(1);
-      expect(result.params[1]).toBe(-1);
+    it("negative threshold throws validation error", () => {
+      expect(() => new VectorDistanceCriteria("col", [1, 2], "cosine", "lt", -1))
+        .toThrow(/non-negative finite number/);
     });
   });
 
@@ -317,19 +309,23 @@ describe("VectorDistanceCriteria — adversarial", () => {
 // VectorOrderExpression
 // ============================================================
 describe("VectorOrderExpression — adversarial", () => {
-  it("generates valid ORDER BY with ASC", () => {
+  it("generates valid ORDER BY expression with ASC (direction added by builder)", () => {
     const expr = new VectorOrderExpression("embedding", [1, 2, 3], "cosine", "ASC");
     const result = expr.toSql(1);
     expect(result.sql).toContain("<=>");
-    expect(result.sql).toContain("ASC");
+    // Direction is NOT in toSql() output — the builder appends it via expr.direction
+    expect(result.sql).not.toContain("ASC");
+    expect(expr.direction).toBe("ASC");
     expect(result.params).toHaveLength(1);
   });
 
-  it("generates valid ORDER BY with DESC", () => {
+  it("generates valid ORDER BY expression with DESC (direction added by builder)", () => {
     const expr = new VectorOrderExpression("embedding", [1, 2, 3], "l2", "DESC");
     const result = expr.toSql(1);
     expect(result.sql).toContain("<->");
-    expect(result.sql).toContain("DESC");
+    // Direction is NOT in toSql() output — the builder appends it via expr.direction
+    expect(result.sql).not.toContain("DESC");
+    expect(expr.direction).toBe("DESC");
   });
 
   it("empty vector in ORDER BY", () => {
@@ -867,7 +863,7 @@ describe("similarTo — adversarial", () => {
     expect(criteria.type).toBe("vectorDistance");
     const result = criteria.toSql(1);
     expect(result.sql).toContain("<=>"); // cosine default
-    expect(result.sql).toContain("< $"); // lt operator
+    expect(result.sql).toContain("<= $"); // lte operator
   });
 
   it("respects explicit metric", () => {
@@ -888,10 +884,9 @@ describe("similarTo — adversarial", () => {
     expect(result.params[1]).toBe(0);
   });
 
-  it("negative threshold (no guard)", () => {
-    const criteria = similarTo("embedding", [1], -0.5);
-    const result = criteria.toSql(1);
-    expect(result.params[1]).toBe(-0.5);
+  it("negative threshold throws validation error", () => {
+    expect(() => similarTo("embedding", [1], -0.5))
+      .toThrow(/non-negative finite number/);
   });
 });
 
@@ -1027,11 +1022,9 @@ describe("buildDerivedQuery — SimilarTo operator", () => {
     };
 
     const query = buildDerivedQuery(descriptor, metadata, [[1, 2, 3]]);
-    // Check what operator is actually used
-    // The code hardcodes <=> in derived-query-executor.ts line 193
-    expect(query.sql).toContain("<=>");
-    // This means a field with metric: "l2" still gets cosine distance in derived queries.
-    // Documenting this as a known design choice or bug.
+    // The code now uses the field's configured metric instead of hardcoding cosine.
+    // Since this field has metric: "l2", it should use <->.
+    expect(query.sql).toContain("<->");
   });
 });
 
