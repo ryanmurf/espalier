@@ -34,3 +34,7 @@ export {
   assertQueriesMatching,
 } from "./assertions/query-assertions.js";
 export type { CapturedQuery, AssertionResult } from "./assertions/query-assertions.js";
+
+// Migration testing
+export { testMigration, createSchemaAssertion } from "./migration/migration-tester.js";
+export type { MigrationTestContext, SchemaAssertion } from "./migration/migration-tester.js";
