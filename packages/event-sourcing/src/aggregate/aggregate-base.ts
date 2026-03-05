@@ -70,9 +70,17 @@ export abstract class AggregateBase {
 
   /**
    * Load the aggregate from a history of events (rehydration).
+   * Events must be ordered by version in ascending order. An error is thrown
+   * if an event's version is less than or equal to the current version.
    */
   loadFromHistory(events: DomainEvent[]): void {
     for (const event of events) {
+      if (event.version <= this._version) {
+        throw new Error(
+          `Out-of-order event: event version ${event.version} is <= current aggregate version ${this._version}. ` +
+          `Events must be ordered by ascending version.`,
+        );
+      }
       this.applyEvent(event);
       this._version = event.version;
     }

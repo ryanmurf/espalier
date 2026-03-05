@@ -12,8 +12,13 @@ export interface CommandHandlerOptions {
 const commandHandlerMetadata = new WeakMap<object, CommandHandlerOptions>();
 
 /**
- * @CommandHandler decorator — marks a class as handling a specific command type.
+ * @CommandHandler decorator -- marks a class as handling a specific command type.
  * The class must have an `execute(command)` method.
+ *
+ * **DI limitation:** The decorated class is instantiated via `new target()` with
+ * no arguments during class initialization. If your handler requires constructor
+ * dependencies, register it manually with the command bus instead of relying on
+ * this decorator's auto-registration.
  */
 export function CommandHandler(options: CommandHandlerOptions) {
   return function<T extends new (...args: any[]) => any>(

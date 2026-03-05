@@ -5,6 +5,7 @@ import { OutboxStore } from "../outbox/outbox-store.js";
 import type { EventStoreOptions, OutboxOptions, DomainEvent } from "../types.js";
 import { getAggregateRootMetadata } from "../aggregate/aggregate-root.js";
 import type { AggregateBase } from "../aggregate/aggregate-base.js";
+import { isOutboxEntity } from "../outbox/outbox-decorator.js";
 
 // Access Web Crypto API available in Node 19+, Bun, Deno, and browsers
 const _crypto = (globalThis as Record<string, unknown>)["crypto"] as {
@@ -32,6 +33,14 @@ export interface EventSourcingPluginConfig {
  *
  * The `afterSave` hook checks whether a saved entity is an `@AggregateRoot`
  * and, if so, persists any uncommitted domain events to the event store.
+ *
+ * **Transactional limitation:** The auto-outbox mode and the `afterSave` hook
+ * both open separate connections via `dataSource.getConnection()`, which means
+ * writes happen OUTSIDE the entity's transaction. This is a "best-effort"
+ * convenience -- NOT a fully transactional outbox. For true transactional
+ * guarantees, callers must use {@link OutboxStore.writeEvents} and
+ * {@link EventStore.append} within their own transaction, passing the active
+ * connection explicitly.
  */
 export class EventSourcingPlugin implements Plugin {
   readonly name = "event-sourcing";
@@ -50,13 +59,19 @@ export class EventSourcingPlugin implements Plugin {
   async init(context: PluginContext): Promise<void> {
     if (this.config.autoOutbox) {
       context.eventBus.on("entity:persisted", (payload: unknown) => {
-        void this.writeOutboxEvent("persisted", payload);
+        this.writeOutboxEvent("persisted", payload).catch((err) => {
+          this.logError("Failed to write outbox event for entity:persisted", err);
+        });
       });
       context.eventBus.on("entity:updated", (payload: unknown) => {
-        void this.writeOutboxEvent("updated", payload);
+        this.writeOutboxEvent("updated", payload).catch((err) => {
+          this.logError("Failed to write outbox event for entity:updated", err);
+        });
       });
       context.eventBus.on("entity:removed", (payload: unknown) => {
-        void this.writeOutboxEvent("removed", payload);
+        this.writeOutboxEvent("removed", payload).catch((err) => {
+          this.logError("Failed to write outbox event for entity:removed", err);
+        });
       });
     }
 
@@ -78,6 +93,9 @@ export class EventSourcingPlugin implements Plugin {
             Array.isArray(aggregate.uncommittedEvents) &&
             aggregate.uncommittedEvents.length > 0
           ) {
+            // NOTE: This opens a separate connection outside the entity's transaction.
+            // For true transactional event persistence, use EventStore.append(connection, ...)
+            // within your own transaction.
             const connection = await this.config.dataSource.getConnection();
             try {
               await this.eventStore.append(
@@ -119,7 +137,6 @@ export class EventSourcingPlugin implements Plugin {
     if (!entityPayload.entityClass || !entityPayload.entity) return;
 
     // Only write outbox events for entities decorated with @Outbox
-    const { isOutboxEntity } = await import("../outbox/outbox-decorator.js");
     if (!isOutboxEntity(entityPayload.entityClass)) return;
 
     const entity = entityPayload.entity;
@@ -137,11 +154,19 @@ export class EventSourcingPlugin implements Plugin {
       timestamp: new Date(),
     };
 
+    // NOTE: This opens a separate connection outside the entity's transaction.
+    // For true transactional outbox, use OutboxStore.writeEvents(connection, events)
+    // within your own transaction.
     const connection = await this.config.dataSource.getConnection();
     try {
       await this.outboxStore.writeEvents(connection, [event]);
     } finally {
       await connection.close();
     }
+  }
+
+  private logError(message: string, err: unknown): void {
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    (globalThis as any).console?.error?.(`[EventSourcingPlugin] ${message}: ${errorMessage}`);
   }
 }

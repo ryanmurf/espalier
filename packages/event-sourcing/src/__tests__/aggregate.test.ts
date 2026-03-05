@@ -270,8 +270,8 @@ describe("AggregateBase", () => {
       expect(order.version).toBe(1);
     });
 
-    it("version set to last event's version even if out of order", () => {
-      // Adversarial: events out of order by version
+    it("throws on out-of-order events", () => {
+      // Out-of-order events must be rejected to prevent corrupt aggregate state
       const order = new OrderAggregate("ord-1");
       const history: DomainEvent[] = [
         {
@@ -292,14 +292,9 @@ describe("AggregateBase", () => {
         },
       ];
 
-      order.loadFromHistory(history);
-
-      // Implementation sets _version = event.version for each event in order
-      // So last event's version wins: 1
-      expect(order.version).toBe(1);
-      // Both handlers still executed
-      expect(order.handlerCalls).toContain("ItemAdded");
-      expect(order.handlerCalls).toContain("OrderCreated");
+      expect(() => order.loadFromHistory(history)).toThrow(
+        /Out-of-order event/,
+      );
     });
   });
 
