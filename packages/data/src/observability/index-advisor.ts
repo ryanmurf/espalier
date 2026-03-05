@@ -63,10 +63,16 @@ export class IndexAdvisor {
     const suggestions: IndexSuggestion[] = [];
     this.visitNode(plan.rootNode, suggestions);
 
+    // Build set of already-cached suggestion keys for dedup across calls
+    const cachedKeys = new Set<string>();
+    for (const s of this.cachedSuggestions) {
+      cachedKeys.add(`${s.table}.${s.columns.join(",")}`);
+    }
+
     // Deduplicate against existing indexes and previous suggestions
     const deduped = suggestions.filter((s) => {
       const key = `${s.table}.${s.columns.join(",")}`;
-      return !this.existingIndexes.has(key);
+      return !this.existingIndexes.has(key) && !cachedKeys.has(key);
     });
 
     // Deduplicate within this batch

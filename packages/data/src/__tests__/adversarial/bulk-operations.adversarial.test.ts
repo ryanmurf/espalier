@@ -195,20 +195,12 @@ describe("BulkOperationBuilder — chunking", () => {
     }
   });
 
-  it("chunkSize 0 — BUG: rows.length (>0) <= 0 is false, enters loop with slice(0,0)", () => {
-    const b = makeBuilder({ chunkSize: 0 });
-    // chunk() method: rows.length(1) <= chunkSize(0) is false
-    // Loop: i=0, slice(0,0)=[], i+=0 => infinite loop!
-    // This is a potential infinite loop bug
-    // We can't safely run this test — just document it
-    // Skip to avoid hanging the test runner
+  it("chunkSize 0 — throws validation error", () => {
+    expect(() => makeBuilder({ chunkSize: 0 })).toThrow("chunkSize must be a positive integer");
   });
 
-  it("chunkSize negative — similar infinite loop risk", () => {
-    // rows.length(1) <= -1 is false
-    // Loop: i=0, slice(0,-1)=[], i+=(-1) => i=-1, then -1 < 1 => slice(-1, -2)=[]
-    // infinite loop risk
-    // Document only, do not run
+  it("chunkSize negative — throws validation error", () => {
+    expect(() => makeBuilder({ chunkSize: -1 })).toThrow("chunkSize must be a positive integer");
   });
 });
 
@@ -389,15 +381,9 @@ describe("BulkOperationBuilder.buildBulkUpdate — adversarial", () => {
     expect(queries.length).toBe(2);
   });
 
-  it("zero update columns — generates SET with no CASE clauses", () => {
+  it("zero update columns — throws validation error", () => {
     const b = makeBuilder();
-    const queries = b.buildBulkUpdate("t", "id", [], [[1]]);
-    // This is an edge case — SET clause will be empty
-    // Should produce: UPDATE "t" SET  WHERE "id" IN ($1)
-    expect(queries.length).toBe(1);
-    // The SQL may be malformed with empty SET — this is a potential bug
-    expect(queries[0].sql).toContain("UPDATE");
-    expect(queries[0].sql).toContain("SET");
+    expect(() => b.buildBulkUpdate("t", "id", [], [[1]])).toThrow("updateColumns must not be empty");
   });
 });
 
@@ -484,31 +470,26 @@ describe("BulkOperationBuilder — cross-dialect", () => {
 // ==========================================================================
 
 describe("BulkOperationBuilder — mismatched columns and row values", () => {
-  it("row with fewer values than columns — params still sequential", () => {
+  it("row with fewer values than columns — throws validation error", () => {
     const b = makeBuilder();
-    // 3 columns but only 2 values per row
-    const queries = b.buildBulkInsert("t", ["a", "b", "c"], [["x", "y"]]);
-    // No validation — just generates ($1, $2)
-    expect(queries[0].params.length).toBe(2);
-    expect(queries[0].sql).toContain("($1, $2)");
-    // BUG: SQL has 3 column names but only 2 values — will fail at DB level
+    expect(() => b.buildBulkInsert("t", ["a", "b", "c"], [["x", "y"]])).toThrow(
+      "Row 0 has 2 values but 3 columns were specified",
+    );
   });
 
-  it("row with more values than columns — extra values included as params", () => {
+  it("row with more values than columns — throws validation error", () => {
     const b = makeBuilder();
-    const queries = b.buildBulkInsert("t", ["a"], [["x", "y", "z"]]);
-    expect(queries[0].params.length).toBe(3);
-    // BUG: SQL has 1 column but 3 params — ($1, $2, $3) — will fail at DB level
+    expect(() => b.buildBulkInsert("t", ["a"], [["x", "y", "z"]])).toThrow(
+      "Row 0 has 3 values but 1 columns were specified",
+    );
   });
 
-  it("rows with inconsistent lengths — no validation, mixed param counts", () => {
+  it("rows with inconsistent lengths — throws validation error for mismatched row", () => {
     const b = makeBuilder();
-    const queries = b.buildBulkInsert("t", ["a", "b"], [
+    expect(() => b.buildBulkInsert("t", ["a", "b"], [
       ["x", "y"],
-      ["z"],       // missing second value
-    ]);
-    expect(queries[0].params).toEqual(["x", "y", "z"]);
-    // First row: ($1, $2), second row: ($3) — will produce invalid SQL
+      ["z"],
+    ])).toThrow("Row 1 has 1 values but 2 columns were specified");
   });
 });
 
@@ -517,11 +498,10 @@ describe("BulkOperationBuilder — mismatched columns and row values", () => {
 // ==========================================================================
 
 describe("BulkOperationBuilder — special values", () => {
-  it("undefined values — included as-is (no conversion to null)", () => {
+  it("undefined values — converted to null", () => {
     const b = makeBuilder();
     const queries = b.buildBulkInsert("t", ["a"], [[undefined as any]]);
-    expect(queries[0].params[0]).toBeUndefined();
-    // Database driver may reject undefined — not builder's concern
+    expect(queries[0].params[0]).toBeNull();
   });
 
   it("Date objects — preserved as params", () => {

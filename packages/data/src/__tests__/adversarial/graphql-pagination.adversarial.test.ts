@@ -32,21 +32,21 @@ describe("OffsetPaginationAdapter — adversarial", () => {
   });
 
   describe("generateConnectionType", () => {
-    it("produces TypeConnection with content and pageInfo", () => {
+    it("produces TypeOffsetConnection with content and pageInfo", () => {
       const sdl = adapter.generateConnectionType("User");
-      expect(sdl).toContain("type UserConnection");
+      expect(sdl).toContain("type UserOffsetConnection");
       expect(sdl).toContain("content: [User!]!");
       expect(sdl).toContain("pageInfo: PageInfo!");
     });
 
     it("works with any type name", () => {
       const sdl = adapter.generateConnectionType("MyLongEntityName");
-      expect(sdl).toContain("type MyLongEntityNameConnection");
+      expect(sdl).toContain("type MyLongEntityNameOffsetConnection");
     });
 
     it("empty type name — produces valid but weird SDL", () => {
       const sdl = adapter.generateConnectionType("");
-      expect(sdl).toContain("type Connection");
+      expect(sdl).toContain("type OffsetConnection");
     });
   });
 
@@ -76,16 +76,13 @@ describe("OffsetPaginationAdapter — adversarial", () => {
       expect(result.size).toBe(20);
     });
 
-    it("zero values are preserved (not defaulted)", () => {
-      const result = adapter.mapResolverArgs({ page: 0, size: 0 });
-      expect(result.page).toBe(0);
-      expect(result.size).toBe(0);
+    it("zero page is allowed, zero size throws", () => {
+      expect(() => adapter.mapResolverArgs({ page: 0, size: 0 })).toThrow("Invalid size");
     });
 
-    it("negative values passed through (no validation)", () => {
-      const result = adapter.mapResolverArgs({ page: -1, size: -10 });
-      expect(result.page).toBe(-1);
-      expect(result.size).toBe(-10);
+    it("negative values throw validation errors", () => {
+      expect(() => adapter.mapResolverArgs({ page: -1, size: 10 })).toThrow("Invalid page");
+      expect(() => adapter.mapResolverArgs({ page: 0, size: -10 })).toThrow("Invalid size");
     });
 
     it("extra args are ignored", () => {
@@ -202,9 +199,8 @@ describe("RelayCursorPaginationAdapter — adversarial", () => {
       expect(result.last).toBe(5);
     });
 
-    it("negative first — passed through", () => {
-      const result = adapter.mapResolverArgs({ first: -1 });
-      expect(result.first).toBe(-1);
+    it("negative first — throws validation error", () => {
+      expect(() => adapter.mapResolverArgs({ first: -1 })).toThrow("Invalid first");
     });
   });
 
@@ -307,9 +303,8 @@ describe("KeysetPaginationAdapter — adversarial", () => {
       expect(result.size).toBe(20);
     });
 
-    it("missing sortColumn — undefined (will likely fail at query level)", () => {
-      const result = adapter.mapResolverArgs({});
-      expect(result.sortColumn).toBeUndefined();
+    it("missing sortColumn — throws validation error", () => {
+      expect(() => adapter.mapResolverArgs({})).toThrow("sortColumn is required");
     });
 
     it("invalid sortDirection — uppercased but not validated", () => {
@@ -364,10 +359,11 @@ describe("KeysetPaginationAdapter — adversarial", () => {
       expect(result.lastId).toBe("false");
     });
 
-    it("object lastValue — stringified to '[object Object]'", () => {
-      const page = { content: [], size: 10, hasNext: false, lastValue: {}, lastId: {} };
+    it("object lastValue — JSON.stringified", () => {
+      const page = { content: [], size: 10, hasNext: false, lastValue: { a: 1 }, lastId: { b: 2 } };
       const result = adapter.mapResult(page) as any;
-      expect(result.lastValue).toBe("[object Object]");
+      expect(result.lastValue).toBe('{"a":1}');
+      expect(result.lastId).toBe('{"b":2}');
     });
   });
 });
@@ -406,16 +402,14 @@ describe("Cross-adapter SDL — adversarial", () => {
     expect(relaySdl).not.toContain("type PageInfo {");
   });
 
-  it("offset Connection vs relay Connection — same suffix", () => {
+  it("offset OffsetConnection vs relay Connection — no collision", () => {
     const offset = new OffsetPaginationAdapter();
     const relay = new RelayCursorPaginationAdapter();
-    // Both use UserConnection — potential collision if both used for same entity!
     const offsetConn = offset.generateConnectionType("User");
     const relayConn = relay.generateConnectionType("User");
-    expect(offsetConn).toContain("type UserConnection");
+    expect(offsetConn).toContain("type UserOffsetConnection");
     expect(relayConn).toContain("type UserConnection");
-    // BUG: If both adapters are used in the same schema for different entities,
-    // "UserConnection" will collide since they have different shapes
+    // No collision — different type names
   });
 
   it("keyset uses different type name — no collision with Connection", () => {
@@ -457,8 +451,14 @@ describe("All adapters implement GraphQLPaginationAdapter", () => {
       });
 
       it("mapResolverArgs returns object", () => {
-        const result = adapter.mapResolverArgs({});
-        expect(typeof result).toBe("object");
+        // Keyset requires sortColumn; offset/relay work with empty args
+        if (adapter.name === "keyset") {
+          const result = adapter.mapResolverArgs({ sortColumn: "id" });
+          expect(typeof result).toBe("object");
+        } else {
+          const result = adapter.mapResolverArgs({});
+          expect(typeof result).toBe("object");
+        }
       });
 
       it("mapResult accepts and returns value", () => {
@@ -494,7 +494,7 @@ describe("Mixed pagination adapters — adversarial", () => {
     const offsetConn = offset.generateConnectionType("Order");
     const keysetPage = keyset.generateConnectionType("Product");
 
-    expect(offsetConn).toContain("OrderConnection");
+    expect(offsetConn).toContain("OrderOffsetConnection");
     expect(keysetPage).toContain("ProductKeysetPage");
   });
 });
@@ -507,7 +507,7 @@ describe("Pagination adapter — edge cases", () => {
   it("type name with special chars — passed through to SDL", () => {
     const adapter = new OffsetPaginationAdapter();
     const sdl = adapter.generateConnectionType("My_Entity");
-    expect(sdl).toContain("type My_EntityConnection");
+    expect(sdl).toContain("type My_EntityOffsetConnection");
   });
 
   it("keyset mapResolverArgs with sortDirection null — fallback to ASC via ??", () => {
@@ -517,9 +517,8 @@ describe("Pagination adapter — edge cases", () => {
     expect(result.sortDirection).toBe("ASC");
   });
 
-  it("offset mapResolverArgs with string page — passed through (no type coercion)", () => {
+  it("offset mapResolverArgs with string page — throws validation error", () => {
     const adapter = new OffsetPaginationAdapter();
-    const result = adapter.mapResolverArgs({ page: "not-a-number" as any, size: 10 });
-    expect(result.page).toBe("not-a-number");
+    expect(() => adapter.mapResolverArgs({ page: "not-a-number" as any, size: 10 })).toThrow("Invalid page");
   });
 });

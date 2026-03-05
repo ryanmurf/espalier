@@ -66,7 +66,11 @@ export class PreparedStatementPool {
   private readonly caches = new Map<Connection, ConnectionCache>();
 
   constructor(config?: PreparedStatementPoolConfig) {
-    this.maxSize = config?.maxStatementsPerConnection ?? 256;
+    const max = config?.maxStatementsPerConnection ?? 256;
+    if (!Number.isFinite(max) || max < 1) {
+      throw new Error(`maxStatementsPerConnection must be >= 1, got ${max}`);
+    }
+    this.maxSize = max;
     this.retainOnRelease = config?.retainOnRelease ?? true;
   }
 
@@ -248,6 +252,10 @@ let globalPool: PreparedStatementPool | undefined;
 
 /**
  * Get the global PreparedStatementPool instance, creating one if needed.
+ *
+ * **Note:** The `config` parameter is only used when creating the initial instance.
+ * Subsequent calls return the existing singleton and ignore `config`.
+ * Use {@link setGlobalPreparedStatementPool} to replace the singleton with a new config.
  */
 export function getGlobalPreparedStatementPool(
   config?: PreparedStatementPoolConfig,

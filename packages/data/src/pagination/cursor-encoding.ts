@@ -9,12 +9,39 @@ export interface CursorPayload {
 }
 
 /**
+ * Cross-runtime UTF-8 to base64 encoding.
+ * Uses TextEncoder + btoa with percent-encoding bridge for unicode safety.
+ * Works in Node, Deno, Bun, and browsers without requiring Buffer.
+ */
+function utf8ToBase64(str: string): string {
+  // Encode to UTF-8 bytes, convert each byte to a Latin-1 char for btoa
+  const bytes = new TextEncoder().encode(str);
+  let binary = "";
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
+
+/**
+ * Cross-runtime base64 to UTF-8 decoding.
+ */
+function base64ToUtf8(b64: string): string {
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return new TextDecoder().decode(bytes);
+}
+
+/**
  * Encode a cursor payload to a base64 string.
- * Uses globalThis.btoa (available in Node 16+, Deno, Bun, browsers).
+ * Uses TextEncoder for unicode safety (btoa alone only handles Latin-1).
  */
 export function encodeCursor(payload: CursorPayload): string {
   const json = JSON.stringify(payload);
-  return btoa(json);
+  return utf8ToBase64(json);
 }
 
 /**
@@ -23,7 +50,7 @@ export function encodeCursor(payload: CursorPayload): string {
  */
 export function decodeCursor(cursor: string): CursorPayload {
   try {
-    const json = atob(cursor);
+    const json = base64ToUtf8(cursor);
     const parsed = JSON.parse(json);
     if (!parsed || !Array.isArray(parsed.values) || parsed.id === undefined) {
       throw new Error("Invalid cursor structure");

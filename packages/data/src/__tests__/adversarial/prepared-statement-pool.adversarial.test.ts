@@ -171,20 +171,10 @@ describe("PreparedStatementPool — LRU eviction", () => {
     expect((s2 as any).close).toHaveBeenCalled();
   });
 
-  it("max=0 — BUG?: every statement evicted immediately after adding", () => {
-    // putEntry: cache.map.size(1) > maxSize(0) => evict
-    // The statement just added becomes head AND tail, gets evicted
-    const pool = makePool({ maxStatementsPerConnection: 0 });
-    const conn = makeMockConnection();
-
-    const s1 = pool.acquire(conn, "SQL-1");
-    // Statement was added then immediately evicted
-    expect((s1 as any).close).toHaveBeenCalled();
-
-    // Second acquire of same SQL — not cached (was evicted)
-    const s2 = pool.acquire(conn, "SQL-1");
-    expect(s1).not.toBe(s2);
-    expect(conn.prepareStatement).toHaveBeenCalledTimes(2);
+  it("max=0 — throws validation error", () => {
+    expect(() => makePool({ maxStatementsPerConnection: 0 })).toThrow(
+      "maxStatementsPerConnection must be >= 1",
+    );
   });
 
   it("evicted statement close() failure is swallowed", () => {

@@ -41,7 +41,11 @@ export class BulkOperationBuilder {
 
   constructor(options?: BulkOperationOptions) {
     this.dialect = options?.dialect ?? "postgres";
-    this.chunkSize = options?.chunkSize ?? 1000;
+    const chunk = options?.chunkSize ?? 1000;
+    if (!Number.isFinite(chunk) || chunk < 1) {
+      throw new Error(`chunkSize must be a positive integer, got ${chunk}`);
+    }
+    this.chunkSize = chunk;
     this.returning = options?.returning ?? [];
   }
 
@@ -55,6 +59,16 @@ export class BulkOperationBuilder {
     rows: SqlValue[][],
   ): BulkQuery[] {
     if (rows.length === 0) return [];
+    if (columns.length === 0) {
+      throw new Error("columns must not be empty");
+    }
+    for (let i = 0; i < rows.length; i++) {
+      if (rows[i].length !== columns.length) {
+        throw new Error(
+          `Row ${i} has ${rows[i].length} values but ${columns.length} columns were specified`,
+        );
+      }
+    }
 
     const chunks = this.chunk(rows);
     return chunks.map((chunk) => this.buildInsertChunk(table, columns, chunk));
@@ -97,6 +111,16 @@ export class BulkOperationBuilder {
     rows: SqlValue[][],
   ): BulkQuery[] {
     if (rows.length === 0) return [];
+    if (updateColumns.length === 0) {
+      throw new Error("updateColumns must not be empty");
+    }
+    for (let i = 0; i < rows.length; i++) {
+      if (rows[i].length !== updateColumns.length + 1) {
+        throw new Error(
+          `Row ${i} has ${rows[i].length} values but expected ${updateColumns.length + 1} (id + ${updateColumns.length} update columns)`,
+        );
+      }
+    }
 
     const chunks = this.chunk(rows);
     return chunks.map((chunk) =>
@@ -116,7 +140,7 @@ export class BulkOperationBuilder {
     for (const row of rows) {
       const placeholders: string[] = [];
       for (const val of row) {
-        params.push(val);
+        params.push(val === undefined ? null : val);
         placeholders.push(`$${params.length}`);
       }
       valueGroups.push(`(${placeholders.join(", ")})`);
@@ -185,7 +209,7 @@ export class BulkOperationBuilder {
     // Assign parameter indices for IDs first
     const idParamIndices: number[] = [];
     for (const row of rows) {
-      params.push(row[0]);
+      params.push(row[0] === undefined ? null : row[0]);
       idParamIndices.push(params.length);
     }
 
@@ -195,7 +219,7 @@ export class BulkOperationBuilder {
       const whenClauses: string[] = [];
       for (let rowIdx = 0; rowIdx < rows.length; rowIdx++) {
         const value = rows[rowIdx][colIdx + 1]; // +1 because row[0] is id
-        params.push(value);
+        params.push(value === undefined ? null : value);
         whenClauses.push(`WHEN $${idParamIndices[rowIdx]} THEN $${params.length}`);
       }
       setClauses.push(`${col} = CASE ${idQuoted} ${whenClauses.join(" ")} END`);

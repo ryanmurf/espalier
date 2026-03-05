@@ -277,7 +277,7 @@ describe("GraphQLSchemaGenerator — basic schema", () => {
   it("generates pagination types by default", () => {
     const schema = generator.generate([MinimalEntity]);
     expect(schema.sdl).toContain("type PageInfo");
-    expect(schema.sdl).toContain("type MinimalEntityConnection");
+    expect(schema.sdl).toContain("type MinimalEntityOffsetConnection");
   });
 });
 
@@ -322,10 +322,10 @@ describe("GraphQLSchemaGenerator — relations", () => {
 
   it("generates Connection types for all entities", () => {
     const schema = generator.generate([User, Post, Tag, Profile]);
-    expect(schema.sdl).toContain("type UserConnection");
-    expect(schema.sdl).toContain("type PostConnection");
-    expect(schema.sdl).toContain("type TagConnection");
-    expect(schema.sdl).toContain("type ProfileConnection");
+    expect(schema.sdl).toContain("type UserOffsetConnection");
+    expect(schema.sdl).toContain("type PostOffsetConnection");
+    expect(schema.sdl).toContain("type TagOffsetConnection");
+    expect(schema.sdl).toContain("type ProfileOffsetConnection");
   });
 });
 

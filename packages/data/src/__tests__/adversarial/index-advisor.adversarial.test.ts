@@ -759,14 +759,12 @@ describe("IndexAdvisor — edge cases", () => {
     }));
     const first = advisor.analyze(plan);
     expect(first.length).toBe(1);
-    // BUG CHECK: cachedSuggestions accumulates but doesn't dedup against itself
-    // The dedup only checks existingIndexes, not cachedSuggestions
+    // Dedup now checks cachedSuggestions across calls
     const second = advisor.analyze(plan);
-    // This will likely return 1 again — the within-batch dedup catches it
-    // but it gets added to cachedSuggestions again
-    // So getSuggestions() will have duplicates!
+    // Second call returns empty since the suggestion is already cached
+    expect(second.length).toBe(0);
     const all = advisor.getSuggestions();
-    // If dedup against cache is missing, this reveals the bug:
-    expect(all.length).toBe(2); // BUG: should be 1 if properly deduped against cache
+    // Properly deduped against cache — no duplicates
+    expect(all.length).toBe(1);
   });
 });

@@ -50,7 +50,7 @@ export class OffsetPaginationAdapter implements GraphQLPaginationAdapter {
   }
 
   generateConnectionType(typeName: string): string {
-    return `type ${typeName}Connection {
+    return `type ${typeName}OffsetConnection {
   content: [${typeName}!]!
   pageInfo: PageInfo!
 }`;
@@ -65,9 +65,17 @@ export class OffsetPaginationAdapter implements GraphQLPaginationAdapter {
     size: number;
     sort?: string;
   } {
+    const page = args.page != null ? Number(args.page) : 0;
+    const size = args.size != null ? Number(args.size) : 20;
+    if (!Number.isFinite(page) || page < 0) {
+      throw new Error(`Invalid page: ${JSON.stringify(args.page)}`);
+    }
+    if (!Number.isFinite(size) || size < 1) {
+      throw new Error(`Invalid size: ${JSON.stringify(args.size)}`);
+    }
     return {
-      page: (args.page as number) ?? 0,
-      size: (args.size as number) ?? 20,
+      page,
+      size,
       sort: args.sort as string | undefined,
     };
   }
@@ -135,10 +143,16 @@ type ${typeName}Connection {
     last?: number;
     before?: string;
   } {
+    if (args.first != null && (!Number.isFinite(Number(args.first)) || Number(args.first) < 1)) {
+      throw new Error(`Invalid first: ${JSON.stringify(args.first)}`);
+    }
+    if (args.last != null && (!Number.isFinite(Number(args.last)) || Number(args.last) < 1)) {
+      throw new Error(`Invalid last: ${JSON.stringify(args.last)}`);
+    }
     return {
-      first: args.first as number | undefined,
+      first: args.first != null ? Number(args.first) : undefined,
       after: args.after as string | undefined,
-      last: args.last as number | undefined,
+      last: args.last != null ? Number(args.last) : undefined,
       before: args.before as string | undefined,
     };
   }
@@ -180,9 +194,16 @@ export class KeysetPaginationAdapter implements GraphQLPaginationAdapter {
     afterValue?: string;
     afterId?: string;
   } {
+    const size = args.size != null ? Number(args.size) : 20;
+    if (!Number.isFinite(size) || size < 1) {
+      throw new Error(`Invalid size: ${JSON.stringify(args.size)}`);
+    }
+    if (!args.sortColumn || typeof args.sortColumn !== "string") {
+      throw new Error(`sortColumn is required and must be a string`);
+    }
     return {
-      size: (args.size as number) ?? 20,
-      sortColumn: args.sortColumn as string,
+      size,
+      sortColumn: args.sortColumn,
       sortDirection: ((args.sortDirection as string) ?? "ASC").toUpperCase() as "ASC" | "DESC",
       afterValue: args.afterValue as string | undefined,
       afterId: args.afterId as string | undefined,
@@ -201,8 +222,8 @@ export class KeysetPaginationAdapter implements GraphQLPaginationAdapter {
       content: page.content,
       size: page.size,
       hasNext: page.hasNext,
-      lastValue: page.lastValue != null ? String(page.lastValue) : null,
-      lastId: page.lastId != null ? String(page.lastId) : null,
+      lastValue: page.lastValue != null ? (typeof page.lastValue === "object" ? JSON.stringify(page.lastValue) : String(page.lastValue)) : null,
+      lastId: page.lastId != null ? (typeof page.lastId === "object" ? JSON.stringify(page.lastId) : String(page.lastId)) : null,
     };
   }
 }
