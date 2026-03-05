@@ -114,6 +114,9 @@ export class LibSqlConnection implements Connection {
             DatabaseErrorCode.TX_SAVEPOINT_FAILED,
           );
         }
+        if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name)) {
+          throw new Error(`Invalid savepoint name: "${name}". Only alphanumeric and underscore characters allowed.`);
+        }
         await tx.execute({ sql: `SAVEPOINT ${name}`, args: [] });
       },
 
@@ -125,6 +128,9 @@ export class LibSqlConnection implements Connection {
             DatabaseErrorCode.TX_ROLLBACK_FAILED,
           );
         }
+        if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name)) {
+          throw new Error(`Invalid savepoint name: "${name}". Only alphanumeric and underscore characters allowed.`);
+        }
         await tx.execute({ sql: `ROLLBACK TO ${name}`, args: [] });
       },
     };
@@ -133,9 +139,9 @@ export class LibSqlConnection implements Connection {
   async close(): Promise<void> {
     if (this.activeTransaction) {
       try {
-        this.activeTransaction.close();
+        await this.activeTransaction.rollback();
       } catch {
-        // ignore close errors on transaction
+        // ignore rollback errors on already-closed transactions
       }
       this.activeTransaction = null;
     }

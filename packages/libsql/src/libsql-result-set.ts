@@ -35,7 +35,9 @@ export class LibSqlJdbcResultSet implements ResultSet {
 
   getBoolean(column: string | number): boolean | null {
     const value = this._getValue(column);
-    return value == null ? null : Boolean(value);
+    if (value == null) return null;
+    if (typeof value === 'string') return value !== 'false' && value !== '0' && value !== '';
+    return Boolean(value);
   }
 
   getDate(column: string | number): Date | null {
