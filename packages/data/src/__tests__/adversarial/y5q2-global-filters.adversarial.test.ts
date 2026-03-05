@@ -42,6 +42,7 @@ const fakeMetadata = {
   manyToManyRelations: [],
   oneToOneRelations: [],
   embeddedFields: [],
+  vectorFields: new Map(),
   lifecycleCallbacks: new Map(),
 } as EntityMetadata;
 
@@ -631,6 +632,7 @@ describe("filter function metadata mutation", () => {
       manyToManyRelations: [],
       oneToOneRelations: [],
       embeddedFields: [],
+      vectorFields: new Map(),
       lifecycleCallbacks: new Map(),
     } as EntityMetadata;
 

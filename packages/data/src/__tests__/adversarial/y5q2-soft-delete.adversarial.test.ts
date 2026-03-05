@@ -32,6 +32,7 @@ const fakeMetadata = {
   manyToManyRelations: [],
   oneToOneRelations: [],
   embeddedFields: [],
+  vectorFields: new Map(),
   lifecycleCallbacks: new Map(),
 } as EntityMetadata;
 

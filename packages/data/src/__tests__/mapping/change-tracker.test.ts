@@ -19,6 +19,7 @@ const userMetadata: EntityMetadata = {
   manyToManyRelations: [],
   oneToOneRelations: [],
   embeddedFields: [],
+  vectorFields: new Map(),
   lifecycleCallbacks: new Map(),
 };
 
@@ -124,6 +125,7 @@ describe("EntityChangeTracker: snapshot isolation", () => {
       manyToManyRelations: [],
       oneToOneRelations: [],
       embeddedFields: [],
+      vectorFields: new Map(),
       lifecycleCallbacks: new Map(),
     };
 
@@ -156,6 +158,7 @@ describe("EntityChangeTracker: snapshot isolation", () => {
       manyToManyRelations: [],
       oneToOneRelations: [],
       embeddedFields: [],
+      vectorFields: new Map(),
       lifecycleCallbacks: new Map(),
     };
 
@@ -186,6 +189,7 @@ describe("EntityChangeTracker: snapshot isolation", () => {
       manyToManyRelations: [],
       oneToOneRelations: [],
       embeddedFields: [],
+      vectorFields: new Map(),
       lifecycleCallbacks: new Map(),
     };
 
@@ -284,6 +288,7 @@ describe("EntityChangeTracker: deepEqual edge cases", () => {
       manyToManyRelations: [],
       oneToOneRelations: [],
       embeddedFields: [],
+      vectorFields: new Map(),
       lifecycleCallbacks: new Map(),
     };
 
@@ -317,6 +322,7 @@ describe("EntityChangeTracker: deepEqual edge cases", () => {
       manyToManyRelations: [],
       oneToOneRelations: [],
       embeddedFields: [],
+      vectorFields: new Map(),
       lifecycleCallbacks: new Map(),
     };
 
@@ -405,6 +411,7 @@ describe("EntityChangeTracker: custom column name mapping", () => {
       manyToManyRelations: [],
       oneToOneRelations: [],
       embeddedFields: [],
+      vectorFields: new Map(),
       lifecycleCallbacks: new Map(),
     };
 
@@ -441,6 +448,7 @@ describe("EntityChangeTracker: boolean fields", () => {
       manyToManyRelations: [],
       oneToOneRelations: [],
       embeddedFields: [],
+      vectorFields: new Map(),
       lifecycleCallbacks: new Map(),
     };
 
@@ -470,6 +478,7 @@ describe("EntityChangeTracker: boolean fields", () => {
       manyToManyRelations: [],
       oneToOneRelations: [],
       embeddedFields: [],
+      vectorFields: new Map(),
       lifecycleCallbacks: new Map(),
     };
 
@@ -586,6 +595,7 @@ describe("EntityChangeTracker: adversarial — circular references", () => {
     manyToManyRelations: [],
     oneToOneRelations: [],
     embeddedFields: [],
+    vectorFields: new Map(),
     lifecycleCallbacks: new Map(),
   };
 
@@ -638,6 +648,7 @@ describe("EntityChangeTracker: adversarial — large values", () => {
       manyToManyRelations: [],
       oneToOneRelations: [],
       embeddedFields: [],
+      vectorFields: new Map(),
       lifecycleCallbacks: new Map(),
     };
 
@@ -669,6 +680,7 @@ describe("EntityChangeTracker: adversarial — large values", () => {
       manyToManyRelations: [],
       oneToOneRelations: [],
       embeddedFields: [],
+      vectorFields: new Map(),
       lifecycleCallbacks: new Map(),
     };
 
@@ -760,6 +772,7 @@ describe("EntityChangeTracker: adversarial — type coercion", () => {
       manyToManyRelations: [],
       oneToOneRelations: [],
       embeddedFields: [],
+      vectorFields: new Map(),
       lifecycleCallbacks: new Map(),
     };
 
@@ -851,6 +864,7 @@ describe("EntityChangeTracker: adversarial — Date edge cases", () => {
     manyToManyRelations: [],
     oneToOneRelations: [],
     embeddedFields: [],
+    vectorFields: new Map(),
     lifecycleCallbacks: new Map(),
   };
 

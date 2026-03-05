@@ -16,6 +16,7 @@ const metadata: EntityMetadata = {
   manyToManyRelations: [],
   oneToOneRelations: [],
   embeddedFields: [],
+  vectorFields: new Map(),
   lifecycleCallbacks: new Map(),
 };
 
