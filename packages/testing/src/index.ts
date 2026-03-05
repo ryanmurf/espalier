@@ -5,8 +5,9 @@
  * and query assertions.
  */
 
-// Entity factory (placeholder)
-export { EntityFactory } from "./factory/entity-factory.js";
+// Entity factory
+export { EntityFactory, createFactory } from "./factory/entity-factory.js";
+export type { FactoryOptions, PersistFn } from "./factory/entity-factory.js";
 
 // Seeding framework (placeholder)
 export { Seeder } from "./seeding/seeder.js";
