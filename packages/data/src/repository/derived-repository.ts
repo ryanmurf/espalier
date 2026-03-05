@@ -10,7 +10,8 @@ import type { ProjectionMapper } from "../mapping/projection-mapper.js";
 import { getProjectionMetadata } from "../decorators/projection.js";
 import { SelectBuilder, DeleteBuilder, InsertBuilder } from "../query/query-builder.js";
 import { BulkOperationBuilder } from "../query/bulk-operation-builder.js";
-import { ComparisonCriteria, RawComparisonCriteria } from "../query/criteria.js";
+import { ComparisonCriteria, RawComparisonCriteria, LogicalCriteria } from "../query/criteria.js";
+import type { Criteria } from "../query/criteria.js";
 import type { Specification } from "../query/specification.js";
 import { EntityNotFoundException } from "./entity-not-found.js";
 import { EntityCache } from "../cache/entity-cache.js";
@@ -47,6 +48,9 @@ import { getTenantColumn } from "../tenant/tenant-filter.js";
 import { EntityPersister } from "./entity-persister.js";
 import { CascadeManager } from "./cascade-manager.js";
 import { DerivedQueryHandler } from "./derived-query-handler.js";
+import { getFilters, resolveActiveFilters } from "../filter/filter-registry.js";
+import type { FilterRegistration } from "../filter/filter-registry.js";
+import { FilterContext } from "../filter/filter-context.js";
 
 function isProjectionClass(arg: unknown): arg is new (...args: any[]) => any {
   return typeof arg === "function" && getProjectionMetadata(arg) !== undefined;
@@ -127,12 +131,36 @@ export function createDerivedRepository<T, ID>(
     return tid;
   }
 
-  function applyTenantFilter(builder: { and(criteria: import("../query/criteria.js").Criteria): unknown }): void {
+  function applyTenantFilter(builder: { and(criteria: Criteria): unknown }): void {
     const tid = requireTenantForRead();
     if (!tid || !tenantColumn) return;
     // Qualify with table name to avoid ambiguity in JOINs
     const qualifiedCol = `${quoteIdentifier(metadata.tableName)}.${quoteIdentifier(tenantColumn)}`;
     builder.and(new RawComparisonCriteria("eq", qualifiedCol, tid as SqlValue));
+  }
+
+  // Global query filters
+  const filterRegistrations: FilterRegistration[] = getFilters(entityClass);
+
+  function applyGlobalFilters(builder: { and(criteria: Criteria): unknown }): void {
+    if (!filterRegistrations.length) return;
+    const contextOptions = FilterContext.current();
+    const active = resolveActiveFilters(filterRegistrations, contextOptions);
+    for (const reg of active) {
+      const criteria = reg.filter(metadata);
+      if (criteria) {
+        builder.and(criteria);
+      }
+    }
+  }
+
+  /**
+   * Applies both tenant filter and global query filters to a builder.
+   * Called on every SELECT query to enforce row-level filtering.
+   */
+  function applyAllFilters(builder: { and(criteria: Criteria): unknown }): void {
+    applyTenantFilter(builder);
+    applyGlobalFilters(builder);
   }
 
   function tenantCacheKey(id: unknown): unknown {
@@ -142,10 +170,41 @@ export function createDerivedRepository<T, ID>(
     return `__tenant:${tid}:${String(id)}`;
   }
 
-  function getTenantCriteria(): import("../query/criteria.js").Criteria | undefined {
+  function getTenantCriteria(): Criteria | undefined {
     const tid = requireTenantForRead();
     if (!tid || !tenantColumn) return undefined;
     return new ComparisonCriteria("eq", tenantColumn, tid as SqlValue);
+  }
+
+  /**
+   * Returns combined criteria for tenant filter + all active global filters.
+   * Used by derived query methods which pass criteria to buildDerivedQuery.
+   */
+  function getAllFilterCriteria(): Criteria | undefined {
+    const tenantCriteria = getTenantCriteria();
+    const globalCriteriaList: Criteria[] = [];
+
+    if (filterRegistrations.length) {
+      const contextOptions = FilterContext.current();
+      const active = resolveActiveFilters(filterRegistrations, contextOptions);
+      for (const reg of active) {
+        const c = reg.filter(metadata);
+        if (c) globalCriteriaList.push(c);
+      }
+    }
+
+    if (!tenantCriteria && globalCriteriaList.length === 0) return undefined;
+
+    const all: Criteria[] = [];
+    if (tenantCriteria) all.push(tenantCriteria);
+    all.push(...globalCriteriaList);
+
+    if (all.length === 1) return all[0];
+    let combined = all[0];
+    for (let i = 1; i < all.length; i++) {
+      combined = new LogicalCriteria("and", combined, all[i]);
+    }
+    return combined;
   }
 
   function getIdColumn(): string {
@@ -253,7 +312,7 @@ export function createDerivedRepository<T, ID>(
     eventBus,
     getEntityId,
     tenantCacheKey,
-    getTenantCriteria,
+    getTenantCriteria: getAllFilterCriteria,
     invokeLifecycleCallbacks: (entity: T, event: LifecycleEvent) => persister.invokeLifecycleCallbacks(entity, event),
     emitEntityEvent: (g: string, s: string, p: unknown) => persister.emitEntityEvent(g, s, p),
   });
@@ -732,7 +791,7 @@ export function createDerivedRepository<T, ID>(
           .columns(...projMapper.columns)
           .where(new ComparisonCriteria("eq", idCol, id as SqlValue))
           .limit(1);
-        applyTenantFilter(builder);
+        applyAllFilters(builder);
 
         const query = builder.build();
         const conn = await dataSource.getConnection();
@@ -775,7 +834,7 @@ export function createDerivedRepository<T, ID>(
           .where(new ComparisonCriteria("eq", idCol, id as SqlValue))
           .limit(1);
       }
-      applyTenantFilter(builder);
+      applyAllFilters(builder);
 
       const query = builder.build();
       const conn = await dataSource.getConnection();
@@ -811,7 +870,7 @@ export function createDerivedRepository<T, ID>(
         .columns("1")
         .where(new ComparisonCriteria("eq", idCol, id as SqlValue))
         .limit(1);
-      applyTenantFilter(builder);
+      applyAllFilters(builder);
 
       const query = builder.build();
       const conn = await dataSource.getConnection();
@@ -878,7 +937,7 @@ export function createDerivedRepository<T, ID>(
         if (pageableSpec && typeof pageableSpec.toPredicate === "function") {
           countBuilder.where(pageableSpec.toPredicate(metadata));
         }
-        applyTenantFilter(countBuilder);
+        applyAllFilters(countBuilder);
         const countQuery = countBuilder.build();
 
         // Run count query on its own connection to avoid holding a connection
@@ -920,7 +979,7 @@ export function createDerivedRepository<T, ID>(
           if (pageableSpec && typeof pageableSpec.toPredicate === "function") {
             builder.where(pageableSpec.toPredicate(metadata));
           }
-          applyTenantFilter(builder);
+          applyAllFilters(builder);
 
           if (pageable.sort) {
             for (const s of pageable.sort) {
@@ -972,7 +1031,7 @@ export function createDerivedRepository<T, ID>(
         const projMapper = derivedQueryHandler.getCachedProjectionMapper(specOrProjectionOrPageable as new (...args: any[]) => any);
         const builder = new SelectBuilder(metadata.tableName)
           .columns(...projMapper.columns);
-        applyTenantFilter(builder);
+        applyAllFilters(builder);
 
         const query = builder.build();
         const conn = await dataSource.getConnection();
@@ -1025,7 +1084,7 @@ export function createDerivedRepository<T, ID>(
       if (spec) {
         builder.where(spec.toPredicate(metadata));
       }
-      applyTenantFilter(builder);
+      applyAllFilters(builder);
 
       const query = builder.build();
       const cacheKey = { sql: query.sql, params: query.params as unknown[] };
@@ -1264,7 +1323,7 @@ export function createDerivedRepository<T, ID>(
       const idCol = getIdColumn();
       const builder = new DeleteBuilder(metadata.tableName)
         .where(new ComparisonCriteria("eq", idCol, id as SqlValue));
-      applyTenantFilter(builder);
+      applyAllFilters(builder);
 
       const query = builder.build();
       const conn = await dataSource.getConnection();
@@ -1292,7 +1351,7 @@ export function createDerivedRepository<T, ID>(
       if (options?.where) {
         builder.where(options.where.toPredicate(metadata));
       }
-      applyTenantFilter(builder);
+      applyAllFilters(builder);
 
       const query = builder.build();
 
@@ -1393,7 +1452,7 @@ export function createDerivedRepository<T, ID>(
             .where(new ComparisonCriteria("eq", idCol, id as SqlValue))
             .limit(1);
         }
-        applyTenantFilter(builder);
+        applyAllFilters(builder);
 
         const query = builder.build();
         const stmt = conn.prepareStatement(query.sql);
@@ -1538,7 +1597,7 @@ export function createDerivedRepository<T, ID>(
       if (spec) {
         builder.where(spec.toPredicate(metadata));
       }
-      applyTenantFilter(builder);
+      applyAllFilters(builder);
 
       const query = builder.build();
       const cacheKey = { sql: query.sql, params: query.params as unknown[] };
