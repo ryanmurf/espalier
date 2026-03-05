@@ -139,16 +139,17 @@ export function createDataSource(dialect: Dialect, config: DataSourceConfig): Da
 /**
  * Check if a factory is registered for a given dialect and optional runtime.
  *
- * When `runtime` is specified, returns true if either:
- * - A runtime-specific factory exists for that dialect+runtime combination, OR
- * - A dialect-level factory exists (fallback).
+ * When `runtime` is specified, checks ONLY for a runtime-specific factory
+ * (dialect+runtime combination). Does NOT fall back to dialect-level.
+ * This allows callers to distinguish between "has any factory" and
+ * "has a runtime-specific factory".
  *
- * Use `hasDataSourceFactory(dialect)` (without runtime) to check only for a
+ * Use `hasDataSourceFactory(dialect)` (without runtime) to check for a
  * dialect-level factory.
  */
 export function hasDataSourceFactory(dialect: Dialect, runtime?: RuntimeInfo["runtime"]): boolean {
   if (runtime) {
-    return registry.has(`${dialect}:${runtime}`) || registry.has(dialect);
+    return registry.has(`${dialect}:${runtime}`);
   }
   return registry.has(dialect);
 }

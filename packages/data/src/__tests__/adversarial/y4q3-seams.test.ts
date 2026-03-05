@@ -989,7 +989,7 @@ describe("Seam: QueryCompiler + DerivedQueryHandler", () => {
     const compiled = compiler.compile(descriptor, metadata);
     const { sql, params } = bindCompiledQuery(compiled, [[]]);
 
-    expect(sql).toContain("IN (NULL)");
+    expect(sql).toContain("(1=0)");
     expect(params).toHaveLength(0);
   });
 
@@ -1058,7 +1058,7 @@ describe("Seam: GraphQL Pagination Adapters + SDL generation", () => {
 
     it("generates OffsetPageInfo shared type", () => {
       const sdl = adapter.generateSharedTypes();
-      expect(sdl).toContain("type OffsetPageInfo");
+      expect(sdl).toContain("type PageInfo");
       expect(sdl).toContain("hasNextPage");
       expect(sdl).toContain("totalElements");
     });
@@ -1216,11 +1216,11 @@ describe("Seam: GraphQL Pagination Adapters + SDL generation", () => {
       const relayShared = relay.generateSharedTypes();
 
       // They define different type names
-      expect(offsetShared).toContain("type OffsetPageInfo");
+      expect(offsetShared).toContain("type PageInfo");
       expect(relayShared).toContain("type RelayPageInfo");
       // No name collision
       expect(offsetShared).not.toContain("RelayPageInfo");
-      expect(relayShared).not.toContain("type OffsetPageInfo");
+      expect(relayShared).not.toContain("type PageInfo {");
     });
 
     it("offset and relay connection types use different names", () => {

@@ -372,16 +372,12 @@ describe("diagnose — quoted identifier extraction", () => {
     expect(result!.tableName).toBe("my_table");
   });
 
-  it("BUG: column+relation message matches table pattern first (pattern priority issue)", () => {
+  it("column+relation message should diagnose as column-not-found", () => {
     // Message contains both "column" and "relation ... does not exist"
-    // The table pattern fires before column pattern, so this is misdiagnosed as table-not-found
-    // TODO: Fix by moving column check before table check in diagnose()
+    // Should match column pattern, not table pattern
     const result = diagnose('column "age" of relation "users" does not exist');
     expect(result).not.toBeNull();
-    // Currently matches as table diagnostic, extracting "age" as table name (wrong)
-    expect(result!.tableName).toBe("age");
-    // columnName is NOT set because the column branch never executes
-    expect(result!.columnName).toBeUndefined();
+    expect(result!.columnName).toBe("age");
   });
 
   it("falls back when no quoted identifier", () => {

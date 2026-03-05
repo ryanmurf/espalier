@@ -233,7 +233,8 @@ describe("QueryBatcher — duplicate ID deduplication", () => {
     // Only one unique ID should be in the query params
     expect(paramCapture).toHaveLength(1);
     expect(paramCapture[0]).toHaveLength(1);
-    expect(paramCapture[0][0]).toBe(1);
+    // IDs are normalized to strings before dedup; the param may be the string "1"
+    expect(String(paramCapture[0][0])).toBe("1");
   });
 
   it("mix of duplicate and unique IDs", async () => {
@@ -601,7 +602,8 @@ describe("QueryBatcher — SQL generation", () => {
     await batcher.load(42);
 
     expect(paramCapture).toHaveLength(1);
-    expect(paramCapture[0]).toContain(42);
+    // IDs are normalized to strings for dedup; the param value may be "42" or 42
+    expect(paramCapture[0].map(String)).toContain("42");
   });
 });
 

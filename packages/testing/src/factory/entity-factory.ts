@@ -361,9 +361,10 @@ export class EntityFactory<T> {
       // Skip transient fields
       if (this._transientKeys.has(fieldName)) continue;
 
-      // Skip if already set by constructor (but not empty strings — those need defaults)
+      // Skip if already set by constructor — but not if value is undefined, empty string, or 0
+      // (undefined = ! field not initialized; "" = empty string default; 0 = numeric zero default)
       const currentValue = (entity as Record<string, unknown>)[fieldName];
-      if (currentValue !== undefined && currentValue !== "") continue;
+      if (currentValue !== undefined && currentValue !== "" && currentValue !== 0) continue;
 
       const columnEntry = this._columnEntries.get(field.fieldName);
       const value = this._generateDefault(fieldName, columnEntry);
@@ -377,6 +378,31 @@ export class EntityFactory<T> {
     const idValue = (entity as Record<string, unknown>)[idFieldName];
     if (idValue === undefined || idValue === "") {
       (entity as Record<string, unknown>)[idFieldName] = generateUUID();
+    }
+
+    // Apply defaults to @Version field (not in metadata.fields, tracked separately)
+    if (this._metadata.versionField) {
+      const versionFieldName = String(this._metadata.versionField);
+      const versionValue = (entity as Record<string, unknown>)[versionFieldName];
+      if (versionValue === undefined || versionValue === 0) {
+        (entity as Record<string, unknown>)[versionFieldName] = 0;
+      }
+    }
+
+    // Apply defaults to @CreatedDate and @LastModifiedDate fields
+    if (this._metadata.createdDateField) {
+      const fieldName = String(this._metadata.createdDateField);
+      const value = (entity as Record<string, unknown>)[fieldName];
+      if (value === undefined) {
+        (entity as Record<string, unknown>)[fieldName] = new Date();
+      }
+    }
+    if (this._metadata.lastModifiedDateField) {
+      const fieldName = String(this._metadata.lastModifiedDateField);
+      const value = (entity as Record<string, unknown>)[fieldName];
+      if (value === undefined) {
+        (entity as Record<string, unknown>)[fieldName] = new Date();
+      }
     }
   }
 

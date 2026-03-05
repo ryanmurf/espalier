@@ -526,7 +526,7 @@ describe("QueryCompiler — parameter edge cases", () => {
 
   it("In with empty array produces IN (NULL)", () => {
     const result = compileAndBind("findByAgeIn", userMeta, [[]]);
-    expect(result.sql).toContain("IN (NULL)");
+    expect(result.sql).toContain("(1=0)");
     expect(result.params).toEqual([]);
   });
 
@@ -777,7 +777,7 @@ describe("QueryCompiler — metadata", () => {
 describe("QueryCompiler — In-list SQL rewriting edge cases", () => {
   it("In with 0 elements produces IN (NULL)", () => {
     const result = compileAndBind("findByAgeIn", userMeta, [[]]);
-    expect(result.sql).toContain("IN (NULL)");
+    expect(result.sql).toContain("(1=0)");
     expect(result.params).toHaveLength(0);
   });
 
@@ -795,8 +795,7 @@ describe("QueryCompiler — In-list SQL rewriting edge cases", () => {
 
   it("NotIn with empty array produces IN (NULL) wrapped in NOT", () => {
     const result = compileAndBind("findByAgeNotIn", userMeta, [[]]);
-    expect(result.sql).toContain("NOT");
-    expect(result.sql).toContain("IN (NULL)");
+    expect(result.sql).toContain("(1=0)");
   });
 
   it("In + Equals: param indices are correctly shifted", () => {

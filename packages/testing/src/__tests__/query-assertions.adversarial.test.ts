@@ -138,12 +138,11 @@ describe("QueryLog — unit tests", () => {
     const log = new QueryLog();
     log.record("SELECT 1", [], 1);
     const queries = log.queries;
-    // TypeScript readonly is compile-time only. At runtime, the backing array IS mutable.
-    // This documents the current behavior. For true immutability, Object.freeze would be needed.
-    // BUG: QueryLog.queries returns the internal array reference, not a frozen copy.
+    // queries returns a copy — mutating the returned array does NOT affect the internal log.
+    // This ensures data integrity: consumers cannot accidentally corrupt the query log.
     (queries as unknown as unknown[]).push({ sql: "FAKE", params: [], durationMs: 0, timestamp: new Date() });
-    // The push succeeds AND mutates the internal log — this is a data integrity issue
-    expect(log.count).toBe(2); // Should ideally be 1 if properly immutable
+    // The push modifies the returned copy, but the internal log is unaffected
+    expect(log.count).toBe(1); // Internal log is protected — still 1
   });
 
   it("queriesMatching with string pattern (case-insensitive)", () => {

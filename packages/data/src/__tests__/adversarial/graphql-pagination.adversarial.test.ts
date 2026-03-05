@@ -21,7 +21,7 @@ describe("OffsetPaginationAdapter — adversarial", () => {
   describe("generateSharedTypes", () => {
     it("produces PageInfo type with required fields", () => {
       const sdl = adapter.generateSharedTypes();
-      expect(sdl).toContain("type OffsetPageInfo");
+      expect(sdl).toContain("type PageInfo");
       expect(sdl).toContain("hasNextPage: Boolean!");
       expect(sdl).toContain("hasPreviousPage: Boolean!");
       expect(sdl).toContain("totalElements: Int!");
@@ -36,7 +36,7 @@ describe("OffsetPaginationAdapter — adversarial", () => {
       const sdl = adapter.generateConnectionType("User");
       expect(sdl).toContain("type UserOffsetConnection");
       expect(sdl).toContain("content: [User!]!");
-      expect(sdl).toContain("pageInfo: OffsetPageInfo!");
+      expect(sdl).toContain("pageInfo: PageInfo!");
     });
 
     it("works with any type name", () => {
@@ -397,9 +397,9 @@ describe("Cross-adapter SDL — adversarial", () => {
     const offsetSdl = offset.generateSharedTypes();
     const relaySdl = relay.generateSharedTypes();
     // Verify they use different type names
-    expect(offsetSdl).toContain("type OffsetPageInfo");
+    expect(offsetSdl).toContain("type PageInfo");
     expect(relaySdl).toContain("type RelayPageInfo");
-    expect(relaySdl).not.toContain("type OffsetPageInfo");
+    expect(relaySdl).not.toContain("type PageInfo {");
   });
 
   it("offset OffsetConnection vs relay Connection — no collision", () => {

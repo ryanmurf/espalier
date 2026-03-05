@@ -316,11 +316,13 @@ describe("RelayCursorStrategy.buildResult — adversarial", () => {
     expect(result.pageInfo.hasPreviousPage).toBe(false);
   });
 
-  it("subsequent page (after cursor) — hasPreviousPage is true", () => {
+  it("subsequent page (after cursor) — hasPreviousPage based on extra row, not cursor presence", () => {
     const cursor = encodeCursor({ values: [5], id: 5 });
     const rows = makeRows(5, 6);
+    // Only 5 rows returned (less than limit of 10) — no extra row fetched
+    // New Relay-spec behavior: hasPreviousPage is determined by n+1 row availability, not cursor presence
     const result = s.buildResult(rows, { first: 10, after: cursor }, 100);
-    expect(result.pageInfo.hasPreviousPage).toBe(true);
+    expect(result.pageInfo.hasPreviousPage).toBe(false);
   });
 
   it("backward pagination — rows are reversed", () => {
@@ -348,11 +350,13 @@ describe("RelayCursorStrategy.buildResult — adversarial", () => {
     expect(result.pageInfo.hasPreviousPage).toBe(false);
   });
 
-  it("backward hasNextPage is true when before cursor exists", () => {
+  it("backward hasNextPage based on extra row, not cursor presence", () => {
     const cursor = encodeCursor({ values: [50], id: 50 });
     const rows = makeRows(3, 47);
+    // Only 3 rows returned (less than limit of 10) — no extra row fetched
+    // New Relay-spec behavior: hasNextPage is determined by n+1 row availability, not cursor presence
     const result = s.buildResult(rows, { last: 10, before: cursor }, 100);
-    expect(result.pageInfo.hasNextPage).toBe(true); // there are items after cursor
+    expect(result.pageInfo.hasNextPage).toBe(false);
   });
 
   it("each edge has a valid decodable cursor", () => {
