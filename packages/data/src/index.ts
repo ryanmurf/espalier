@@ -26,6 +26,7 @@ export {
   PostRemove,
   PostLoad,
   getLifecycleCallbacks,
+  addLifecycleCallback,
 } from "./decorators/lifecycle.js";
 
 export type { Repository as RepositoryInterface } from "./repository/repository.js";
@@ -189,6 +190,13 @@ export { SoftDelete, getSoftDeleteMetadata, isSoftDeleteEntity } from "./decorat
 
 export type { VectorOptions, VectorMetadataEntry } from "./decorators/vector.js";
 export { Vector, getVectorFields, getVectorFieldMetadata } from "./decorators/vector.js";
+
+export type { VectorIndexOptions } from "./vector/vector-index-manager.js";
+export { VectorIndexManager } from "./vector/vector-index-manager.js";
+export type { EmbeddingProvider, EmbeddingHookOptions } from "./vector/embedding-hook.js";
+export { createEmbeddingHook, registerEmbeddingHook } from "./vector/embedding-hook.js";
+export type { NearestToResult } from "./vector/vector-specifications.js";
+export { similarTo, nearestTo } from "./vector/vector-specifications.js";
 
 export type { AuditedOptions } from "./decorators/audited.js";
 export { Audited, getAuditedMetadata, isAuditedEntity } from "./decorators/audited.js";
