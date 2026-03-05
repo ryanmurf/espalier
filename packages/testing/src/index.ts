@@ -12,8 +12,9 @@ export type { FactoryOptions, PersistFn } from "./factory/entity-factory.js";
 // Seeding framework (placeholder)
 export { Seeder } from "./seeding/seeder.js";
 
-// Test isolation (placeholder)
-export { TestTransaction } from "./isolation/test-transaction.js";
+// Test isolation
+export { withTestTransaction, withNestedTransaction } from "./isolation/test-transaction.js";
+export type { TestTransactionContext, TestTransactionOptions } from "./isolation/test-transaction.js";
 
 // Query assertions (placeholder)
 export { QueryAssertions } from "./assertions/query-assertions.js";
