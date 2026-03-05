@@ -7,6 +7,7 @@ import { getTenantIdField } from "../decorators/tenant.js";
 import { createPageable } from "../repository/paging.js";
 import { OptimisticLockException } from "../repository/optimistic-lock.js";
 import { EntityNotFoundException } from "../repository/entity-not-found.js";
+import { TenantContext } from "../tenant/tenant-context.js";
 
 /**
  * Options for REST route generation.
@@ -24,6 +25,8 @@ export interface RouteGeneratorOptions {
   tenantHeader?: string;
   /** Custom entity-to-path mapping. Default: lowercase plural. */
   pathMapper?: (entityName: string) => string;
+  /** When true, route handlers require TenantContext to be set, returning 403 otherwise. Default: false. */
+  requireTenantContext?: boolean;
 }
 
 /**
@@ -48,6 +51,7 @@ export class RouteGenerator {
       tenantAware: options?.tenantAware ?? true,
       tenantHeader: options?.tenantHeader ?? "x-tenant-id",
       pathMapper: options?.pathMapper ?? defaultPathMapper,
+      requireTenantContext: options?.requireTenantContext ?? false,
     };
   }
 
@@ -124,27 +128,30 @@ export class RouteGenerator {
     entityClass: new (...args: any[]) => any,
   ): (req: RestRequest) => Promise<RestResponse> {
     return async (req: RestRequest) => {
-      this.applyTenantContext(req, metadata, entityClass);
+      const tenantCheck = this.checkTenantContext(req, entityClass);
+      if (tenantCheck) return tenantCheck;
 
-      if (this.options.pagination) {
-        const pageable = parsePageable(req.query);
-        const page: Page<any> = await repository.findAll(pageable);
-        return {
-          status: 200,
-          body: {
-            content: page.content,
-            page: page.page,
-            size: page.size,
-            totalElements: page.totalElements,
-            totalPages: page.totalPages,
-            hasNext: page.hasNext,
-            hasPrevious: page.hasPrevious,
-          },
-        };
-      }
+      return this.withTenantContext(req, entityClass, async () => {
+        if (this.options.pagination) {
+          const pageable = parsePageable(req.query, metadata);
+          const page: Page<any> = await repository.findAll(pageable);
+          return {
+            status: 200,
+            body: {
+              content: page.content,
+              page: page.page,
+              size: page.size,
+              totalElements: page.totalElements,
+              totalPages: page.totalPages,
+              hasNext: page.hasNext,
+              hasPrevious: page.hasPrevious,
+            },
+          };
+        }
 
-      const entities = await repository.findAll();
-      return { status: 200, body: entities };
+        const entities = await repository.findAll();
+        return { status: 200, body: entities };
+      });
     };
   }
 
@@ -154,12 +161,16 @@ export class RouteGenerator {
     entityClass: new (...args: any[]) => any,
   ): (req: RestRequest) => Promise<RestResponse> {
     return async (req: RestRequest) => {
-      this.applyTenantContext(req, metadata, entityClass);
-      const entity = await repository.findById(req.params.id);
-      if (!entity) {
-        return { status: 404, body: { error: `${entityClass.name} not found` } };
-      }
-      return { status: 200, body: entity };
+      const tenantCheck = this.checkTenantContext(req, entityClass);
+      if (tenantCheck) return tenantCheck;
+
+      return this.withTenantContext(req, entityClass, async () => {
+        const entity = await repository.findById(req.params.id);
+        if (!entity) {
+          return { status: 404, body: { error: `${entityClass.name} not found` } };
+        }
+        return { status: 200, body: entity };
+      });
     };
   }
 
@@ -169,9 +180,13 @@ export class RouteGenerator {
     entityClass: new (...args: any[]) => any,
   ): (req: RestRequest) => Promise<RestResponse> {
     return async (req: RestRequest) => {
-      this.applyTenantContext(req, metadata, entityClass);
-      const total = await repository.count();
-      return { status: 200, body: { count: total } };
+      const tenantCheck = this.checkTenantContext(req, entityClass);
+      if (tenantCheck) return tenantCheck;
+
+      return this.withTenantContext(req, entityClass, async () => {
+        const total = await repository.count();
+        return { status: 200, body: { count: total } };
+      });
     };
   }
 
@@ -181,19 +196,23 @@ export class RouteGenerator {
     entityClass: new (...args: any[]) => any,
   ): (req: RestRequest) => Promise<RestResponse> {
     return async (req: RestRequest) => {
-      this.applyTenantContext(req, metadata, entityClass);
+      const tenantCheck = this.checkTenantContext(req, entityClass);
+      if (tenantCheck) return tenantCheck;
 
       if (!req.body || typeof req.body !== "object") {
         return { status: 400, body: { error: "Request body is required" } };
       }
 
-      try {
-        const entity = Object.assign(new entityClass(), req.body);
-        const saved = await repository.save(entity);
-        return { status: 201, body: saved };
-      } catch (err) {
-        return handleError(err);
-      }
+      return this.withTenantContext(req, entityClass, async () => {
+        try {
+          const safeBody = sanitizeBody(req.body as Record<string, unknown>, metadata);
+          const entity = Object.assign(new entityClass(), safeBody);
+          const saved = await repository.save(entity);
+          return { status: 201, body: saved };
+        } catch (err) {
+          return handleError(err);
+        }
+      });
     };
   }
 
@@ -203,23 +222,27 @@ export class RouteGenerator {
     entityClass: new (...args: any[]) => any,
   ): (req: RestRequest) => Promise<RestResponse> {
     return async (req: RestRequest) => {
-      this.applyTenantContext(req, metadata, entityClass);
+      const tenantCheck = this.checkTenantContext(req, entityClass);
+      if (tenantCheck) return tenantCheck;
 
       if (!req.body || typeof req.body !== "object") {
         return { status: 400, body: { error: "Request body is required" } };
       }
 
-      try {
-        const existing = await repository.findById(req.params.id);
-        if (!existing) {
-          return { status: 404, body: { error: `${entityClass.name} not found` } };
+      return this.withTenantContext(req, entityClass, async () => {
+        try {
+          const existing = await repository.findById(req.params.id);
+          if (!existing) {
+            return { status: 404, body: { error: `${entityClass.name} not found` } };
+          }
+          const safeBody = sanitizeBody(req.body as Record<string, unknown>, metadata);
+          Object.assign(existing, safeBody);
+          const saved = await repository.save(existing);
+          return { status: 200, body: saved };
+        } catch (err) {
+          return handleError(err);
         }
-        Object.assign(existing, req.body);
-        const saved = await repository.save(existing);
-        return { status: 200, body: saved };
-      } catch (err) {
-        return handleError(err);
-      }
+      });
     };
   }
 
@@ -227,6 +250,10 @@ export class RouteGenerator {
     repository: CrudRepository<any, any>,
   ): (req: RestRequest) => Promise<RestResponse> {
     return async (req: RestRequest) => {
+      if (this.options.requireTenantContext && !TenantContext.current()) {
+        return { status: 403, body: { error: "Tenant context is required" } };
+      }
+
       try {
         await repository.deleteById(req.params.id);
         return { status: 204 };
@@ -236,21 +263,42 @@ export class RouteGenerator {
     };
   }
 
-  private applyTenantContext(
+  /**
+   * Check if tenant context is required and present. Returns a 403 response if missing.
+   */
+  private checkTenantContext(
     req: RestRequest,
-    metadata: EntityMetadata,
     entityClass: new (...args: any[]) => any,
-  ): void {
-    if (!this.options.tenantAware) return;
+  ): RestResponse | undefined {
+    if (!this.options.requireTenantContext) return undefined;
+
     const tenantField = getTenantIdField(entityClass);
-    if (!tenantField) return;
+    if (!tenantField) return undefined;
+
+    const tenantId = req.headers[this.options.tenantHeader];
+    if (!tenantId || typeof tenantId !== "string") {
+      return { status: 403, body: { error: "Tenant context is required" } };
+    }
+    return undefined;
+  }
+
+  /**
+   * Run fn within a TenantContext scope based on the request's tenant header.
+   */
+  private withTenantContext<R>(
+    req: RestRequest,
+    entityClass: new (...args: any[]) => any,
+    fn: () => R | Promise<R>,
+  ): R | Promise<R> {
+    if (!this.options.tenantAware) return fn();
+    const tenantField = getTenantIdField(entityClass);
+    if (!tenantField) return fn();
 
     const tenantId = req.headers[this.options.tenantHeader];
     if (tenantId && typeof tenantId === "string") {
-      // Store on request for the repository layer
-      (req as any).__tenantId = tenantId;
-      (req as any).__tenantField = String(tenantField);
+      return TenantContext.run(tenantId, fn);
     }
+    return fn();
   }
 }
 
@@ -264,20 +312,26 @@ function handleError(err: unknown): RestResponse {
   throw err;
 }
 
-function parsePageable(query: Record<string, string | string[] | undefined>): Pageable {
+function parsePageable(query: Record<string, string | string[] | undefined>, metadata: EntityMetadata): Pageable {
   const page = parseInt(String(query.page ?? "0"), 10);
   const size = parseInt(String(query.size ?? "20"), 10);
   let sort: Sort[] | undefined;
 
   if (query.sort) {
     const sortStr = Array.isArray(query.sort) ? query.sort.join(",") : query.sort;
-    sort = sortStr.split(",").map((s) => {
+    const validFields = getValidSortFields(metadata);
+    sort = sortStr.split(",").reduce<Sort[]>((acc, s) => {
       const parts = s.trim().split(":");
-      return {
-        property: parts[0],
-        direction: (parts[1]?.toUpperCase() === "DESC" ? "DESC" : "ASC") as "ASC" | "DESC",
-      };
-    });
+      const property = parts[0];
+      if (validFields.has(property)) {
+        acc.push({
+          property,
+          direction: (parts[1]?.toUpperCase() === "DESC" ? "DESC" : "ASC") as "ASC" | "DESC",
+        });
+      }
+      return acc;
+    }, []);
+    if (sort.length === 0) sort = undefined;
   }
 
   return createPageable(
@@ -285,6 +339,33 @@ function parsePageable(query: Record<string, string | string[] | undefined>): Pa
     Number.isFinite(size) && size > 0 ? Math.min(size, 1000) : 20,
     sort,
   );
+}
+
+/** Keys that must never be copied from user input. */
+const PROTOTYPE_POISON_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+
+/**
+ * Sanitize a request body: only copy own enumerable string keys that map to
+ * known entity column field names, and reject prototype pollution keys.
+ */
+function sanitizeBody(body: Record<string, unknown>, metadata: EntityMetadata): Record<string, unknown> {
+  const allowedFields = new Set(
+    metadata.fields.map((f) => String(f.fieldName)),
+  );
+  const result: Record<string, unknown> = {};
+  for (const key of Object.keys(body)) {
+    if (PROTOTYPE_POISON_KEYS.has(key)) continue;
+    if (!allowedFields.has(key)) continue;
+    result[key] = body[key];
+  }
+  return result;
+}
+
+/**
+ * Build a set of valid sort field names from entity metadata.
+ */
+function getValidSortFields(metadata: EntityMetadata): Set<string> {
+  return new Set(metadata.fields.map((f) => String(f.fieldName)));
 }
 
 function defaultPathMapper(entityName: string): string {

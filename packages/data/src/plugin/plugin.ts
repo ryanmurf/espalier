@@ -70,6 +70,11 @@ export interface PluginDependency {
 
 /**
  * The core plugin interface. All plugins must implement this.
+ *
+ * **Security note:** Plugins have full access to framework internals via
+ * {@link PluginContext}, including the event bus, entity metadata, hooks,
+ * and middleware registration. Consumers should vet plugins before installing
+ * them, as a malicious plugin could intercept or modify any repository operation.
  */
 export interface Plugin {
   /** Unique plugin name. */

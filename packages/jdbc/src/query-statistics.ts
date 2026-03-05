@@ -52,8 +52,13 @@ function normalizeSql(sql: string, redactIdentifiers = false): string {
     normalized = normalized
       .replace(/\b(FROM|JOIN|INTO|UPDATE|TABLE)\s+(?:\w+\.)*(\w+)/gi, "$1 [TABLE]")
       .replace(/\b(SET\s+search_path\s+TO)\s+\S+/gi, "$1 [SCHEMA]");
-    // Replace table-qualified column references (e.g., orders.user_id -> [TABLE].user_id)
-    normalized = normalized.replace(/\b(\w+)\.(\w+)\b/g, "[TABLE].$2");
+    // Replace table-qualified column references only after SQL clauses where they appear
+    // (SELECT, WHERE, ON, SET, ORDER BY, GROUP BY, HAVING, AND, OR)
+    // This avoids false positives on arbitrary dot-qualified names like function calls
+    normalized = normalized.replace(
+      /\b(SELECT|WHERE|ON|SET|ORDER\s+BY|GROUP\s+BY|HAVING|AND|OR|,)\s+([^,]*?)\b(\w+)\.(\w+)\b/gi,
+      (match, keyword) => match.replace(/\b(\w+)\.(\w+)\b/g, "[TABLE].$2"),
+    );
   }
 
   return normalized;

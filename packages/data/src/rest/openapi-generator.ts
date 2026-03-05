@@ -82,7 +82,7 @@ export class OpenApiGenerator {
 
       schemas[typeName] = this.generateSchema(entityClass, metadata);
       schemas[`${typeName}Input`] = this.generateInputSchema(entityClass, metadata);
-      schemas[`${typeName}UpdateInput`] = this.generateInputSchema(entityClass, metadata);
+      schemas[`${typeName}UpdateInput`] = this.generateUpdateInputSchema(entityClass, metadata);
     }
 
     // Generate pagination schemas
@@ -175,6 +175,34 @@ export class OpenApiGenerator {
       properties[fieldName] = toOpenApiType(sqlType, fieldName);
     }
 
+    return { type: "object", properties };
+  }
+
+  private generateUpdateInputSchema(
+    entityClass: new (...args: any[]) => any,
+    metadata: EntityMetadata,
+  ): OpenApiSchema {
+    const properties: Record<string, OpenApiSchemaRef> = {};
+    const typeMappings = getColumnTypeMappings(entityClass);
+    const idField = getIdField(entityClass);
+    const createdDateField = getCreatedDateField(entityClass);
+    const lastModifiedDateField = getLastModifiedDateField(entityClass);
+    const versionField = getVersionField(entityClass);
+
+    const exclude = new Set<string | symbol>(
+      [idField, createdDateField, lastModifiedDateField, versionField].filter(
+        (v): v is string | symbol => v != null,
+      ),
+    );
+
+    for (const mapping of metadata.fields) {
+      if (exclude.has(mapping.fieldName)) continue;
+      const fieldName = String(mapping.fieldName);
+      const sqlType = typeMappings.get(mapping.fieldName);
+      properties[fieldName] = toOpenApiType(sqlType, fieldName);
+    }
+
+    // Update schema has no required fields — all are optional
     return { type: "object", properties };
   }
 

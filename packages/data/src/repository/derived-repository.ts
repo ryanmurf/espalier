@@ -2137,7 +2137,10 @@ export function createDerivedRepository<T, ID>(
           for (let i = 0; i < query.params.length; i++) {
             stmt.setParameter(i + 1, query.params[i]);
           }
-          await stmt.executeUpdate();
+          const affectedRows = await stmt.executeUpdate();
+          if (affectedRows === 0) {
+            throw new EntityNotFoundException(entityName, id);
+          }
           entityCache.evict(entityClass, tenantCacheKey(id));
           queryCache.invalidate(entityClass);
         } finally {

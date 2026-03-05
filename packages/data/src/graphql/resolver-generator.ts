@@ -6,6 +6,7 @@ import { getEntityMetadata } from "../mapping/entity-metadata.js";
 import { getTenantIdField } from "../decorators/tenant.js";
 import { equal, Specifications } from "../query/specification.js";
 import { createPageable } from "../repository/paging.js";
+import { TenantContext } from "../tenant/tenant-context.js";
 
 /**
  * A resolver function that can be used by any GraphQL server.
@@ -37,6 +38,8 @@ export interface ResolverGeneratorOptions {
   tenantAware?: boolean;
   /** Function to extract tenant ID from GraphQL context. */
   getTenantId?: (context: any) => string | number | undefined;
+  /** Maximum nesting depth for relation resolvers. Default: 10. */
+  maxDepth?: number;
 }
 
 /**
@@ -59,6 +62,7 @@ export class ResolverGenerator {
       pagination: options?.pagination ?? true,
       tenantAware: options?.tenantAware ?? true,
       getTenantId: options?.getTenantId ?? ((ctx: any) => ctx?.tenantId),
+      maxDepth: options?.maxDepth ?? 10,
     };
   }
 
@@ -103,8 +107,9 @@ export class ResolverGenerator {
     entityClass: new (...args: any[]) => any,
   ): ResolverFn {
     return async (_parent: any, args: { id: any }, context: any) => {
-      this.applyTenantContext(context, metadata, entityClass);
-      return repository.findById(args.id);
+      return this.withTenantContext(context, metadata, entityClass, () =>
+        repository.findById(args.id),
+      );
     };
   }
 
@@ -114,20 +119,21 @@ export class ResolverGenerator {
     entityClass: new (...args: any[]) => any,
   ): ResolverFn {
     return async (_parent: any, args: { page?: number; size?: number; sort?: string }, context: any) => {
-      this.applyTenantContext(context, metadata, entityClass);
-      const pageable = this.toPageable(args);
-      const page: Page<any> = await repository.findAll(pageable);
-      return {
-        content: page.content,
-        pageInfo: {
-          hasNextPage: page.hasNext,
-          hasPreviousPage: page.hasPrevious,
-          totalElements: page.totalElements,
-          totalPages: page.totalPages,
-          page: page.page,
-          size: page.size,
-        },
-      };
+      return this.withTenantContext(context, metadata, entityClass, async () => {
+        const pageable = this.toPageable(args, metadata);
+        const page: Page<any> = await repository.findAll(pageable);
+        return {
+          content: page.content,
+          pageInfo: {
+            hasNextPage: page.hasNext,
+            hasPreviousPage: page.hasPrevious,
+            totalElements: page.totalElements,
+            totalPages: page.totalPages,
+            page: page.page,
+            size: page.size,
+          },
+        };
+      });
     };
   }
 
@@ -137,8 +143,9 @@ export class ResolverGenerator {
     entityClass: new (...args: any[]) => any,
   ): ResolverFn {
     return async (_parent: any, _args: any, context: any) => {
-      this.applyTenantContext(context, metadata, entityClass);
-      return repository.findAll();
+      return this.withTenantContext(context, metadata, entityClass, () =>
+        repository.findAll(),
+      );
     };
   }
 
@@ -148,8 +155,9 @@ export class ResolverGenerator {
     entityClass: new (...args: any[]) => any,
   ): ResolverFn {
     return async (_parent: any, _args: any, context: any) => {
-      this.applyTenantContext(context, metadata, entityClass);
-      return repository.count();
+      return this.withTenantContext(context, metadata, entityClass, () =>
+        repository.count(),
+      );
     };
   }
 
@@ -159,9 +167,11 @@ export class ResolverGenerator {
     entityClass: new (...args: any[]) => any,
   ): ResolverFn {
     return async (_parent: any, args: { input: any }, context: any) => {
-      this.applyTenantContext(context, metadata, entityClass);
-      const entity = Object.assign(new entityClass(), args.input);
-      return repository.save(entity);
+      return this.withTenantContext(context, metadata, entityClass, () => {
+        const safeInput = sanitizeInput(args.input, metadata);
+        const entity = Object.assign(new entityClass(), safeInput);
+        return repository.save(entity);
+      });
     };
   }
 
@@ -171,13 +181,15 @@ export class ResolverGenerator {
     entityClass: new (...args: any[]) => any,
   ): ResolverFn {
     return async (_parent: any, args: { id: any; input: any }, context: any) => {
-      this.applyTenantContext(context, metadata, entityClass);
-      const existing = await repository.findById(args.id);
-      if (!existing) {
-        throw new Error(`${entityClass.name} with id ${args.id} not found`);
-      }
-      Object.assign(existing, args.input);
-      return repository.save(existing);
+      return this.withTenantContext(context, metadata, entityClass, async () => {
+        const existing = await repository.findById(args.id);
+        if (!existing) {
+          throw new Error("Entity not found");
+        }
+        const safeInput = sanitizeInput(args.input, metadata);
+        Object.assign(existing, safeInput);
+        return repository.save(existing);
+      });
     };
   }
 
@@ -187,49 +199,56 @@ export class ResolverGenerator {
     entityClass: new (...args: any[]) => any,
   ): ResolverFn {
     return async (_parent: any, args: { id: any }, context: any) => {
-      this.applyTenantContext(context, metadata, entityClass);
-      const existing = await repository.findById(args.id);
-      if (!existing) {
-        return false;
-      }
-      await repository.deleteById(args.id);
-      return true;
+      return this.withTenantContext(context, metadata, entityClass, async () => {
+        const existing = await repository.findById(args.id);
+        if (!existing) {
+          return false;
+        }
+        await repository.deleteById(args.id);
+        return true;
+      });
     };
   }
 
-  private toPageable(args: { page?: number; size?: number; sort?: string }): Pageable {
+  private toPageable(args: { page?: number; size?: number; sort?: string }, metadata: EntityMetadata): Pageable {
     const page = args.page ?? 0;
     const size = args.size ?? 20;
     let sort: Sort[] | undefined;
 
     if (args.sort) {
-      sort = args.sort.split(",").map((s) => {
+      const validFields = getValidSortFields(metadata);
+      sort = args.sort.split(",").reduce<Sort[]>((acc, s) => {
         const parts = s.trim().split(":");
-        return {
-          property: parts[0],
-          direction: (parts[1]?.toUpperCase() === "DESC" ? "DESC" : "ASC") as "ASC" | "DESC",
-        };
-      });
+        const property = parts[0];
+        if (validFields.has(property)) {
+          acc.push({
+            property,
+            direction: (parts[1]?.toUpperCase() === "DESC" ? "DESC" : "ASC") as "ASC" | "DESC",
+          });
+        }
+        return acc;
+      }, []);
+      if (sort.length === 0) sort = undefined;
     }
 
     return createPageable(page, size, sort);
   }
 
-  private applyTenantContext(
+  private withTenantContext<R>(
     context: any,
     metadata: EntityMetadata,
     entityClass: new (...args: any[]) => any,
-  ): void {
-    if (!this.options.tenantAware) return;
+    fn: () => R | Promise<R>,
+  ): R | Promise<R> {
+    if (!this.options.tenantAware) return fn();
     const tenantField = getTenantIdField(entityClass);
-    if (!tenantField) return;
+    if (!tenantField) return fn();
 
     const tenantId = this.options.getTenantId(context);
-    if (tenantId != null && context) {
-      // Store tenant ID in context for the repository layer to pick up
-      context.__tenantId = tenantId;
-      context.__tenantField = String(tenantField);
+    if (tenantId != null) {
+      return TenantContext.run(String(tenantId), fn);
     }
+    return fn();
   }
 }
 
@@ -251,6 +270,33 @@ export function createFilterSpec<T>(
 
   // Combine with AND using Specifications.and
   return Specifications.and(...specs);
+}
+
+/** Keys that must never be copied from user input. */
+const PROTOTYPE_POISON_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+
+/**
+ * Sanitize user input: only copy own enumerable string keys that map to
+ * known entity column field names, and reject prototype pollution keys.
+ */
+function sanitizeInput(input: Record<string, unknown>, metadata: EntityMetadata): Record<string, unknown> {
+  const allowedFields = new Set(
+    metadata.fields.map((f) => String(f.fieldName)),
+  );
+  const result: Record<string, unknown> = {};
+  for (const key of Object.keys(input)) {
+    if (PROTOTYPE_POISON_KEYS.has(key)) continue;
+    if (!allowedFields.has(key)) continue;
+    result[key] = input[key];
+  }
+  return result;
+}
+
+/**
+ * Build a set of valid sort field names from entity metadata.
+ */
+function getValidSortFields(metadata: EntityMetadata): Set<string> {
+  return new Set(metadata.fields.map((f) => String(f.fieldName)));
 }
 
 function camelCase(str: string): string {

@@ -57,6 +57,8 @@ export interface GraphQLSchemaOptions {
   pagination?: boolean;
   /** Fields to exclude from input types (auto-generated). */
   excludeFromInput?: string[];
+  /** Custom mapping from entity class to GraphQL type name. */
+  typeNameMapper?: (entityClass: new (...args: any[]) => any) => string;
 }
 
 /**
@@ -88,6 +90,7 @@ export class GraphQLSchemaGenerator {
       mutations: options?.mutations ?? true,
       pagination: options?.pagination ?? true,
       excludeFromInput: options?.excludeFromInput ?? [],
+      typeNameMapper: options?.typeNameMapper ?? toTypeName,
     };
   }
 
@@ -101,7 +104,7 @@ export class GraphQLSchemaGenerator {
     const mutationFields: string[] = [];
 
     for (const entityClass of entityClasses) {
-      const typeName = toTypeName(entityClass);
+      const typeName = this.options.typeNameMapper(entityClass);
       const metadata = getEntityMetadata(entityClass);
       const idField = getIdField(entityClass);
 
@@ -135,7 +138,8 @@ export class GraphQLSchemaGenerator {
       }
     }
 
-    const sdl = this.assembleSdl(types, inputTypes, queryFields, mutationFields);
+    const typeNames = entityClasses.map((ec) => this.options.typeNameMapper(ec));
+    const sdl = this.assembleSdl(types, inputTypes, queryFields, mutationFields, typeNames);
 
     return { sdl, types, inputTypes, queryFields, mutationFields };
   }
@@ -158,22 +162,22 @@ export class GraphQLSchemaGenerator {
 
     // Relations
     for (const rel of metadata.manyToOneRelations) {
-      const relTypeName = toTypeName(rel.target());
+      const relTypeName = this.options.typeNameMapper(rel.target());
       fields.push(`  ${String(rel.fieldName)}: ${relTypeName}`);
     }
 
     for (const rel of metadata.oneToManyRelations) {
-      const relTypeName = toTypeName(rel.target());
+      const relTypeName = this.options.typeNameMapper(rel.target());
       fields.push(`  ${String(rel.fieldName)}: [${relTypeName}!]!`);
     }
 
     for (const rel of metadata.manyToManyRelations) {
-      const relTypeName = toTypeName(rel.target());
+      const relTypeName = this.options.typeNameMapper(rel.target());
       fields.push(`  ${String(rel.fieldName)}: [${relTypeName}!]!`);
     }
 
     for (const rel of metadata.oneToOneRelations) {
-      const relTypeName = toTypeName(rel.target());
+      const relTypeName = this.options.typeNameMapper(rel.target());
       fields.push(`  ${String(rel.fieldName)}: ${relTypeName}`);
     }
 
@@ -258,6 +262,7 @@ export class GraphQLSchemaGenerator {
     inputTypes: Map<string, string>,
     queryFields: string[],
     mutationFields: string[],
+    typeNames: string[],
   ): string {
     const parts: string[] = [];
 
@@ -281,19 +286,21 @@ export class GraphQLSchemaGenerator {
     }
 
     // Object types
+    let typeIdx = 0;
     for (const typeDef of types.values()) {
       parts.push(typeDef);
       parts.push("");
 
       // Connection type for pagination
       if (this.options.pagination) {
-        const typeName = typeDef.split(" ")[1];
+        const typeName = typeNames[typeIdx];
         parts.push(`type ${typeName}Connection {
   content: [${typeName}!]!
   pageInfo: PageInfo!
 }`);
         parts.push("");
       }
+      typeIdx++;
     }
 
     // Input types
