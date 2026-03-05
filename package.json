@@ -7,7 +7,8 @@
     "test": "vitest",
     "clean": "pnpm -r clean",
     "size": "size-limit",
-    "size:report": "size-limit --json"
+    "size:report": "size-limit --json",
+    "benchmark": "node benchmarks/run.mjs"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
