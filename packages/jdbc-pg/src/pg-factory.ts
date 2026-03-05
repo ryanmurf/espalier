@@ -24,7 +24,8 @@ export interface PgFactoryConfig {
  * Create a PostgreSQL DataSource, auto-selecting the best driver for the current runtime.
  *
  * - **Bun**: uses `bun:sql` via `BunPgDataSource`
- * - **Node / Deno / Edge**: uses `pg` via `PgDataSource`
+ * - **Deno**: uses `deno-postgres` or `pg` via npm compat via `DenoPgDataSource`
+ * - **Node / Edge**: uses `pg` via `PgDataSource`
  */
 export function createPgDataSource(config: PgFactoryConfig): DataSource {
   const runtime = detectRuntime();
@@ -32,6 +33,20 @@ export function createPgDataSource(config: PgFactoryConfig): DataSource {
   if (runtime.runtime === "bun") {
     const { BunPgDataSource } = require("./bun-pg-data-source.js") as typeof import("./bun-pg-data-source.js");
     return new BunPgDataSource({
+      url: config.url,
+      hostname: config.hostname,
+      port: config.port,
+      database: config.database,
+      username: config.username,
+      password: config.password,
+      max: config.max,
+      typeConverters: config.typeConverters,
+    });
+  }
+
+  if (runtime.runtime === "deno") {
+    const { DenoPgDataSource } = require("./deno-pg-data-source.js") as typeof import("./deno-pg-data-source.js");
+    return new DenoPgDataSource({
       url: config.url,
       hostname: config.hostname,
       port: config.port,
