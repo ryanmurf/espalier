@@ -90,6 +90,25 @@ importers:
         specifier: ^5.7.3
         version: 5.9.3
 
+  packages/event-sourcing:
+    dependencies:
+      espalier-data:
+        specifier: workspace:*
+        version: link:../data
+      espalier-jdbc:
+        specifier: workspace:*
+        version: link:../jdbc
+    devDependencies:
+      tsup:
+        specifier: ^8.4.0
+        version: 8.5.1(postcss@8.5.6)(typescript@5.9.3)
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.1.1
+        version: 3.2.4(@types/node@25.3.0)
+
   packages/jdbc:
     devDependencies:
       tsup:
