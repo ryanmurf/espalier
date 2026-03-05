@@ -58,6 +58,7 @@ import { getSoftDeleteMetadata } from "../decorators/soft-delete.js";
 import { NullCriteria } from "../query/criteria.js";
 import { isAuditedEntity } from "../decorators/audited.js";
 import { AuditLogWriter } from "../audit/audit-log.js";
+import { isViewEntity, isMaterializedViewEntity } from "../decorators/view.js";
 
 function isProjectionClass(arg: unknown): arg is new (...args: any[]) => any {
   return typeof arg === "function" && getProjectionMetadata(arg) !== undefined;
@@ -114,6 +115,9 @@ export function createDerivedRepository<T, ID>(
   // Multi-tenancy
   const tenantColumn = getTenantColumn(metadata);
   const tenantIdField = metadata.tenantIdField;
+
+  // Read-only view check
+  const isReadOnlyView = isViewEntity(entityClass) || isMaterializedViewEntity(entityClass);
 
   // Soft-delete
   const softDeleteMeta = getSoftDeleteMetadata(entityClass);
@@ -1179,6 +1183,9 @@ export function createDerivedRepository<T, ID>(
     },
 
     async save(entity: T): Promise<T> {
+      if (isReadOnlyView) {
+        throw new Error("Cannot modify a view entity. Views are read-only.");
+      }
       if (repoLogger.isEnabled(LogLevel.DEBUG)) {
         repoLogger.debug("save", { operation: "save", entityType: entityName });
       }
@@ -1211,6 +1218,9 @@ export function createDerivedRepository<T, ID>(
     },
 
     async saveAll(entities: T[]): Promise<T[]> {
+      if (isReadOnlyView) {
+        throw new Error("Cannot modify a view entity. Views are read-only.");
+      }
       if (entities.length === 0) return [];
 
       // Partition into new vs existing entities
@@ -1333,6 +1343,9 @@ export function createDerivedRepository<T, ID>(
     },
 
     async delete(entity: T): Promise<void> {
+      if (isReadOnlyView) {
+        throw new Error("Cannot modify a view entity. Views are read-only.");
+      }
       if (repoLogger.isEnabled(LogLevel.DEBUG)) {
         repoLogger.debug("delete", { operation: "delete", entityType: entityName });
       }
@@ -1345,6 +1358,9 @@ export function createDerivedRepository<T, ID>(
     },
 
     async deleteAll(entities: T[]): Promise<void> {
+      if (isReadOnlyView) {
+        throw new Error("Cannot modify a view entity. Views are read-only.");
+      }
       const conn = await dataSource.getConnection();
       const tx = await conn.beginTransaction();
       try {
@@ -1361,6 +1377,9 @@ export function createDerivedRepository<T, ID>(
     },
 
     async deleteById(id: ID): Promise<void> {
+      if (isReadOnlyView) {
+        throw new Error("Cannot modify a view entity. Views are read-only.");
+      }
       if (repoLogger.isEnabled(LogLevel.DEBUG)) {
         repoLogger.debug("deleteById", { operation: "deleteById", entityType: entityName, id: String(id) });
       }
