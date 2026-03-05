@@ -25,10 +25,10 @@ export async function sha256(input: string): Promise<string> {
  * @returns true if both arrays are non-null, same length, and identical byte-by-byte
  */
 export function timingSafeEqual(a: Uint8Array, b: Uint8Array): boolean {
-  if (a.length !== b.length) return false;
-  let result = 0;
-  for (let i = 0; i < a.length; i++) {
-    result |= a[i] ^ b[i];
+  const maxLen = Math.max(a.length, b.length);
+  let result = a.length === b.length ? 0 : 1; // length mismatch contributes to result
+  for (let i = 0; i < maxLen; i++) {
+    result |= (a[i] ?? 0) ^ (b[i] ?? 0);
   }
   return result === 0;
 }

@@ -45,23 +45,41 @@ async function loadSeedingModule(): Promise<{
 }
 
 async function discoverSeedFiles(seedsDir: string): Promise<void> {
-  const { readdirSync, existsSync } = await import("node:fs");
+  const { readdirSync, existsSync, realpathSync } = await import("node:fs");
   const { resolve, extname } = await import("node:path");
 
   if (!existsSync(seedsDir)) {
     throw new Error(`Seeds directory not found: ${seedsDir}`);
   }
 
-  const files = readdirSync(seedsDir)
+  // Canonicalize and validate seedsDir to prevent path traversal
+  const projectRoot = process.cwd();
+  const canonicalSeedsDir = realpathSync(resolve(seedsDir));
+  if (!canonicalSeedsDir.startsWith(projectRoot + "/") && canonicalSeedsDir !== projectRoot) {
+    throw new Error(`Seeds directory must be inside the project: ${canonicalSeedsDir}`);
+  }
+
+  // Only include .ts files if a TypeScript loader is active
+  const hasTsLoader =
+    !!(process as any)[Symbol.for("ts-node.register.instance")] ||
+    !!(globalThis as any).__tsx;
+
+  const files = readdirSync(canonicalSeedsDir)
     .filter((f: string) => {
       const ext = extname(f);
-      return ext === ".ts" || ext === ".js" || ext === ".mjs";
+      return ext === ".js" || ext === ".mjs" || (hasTsLoader && ext === ".ts");
     })
     .sort();
 
   for (const file of files) {
-    const fullPath = resolve(seedsDir, file);
-    await import(fullPath);
+    const fullPath = resolve(canonicalSeedsDir, file);
+    // Validate each file to prevent symlink escape
+    const canonicalPath = realpathSync(fullPath);
+    if (!canonicalPath.startsWith(canonicalSeedsDir + "/")) {
+      console.warn(`Skipping ${file} — resolves outside seeds directory (possible symlink)`);
+      continue;
+    }
+    await import(canonicalPath);
   }
 }
 
