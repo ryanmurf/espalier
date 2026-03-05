@@ -920,11 +920,31 @@ export function createDerivedRepository<T, ID>(
       if (repoLogger.isEnabled(LogLevel.DEBUG)) {
         repoLogger.debug("save", { operation: "save", entityType: entityName });
       }
+      // Wrap in transaction when cascade relations exist for atomicity
+      const hasCascade =
+        metadata.oneToManyRelations.some(r => r.cascade.size > 0) ||
+        metadata.manyToManyRelations.some(r => r.cascade.size > 0) ||
+        metadata.oneToOneRelations.some(r => r.cascade.size > 0) ||
+        metadata.manyToOneRelations.some(r => r.cascade.size > 0);
       const conn = await dataSource.getConnection();
-      try {
-        return await persister.saveWithConnection(entity, conn);
-      } finally {
-        await conn.close();
+      if (hasCascade) {
+        const tx = await conn.beginTransaction();
+        try {
+          const result = await persister.saveWithConnection(entity, conn);
+          await tx.commit();
+          return result;
+        } catch (err) {
+          await tx.rollback();
+          throw err;
+        } finally {
+          await conn.close();
+        }
+      } else {
+        try {
+          return await persister.saveWithConnection(entity, conn);
+        } finally {
+          await conn.close();
+        }
       }
     },
 
