@@ -6,7 +6,7 @@
  * Goal: break every edge case at the boundaries between these modules.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { DataSource, Connection, PreparedStatement, ResultSet, SqlValue } from "espalier-jdbc";
+import type { DataSource, Connection, PreparedStatement, ResultSet, SqlValue, Transaction } from "espalier-jdbc";
 import { Table } from "../../decorators/table.js";
 import { Column } from "../../decorators/column.js";
 import { Id } from "../../decorators/id.js";
@@ -41,10 +41,11 @@ function createMockConnection(stmt: PreparedStatement): Connection {
     beginTransaction: vi.fn(async () => ({
       commit: vi.fn(async () => {}),
       rollback: vi.fn(async () => {}),
-      setSavepoint: vi.fn(async () => ({ name: "sp" })),
+      setSavepoint: vi.fn(async () => {}),
       releaseSavepoint: vi.fn(async () => {}),
       rollbackToSavepoint: vi.fn(async () => {}),
-    })),
+      rollbackTo: vi.fn(async () => {}),
+    } as unknown as Transaction)),
     close: vi.fn(async () => {}),
     isClosed: vi.fn(() => false),
   };

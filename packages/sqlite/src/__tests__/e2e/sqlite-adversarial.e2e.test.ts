@@ -10,7 +10,9 @@ import type { SqliteDataSource } from "../../sqlite-data-source.js";
 // Graceful skip if better-sqlite3 native module can't load
 let canLoadSqlite = true;
 try {
-  await import("../../sqlite-data-source.js");
+  const mod = await import("../../sqlite-data-source.js");
+  const ds = new mod.SqliteDataSource({ filename: ":memory:" });
+  await ds.close();
 } catch (err: any) {
   if (err?.code === "ERR_DLOPEN_FAILED" || err?.message?.includes("NODE_MODULE_VERSION")) {
     canLoadSqlite = false;

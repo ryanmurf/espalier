@@ -36,7 +36,7 @@ function createMockConnection(opts?: {
       closed = true;
       if (opts?.closeFails) throw new Error("Close failed");
     }),
-    isClosed: vi.fn(isClosedFn),
+    isClosed: vi.fn(isClosedFn) as unknown as () => boolean,
   };
 }
 

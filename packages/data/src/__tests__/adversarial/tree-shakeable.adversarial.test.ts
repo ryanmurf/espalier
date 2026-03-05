@@ -312,7 +312,7 @@ describe("tree-shakeable architecture adversarial tests", () => {
       @Table("rel_children")
       class RelChild {
         @Id @Column() id: number = 0;
-        @ManyToOne(() => RelParent) parent!: RelParent;
+        @ManyToOne({ target: () => RelParent }) parent!: RelParent;
       }
 
       // Instantiate to trigger addInitializer metadata registration
