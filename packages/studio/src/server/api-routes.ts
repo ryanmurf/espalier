@@ -328,4 +328,73 @@ export function createApiRoutes(app: Hono, ctx: ApiRouteContext): void {
       await conn.close();
     }
   });
+
+  app.post("/api/query", async (c) => {
+    let body: { sql?: string; params?: unknown[] };
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: "Invalid JSON body" }, 400);
+    }
+
+    const sql = body.sql?.trim();
+    if (!sql) {
+      return c.json({ error: "SQL query is required" }, 400);
+    }
+
+    if (sql.length > 10000) {
+      return c.json({ error: "Query too long (max 10000 characters)" }, 400);
+    }
+
+    const isReadQuery = /^\s*(SELECT|SHOW|DESCRIBE|EXPLAIN|WITH)\b/i.test(sql);
+
+    if (!isReadQuery && ctx.readOnly) {
+      return c.json(
+        { error: "Write queries disabled in read-only mode. Start studio with --write-mode." },
+        403,
+      );
+    }
+
+    const params = Array.isArray(body.params) ? body.params : [];
+
+    const conn = await ctx.dataSource.getConnection();
+    try {
+      if (isReadQuery) {
+        const ps = conn.prepareStatement(sql);
+        try {
+          for (let i = 0; i < params.length; i++) {
+            ps.setParameter(i + 1, params[i] as any);
+          }
+          const rs = await ps.executeQuery();
+          const rows: Record<string, unknown>[] = [];
+          let count = 0;
+          const maxRows = 1000;
+          while (await rs.next()) {
+            if (count >= maxRows) break;
+            rows.push(rs.getRow());
+            count++;
+          }
+          await rs.close();
+          return c.json({ rows, truncated: count >= maxRows });
+        } finally {
+          await ps.close();
+        }
+      } else {
+        const ps = conn.prepareStatement(sql);
+        try {
+          for (let i = 0; i < params.length; i++) {
+            ps.setParameter(i + 1, params[i] as any);
+          }
+          const affected = await ps.executeUpdate();
+          return c.json({ affected, rows: [] });
+        } finally {
+          await ps.close();
+        }
+      }
+    } catch (err) {
+      return c.json({ error: (err as Error).message }, 500);
+    } finally {
+      await conn.close();
+    }
+  });
 }

@@ -250,21 +250,55 @@ function renderDiagram() {
 function renderQueryView() {
   document.getElementById("content").innerHTML =
     '<div class="query-view">' +
-    '<textarea class="query-editor" id="sqlInput" placeholder="SELECT * FROM ...">' + (currentTable ? 'SELECT * FROM ' + currentTable + ' LIMIT 20' : '') + '</textarea>' +
+    '<textarea class="query-editor" id="sqlInput" placeholder="SELECT * FROM ... WHERE id = $1" oninput="detectParams()">' + (currentTable ? 'SELECT * FROM ' + currentTable + ' LIMIT 20' : '') + '</textarea>' +
+    '<div id="paramFields" style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap"></div>' +
+    '<div style="display:flex;gap:8px;margin-top:8px;align-items:center">' +
     '<button class="query-btn" onclick="runQuery()">Run Query</button>' +
+    '<span id="queryInfo" style="font-size:11px;color:var(--muted)"></span>' +
+    '</div>' +
     '<div class="query-results" id="queryResults"></div>' +
     '</div>';
+  detectParams();
+}
+
+function detectParams() {
+  const sql = document.getElementById("sqlInput").value;
+  const matches = sql.match(/\\$\\d+/g);
+  const el = document.getElementById("paramFields");
+  if (!matches || matches.length === 0) { el.innerHTML = ""; return; }
+  const unique = [...new Set(matches)].sort((a,b) => parseInt(a.slice(1)) - parseInt(b.slice(1)));
+  el.innerHTML = unique.map(p =>
+    '<label style="font-size:12px;color:var(--muted)">' + p +
+    ' <input type="text" id="param_' + p.slice(1) + '" placeholder="value" style="background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:4px 8px;font-size:12px;width:120px">' +
+    '</label>'
+  ).join("");
+}
+
+function getParams() {
+  const sql = document.getElementById("sqlInput").value;
+  const matches = sql.match(/\\$\\d+/g);
+  if (!matches) return [];
+  const unique = [...new Set(matches)].sort((a,b) => parseInt(a.slice(1)) - parseInt(b.slice(1)));
+  return unique.map(p => {
+    const input = document.getElementById("param_" + p.slice(1));
+    return input ? input.value : null;
+  });
 }
 
 async function runQuery() {
   const sql = document.getElementById("sqlInput").value.trim();
   if (!sql) return;
+  const params = getParams();
   const el = document.getElementById("queryResults");
+  const info = document.getElementById("queryInfo");
   el.innerHTML = '<div class="empty">Running...</div>';
-  const res = await fetch("/api/query", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({sql}) });
+  info.textContent = "";
+  const start = performance.now();
+  const res = await fetch("/api/query", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({sql, params}) });
+  const elapsed = (performance.now() - start).toFixed(0);
   const data = await res.json();
-  if (data.error) { el.innerHTML = '<div class="error">' + escHtml(data.error) + '</div>'; return; }
-  if (!data.rows || data.rows.length === 0) { el.innerHTML = '<div class="empty">Query returned no rows. Affected: ' + (data.affected ?? 0) + '</div>'; return; }
+  if (data.error) { el.innerHTML = '<div class="error">' + escHtml(data.error) + '</div>'; info.textContent = elapsed + "ms"; return; }
+  if (!data.rows || data.rows.length === 0) { el.innerHTML = '<div class="empty">Query returned no rows. Affected: ' + (data.affected ?? 0) + '</div>'; info.textContent = elapsed + "ms"; return; }
   const cols = Object.keys(data.rows[0]);
   let html = '<table><thead><tr>';
   for (const c of cols) html += '<th>' + escHtml(c) + '</th>';
@@ -275,7 +309,9 @@ async function runQuery() {
     html += '</tr>';
   }
   html += '</tbody></table>';
+  if (data.truncated) html += '<div class="empty">Results truncated to 1000 rows.</div>';
   el.innerHTML = html;
+  info.textContent = data.rows.length + " rows in " + elapsed + "ms" + (data.truncated ? " (truncated)" : "");
 }
 
 init();
