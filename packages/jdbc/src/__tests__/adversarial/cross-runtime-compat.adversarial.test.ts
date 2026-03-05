@@ -452,9 +452,9 @@ describe("version consistency", () => {
     return pkg.version;
   }
 
-  it("D1 package version matches current release (v1.3.0)", () => {
+  it("D1 package version matches current release (v1.6.0)", () => {
     const version = getVersion(D1_PKG);
     if (!version) return; // Skip if D1 package doesn't exist
-    expect(version).toBe("1.3.0");
+    expect(version).toBe("1.6.0");
   });
 });

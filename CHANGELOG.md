@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.6.0] - Y5 Q2 — Soft Deletes & Audit Trail
+
+### Features
+- **Global Query Filters**: `@Filter` decorator and `FilterContext` for declarative, scoped query filtering
+- **@SoftDelete Decorator**: Automatic soft deletion with `deleted_at` timestamp, global filter excludes deleted rows by default
+- **@Audited Decorator**: Automatic audit trail recording INSERT/UPDATE/DELETE operations to `espalier_audit_log` table
+- **Entity Snapshots**: `snapshot()`, `diff()`, and `diffEntity()` for immutable point-in-time entity state capture and comparison
+- **GraphQL Integration**: Soft-delete queries (`findDeleted`, `restore`), `includeDeleted` argument, and audit log queries for `@Audited` entities
+- **REST Integration**: `/deleted`, `/:id/restore`, `/:id/audit` endpoints with `?includeDeleted=true` query parameter support
+
+### New Exports (espalier-data/core)
+- Filter infrastructure: `Filter`, `FilterContext`, `getFilters`, `registerFilter`, `resolveActiveFilters`
+- Soft delete: `@SoftDelete`, `getSoftDeleteMetadata`, `isSoftDeleteEntity`
+- Audit trail: `@Audited`, `AuditContext`, `AuditLogWriter`, `getAuditLog`, `getAuditLogForEntity`, `getFieldHistory`
+- Snapshots: `snapshot`, `diff`, `diffEntity`, `Snapshot`, `DiffResult`, `FieldDiff`
+
+## [1.5.0] - Y5 Q1 — Espalier Studio
+
 ## [1.3.0] - Y4 Q3 — Query Performance Engine & Pluggable Pagination
 
 ### Review Fixes (post-release)

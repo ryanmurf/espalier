@@ -126,3 +126,22 @@ export type {
   MigrationRunner,
 } from "./migration/migration.js";
 export { DEFAULT_MIGRATION_TABLE, DEFAULT_SCHEMA } from "./migration/migration.js";
+
+// Global query filters
+export type { FilterDefinition, FilterRegistration, FilterOptions } from "./filter/index.js";
+export { Filter, getFilters, registerFilter, unregisterFilter, resolveActiveFilters, FilterContext } from "./filter/index.js";
+
+// Soft delete
+export type { SoftDeleteOptions } from "./decorators/soft-delete.js";
+export { SoftDelete, getSoftDeleteMetadata, isSoftDeleteEntity } from "./decorators/soft-delete.js";
+
+// Audit trail
+export type { AuditedOptions } from "./decorators/audited.js";
+export { Audited, getAuditedMetadata, isAuditedEntity } from "./decorators/audited.js";
+export type { AuditUser, AuditEntry, AuditFieldChange, AuditOperation } from "./audit/index.js";
+export { AuditContext, AuditLogWriter, getAuditLog, getAuditLogForEntity, getFieldHistory } from "./audit/index.js";
+
+// Entity snapshots
+export type { Snapshot } from "./snapshot/index.js";
+export type { DiffResult, FieldDiff } from "./snapshot/index.js";
+export { snapshot, diff, diffEntity } from "./snapshot/index.js";
