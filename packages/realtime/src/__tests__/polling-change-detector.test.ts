@@ -150,29 +150,43 @@ describe("PollingChangeDetector", () => {
   });
 
   it("should throw when already watching", async () => {
-    const ds = createMockDataSource([[{ id: 1 }], [{ id: 2 }], [{ id: 3 }]]);
-    const detector = new PollingChangeDetector(ds, {
+    // Create a data source where getConnection blocks indefinitely
+    // so the first watch() stays in-progress
+    let unblock: (() => void) | undefined;
+    const blockingDs: DataSource = {
+      async getConnection(): Promise<Connection> {
+        await new Promise<void>((resolve) => { unblock = resolve; });
+        // Return a dummy connection (won't actually be used since we abort)
+        return createMockDataSource([[{ id: 1 }]]).getConnection();
+      },
+      async close() {},
+    };
+
+    const detector = new PollingChangeDetector(blockingDs, {
       intervalMs: 100,
       query: "SELECT 1",
     });
 
-    // Start watching in background
+    // Start first watch in background - it will block on getConnection
     const watchPromise = (async () => {
       for await (const _n of detector.watch("ch1")) {
-        detector.stop();
         break;
       }
     })();
 
-    // Give it a tick to start
-    await new Promise((r) => setTimeout(r, 10));
+    // Yield to let the first watch enter its generator body and set abortController
+    await new Promise((r) => setTimeout(r, 20));
 
-    await expect(async () => {
-      for await (const _n of detector.watch("ch2")) {
-        break;
-      }
-    }).rejects.toThrow(/already watching/);
+    // Second watch should throw synchronously inside the generator
+    const secondIter = detector.watch("ch2");
+    // Calling .next() triggers the generator body which checks the guard
+    await expect(
+      (secondIter as AsyncGenerator).next(),
+    ).rejects.toThrow(/already watching/);
 
+    // Clean up
+    detector.stop();
+    if (unblock) unblock();
     await watchPromise;
   });
 });
