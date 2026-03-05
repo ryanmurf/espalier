@@ -36,6 +36,9 @@ export interface SchemaTable {
   tableName: string;
   columns: SchemaColumn[];
   relations: SchemaRelation[];
+  isSoftDelete?: boolean;
+  isAudited?: boolean;
+  softDeleteColumn?: string;
 }
 
 export interface SchemaModel {

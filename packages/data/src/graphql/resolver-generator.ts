@@ -4,6 +4,8 @@ import type { Specification } from "../query/specification.js";
 import type { EntityMetadata } from "../mapping/entity-metadata.js";
 import { getEntityMetadata } from "../mapping/entity-metadata.js";
 import { getTenantIdField } from "../decorators/tenant.js";
+import { getSoftDeleteMetadata } from "../decorators/soft-delete.js";
+import { isAuditedEntity } from "../decorators/audited.js";
 import { equal, Specifications } from "../query/specification.js";
 import { createPageable } from "../repository/paging.js";
 import { TenantContext } from "../tenant/tenant-context.js";
@@ -106,11 +108,27 @@ export class ResolverGenerator {
 
       query[`${camelName}Count`] = this.createCountResolver(repository, metadata, entityClass);
 
+      // Soft-delete query resolvers
+      const softDeleteMeta = getSoftDeleteMetadata(entityClass);
+      if (softDeleteMeta) {
+        query[`${camelName}sDeleted`] = this.createFindOnlyDeletedResolver(repository, metadata, entityClass);
+      }
+
+      // Audit log query resolver
+      if (isAuditedEntity(entityClass)) {
+        query[`${camelName}AuditLog`] = this.createAuditLogResolver(repository, metadata, entityClass);
+      }
+
       // Mutation resolvers
       if (this.options.mutations) {
         mutation[`create${typeName}`] = this.createSaveResolver(repository, metadata, entityClass);
         mutation[`update${typeName}`] = this.createUpdateResolver(repository, metadata, entityClass);
         mutation[`delete${typeName}`] = this.createDeleteResolver(repository, metadata, entityClass);
+
+        // Soft-delete restore mutation
+        if (softDeleteMeta) {
+          mutation[`restore${typeName}`] = this.createRestoreResolver(repository, metadata, entityClass);
+        }
       }
     }
 
@@ -134,10 +152,14 @@ export class ResolverGenerator {
     metadata: EntityMetadata,
     entityClass: new (...args: any[]) => any,
   ): ResolverFn {
-    return async (_parent: any, args: { page?: number; size?: number; sort?: string }, context: any) => {
+    const hasSoftDelete = !!getSoftDeleteMetadata(entityClass);
+    return async (_parent: any, args: { page?: number; size?: number; sort?: string; includeDeleted?: boolean }, context: any) => {
       return this.withTenantContext(context, metadata, entityClass, async () => {
         const pageable = this.toPageable(args, metadata);
-        const page: Page<any> = await repository.findAll(pageable);
+        const repo = repository as any;
+        const page: Page<any> = hasSoftDelete && args.includeDeleted && typeof repo.findIncludingDeleted === "function"
+          ? await repo.findIncludingDeleted(pageable)
+          : await repository.findAll(pageable);
         return {
           content: page.content,
           pageInfo: {
@@ -182,10 +204,15 @@ export class ResolverGenerator {
     metadata: EntityMetadata,
     entityClass: new (...args: any[]) => any,
   ): ResolverFn {
-    return async (_parent: any, _args: any, context: any) => {
-      return this.withTenantContext(context, metadata, entityClass, () =>
-        repository.findAll(),
-      );
+    const hasSoftDelete = !!getSoftDeleteMetadata(entityClass);
+    return async (_parent: any, args: { includeDeleted?: boolean }, context: any) => {
+      return this.withTenantContext(context, metadata, entityClass, () => {
+        const repo = repository as any;
+        if (hasSoftDelete && args.includeDeleted && typeof repo.findIncludingDeleted === "function") {
+          return repo.findIncludingDeleted();
+        }
+        return repository.findAll();
+      });
     };
   }
 
@@ -246,6 +273,69 @@ export class ResolverGenerator {
         }
         await repository.deleteById(args.id);
         return true;
+      });
+    };
+  }
+
+  private createFindOnlyDeletedResolver(
+    repository: CrudRepository<any, any>,
+    metadata: EntityMetadata,
+    entityClass: new (...args: any[]) => any,
+  ): ResolverFn {
+    return async (_parent: any, _args: any, context: any) => {
+      return this.withTenantContext(context, metadata, entityClass, () => {
+        const repo = repository as any;
+        if (typeof repo.findOnlyDeleted === "function") {
+          return repo.findOnlyDeleted();
+        }
+        return [];
+      });
+    };
+  }
+
+  private createRestoreResolver(
+    repository: CrudRepository<any, any>,
+    metadata: EntityMetadata,
+    entityClass: new (...args: any[]) => any,
+  ): ResolverFn {
+    return async (_parent: any, args: { id: any }, context: any) => {
+      return this.withTenantContext(context, metadata, entityClass, async () => {
+        const repo = repository as any;
+        // Find the entity including deleted to get the soft-deleted row
+        let entity: any;
+        if (typeof repo.findIncludingDeleted === "function") {
+          const all = await repo.findIncludingDeleted();
+          entity = Array.isArray(all)
+            ? all.find((e: any) => String(e.id) === String(args.id))
+            : undefined;
+        }
+        if (!entity) {
+          throw new Error("Entity not found");
+        }
+        if (typeof repo.restore === "function") {
+          await repo.restore(entity);
+        }
+        return entity;
+      });
+    };
+  }
+
+  private createAuditLogResolver(
+    repository: CrudRepository<any, any>,
+    metadata: EntityMetadata,
+    entityClass: new (...args: any[]) => any,
+  ): ResolverFn {
+    return async (_parent: any, args: { entityId: any; limit?: number }, context: any) => {
+      return this.withTenantContext(context, metadata, entityClass, async () => {
+        const repo = repository as any;
+        if (typeof repo.getAuditLog === "function") {
+          const entries = await repo.getAuditLog(args.entityId);
+          if (args.limit != null && args.limit > 0) {
+            return entries.slice(0, args.limit);
+          }
+          return entries;
+        }
+        return [];
       });
     };
   }

@@ -1,6 +1,8 @@
 import {
   getEntityMetadata,
   getColumnMetadataEntries,
+  getSoftDeleteMetadata,
+  isAuditedEntity,
 } from "espalier-data";
 import type { EntityMetadata, ColumnMetadataEntry } from "espalier-data";
 import type {
@@ -136,11 +138,15 @@ export function extractSchema(options: SchemaExtractorOptions): SchemaModel {
     const columns = buildColumns(entityClass, meta);
     const relations = buildRelations(meta, metaMap);
 
+    const softDeleteMeta = getSoftDeleteMetadata(entityClass);
     tables.push({
       className: entityClass.name,
       tableName: meta.tableName,
       columns,
       relations,
+      isSoftDelete: !!softDeleteMeta,
+      isAudited: isAuditedEntity(entityClass),
+      softDeleteColumn: softDeleteMeta?.columnName,
     });
 
     allRelations.push(...relations);

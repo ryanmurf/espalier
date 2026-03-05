@@ -208,9 +208,18 @@ export function createApiRoutes(app: Hono, ctx: ApiRouteContext): void {
     const query = c.req.query();
     const { offset, limit } = parsePageParams(query);
     const sort = parseSortParam(query.sort, table);
+    const includeDeleted = query.includeDeleted === "true";
 
     const safeName = sanitizeIdentifier(table.tableName);
     let sql = `SELECT * FROM ${safeName}`;
+
+    // If this table is soft-delete enabled and we should NOT include deleted rows,
+    // filter out soft-deleted rows by default
+    if (table.isSoftDelete && table.softDeleteColumn && !includeDeleted) {
+      const safeDeleteCol = sanitizeIdentifier(table.softDeleteColumn);
+      sql += ` WHERE ${safeDeleteCol} IS NULL`;
+    }
+
     if (sort) {
       sql += ` ORDER BY ${sort.column} ${sort.direction}`;
     }
@@ -227,7 +236,12 @@ export function createApiRoutes(app: Hono, ctx: ApiRouteContext): void {
         }
         await rs.close();
 
-        const countRs = await stmt.executeQuery(`SELECT COUNT(*) AS total FROM ${safeName}`);
+        let countSql = `SELECT COUNT(*) AS total FROM ${safeName}`;
+        if (table.isSoftDelete && table.softDeleteColumn && !includeDeleted) {
+          const safeDeleteCol = sanitizeIdentifier(table.softDeleteColumn);
+          countSql += ` WHERE ${safeDeleteCol} IS NULL`;
+        }
+        const countRs = await stmt.executeQuery(countSql);
         let total = 0;
         if (await countRs.next()) {
           total = countRs.getNumber("total") ?? 0;
@@ -451,6 +465,99 @@ export function createApiRoutes(app: Hono, ctx: ApiRouteContext): void {
           return c.json({ error: "Row not found" }, 404);
         }
         return c.json({ affected });
+      } finally {
+        await ps.close();
+      }
+    } catch (err) {
+      return c.json({ error: sanitizeErrorMessage(err) }, 500);
+    } finally {
+      await conn.close();
+    }
+  });
+
+  app.get("/api/tables/:table/audit/:id", async (c) => {
+    const tableName = c.req.param("table");
+    const table = findTable(ctx.schema, tableName);
+    if (!table) {
+      return c.json({ error: `Table "${tableName}" not found` }, 404);
+    }
+    if (!table.isAudited) {
+      return c.json({ error: `Table "${tableName}" is not audited` }, 400);
+    }
+
+    const id = c.req.param("id");
+    const safeClassName = sanitizeIdentifier(table.className);
+
+    const conn = await ctx.dataSource.getConnection();
+    try {
+      const ps = conn.prepareStatement(
+        `SELECT id, entity_type, entity_id, operation, changes, user_id, timestamp FROM espalier_audit_log WHERE entity_type = $1 AND entity_id = $2 ORDER BY timestamp DESC`,
+      );
+      try {
+        ps.setParameter(1, safeClassName);
+        ps.setParameter(2, id);
+        const rs = await ps.executeQuery();
+        const entries: Record<string, unknown>[] = [];
+        while (await rs.next()) {
+          const row = rs.getRow();
+          entries.push({
+            id: row.id,
+            entityType: row.entity_type,
+            entityId: row.entity_id,
+            operation: row.operation,
+            changes: typeof row.changes === "string" ? JSON.parse(row.changes as string) : row.changes,
+            userId: row.user_id ?? null,
+            timestamp: row.timestamp,
+          });
+        }
+        await rs.close();
+        return c.json(entries);
+      } finally {
+        await ps.close();
+      }
+    } catch (err) {
+      return c.json({ error: sanitizeErrorMessage(err) }, 500);
+    } finally {
+      await conn.close();
+    }
+  });
+
+  app.post("/api/tables/:table/:id/restore", async (c) => {
+    if (ctx.readOnly) {
+      return c.json({ error: "Write operations disabled. Start studio with --write-mode." }, 403);
+    }
+
+    const tableName = c.req.param("table");
+    const table = findTable(ctx.schema, tableName);
+    if (!table) {
+      return c.json({ error: `Table "${tableName}" not found` }, 404);
+    }
+    if (!table.isSoftDelete || !table.softDeleteColumn) {
+      return c.json({ error: `Table "${tableName}" does not support soft delete` }, 400);
+    }
+
+    const pkCol = table.columns.find((col) => col.isPrimaryKey);
+    if (!pkCol) {
+      return c.json({ error: `No primary key column found for table "${tableName}"` }, 400);
+    }
+
+    const id = c.req.param("id");
+    const safeName = sanitizeIdentifier(table.tableName);
+    const safePk = sanitizeIdentifier(pkCol.columnName);
+    const safeDeleteCol = sanitizeIdentifier(table.softDeleteColumn);
+
+    const conn = await ctx.dataSource.getConnection();
+    try {
+      const ps = conn.prepareStatement(
+        `UPDATE ${safeName} SET ${safeDeleteCol} = NULL WHERE ${safePk} = $1`,
+      );
+      try {
+        ps.setParameter(1, id);
+        const affected = await ps.executeUpdate();
+        if (affected === 0) {
+          return c.json({ error: "Row not found" }, 404);
+        }
+        return c.json({ restored: true, affected });
       } finally {
         await ps.close();
       }

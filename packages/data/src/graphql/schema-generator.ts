@@ -4,6 +4,8 @@ import { getIdField } from "../decorators/id.js";
 import { getColumnTypeMappings } from "../decorators/column.js";
 import { getCreatedDateField, getLastModifiedDateField } from "../decorators/auditing.js";
 import { getVersionField } from "../decorators/version.js";
+import { getSoftDeleteMetadata } from "../decorators/soft-delete.js";
+import { isAuditedEntity } from "../decorators/audited.js";
 import type { GraphQLPaginationAdapter } from "./pagination-adapter.js";
 import { OffsetPaginationAdapter } from "./pagination-adapter.js";
 
@@ -124,6 +126,7 @@ export class GraphQLSchemaGenerator {
     const queryFields: string[] = [];
     const mutationFields: string[] = [];
     const entityAdapters = new Map<string, GraphQLPaginationAdapter>();
+    let needsAuditEntryType = false;
 
     for (const entityClass of entityClasses) {
       const typeName = this.options.typeNameMapper(entityClass);
@@ -143,6 +146,7 @@ export class GraphQLSchemaGenerator {
       if (idField) {
         queryFields.push(`  ${camelCase(typeName)}(id: ID!): ${typeName}`);
       }
+      const hasSoftDelete = !!getSoftDeleteMetadata(entityClass);
       if (this.options.pagination) {
         const adapter = this.getAdapterForEntity(entityClass);
         entityAdapters.set(typeName, adapter);
@@ -155,11 +159,25 @@ export class GraphQLSchemaGenerator {
         } else {
           resultType = `${typeName}Connection`;
         }
-        queryFields.push(`  ${camelCase(typeName)}s(${args}): ${resultType}!`);
+        const extraArgs = hasSoftDelete ? ", includeDeleted: Boolean" : "";
+        queryFields.push(`  ${camelCase(typeName)}s(${args}${extraArgs}): ${resultType}!`);
       } else {
-        queryFields.push(`  ${camelCase(typeName)}s: [${typeName}!]!`);
+        const listArgs = hasSoftDelete ? "(includeDeleted: Boolean)" : "";
+        queryFields.push(`  ${camelCase(typeName)}s${listArgs}: [${typeName}!]!`);
       }
       queryFields.push(`  ${camelCase(typeName)}Count: Int!`);
+
+      // Soft-delete queries and mutations
+      const softDeleteMeta = getSoftDeleteMetadata(entityClass);
+      if (softDeleteMeta && idField) {
+        queryFields.push(`  ${camelCase(typeName)}sDeleted: [${typeName}!]!`);
+      }
+
+      // Audited entity queries
+      if (isAuditedEntity(entityClass)) {
+        needsAuditEntryType = true;
+        queryFields.push(`  ${camelCase(typeName)}AuditLog(entityId: ID!, limit: Int): [AuditEntry!]!`);
+      }
 
       // Generate mutation fields
       if (this.options.mutations) {
@@ -168,11 +186,16 @@ export class GraphQLSchemaGenerator {
           mutationFields.push(`  update${typeName}(id: ID!, input: ${typeName}UpdateInput!): ${typeName}!`);
           mutationFields.push(`  delete${typeName}(id: ID!): Boolean!`);
         }
+
+        // Soft-delete restore mutation
+        if (softDeleteMeta && idField) {
+          mutationFields.push(`  restore${typeName}(id: ID!): ${typeName}!`);
+        }
       }
     }
 
     const typeNames = entityClasses.map((ec) => this.options.typeNameMapper(ec));
-    const sdl = this.assembleSdl(types, inputTypes, queryFields, mutationFields, typeNames, entityAdapters);
+    const sdl = this.assembleSdl(types, inputTypes, queryFields, mutationFields, typeNames, entityAdapters, needsAuditEntryType);
 
     return { sdl, types, inputTypes, queryFields, mutationFields };
   }
@@ -297,6 +320,7 @@ export class GraphQLSchemaGenerator {
     mutationFields: string[],
     typeNames: string[],
     entityAdapters: Map<string, GraphQLPaginationAdapter>,
+    needsAuditEntryType: boolean = false,
   ): string {
     const parts: string[] = [];
 
@@ -304,7 +328,30 @@ export class GraphQLSchemaGenerator {
     for (const scalar of this.options.customScalars) {
       parts.push(`scalar ${scalar}`);
     }
+    if (!this.options.customScalars.includes("JSON") && needsAuditEntryType) {
+      parts.push("scalar JSON");
+    }
     parts.push("");
+
+    // AuditEntry type (shared across all @Audited entities)
+    if (needsAuditEntryType) {
+      parts.push(`type AuditFieldChange {
+  field: String!
+  oldValue: JSON
+  newValue: JSON
+}
+
+type AuditEntry {
+  id: Int!
+  entityType: String!
+  entityId: String!
+  operation: String!
+  changes: [AuditFieldChange!]!
+  userId: String
+  timestamp: DateTime!
+}`);
+      parts.push("");
+    }
 
     // Pagination shared types (deduplicated by adapter name)
     if (this.options.pagination) {

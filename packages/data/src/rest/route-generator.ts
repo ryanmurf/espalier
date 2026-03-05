@@ -4,6 +4,8 @@ import type { EntityMetadata } from "../mapping/entity-metadata.js";
 import type { RestRequest, RestResponse, RouteDefinition } from "./handler.js";
 import { getEntityMetadata } from "../mapping/entity-metadata.js";
 import { getTenantIdField } from "../decorators/tenant.js";
+import { getSoftDeleteMetadata } from "../decorators/soft-delete.js";
+import { isAuditedEntity } from "../decorators/audited.js";
 import { createPageable } from "../repository/paging.js";
 import { OptimisticLockException } from "../repository/optimistic-lock.js";
 import { EntityNotFoundException } from "../repository/entity-not-found.js";
@@ -92,6 +94,29 @@ export class RouteGenerator {
         handler: this.createCountHandler(repository, metadata, entityClass),
       });
 
+      // Soft-delete routes
+      const softDeleteMeta = getSoftDeleteMetadata(entityClass);
+      if (softDeleteMeta) {
+        // GET /entities/deleted — findOnlyDeleted
+        routes.push({
+          method: "GET",
+          path: `${base}/deleted`,
+          operationId: `findDeleted${typeName}`,
+          handler: this.createFindOnlyDeletedHandler(repository, metadata, entityClass),
+        });
+      }
+
+      // Audit log routes
+      if (isAuditedEntity(entityClass)) {
+        // GET /entities/:id/audit — audit log
+        routes.push({
+          method: "GET",
+          path: `${base}/:id/audit`,
+          operationId: `auditLog${typeName}`,
+          handler: this.createAuditLogHandler(repository, metadata, entityClass),
+        });
+      }
+
       if (this.options.mutations) {
         // POST /entities — create
         routes.push({
@@ -116,6 +141,16 @@ export class RouteGenerator {
           operationId: `delete${typeName}`,
           handler: this.createDeleteHandler(repository, metadata, entityClass),
         });
+
+        // POST /entities/:id/restore — restore soft-deleted
+        if (softDeleteMeta) {
+          routes.push({
+            method: "POST",
+            path: `${base}/:id/restore`,
+            operationId: `restore${typeName}`,
+            handler: this.createRestoreHandler(repository, metadata, entityClass),
+          });
+        }
       }
     }
 
@@ -127,14 +162,20 @@ export class RouteGenerator {
     metadata: EntityMetadata,
     entityClass: new (...args: any[]) => any,
   ): (req: RestRequest) => Promise<RestResponse> {
+    const hasSoftDelete = !!getSoftDeleteMetadata(entityClass);
     return async (req: RestRequest) => {
       const tenantCheck = this.checkTenantContext(req, entityClass);
       if (tenantCheck) return tenantCheck;
 
       return this.withTenantContext(req, entityClass, async () => {
+        const includeDeleted = hasSoftDelete && String(req.query.includeDeleted) === "true";
+        const repo = repository as any;
+
         if (this.options.pagination) {
           const pageable = parsePageable(req.query, metadata);
-          const page: Page<any> = await repository.findAll(pageable);
+          const page: Page<any> = includeDeleted && typeof repo.findIncludingDeleted === "function"
+            ? await repo.findIncludingDeleted(pageable)
+            : await repository.findAll(pageable);
           return {
             status: 200,
             body: {
@@ -149,7 +190,9 @@ export class RouteGenerator {
           };
         }
 
-        const entities = await repository.findAll();
+        const entities = includeDeleted && typeof repo.findIncludingDeleted === "function"
+          ? await repo.findIncludingDeleted()
+          : await repository.findAll();
         return { status: 200, body: entities };
       });
     };
@@ -262,6 +305,80 @@ export class RouteGenerator {
         } catch (err) {
           return handleError(err);
         }
+      });
+    };
+  }
+
+  private createFindOnlyDeletedHandler(
+    repository: CrudRepository<any, any>,
+    metadata: EntityMetadata,
+    entityClass: new (...args: any[]) => any,
+  ): (req: RestRequest) => Promise<RestResponse> {
+    return async (req: RestRequest) => {
+      const tenantCheck = this.checkTenantContext(req, entityClass);
+      if (tenantCheck) return tenantCheck;
+
+      return this.withTenantContext(req, entityClass, async () => {
+        const repo = repository as any;
+        if (typeof repo.findOnlyDeleted === "function") {
+          const entities = await repo.findOnlyDeleted();
+          return { status: 200, body: entities };
+        }
+        return { status: 200, body: [] };
+      });
+    };
+  }
+
+  private createRestoreHandler(
+    repository: CrudRepository<any, any>,
+    metadata: EntityMetadata,
+    entityClass: new (...args: any[]) => any,
+  ): (req: RestRequest) => Promise<RestResponse> {
+    return async (req: RestRequest) => {
+      const tenantCheck = this.checkTenantContext(req, entityClass);
+      if (tenantCheck) return tenantCheck;
+
+      return this.withTenantContext(req, entityClass, async () => {
+        try {
+          const repo = repository as any;
+          // Find the entity including deleted rows
+          let entity: any;
+          if (typeof repo.findIncludingDeleted === "function") {
+            const all = await repo.findIncludingDeleted();
+            entity = Array.isArray(all)
+              ? all.find((e: any) => String(e.id) === String(req.params.id))
+              : undefined;
+          }
+          if (!entity) {
+            return { status: 404, body: { error: `${entityClass.name} not found` } };
+          }
+          if (typeof repo.restore === "function") {
+            await repo.restore(entity);
+          }
+          return { status: 200, body: entity };
+        } catch (err) {
+          return handleError(err);
+        }
+      });
+    };
+  }
+
+  private createAuditLogHandler(
+    repository: CrudRepository<any, any>,
+    metadata: EntityMetadata,
+    entityClass: new (...args: any[]) => any,
+  ): (req: RestRequest) => Promise<RestResponse> {
+    return async (req: RestRequest) => {
+      const tenantCheck = this.checkTenantContext(req, entityClass);
+      if (tenantCheck) return tenantCheck;
+
+      return this.withTenantContext(req, entityClass, async () => {
+        const repo = repository as any;
+        if (typeof repo.getAuditLog === "function") {
+          const entries = await repo.getAuditLog(req.params.id);
+          return { status: 200, body: entries };
+        }
+        return { status: 200, body: [] };
       });
     };
   }
