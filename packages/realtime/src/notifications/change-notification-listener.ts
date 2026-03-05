@@ -50,6 +50,7 @@ export class ChangeNotificationListener {
       // Poll for notifications using the pg-specific notification mechanism.
       // We use a queue + polling approach since the JDBC abstraction
       // doesn't expose raw socket events.
+      const MAX_QUEUE_SIZE = 10_000;
       const queue: ChangeNotification[] = [];
       let resolveWaiter: (() => void) | null = null;
 
@@ -69,19 +70,29 @@ export class ChangeNotificationListener {
       const rawClient = (connection as unknown as Record<string, unknown>)["_client"] ??
         (connection as unknown as Record<string, unknown>)["client"];
 
+      const notificationHandler = (msg: { channel: string; payload: string }) => {
+        if (msg.channel === channel && queue.length < MAX_QUEUE_SIZE) {
+          queue.push({
+            channel: msg.channel,
+            payload: msg.payload ?? "",
+            timestamp: new Date(),
+          });
+          resolveWaiter?.();
+        }
+      };
+
       if (rawClient && typeof (rawClient as Record<string, unknown>).on === "function") {
-        (rawClient as { on: (event: string, cb: (msg: { channel: string; payload: string }) => void) => void }).on(
+        (rawClient as { on: (event: string, cb: typeof notificationHandler) => void }).on(
           "notification",
-          (msg: { channel: string; payload: string }) => {
-            if (msg.channel === channel) {
-              queue.push({
-                channel: msg.channel,
-                payload: msg.payload ?? "",
-                timestamp: new Date(),
-              });
-              resolveWaiter?.();
-            }
-          },
+          notificationHandler,
+        );
+      } else {
+        clearInterval(pollInterval);
+        await connection.close();
+        this.activeChannels.delete(channel);
+        throw new Error(
+          "Cannot access underlying database client for LISTEN/NOTIFY. " +
+          "ChangeNotificationListener requires a PostgreSQL connection from espalier-jdbc-pg.",
         );
       }
 
@@ -103,6 +114,13 @@ export class ChangeNotificationListener {
         }
       } finally {
         clearInterval(pollInterval);
+        // Remove notification listener to prevent memory leak
+        if (rawClient && typeof (rawClient as Record<string, unknown>).off === "function") {
+          (rawClient as { off: (event: string, cb: typeof notificationHandler) => void }).off(
+            "notification",
+            notificationHandler,
+          );
+        }
         // Issue UNLISTEN
         try {
           const unlistenStmt = connection.prepareStatement(`UNLISTEN ${quoteChannel(channel)}`);
@@ -114,8 +132,9 @@ export class ChangeNotificationListener {
         this.activeChannels.delete(channel);
       }
     } catch (error) {
+      // Connection is cleaned up by inner finally or by the raw client check above.
+      // Only clean up the channel map entry here.
       this.activeChannels.delete(channel);
-      await connection.close();
       throw error;
     }
   }

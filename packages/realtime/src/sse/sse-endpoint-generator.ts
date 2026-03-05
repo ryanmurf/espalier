@@ -23,7 +23,7 @@ export class SseEndpointGenerator {
     options?: SseOptions,
   ): (req: SseRequest, res: SseResponse) => void {
     const heartbeatMs = options?.heartbeatIntervalMs ?? DEFAULT_HEARTBEAT_MS;
-    const eventType = options?.eventType ?? DEFAULT_EVENT_TYPE;
+    const eventType = validateEventType(options?.eventType ?? DEFAULT_EVENT_TYPE);
 
     return (req: SseRequest, res: SseResponse) => {
       // Set SSE headers
@@ -39,8 +39,7 @@ export class SseEndpointGenerator {
       const abortController = new AbortController();
 
       // Determine last event ID for reconnection
-      const lastEventId = getLastEventId(req);
-      let eventCounter = lastEventId ? parseInt(lastEventId, 10) : 0;
+      let eventCounter = parseEventId(getLastEventId(req));
 
       // Handle client disconnect
       res.on("close", () => {
@@ -119,7 +118,7 @@ export class SseEndpointGenerator {
   generateFastifyPlugin<T>(
     changeSource: AsyncIterable<ChangeEvent<T>>,
     options?: SseOptions,
-  ): FastifyPluginResult<T> {
+  ): FastifyPluginResult {
     const coreHandler = this.generateHandler(changeSource, options);
 
     return {
@@ -145,11 +144,10 @@ export class SseEndpointGenerator {
     options?: SseOptions,
   ): (c: HonoContext) => Response {
     const heartbeatMs = options?.heartbeatIntervalMs ?? DEFAULT_HEARTBEAT_MS;
-    const eventType = options?.eventType ?? DEFAULT_EVENT_TYPE;
+    const eventType = validateEventType(options?.eventType ?? DEFAULT_EVENT_TYPE);
 
     return (c: HonoContext) => {
-      const lastEventId = c.req.header("Last-Event-ID");
-      let eventCounter = lastEventId ? parseInt(lastEventId, 10) : 0;
+      let eventCounter = parseEventId(c.req.header("Last-Event-ID"));
 
       const stream = new ReadableStream({
         async start(controller) {
@@ -213,7 +211,7 @@ interface FastifyReply {
   hijack(): void;
 }
 
-interface FastifyPluginResult<_T> {
+interface FastifyPluginResult {
   handler(request: FastifyRequest, reply: FastifyReply): void;
 }
 
@@ -232,4 +230,17 @@ function getLastEventId(req: SseRequest): string | undefined {
 function createFastifyResponseAdapter(reply: FastifyReply): SseResponse {
   reply.hijack();
   return reply.raw;
+}
+
+function parseEventId(value: string | undefined): number {
+  if (!value) return 0;
+  const parsed = parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+}
+
+function validateEventType(eventType: string): string {
+  if (/[\r\n]/.test(eventType)) {
+    throw new Error("SSE event type must not contain newline characters");
+  }
+  return eventType;
 }

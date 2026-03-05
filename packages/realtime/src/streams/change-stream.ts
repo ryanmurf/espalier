@@ -114,10 +114,10 @@ function defaultParse<T>(payload: string): ParsedPayload<T> {
     changed_fields?: string[];
   };
 
-  const operation = data.operation as OperationType;
-  if (!["INSERT", "UPDATE", "DELETE"].includes(operation)) {
+  if (!["INSERT", "UPDATE", "DELETE"].includes(data.operation)) {
     throw new Error(`Unknown operation: ${data.operation}`);
   }
+  const operation = data.operation as OperationType;
 
   return {
     operation,

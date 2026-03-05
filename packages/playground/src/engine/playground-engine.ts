@@ -1,6 +1,19 @@
 import initSqlJs, { type Database } from "sql.js";
 import type { PlaygroundOptions, PlaygroundResult } from "./types.js";
 
+function quoteIdent(name: string): string {
+  return `"${name.replace(/"/g, '""')}"`;
+}
+
+const SAFE_TYPE_RE = /^[A-Za-z][A-Za-z0-9_ ]*(\(\d+\))?$/;
+
+function validateType(type: string): string {
+  if (!SAFE_TYPE_RE.test(type.trim())) {
+    throw new Error(`Invalid column type: "${type}"`);
+  }
+  return type;
+}
+
 export class PlaygroundEngine {
   private db: Database | null = null;
   private sqlLog: string[] = [];
@@ -29,9 +42,9 @@ export class PlaygroundEngine {
         const columns = entity?.columns;
         if (Array.isArray(columns) && columns.length > 0) {
           const colDefs = columns
-            .map((c: { name: string; type?: string }) => `${c.name} ${c.type ?? "TEXT"}`)
+            .map((c: { name: string; type?: string }) => `${quoteIdent(c.name)} ${validateType(c.type ?? "TEXT")}`)
             .join(", ");
-          const ddl = `CREATE TABLE IF NOT EXISTS ${tableName} (${colDefs})`;
+          const ddl = `CREATE TABLE IF NOT EXISTS ${quoteIdent(tableName)} (${colDefs})`;
           this.db.run(ddl);
           this.sqlLog.push(ddl);
         }
@@ -43,10 +56,10 @@ export class PlaygroundEngine {
         for (const row of rows) {
           const keys = Object.keys(row);
           if (keys.length === 0) continue;
-          const cols = keys.join(", ");
+          const cols = keys.map((k) => quoteIdent(k)).join(", ");
           const placeholders = keys.map(() => "?").join(", ");
           const values = keys.map((k) => row[k]);
-          const sql = `INSERT INTO ${table} (${cols}) VALUES (${placeholders})`;
+          const sql = `INSERT INTO ${quoteIdent(table)} (${cols}) VALUES (${placeholders})`;
           this.db.run(sql, values);
           this.sqlLog.push(sql);
         }

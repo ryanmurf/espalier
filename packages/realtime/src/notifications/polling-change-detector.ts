@@ -104,5 +104,6 @@ export class PollingChangeDetector {
 }
 
 function clampInterval(ms: number): number {
+  if (!Number.isFinite(ms)) return MIN_POLL_INTERVAL;
   return Math.max(MIN_POLL_INTERVAL, Math.min(MAX_POLL_INTERVAL, ms));
 }

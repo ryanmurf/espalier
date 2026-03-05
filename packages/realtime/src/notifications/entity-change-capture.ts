@@ -62,7 +62,7 @@ BEGIN
     'row', row_data
   );
 
-  PERFORM pg_notify('${channel}', payload::TEXT);
+  PERFORM pg_notify('${channel.replace(/'/g, "''")}', payload::TEXT);
 
   IF (TG_OP = 'DELETE') THEN
     RETURN OLD;

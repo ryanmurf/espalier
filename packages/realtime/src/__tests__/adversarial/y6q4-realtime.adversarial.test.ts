@@ -40,9 +40,14 @@ function createMockDataSource(overrides?: Partial<{ getConnection: () => Promise
     executeUpdate: vi.fn().mockResolvedValue(0),
     setParameter: vi.fn(),
   };
+  const mockClient = {
+    on: vi.fn(),
+    off: vi.fn(),
+  };
   const mockConnection = {
     prepareStatement: vi.fn().mockReturnValue(mockStatement),
     close: vi.fn().mockResolvedValue(undefined),
+    _client: mockClient,
   };
 
   return {
@@ -405,11 +410,9 @@ describe("PollingChangeDetector — adversarial", () => {
       intervalMs: NaN,
       query: "SELECT 1",
     });
-    // NaN comparison: Math.max(100, Math.min(60000, NaN)) = Math.max(100, NaN) = NaN
-    // This reveals a potential bug — let's document the actual behavior
+    // NaN is clamped to MIN_POLL_INTERVAL (100ms)
     const interval = (detector as any).intervalMs;
-    // NaN propagates through Math.max/Math.min, so the interval will be NaN
-    expect(Number.isNaN(interval)).toBe(true);
+    expect(interval).toBe(100);
   });
 
   it("should clamp Infinity to 60000ms", () => {
@@ -418,7 +421,8 @@ describe("PollingChangeDetector — adversarial", () => {
       intervalMs: Infinity,
       query: "SELECT 1",
     });
-    expect((detector as any).intervalMs).toBe(60000);
+    // Infinity is not finite, so it's clamped to MIN_POLL_INTERVAL (100ms)
+    expect((detector as any).intervalMs).toBe(100);
   });
 
   it("should clamp -Infinity to 100ms", () => {
