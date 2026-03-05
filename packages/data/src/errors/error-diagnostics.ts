@@ -85,6 +85,21 @@ export function diagnose(
     };
   }
 
+  // Column not found (check before table — "column X of relation Y does not exist" matches both)
+  if (
+    lower.includes("column") && (lower.includes("does not exist") || lower.includes("not found") || lower.includes("unknown column"))
+  ) {
+    const colName = extractQuoted(message) ?? context?.columnName;
+    return {
+      originalMessage: message,
+      diagnosticMessage: `Column '${colName ?? "unknown"}' not found.`,
+      hint: `Check your @Column mapping or run migrations. ` +
+        `Ensure the column name in @Column('${colName ?? "name"}') matches the database column.`,
+      columnName: colName ?? undefined,
+      tableName: context?.tableName,
+    };
+  }
+
   // Table not found / relation does not exist
   if (
     lower.includes("relation") && lower.includes("does not exist") ||
@@ -97,21 +112,6 @@ export function diagnose(
       hint: `Did you run migrations? Use \`espalier migrate up\` to apply pending migrations. ` +
         `Or check that the table name in @Table matches your database schema.`,
       tableName: tableName ?? undefined,
-    };
-  }
-
-  // Column not found
-  if (
-    lower.includes("column") && (lower.includes("does not exist") || lower.includes("not found") || lower.includes("unknown column"))
-  ) {
-    const colName = extractQuoted(message) ?? context?.columnName;
-    return {
-      originalMessage: message,
-      diagnosticMessage: `Column '${colName ?? "unknown"}' not found.`,
-      hint: `Check your @Column mapping or run migrations. ` +
-        `Ensure the column name in @Column('${colName ?? "name"}') matches the database column.`,
-      columnName: colName ?? undefined,
-      tableName: context?.tableName,
     };
   }
 
