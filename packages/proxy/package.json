@@ -1,6 +1,6 @@
 {
   "name": "espalier-proxy",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "description": "Serverless connection proxy for espalier-jdbc — connection reuse across Lambda/edge invocations",
   "type": "module",
   "main": "./dist/index.cjs",

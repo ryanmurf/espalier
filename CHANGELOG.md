@@ -22,6 +22,10 @@
 
 ### Fixed
 - `detectRuntime()` no longer crashes when `globalThis.Bun` is `null`
+- **jdbc/D1** (11 fixes): runtime detection null guard, factory validation, `timingSafeEqual` polyfill, D1 rollback/cursor/params/success checks, CI workflow fixes
+- **jdbc-pg** (10 fixes): SQL injection via isolation level interpolation, connection release on error, pool race condition, Deno import path, credentials in error messages, pool size defaults, ESM `require` to `import`
+- **sqlite** (7 fixes): resource leak on close, path traversal protection, idempotent close, JSDoc warnings, statement finalize, ESM `require` to `import`
+- Test typecheck fixes: `parseDerivedQueryMethod` arity, `ColumnMetadata` shape, mock call type assertion
 
 ## [1.1.0] - Y4 Q1
 
