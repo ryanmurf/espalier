@@ -245,6 +245,81 @@ export class EventStore {
     ];
   }
 
+  /**
+   * Load events across all aggregates with optional filtering.
+   * Results are ordered by sequence (global ordering).
+   */
+  async loadAllEvents(
+    connection: Connection,
+    options?: {
+      aggregateTypes?: string[];
+      eventTypes?: string[];
+      fromSequence?: number;
+      fromTimestamp?: Date;
+      toTimestamp?: Date;
+      fromVersion?: number;
+      limit?: number;
+    },
+  ): Promise<StoredEvent[]> {
+    const conditions: string[] = [];
+    const params: Array<string | number | Date> = [];
+    let paramIdx = 1;
+
+    if (options?.aggregateTypes && options.aggregateTypes.length > 0) {
+      const placeholders = options.aggregateTypes.map((_, i) => `$${paramIdx + i}`);
+      conditions.push(`"aggregate_type" IN (${placeholders.join(", ")})`);
+      params.push(...options.aggregateTypes);
+      paramIdx += options.aggregateTypes.length;
+    }
+
+    if (options?.eventTypes && options.eventTypes.length > 0) {
+      const placeholders = options.eventTypes.map((_, i) => `$${paramIdx + i}`);
+      conditions.push(`"event_type" IN (${placeholders.join(", ")})`);
+      params.push(...options.eventTypes);
+      paramIdx += options.eventTypes.length;
+    }
+
+    if (options?.fromSequence !== undefined) {
+      conditions.push(`"sequence" > $${paramIdx}`);
+      params.push(options.fromSequence);
+      paramIdx++;
+    }
+
+    if (options?.fromTimestamp !== undefined) {
+      conditions.push(`"timestamp" >= $${paramIdx}`);
+      params.push(options.fromTimestamp as unknown as string as unknown as number);
+      paramIdx++;
+    }
+
+    if (options?.toTimestamp !== undefined) {
+      conditions.push(`"timestamp" <= $${paramIdx}`);
+      params.push(options.toTimestamp as unknown as string as unknown as number);
+      paramIdx++;
+    }
+
+    if (options?.fromVersion !== undefined) {
+      conditions.push(`"version" >= $${paramIdx}`);
+      params.push(options.fromVersion);
+      paramIdx++;
+    }
+
+    const whereClause = conditions.length > 0
+      ? ` WHERE ${conditions.join(" AND ")}`
+      : "";
+
+    const limitClause = options?.limit !== undefined
+      ? ` LIMIT $${paramIdx}`
+      : "";
+
+    if (options?.limit !== undefined) {
+      params.push(options.limit);
+    }
+
+    const sql = `SELECT "event_id", "aggregate_id", "aggregate_type", "event_type", "payload", "version", "sequence", "timestamp", "metadata" FROM ${this.qualifiedTable}${whereClause} ORDER BY "sequence" ASC${limitClause}`;
+
+    return this.executeEventQuery(connection, sql, params as Array<string | number>);
+  }
+
   // ---- private helpers ----
 
   private async executeEventQuery(

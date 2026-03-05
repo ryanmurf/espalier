@@ -51,3 +51,15 @@ export { InMemoryEventBusAdapter } from "./adapter/index.js";
 // Plugin
 export type { EventSourcingPluginConfig } from "./plugin/index.js";
 export { EventSourcingPlugin } from "./plugin/index.js";
+
+// Projection
+export { Projection, getProjectionMetadata, ProjectionRunner } from "./projection/index.js";
+export type { ProjectionHandler, ProjectionOptions } from "./projection/index.js";
+
+// Snapshot
+export { SnapshotStore } from "./snapshot/index.js";
+export type { AggregateSnapshot } from "./snapshot/index.js";
+
+// Replay
+export { EventReplayer } from "./replay/index.js";
+export type { ReplayOptions } from "./replay/index.js";
