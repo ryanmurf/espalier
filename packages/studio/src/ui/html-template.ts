@@ -54,8 +54,14 @@ tr:hover td { background: rgba(99,102,241,.06); }
 .write-badge { background: var(--danger); color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; }
 .schema-view { padding: 16px; font-size: 13px; }
 .schema-view pre { background: var(--surface); padding: 16px; border-radius: 8px; overflow: auto; max-height: calc(100vh - 120px); }
-.diagram-view { padding: 16px; }
-.diagram-view pre { background: var(--surface); padding: 16px; border-radius: 8px; overflow: auto; font-size: 12px; max-height: calc(100vh - 120px); }
+.diagram-view { padding: 16px; display: flex; flex-direction: column; height: 100%; }
+.diagram-toolbar { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; align-items: center; }
+.diagram-toolbar button { background: var(--border); color: var(--text); border: none; padding: 4px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+.diagram-toolbar button:hover { background: var(--accent); color: #fff; }
+.diagram-toolbar .zoom-controls { display: flex; gap: 4px; margin-left: auto; }
+.diagram-container { flex: 1; overflow: auto; background: var(--surface); border-radius: 8px; position: relative; }
+.diagram-container .mermaid-rendered { transform-origin: top left; transition: transform .2s; padding: 20px; }
+.diagram-source { background: var(--surface); padding: 16px; border-radius: 8px; overflow: auto; font-size: 12px; max-height: 300px; margin-top: 12px; }
 .query-view { padding: 16px; display: flex; flex-direction: column; height: 100%; }
 .query-editor { width: 100%; min-height: 120px; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 12px; font-family: "SF Mono", Menlo, monospace; font-size: 13px; resize: vertical; }
 .query-btn { margin-top: 8px; background: var(--accent); color: #fff; border: none; padding: 8px 20px; border-radius: 6px; cursor: pointer; font-size: 13px; align-self: flex-start; }
@@ -63,6 +69,11 @@ tr:hover td { background: rgba(99,102,241,.06); }
 .query-results { margin-top: 16px; flex: 1; overflow: auto; }
 .error { background: rgba(239,68,68,.15); border: 1px solid var(--danger); color: var(--danger); padding: 12px; border-radius: 8px; font-size: 13px; }
 </style>
+<script type="module">
+import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+mermaid.initialize({ startOnLoad: false, theme: "dark", er: { useMaxWidth: false } });
+window.mermaid = mermaid;
+</script>
 </head>
 <body>
 <div id="app">
@@ -230,21 +241,132 @@ function renderSchema() {
   document.getElementById("content").innerHTML = '<div class="schema-view"><pre>' + escHtml(JSON.stringify(tableData, null, 2)) + '</pre></div>';
 }
 
-function renderDiagram() {
-  if (!schema) return;
+let diagramZoom = 1;
+
+function getMermaidSource() {
+  if (!schema) return "";
   let lines = ["erDiagram"];
   for (const t of schema.tables) {
     lines.push("    " + t.tableName + " {");
-    for (const c of t.columns) lines.push("        " + (c.type || "string") + " " + c.columnName + (c.isPrimaryKey ? ' "PK"' : ''));
+    for (const c of t.columns) {
+      let annotation = "";
+      if (c.isPrimaryKey) annotation = ' "PK"';
+      else if (c.unique) annotation = ' "UK"';
+      lines.push("        " + (c.type || "string").replace(/\\s+/g, "_") + " " + c.columnName + annotation);
+    }
     lines.push("    }");
   }
+  const seen = new Set();
   for (const r of schema.relations) {
+    const key = [r.sourceTable, r.targetTable, r.fieldName].sort().join(":");
+    if (seen.has(key)) continue;
+    seen.add(key);
     if (r.type === "ManyToOne") lines.push("    " + r.sourceTable + " }o--|| " + r.targetTable + ' : "' + r.fieldName + '"');
     else if (r.type === "OneToMany") lines.push("    " + r.sourceTable + " ||--o{ " + r.targetTable + ' : "' + r.fieldName + '"');
     else if (r.type === "ManyToMany") lines.push("    " + r.sourceTable + " }o--o{ " + r.targetTable + ' : "' + r.fieldName + '"');
     else if (r.type === "OneToOne") lines.push("    " + r.sourceTable + " ||--|| " + r.targetTable + ' : "' + r.fieldName + '"');
   }
-  document.getElementById("content").innerHTML = '<div class="diagram-view"><pre>' + escHtml(lines.join("\\n")) + '</pre></div>';
+  return lines.join("\\n");
+}
+
+function getD2Source() {
+  if (!schema) return "";
+  let lines = [];
+  for (const t of schema.tables) {
+    lines.push(t.tableName + ": {");
+    lines.push("    shape: sql_table");
+    for (const c of t.columns) {
+      let constraint = "";
+      if (c.isPrimaryKey) constraint = " {constraint: primary_key}";
+      else if (c.unique) constraint = " {constraint: unique}";
+      lines.push("    " + c.columnName + ": " + (c.type || "string") + constraint);
+    }
+    lines.push("}");
+    lines.push("");
+  }
+  const seen = new Set();
+  for (const r of schema.relations) {
+    const key = [r.sourceTable, r.targetTable, r.fieldName].sort().join(":");
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const label = r.type === "ManyToOne" ? "(N:1)" : r.type === "OneToMany" ? "(1:N)" : r.type === "ManyToMany" ? "(N:M)" : "(1:1)";
+    lines.push(r.sourceTable + " -> " + r.targetTable + ": " + r.fieldName + " " + label);
+  }
+  return lines.join("\\n");
+}
+
+async function renderDiagram() {
+  if (!schema) return;
+  diagramZoom = 1;
+  const mermaidSrc = getMermaidSource();
+
+  let html = '<div class="diagram-view">';
+  html += '<div class="diagram-toolbar">';
+  html += '<button onclick="exportSvg()">Download SVG</button>';
+  html += '<button onclick="copyMermaid()">Copy Mermaid</button>';
+  html += '<button onclick="copyD2()">Copy D2</button>';
+  html += '<button onclick="toggleSource()">Toggle Source</button>';
+  html += '<div class="zoom-controls">';
+  html += '<button onclick="zoomDiagram(-0.2)">-</button>';
+  html += '<button onclick="zoomDiagram(0)">Reset</button>';
+  html += '<button onclick="zoomDiagram(0.2)">+</button>';
+  html += '</div></div>';
+  html += '<div class="diagram-container"><div class="mermaid-rendered" id="diagramRender"></div></div>';
+  html += '<pre class="diagram-source" id="diagramSource" style="display:none">' + escHtml(mermaidSrc) + '</pre>';
+  html += '</div>';
+
+  document.getElementById("content").innerHTML = html;
+
+  if (window.mermaid) {
+    try {
+      const { svg } = await window.mermaid.render("er-diagram", mermaidSrc);
+      document.getElementById("diagramRender").innerHTML = svg;
+    } catch (e) {
+      document.getElementById("diagramRender").innerHTML = '<div class="error">Mermaid render failed: ' + escHtml(String(e)) + '</div><pre>' + escHtml(mermaidSrc) + '</pre>';
+    }
+  } else {
+    document.getElementById("diagramRender").innerHTML = '<pre>' + escHtml(mermaidSrc) + '</pre>';
+  }
+}
+
+function zoomDiagram(delta) {
+  const el = document.getElementById("diagramRender");
+  if (!el) return;
+  if (delta === 0) diagramZoom = 1;
+  else diagramZoom = Math.max(0.2, Math.min(3, diagramZoom + delta));
+  el.style.transform = "scale(" + diagramZoom + ")";
+}
+
+function exportSvg() {
+  const el = document.getElementById("diagramRender");
+  if (!el) return;
+  const svgEl = el.querySelector("svg");
+  if (!svgEl) return;
+  const blob = new Blob([svgEl.outerHTML], { type: "image/svg+xml" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "er-diagram.svg";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function copyMermaid() {
+  navigator.clipboard.writeText(getMermaidSource()).then(() => {
+    alert("Mermaid source copied to clipboard.");
+  });
+}
+
+function copyD2() {
+  navigator.clipboard.writeText(getD2Source()).then(() => {
+    alert("D2 source copied to clipboard.");
+  });
+}
+
+function toggleSource() {
+  const el = document.getElementById("diagramSource");
+  if (!el) return;
+  el.style.display = el.style.display === "none" ? "block" : "none";
 }
 
 function renderQueryView() {
