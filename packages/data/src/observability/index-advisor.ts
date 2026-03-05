@@ -238,7 +238,7 @@ export class IndexAdvisor {
   private extractColumnsFromFilter(filter: string): string[] {
     const columns: string[] = [];
     // Match unquoted identifiers before comparison operators
-    const regex = /\b([a-z_][a-z0-9_]*)\s*(?:=|<>|!=|>=?|<=?|~~|LIKE|IN|IS)\b/gi;
+    const regex = /\b([a-z_][a-z0-9_]*)\s*(?:=|<>|!=|>=?|<=?|~~|LIKE|IN|IS\b)/gi;
     let match: RegExpExecArray | null;
     const seen = new Set<string>();
     while ((match = regex.exec(filter)) !== null) {

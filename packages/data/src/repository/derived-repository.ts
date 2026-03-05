@@ -21,7 +21,7 @@ import type { LifecycleEvent } from "../decorators/lifecycle.js";
 import { EntityChangeTracker } from "../mapping/change-tracker.js";
 import type { StreamOptions } from "./streaming.js";
 import type { EventBus } from "../events/event-bus.js";
-import type { EntityLoadedEvent } from "../events/entity-events.js";
+import type { EntityLoadedEvent, EntityPersistedEvent } from "../events/entity-events.js";
 import { ENTITY_EVENTS } from "../events/entity-events.js";
 import type { OneToOneRelation } from "../decorators/relations.js";
 import { getTableName } from "../decorators/table.js";
@@ -692,9 +692,21 @@ export function createDerivedRepository<T, ID>(
       }
     }
 
-    // Post-persist lifecycle
+    // Post-persist lifecycle and events
     for (const entity of results) {
       await persister.invokeLifecycleCallbacks(entity, "PostPersist");
+      await persister.emitEntityEvent(
+        ENTITY_EVENTS.PERSISTED,
+        `${ENTITY_EVENTS.PERSISTED}:${entityName}`,
+        {
+          type: "persisted",
+          entityClass,
+          entityName,
+          entity,
+          id: getEntityId(entity),
+          timestamp: new Date(),
+        } satisfies EntityPersistedEvent<T>,
+      );
     }
 
     entityCache.clear();

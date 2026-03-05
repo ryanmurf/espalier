@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.3.0] - Y4 Q3 — Query Performance Engine & Pluggable Pagination
+
+### Added
+- **Query compilation**: `QueryCompiler` compiles derived query methods into reusable `CompiledQuery` objects with parameter binding
+- **N+1 detection**: `N1Detector` with `AsyncLocalStorage` scoped tracking, configurable thresholds, and `N1DetectionError`
+- **Query batcher**: `QueryBatcher` implements DataLoader pattern for batching `findById` calls into single IN queries
+- **Pagination strategy interface**: `PaginationStrategy<TRequest, TResult>` with `PaginationStrategyRegistry`
+- **Offset pagination**: `OffsetPaginationStrategy` (default, backward compatible)
+- **Relay cursor pagination**: `RelayCursorStrategy` with base64 cursor encoding, forward/backward pagination
+- **Keyset pagination**: `KeysetPaginationStrategy` with dialect-portable expanded AND/OR WHERE generation
+- **@Pagination decorator**: per-entity strategy selection via decorator
+- **Bulk operations**: `BulkOperationBuilder` for multi-row INSERT, CASE-based UPDATE, dialect-aware UPSERT
+- **Bulk saveAll**: `saveAll()` uses multi-row INSERT for new entities, individual save for existing
+- **upsertAll**: new `CrudRepository.upsertAll()` with `ON CONFLICT DO UPDATE` (Postgres) / `ON DUPLICATE KEY UPDATE` (MySQL)
+- **Prepared statement pool**: `PreparedStatementPool` with per-connection LRU caching, aggregate metrics
+- **Index advisor**: `IndexAdvisor` analyzes query plans for missing indexes, generates `CREATE INDEX` DDL
+- **GraphQL pagination adapters**: `GraphQLPaginationAdapter` interface with Offset, RelayCursor, Keyset implementations
+- Per-entity pagination adapter overrides in `GraphQLSchemaGenerator` and `ResolverGenerator`
+
 ## [1.2.0] - Y4 Q2 — Multi-Runtime Support
 
 ### Added

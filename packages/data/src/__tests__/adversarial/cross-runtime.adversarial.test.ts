@@ -71,17 +71,17 @@ describe("no Node-specific APIs in espalier-data", () => {
     }
   });
 
-  it("only tenant files use node:async_hooks", () => {
-    // Verify AsyncLocalStorage usage is confined to tenant-related files
-    const nonTenantViolations: string[] = [];
+  it("only tenant and observability files use node:async_hooks", () => {
+    // AsyncLocalStorage is used in tenant context and N1 detection scoping
+    const nonAllowedViolations: string[] = [];
     for (const file of srcFiles) {
-      if (file.includes("/tenant/")) continue;
+      if (file.includes("/tenant/") || file.includes("/observability/")) continue;
       const content = fs.readFileSync(file, "utf-8");
       if (/from\s+["']node:async_hooks["']/.test(content)) {
-        nonTenantViolations.push(path.relative(ROOT, file));
+        nonAllowedViolations.push(path.relative(ROOT, file));
       }
     }
-    expect(nonTenantViolations).toEqual([]);
+    expect(nonAllowedViolations).toEqual([]);
   });
 
   it("no Buffer usage in runtime code", () => {

@@ -452,10 +452,9 @@ describe("version consistency", () => {
     return pkg.version;
   }
 
-  it("D1 package version matches docs reference (v1.2.0)", () => {
+  it("D1 package version matches current release (v1.3.0)", () => {
     const version = getVersion(D1_PKG);
     if (!version) return; // Skip if D1 package doesn't exist
-    // The docs say v1.2.0 is the multi-runtime release
-    expect(version).toBe("1.2.0");
+    expect(version).toBe("1.3.0");
   });
 });

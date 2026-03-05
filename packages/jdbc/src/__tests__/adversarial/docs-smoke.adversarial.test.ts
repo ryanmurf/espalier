@@ -208,10 +208,10 @@ describe("version consistency", () => {
   it("D1 package version matches CHANGELOG version", () => {
     const d1Pkg = readPackageJson("packages/d1/package.json");
     if (!d1Pkg.version) return;
-    expect(d1Pkg.version).toBe("1.2.0");
+    expect(d1Pkg.version).toBe("1.3.0");
   });
 
-  it("CHANGELOG v1.2.0 is the latest entry", () => {
+  it("CHANGELOG v1.3.0 is the latest entry", () => {
     const changelog = readFile("CHANGELOG.md");
     const versionPattern = /## \[(\d+\.\d+\.\d+)\]/g;
     const versions: string[] = [];
@@ -220,7 +220,7 @@ describe("version consistency", () => {
       versions.push(match[1]);
     }
     expect(versions.length).toBeGreaterThan(0);
-    expect(versions[0]).toBe("1.2.0");
+    expect(versions[0]).toBe("1.3.0");
   });
 });
 

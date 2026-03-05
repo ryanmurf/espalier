@@ -82,6 +82,12 @@ export { bindCompiledQuery, QueryCompiler } from "./query/index.js";
 export type { QueryBatcherConfig } from "./query/index.js";
 export { QueryBatcher, QueryBatcherRegistry } from "./query/index.js";
 
+export type { BulkDialect, BulkOperationOptions, BulkQuery } from "./query/index.js";
+export { BulkOperationBuilder } from "./query/index.js";
+
+export type { PreparedStatementPoolConfig, PreparedStatementPoolMetrics } from "./query/index.js";
+export { PreparedStatementPool, getGlobalPreparedStatementPool, setGlobalPreparedStatementPool } from "./query/index.js";
+
 export type {
   PaginationStrategy,
   CursorPageable,
@@ -94,10 +100,15 @@ export type {
 } from "./pagination/index.js";
 export {
   OffsetPaginationStrategy,
+  RelayCursorStrategy,
+  KeysetPaginationStrategy,
   PaginationStrategyRegistry,
   getGlobalPaginationRegistry,
   setGlobalPaginationRegistry,
+  encodeCursor,
+  decodeCursor,
 } from "./pagination/index.js";
+export type { CursorPayload, RelayCursorStrategyOptions, KeysetStrategyOptions } from "./pagination/index.js";
 
 export { Pagination, getPaginationStrategy } from "./decorators/pagination.js";
 
@@ -176,6 +187,8 @@ export { TenantSchemaManager, TenantLimitExceededError } from "./tenant/index.js
 export type { ObservabilityConfig, ObservabilityHandle } from "./observability/index.js";
 export type { N1DetectionConfig, N1DetectionEvent } from "./observability/index.js";
 export { N1Detector, N1DetectionError } from "./observability/index.js";
+export type { IndexType, IndexSuggestion, IndexAdvisorConfig } from "./observability/index.js";
+export { IndexAdvisor } from "./observability/index.js";
 
 export type { Plugin, PluginContext, PluginHook, PluginDependency, HookType, HookContext } from "./plugin/index.js";
 export type { MiddlewareContext, MiddlewareFn } from "./plugin/index.js";
@@ -186,6 +199,7 @@ export { createPluginDecorator } from "./plugin/index.js";
 
 export type { GraphQLSchemaOptions, GeneratedGraphQLSchema, GraphQLPluginConfig } from "./graphql/index.js";
 export type { ResolverFn, ResolverMap, BatchLoadFn, ResolverGeneratorOptions, EntityRegistration } from "./graphql/index.js";
+export type { GraphQLPaginationAdapter } from "./graphql/index.js";
 
 export type { RestRequest, RestResponse, RestHandler, HttpMethod, RouteDefinition } from "./rest/index.js";
 export type { RouteGeneratorOptions, RestEntityRegistration, RestPluginConfig } from "./rest/index.js";
