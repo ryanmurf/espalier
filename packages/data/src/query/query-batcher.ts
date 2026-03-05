@@ -101,7 +101,9 @@ export class QueryBatcher<T> {
       }
     }
 
-    const idValues = [...new Set(chunk.map((r) => r.id))];
+    // Normalize IDs to strings for consistent dedup — mirrors the string-keyed
+    // idMap above so that integer 1 and string "1" are treated as the same key.
+    const idValues = [...new Set(chunk.map((r) => String(r.id)))];
 
     // Find the ID column
     const idField = this.metadata.fields.find(

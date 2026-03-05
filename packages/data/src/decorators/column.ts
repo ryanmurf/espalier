@@ -30,11 +30,44 @@ export interface ColumnMetadataEntry {
 
 const columnMetadata = new WeakMap<object, Map<string | symbol, ColumnMetadataEntry>>();
 
+/**
+ * Known SQL type keywords that users commonly pass as the first string argument
+ * to @Column() by mistake, e.g. @Column("VARCHAR(36)") or @Column("TEXT").
+ * The string argument sets the COLUMN NAME, not the column type.
+ */
+const SQL_TYPE_KEYWORDS = new Set([
+  "varchar", "char", "text", "nvarchar", "nchar", "clob",
+  "int", "integer", "bigint", "smallint", "tinyint", "mediumint",
+  "float", "double", "real", "decimal", "numeric",
+  "boolean", "bool", "bit",
+  "date", "time", "datetime", "timestamp", "timestamptz", "interval",
+  "blob", "bytea", "binary", "varbinary",
+  "json", "jsonb", "xml", "uuid",
+  "serial", "bigserial", "smallserial",
+  "array", "enum",
+]);
+
+function looksLikeSqlType(value: string): boolean {
+  // Contains parentheses — e.g. VARCHAR(255), DECIMAL(10,2)
+  if (value.includes("(") || value.includes(")")) return true;
+  // All uppercase (common SQL type notation) with only word chars and spaces
+  if (value === value.toUpperCase() && /^[A-Z][A-Z0-9\s_]*$/.test(value)) return true;
+  // Matches a known SQL type keyword (case-insensitive)
+  if (SQL_TYPE_KEYWORDS.has(value.toLowerCase())) return true;
+  return false;
+}
+
 export function Column(options?: ColumnOptions | string) {
   return function <T>(
     _target: undefined,
     context: ClassFieldDecoratorContext<T>,
   ): void {
+    if (typeof options === "string" && looksLikeSqlType(options)) {
+      throw new Error(
+        `@Column("${options}") sets the column NAME, not the type. ` +
+        `Use @Column({ type: "${options}" }) to set the SQL type instead.`,
+      );
+    }
     const opts = typeof options === "string" ? { name: options } : (options ?? {});
     const columnName = opts.name ?? camelToSnakeCase(String(context.name));
 

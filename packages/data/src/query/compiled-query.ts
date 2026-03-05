@@ -96,7 +96,13 @@ export function bindCompiledQuery(
         const idx = inMatch.index;
         segments.push(sql.slice(lastPos, idx));
         if (arrLen === 0) {
-          segments.push("IN (NULL)");
+          // Empty IN-list: use unconditional false instead of IN (NULL).
+          // col IN (NULL) never matches due to SQL NULL semantics, and
+          // the intent of an empty array is "match nothing".
+          // The regex matched the full "IN ($N)" token, so we replace
+          // the entire match with "(1=0)" — the leading text up to `idx`
+          // is already in segments from the slice above.
+          segments.push("(1=0)");
         } else {
           const placeholders = arr.map((_, i) => `$${outputParamIdx + i}`);
           segments.push(`IN (${placeholders.join(", ")})`);

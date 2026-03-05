@@ -5,7 +5,13 @@ import type { PlanAdvisorConfig } from "espalier-jdbc";
 /**
  * Type of index to suggest.
  */
-export type IndexType = "btree" | "hash" | "gin" | "gist";
+export type IndexType = "btree" | "hash" | "gin" | "gist" | "brin" | "spgist";
+
+/**
+ * Allowlist of valid index types for DDL generation.
+ * Used to prevent injection of arbitrary strings into generated SQL.
+ */
+const ALLOWED_INDEX_TYPES = new Set<string>(["btree", "hash", "gin", "gist", "brin", "spgist"]);
 
 /**
  * A concrete index suggestion with DDL.
@@ -67,23 +73,29 @@ export class IndexAdvisor {
     const suggestions: IndexSuggestion[] = [];
     this.visitNode(plan.rootNode, suggestions);
 
-    // Build set of already-cached suggestion keys for dedup across calls
+    // Build set of already-cached suggestion keys for dedup across calls.
+    // For full-scan suggestions (empty columns), use a unique sentinel key so
+    // that multiple distinct full-scan suggestions on the same table are not
+    // collapsed into a single entry (they may have different reasons/estimates).
     const cachedKeys = new Set<string>();
     for (const s of this.cachedSuggestions) {
-      cachedKeys.add(`${s.table}.${s.columns.join(",")}`);
+      cachedKeys.add(suggestionDedupKey(s));
     }
 
-    // Deduplicate against existing indexes and previous suggestions
+    // Deduplicate against existing indexes and previous suggestions.
+    // Full-scan suggestions are never in existingIndexes (empty columns), so
+    // we only skip them if an identical suggestion was cached previously.
     const deduped = suggestions.filter((s) => {
-      const key = `${s.table}.${s.columns.join(",")}`;
-      return !this.existingIndexes.has(key) && !cachedKeys.has(key);
+      const key = suggestionDedupKey(s);
+      return !this.existingIndexes.has(`${s.table}.${s.columns.join(",")}`) &&
+        !cachedKeys.has(key);
     });
 
     // Deduplicate within this batch
     const seen = new Set<string>();
     const unique: IndexSuggestion[] = [];
     for (const s of deduped) {
-      const key = `${s.table}.${s.columns.join(",")}`;
+      const key = suggestionDedupKey(s);
       if (!seen.has(key)) {
         seen.add(key);
         unique.push(s);
@@ -240,6 +252,11 @@ export class IndexAdvisor {
     reason: string,
     estimatedImprovement: string,
   ): IndexSuggestion {
+    // Validate indexType against the allowlist to prevent injection into DDL
+    if (!ALLOWED_INDEX_TYPES.has(indexType)) {
+      throw new Error(`Unsupported index type: ${indexType}`);
+    }
+
     const indexName = `idx_${table}_${columns.join("_")}`;
     const colList = columns.map((c) => quoteIdentifier(c)).join(", ");
     const usingClause = indexType !== "btree" ? ` USING ${indexType}` : "";
@@ -295,6 +312,21 @@ export class IndexAdvisor {
     }
     return undefined;
   }
+}
+
+/**
+ * Compute a dedup key for an IndexSuggestion.
+ *
+ * Full-scan suggestions have `columns: []`, which would produce the same key
+ * `"table."` for every full-scan on the same table, collapsing distinct
+ * suggestions. Use a sentinel suffix to disambiguate by reason so that each
+ * unique full-scan advisory is preserved.
+ */
+function suggestionDedupKey(s: IndexSuggestion): string {
+  if (s.columns.length === 0) {
+    return `${s.table}.__fullscan__:${s.reason}`;
+  }
+  return `${s.table}.${s.columns.join(",")}`;
 }
 
 const SQL_KEYWORDS = new Set([

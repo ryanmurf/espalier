@@ -24,6 +24,11 @@ export interface RelayCursorStrategyOptions {
   idField?: string;
   /** Maximum allowed page size (first/last). Default: 1000. */
   maxPageSize?: number;
+  /**
+   * Maximum number of sort columns allowed. Prevents DoS via excessively
+   * complex cursor conditions. Default: 8.
+   */
+  maxSortColumns?: number;
 }
 
 /**
@@ -51,6 +56,14 @@ export class RelayCursorStrategy implements PaginationStrategy<CursorPageable, C
       { column: options.idColumn, direction: "ASC" },
     ];
     this.maxPageSize = options.maxPageSize ?? 1000;
+
+    const maxSortColumns = options.maxSortColumns ?? 8;
+    if (this.sortColumns.length > maxSortColumns) {
+      throw new Error(
+        `Too many sort columns: ${this.sortColumns.length} (max ${maxSortColumns}). ` +
+        `Reduce the number of sortColumns or increase maxSortColumns.`,
+      );
+    }
   }
 
   applyToQuery(builder: SelectBuilder, request: CursorPageable): void {
@@ -104,9 +117,17 @@ export class RelayCursorStrategy implements PaginationStrategy<CursorPageable, C
       cursor: this.buildCursorForRow(node),
     }));
 
+    // Per Relay spec:
+    // - hasNextPage: true iff there are more results AFTER the last returned edge
+    //   (i.e., we fetched an extra row beyond the page size)
+    // - hasPreviousPage: true iff there are more results BEFORE the first returned edge
+    // For forward pagination (after/first): hasNextPage = hasMore, hasPreviousPage = false
+    //   (we don't know what's before without a separate count query)
+    // For backward pagination (before/last): hasPreviousPage = hasMore, hasNextPage = false
+    // Cursor presence is NOT a reliable indicator per spec — use actual row availability.
     const pageInfo: PageInfo = {
-      hasNextPage: isBackward ? (request.before != null) : hasMore,
-      hasPreviousPage: isBackward ? hasMore : (request.after != null),
+      hasNextPage: isBackward ? false : hasMore,
+      hasPreviousPage: isBackward ? hasMore : false,
       startCursor: edges.length > 0 ? edges[0].cursor : null,
       endCursor: edges.length > 0 ? edges[edges.length - 1].cursor : null,
     };
@@ -195,7 +216,7 @@ export class RelayCursorStrategy implements PaginationStrategy<CursorPageable, C
         let sql = finalSql;
         const finalParams: SqlValue[] = [];
         for (let i = 0; i < cursorParams.length; i++) {
-          sql = sql.replace(`$__cursor_final_${i}__`, `$${paramOffset + i}`);
+          sql = sql.replaceAll(`$__cursor_final_${i}__`, `$${paramOffset + i}`);
           finalParams.push(cursorParams[i]);
         }
         return { sql: `(${sql})`, params: finalParams };
