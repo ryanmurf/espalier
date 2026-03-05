@@ -102,8 +102,7 @@ describe.skipIf(!canConnect)("TenantSchemaManager — resource limits (#48)", { 
   describe("basic limit enforcement", () => {
     it("provisioning works up to the limit", async () => {
       // Account for existing schemas from other test runs
-      const limit = baselineSchemaCount + 3;
-      const mgr = new TenantSchemaManager({ maxTenants: limit });
+      const mgr = new TenantSchemaManager({ maxTenants: 3, schemaPrefix: PREFIX });
 
       await mgr.provisionTenant(ds, "a", [RlItem], resolver);
       await mgr.provisionTenant(ds, "b", [RlItem], resolver);
@@ -120,8 +119,7 @@ describe.skipIf(!canConnect)("TenantSchemaManager — resource limits (#48)", { 
     });
 
     it("provisioning fails at limit+1 with TenantLimitExceededError", async () => {
-      const limit = baselineSchemaCount + 2;
-      const mgr = new TenantSchemaManager({ maxTenants: limit });
+      const mgr = new TenantSchemaManager({ maxTenants: 2, schemaPrefix: PREFIX });
 
       await mgr.provisionTenant(ds, "a", [RlItem], resolver);
       await mgr.provisionTenant(ds, "b", [RlItem], resolver);
@@ -132,8 +130,7 @@ describe.skipIf(!canConnect)("TenantSchemaManager — resource limits (#48)", { 
     });
 
     it("error is instanceof TenantLimitExceededError", async () => {
-      const limit = baselineSchemaCount + 1;
-      const mgr = new TenantSchemaManager({ maxTenants: limit });
+      const mgr = new TenantSchemaManager({ maxTenants: 1, schemaPrefix: PREFIX });
       await mgr.provisionTenant(ds, "a", [RlItem], resolver);
 
       try {
@@ -147,8 +144,7 @@ describe.skipIf(!canConnect)("TenantSchemaManager — resource limits (#48)", { 
     });
 
     it("schema is NOT created when limit is exceeded", async () => {
-      const limit = baselineSchemaCount + 1;
-      const mgr = new TenantSchemaManager({ maxTenants: limit });
+      const mgr = new TenantSchemaManager({ maxTenants: 1, schemaPrefix: PREFIX });
       await mgr.provisionTenant(ds, "a", [RlItem], resolver);
 
       try {
@@ -239,8 +235,7 @@ describe.skipIf(!canConnect)("TenantSchemaManager — resource limits (#48)", { 
 
   describe("deprovision frees a slot", () => {
     it("after deprovision, new tenant can be provisioned", async () => {
-      const limit = baselineSchemaCount + 2;
-      const mgr = new TenantSchemaManager({ maxTenants: limit });
+      const mgr = new TenantSchemaManager({ maxTenants: 2, schemaPrefix: PREFIX });
 
       await mgr.provisionTenant(ds, "a", [RlItem], resolver);
       await mgr.provisionTenant(ds, "b", [RlItem], resolver);
@@ -268,8 +263,7 @@ describe.skipIf(!canConnect)("TenantSchemaManager — resource limits (#48)", { 
     });
 
     it("deprovision then re-provision same tenant works", async () => {
-      const limit = baselineSchemaCount + 1;
-      const mgr = new TenantSchemaManager({ maxTenants: limit });
+      const mgr = new TenantSchemaManager({ maxTenants: 1, schemaPrefix: PREFIX });
 
       await mgr.provisionTenant(ds, "a", [RlItem], resolver);
       await mgr.deprovisionTenant(ds, "a", resolver);
@@ -291,8 +285,7 @@ describe.skipIf(!canConnect)("TenantSchemaManager — resource limits (#48)", { 
 
   describe("concurrent provisioning", () => {
     it("BUG: concurrent requests can exceed maxTenants (TOCTOU race)", async () => {
-      const limit = baselineSchemaCount + 2;
-      const mgr = new TenantSchemaManager({ maxTenants: limit });
+      const mgr = new TenantSchemaManager({ maxTenants: 2, schemaPrefix: PREFIX });
 
       // Fire 5 concurrent provisions with limit for only 2 new schemas
       const results = await Promise.allSettled(
@@ -325,8 +318,7 @@ describe.skipIf(!canConnect)("TenantSchemaManager — resource limits (#48)", { 
     });
 
     it("concurrent provisioning of the SAME tenant doesn't crash", async () => {
-      const limit = baselineSchemaCount + 5;
-      const mgr = new TenantSchemaManager({ maxTenants: limit });
+      const mgr = new TenantSchemaManager({ maxTenants: 5, schemaPrefix: PREFIX });
 
       const results = await Promise.allSettled(
         Array.from({ length: 5 }, () =>
@@ -354,8 +346,7 @@ describe.skipIf(!canConnect)("TenantSchemaManager — resource limits (#48)", { 
 
   describe("error message safety", () => {
     it("TenantLimitExceededError does not leak schema names", async () => {
-      const limit = baselineSchemaCount + 1;
-      const mgr = new TenantSchemaManager({ maxTenants: limit });
+      const mgr = new TenantSchemaManager({ maxTenants: 1, schemaPrefix: PREFIX });
       await mgr.provisionTenant(ds, "secret_tenant", [RlItem], resolver);
 
       try {
@@ -385,8 +376,7 @@ describe.skipIf(!canConnect)("TenantSchemaManager — resource limits (#48)", { 
     });
 
     it("TenantLimitExceededError exposes current and max counts only", async () => {
-      const limit = baselineSchemaCount + 1;
-      const mgr = new TenantSchemaManager({ maxTenants: limit });
+      const mgr = new TenantSchemaManager({ maxTenants: 1, schemaPrefix: PREFIX });
       await mgr.provisionTenant(ds, "x", [RlItem], resolver);
 
       try {
@@ -395,7 +385,7 @@ describe.skipIf(!canConnect)("TenantSchemaManager — resource limits (#48)", { 
       } catch (err) {
         const msg = (err as Error).message;
         // Should contain numeric info about limit
-        expect(msg).toContain(String(limit));
+        expect(msg).toContain("1");
         expect(msg).toMatch(/\d+/);
       }
     });
@@ -407,8 +397,7 @@ describe.skipIf(!canConnect)("TenantSchemaManager — resource limits (#48)", { 
 
   describe("adversarial edge cases", () => {
     it("maxTenants=1 allows exactly one new schema", async () => {
-      const limit = baselineSchemaCount + 1;
-      const mgr = new TenantSchemaManager({ maxTenants: limit });
+      const mgr = new TenantSchemaManager({ maxTenants: 1, schemaPrefix: PREFIX });
       await mgr.provisionTenant(ds, "only", [RlItem], resolver);
 
       // Second one fails
@@ -431,8 +420,7 @@ describe.skipIf(!canConnect)("TenantSchemaManager — resource limits (#48)", { 
       // but the limit check counts ALL existing schemas BEFORE the create.
       // So re-provisioning a tenant that already exists hits the limit
       // even though no new schema will be created.
-      const limit = baselineSchemaCount + 2;
-      const mgr = new TenantSchemaManager({ maxTenants: limit });
+      const mgr = new TenantSchemaManager({ maxTenants: 2, schemaPrefix: PREFIX });
       await mgr.provisionTenant(ds, "a", [RlItem], resolver);
       await mgr.provisionTenant(ds, "b", [RlItem], resolver);
 
