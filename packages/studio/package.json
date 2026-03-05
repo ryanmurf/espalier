@@ -49,13 +49,16 @@
       }
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsup",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "@hono/node-server": "^1.19.11",
     "espalier-data": "workspace:*",
     "espalier-jdbc": "workspace:*",
     "hono": "^4.7.0"
