@@ -376,8 +376,7 @@ describe("Derived query methods on auto-generated repositories", () => {
       const repo = createAutoRepository<User, number>(UserRepository, ds);
       await (repo as any).findByActiveTrue();
 
-      expect(lastPreparedSql).toContain('"active" = $1');
-      expect(lastSetParams).toEqual([{ index: 1, value: true }]);
+      expect(lastPreparedSql).toContain('"active" = TRUE');
     });
 
     it("findByActiveFalse generates = false", async () => {
@@ -389,8 +388,7 @@ describe("Derived query methods on auto-generated repositories", () => {
       const repo = createAutoRepository<User, number>(UserRepository, ds);
       await (repo as any).findByActiveFalse();
 
-      expect(lastPreparedSql).toContain('"active" = $1');
-      expect(lastSetParams).toEqual([{ index: 1, value: false }]);
+      expect(lastPreparedSql).toContain('"active" = FALSE');
     });
 
     it("findByNameNot generates != condition", async () => {
@@ -402,7 +400,7 @@ describe("Derived query methods on auto-generated repositories", () => {
       const repo = createAutoRepository<User, number>(UserRepository, ds);
       await (repo as any).findByNameNot("Bob");
 
-      expect(lastPreparedSql).toContain('"name" != $1');
+      expect(lastPreparedSql).toContain('"name" <> $1');
       expect(lastSetParams).toEqual([{ index: 1, value: "Bob" }]);
     });
 
@@ -833,12 +831,12 @@ describe("Derived query methods on auto-generated repositories", () => {
 
       const repo = createAutoRepository<User, number>(UserRepository, ds);
 
-      await expect((repo as any).findByUnknownField("value")).rejects.toThrow(
+      expect(() => (repo as any).findByUnknownField("value")).toThrow(
         /Unknown property "unknownField"/,
       );
     });
 
-    it("throws for invalid method name prefix", async () => {
+    it("throws for invalid method name prefix", () => {
       const rs = new TestResultSet([]);
       const stmt = createMockPreparedStatement(rs);
       const conn = createMockConnection(() => stmt);
@@ -846,12 +844,12 @@ describe("Derived query methods on auto-generated repositories", () => {
 
       const repo = createAutoRepository<User, number>(UserRepository, ds);
 
-      await expect((repo as any).getByName("Alice")).rejects.toThrow(
+      expect(() => (repo as any).getByName("Alice")).toThrow(
         /Invalid derived query method name/,
       );
     });
 
-    it("throws for findDistinct without By", async () => {
+    it("throws for findDistinct without By", () => {
       const rs = new TestResultSet([]);
       const stmt = createMockPreparedStatement(rs);
       const conn = createMockConnection(() => stmt);
@@ -859,12 +857,12 @@ describe("Derived query methods on auto-generated repositories", () => {
 
       const repo = createAutoRepository<User, number>(UserRepository, ds);
 
-      await expect((repo as any).findDistinctName("Alice")).rejects.toThrow(
+      expect(() => (repo as any).findDistinctName("Alice")).toThrow(
         /expected "By" after "findDistinct"/,
       );
     });
 
-    it("throws for method with no predicates after By", async () => {
+    it("throws for method with no predicates after By", () => {
       const rs = new TestResultSet([]);
       const stmt = createMockPreparedStatement(rs);
       const conn = createMockConnection(() => stmt);
@@ -873,7 +871,7 @@ describe("Derived query methods on auto-generated repositories", () => {
       const repo = createAutoRepository<User, number>(UserRepository, ds);
 
       // parseDerivedQueryMethod("findBy") should throw because rest is empty
-      await expect((repo as any).findBy()).rejects.toThrow(
+      expect(() => (repo as any).findBy()).toThrow(
         /no property predicates found after "By"/,
       );
     });

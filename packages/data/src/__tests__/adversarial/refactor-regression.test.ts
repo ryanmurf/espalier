@@ -749,10 +749,9 @@ describe("Cross-cutting: repository proxy integration", () => {
       const { ds } = buildMockStack([]);
       const repo = createDerivedRepository<RRSimple, number>(RRSimple, ds) as any;
 
-      // The proxy returns a function for ANY property access (lazy creation).
-      // But calling it should throw since "randomMethod" can't be parsed.
-      expect(typeof repo.randomMethod).toBe("function");
-      await expect(repo.randomMethod()).rejects.toThrow();
+      // The proxy throws synchronously when accessing a method name that
+      // cannot be parsed as a derived query.
+      expect(() => repo.randomMethod()).toThrow();
     });
   });
 

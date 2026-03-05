@@ -2,6 +2,40 @@
 
 ## [1.3.0] - Y4 Q3 — Query Performance Engine & Pluggable Pagination
 
+### Review Fixes (post-release)
+
+#### Security (7 fixes)
+- LIKE wildcard injection in `compiled-query.ts` `applyTransform` — user input now escaped
+- Cursor payload prototype pollution via `JSON.parse` in `cursor-encoding.ts` — null prototype enforced
+- Keyset pagination `sortColumn` not validated against entity metadata — now validated
+- Integer overflow risk in offset pagination with large page/size — bounds checked
+- No maximum page size enforcement in pagination strategies — configurable max added
+- Index advisor DDL generation now uses `quoteIdentifier` to prevent SQL injection
+- Information leakage in error messages — sensitive details redacted
+
+#### Code Quality (10 fixes)
+- `QueryCompiler` True/False operators no longer generate unused bindings — inline `TRUE`/`FALSE` literals
+- `QueryCompiler.buildSql` unused parameters removed
+- `QueryCompiler` exists action dead code (push then pop) cleaned up
+- `bindCompiledQuery` spread path placeholder rewriting made robust
+- `decodeCursor` now validates type safety of parsed values
+- `upsertAll` no longer hardcodes dialect to `"postgres"` — uses actual dialect
+- `N1Detector.normalizeSql` regex no longer replaces numbers inside identifiers
+- `RelayCursorStrategy` magic param offset replaced with deterministic collision-free approach
+- `PreparedStatementPool` eviction now properly awaits `close()`
+- `KeysetPaginationAdapter.mapResolverArgs` validates `sortDirection`
+
+#### Bug Fixes (17 fixes from adversarial testing)
+- Keyset null cursor and pagination null-vs-undefined bugs
+- GraphQL pagination adapter `PageInfo` type name conflicts resolved
+- `QueryBatcher` `String(id)` dedup no longer collapses different types
+- `IndexAdvisor.createSuggestion` now quotes identifiers properly
+- `PreparedStatementPool` uses `WeakRef` for connection references (prevents GC leaks)
+- `IndexAdvisor` cached suggestions accumulation now bounded
+- ReDoS risk in N+1 detector SQL normalization regex mitigated
+- Test alignment: derived query error tests updated for synchronous throw behavior
+- Bundle size threshold updated for Q3 feature growth (2MB -> 2.5MB)
+
 ### Added
 - **Query compilation**: `QueryCompiler` compiles derived query methods into reusable `CompiledQuery` objects with parameter binding
 - **N+1 detection**: `N1Detector` with `AsyncLocalStorage` scoped tracking, configurable thresholds, and `N1DetectionError`

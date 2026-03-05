@@ -46,11 +46,11 @@ function makeMetadata(overrides?: Partial<EntityMetadata>): EntityMetadata {
     tableName: "users",
     idField: "id" as any,
     fields: [
-      { fieldName: "id" as any, columnName: "id", type: "number" },
-      { fieldName: "name" as any, columnName: "name", type: "string" },
-      { fieldName: "email" as any, columnName: "email", type: "string" },
-      { fieldName: "age" as any, columnName: "age", type: "number" },
-      { fieldName: "active" as any, columnName: "active", type: "boolean" },
+      { fieldName: "id" as any, columnName: "id" },
+      { fieldName: "name" as any, columnName: "name" },
+      { fieldName: "email" as any, columnName: "email" },
+      { fieldName: "age" as any, columnName: "age" },
+      { fieldName: "active" as any, columnName: "active" },
     ] as FieldMapping[],
     ...overrides,
   } as EntityMetadata;
@@ -83,7 +83,7 @@ function makePlanNode(overrides?: Partial<PlanNode>): PlanNode {
     startupCost: 0,
     totalCost: 100,
     estimatedRows: 5000,
-    estimatedWidth: 64,
+    width: 64,
     children: [],
     ...overrides,
   };

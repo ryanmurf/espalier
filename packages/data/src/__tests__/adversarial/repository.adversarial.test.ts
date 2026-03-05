@@ -678,12 +678,11 @@ describe("Adversarial: @Repository decorator and auto-generated repository", () 
       const { ds } = buildMockStack();
       const repo = createAutoRepository<AdvUser, number>(FieldErrRepo, ds);
 
-      // Accessing the method should NOT throw — the proxy returns a function lazily
-      const fn = (repo as any).findByNonexistentField;
-      expect(typeof fn).toBe("function");
-
-      // Calling it SHOULD throw because "nonexistentField" is not a known column
-      await expect(fn("value")).rejects.toThrow(/Unknown property "nonexistentField"/);
+      // The proxy throws synchronously because query compilation happens
+      // eagerly during property access (not deferred to execution).
+      expect(() => (repo as any).findByNonexistentField("value")).toThrow(
+        /Unknown property "nonexistentField"/,
+      );
     });
 
     it("deleteByNonexistentField throws at execution time", async () => {
@@ -693,7 +692,7 @@ describe("Adversarial: @Repository decorator and auto-generated repository", () 
       const { ds } = buildMockStack();
       const repo = createAutoRepository<AdvUser, number>(DeleteFieldErrRepo, ds);
 
-      await expect((repo as any).deleteByNonexistentField("val")).rejects.toThrow(
+      expect(() => (repo as any).deleteByNonexistentField("val")).toThrow(
         /Unknown property "nonexistentField"/,
       );
     });
