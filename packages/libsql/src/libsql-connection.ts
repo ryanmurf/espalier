@@ -52,6 +52,8 @@ export class LibSqlConnection implements Connection {
     }
 
     let completed = false;
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    const conn = this;
 
     return {
       async commit(): Promise<void> {
@@ -71,6 +73,8 @@ export class LibSqlConnection implements Connection {
             undefined,
             DatabaseErrorCode.TX_COMMIT_FAILED,
           );
+        } finally {
+          conn.activeTransaction = null;
         }
         if (logger.isEnabled(LogLevel.DEBUG)) {
           logger.debug("transaction committed");
@@ -94,6 +98,8 @@ export class LibSqlConnection implements Connection {
             undefined,
             DatabaseErrorCode.TX_ROLLBACK_FAILED,
           );
+        } finally {
+          conn.activeTransaction = null;
         }
         if (logger.isEnabled(LogLevel.DEBUG)) {
           logger.debug("transaction rolled back");

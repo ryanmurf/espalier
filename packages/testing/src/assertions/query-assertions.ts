@@ -18,7 +18,7 @@ export class QueryLog {
   private _queries: CapturedQuery[] = [];
 
   get queries(): readonly CapturedQuery[] {
-    return this._queries;
+    return [...this._queries];
   }
 
   get count(): number {
