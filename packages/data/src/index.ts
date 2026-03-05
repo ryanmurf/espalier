@@ -82,6 +82,25 @@ export { bindCompiledQuery, QueryCompiler } from "./query/index.js";
 export type { QueryBatcherConfig } from "./query/index.js";
 export { QueryBatcher, QueryBatcherRegistry } from "./query/index.js";
 
+export type {
+  PaginationStrategy,
+  CursorPageable,
+  Edge,
+  PageInfo,
+  CursorPage,
+  KeysetPageable,
+  KeysetPage,
+  PaginatedResult,
+} from "./pagination/index.js";
+export {
+  OffsetPaginationStrategy,
+  PaginationStrategyRegistry,
+  getGlobalPaginationRegistry,
+  setGlobalPaginationRegistry,
+} from "./pagination/index.js";
+
+export { Pagination, getPaginationStrategy } from "./decorators/pagination.js";
+
 export type { Specification } from "./query/index.js";
 export {
   Specifications,
