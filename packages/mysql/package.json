@@ -1,6 +1,6 @@
 {
   "name": "espalier-jdbc-mysql",
-  "version": "1.9.0",
+  "version": "1.10.0",
   "description": "MySQL driver adapter for espalier-jdbc",
   "type": "module",
   "main": "./dist/index.cjs",

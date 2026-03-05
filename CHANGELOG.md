@@ -1,5 +1,26 @@
 # Changelog
 
+## [1.10.0] - Y6 Q2 — Advanced Migrations
+
+### Features
+- **SchemaDiffEngine**: Compare entity metadata against introspected database schema, auto-generate migration DDL. Detects added/removed/modified tables and columns with type normalization (int4/integer/INT match).
+- **@Deprecated Decorator**: Field decorator marking columns for removal. Supports `replacedBy`, `removeAfter`, and `reason` options.
+- **Expand/Contract Migrations**: `generateExpandContractMigration()` produces paired expand (add column, copy data) and contract (drop column) DDL from @Deprecated metadata.
+- **TenantAwareMigrationRunner**: Run migrations across multiple tenant schemas with configurable concurrency, progress callbacks, and error handling (continueOnError option).
+- **DataMigration Interface**: Extend Migration with `data(connection)` and `undoData(connection)` for data transforms alongside schema changes. All three runners (PG, MySQL, SQLite) invoke data callbacks within migration transactions.
+- **Migration Testing Utilities**: `testMigration()` runs migration SQL in a transaction that auto-rolls back. `SchemaAssertion` provides tableExists, columnExists, columnIsNullable, primaryKeyExists assertions.
+- **CLI Schema Commands**: `espalier schema diff` — compare entities vs DB schema. `espalier schema generate` — auto-create migration file from diff.
+
+### Security
+- Sanitize generated migration file descriptions to prevent code injection
+- Schema introspector integration in adapter factory for safe schema comparison
+
+### Bug Fixes
+- All migration runners (PG/MySQL/SQLite) now call `migration.data()` after DDL and `migration.undoData()` before rollback DDL
+
+### Tests
+- 89 adversarial tests for schema diff, @Deprecated, expand/contract, tenant migrations, data migrations
+
 ## [1.9.0] - Y6 Q1 — Full-Text Search, Views & Tree Data
 
 ### Features
