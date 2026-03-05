@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { DataSource, Connection, PreparedStatement, ResultSet, Logger } from "espalier-jdbc";
+import { TestResultSet } from "../test-utils/test-result-set.js";
 import { LogLevel, NoopLogger, ConsoleLogger, setGlobalLogger } from "espalier-jdbc";
 import { EntityCache } from "../../cache/entity-cache.js";
 import { QueryCache } from "../../cache/query-cache.js";
@@ -14,56 +15,7 @@ import { createDerivedRepository } from "../../repository/derived-repository.js"
 // Mock helpers
 // ---------------------------------------------------------------------------
 
-function createMockResultSet(rows: Record<string, unknown>[] = []): ResultSet {
-  let cursor = -1;
-  return {
-    async next() {
-      cursor++;
-      return cursor < rows.length;
-    },
-    getString(col: string | number) {
-      const row = rows[cursor];
-      if (!row) return null;
-      const val = typeof col === "number" ? Object.values(row)[col] : row[col];
-      return val != null ? String(val) : null;
-    },
-    getNumber(col: string | number) {
-      const row = rows[cursor];
-      if (!row) return null;
-      const val = typeof col === "number" ? Object.values(row)[col] : row[col];
-      return val != null ? Number(val) : null;
-    },
-    getBoolean(col: string | number) {
-      const row = rows[cursor];
-      if (!row) return null;
-      const val = typeof col === "number" ? Object.values(row)[col] : row[col];
-      return val != null ? Boolean(val) : null;
-    },
-    getDate() { return null; },
-    getRow() { return rows[cursor] ?? {}; },
-    getMetadata() {
-      if (rows.length === 0) return [];
-      return Object.keys(rows[0]!).map((name) => ({
-        name,
-        dataType: "text",
-        nullable: true,
-        primaryKey: false,
-      }));
-    },
-    async close() {},
-    [Symbol.asyncIterator]() {
-      return {
-        async next(): Promise<IteratorResult<Record<string, unknown>>> {
-          cursor++;
-          if (cursor < rows.length) {
-            return { value: rows[cursor]!, done: false };
-          }
-          return { value: undefined as any, done: true };
-        },
-      };
-    },
-  };
-}
+// createMockResultSet replaced by TestResultSet
 
 function createMockPreparedStatement(rs: ResultSet): PreparedStatement {
   return {
@@ -97,7 +49,7 @@ function createMockDataSource(conn: Connection): DataSource {
 }
 
 function buildMockStack(rows: Record<string, unknown>[] = []) {
-  const rs = createMockResultSet(rows);
+  const rs = new TestResultSet(rows);
   const stmt = createMockPreparedStatement(rs);
   const conn = createMockConnection(stmt);
   const ds = createMockDataSource(conn);
@@ -837,7 +789,7 @@ describe("adversarial: logging instrumentation (Data layer)", () => {
       // Build a mock stack that returns different results each time
       const rows = [{ id: 1, name: "A", email: "a" }];
       const makeMock = () => {
-        const rs = createMockResultSet(rows);
+        const rs = new TestResultSet(rows);
         const stmt = createMockPreparedStatement(rs);
         const conn = createMockConnection(stmt);
         return conn;
@@ -1051,7 +1003,7 @@ describe("adversarial: logging instrumentation (Data layer)", () => {
       setGlobalLogger(spy);
 
       const rows = [{ "COUNT(*)": 5 }];
-      const rs = createMockResultSet(rows);
+      const rs = new TestResultSet(rows);
       const stmt = createMockPreparedStatement(rs);
       const conn = createMockConnection(stmt);
       const ds = createMockDataSource(conn);

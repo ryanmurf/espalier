@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import type { DataSource, Connection, PreparedStatement, ResultSet } from "espalier-jdbc";
+import type { DataSource, Connection, PreparedStatement } from "espalier-jdbc";
 import { Repository } from "../../decorators/repository.js";
 import { Table } from "../../decorators/table.js";
 import { Column } from "../../decorators/column.js";
@@ -10,6 +10,7 @@ import {
   validateDerivedMethods,
 } from "../../repository/auto-repository.js";
 import { getEntityMetadata } from "../../mapping/entity-metadata.js";
+import { TestResultSet } from "../test-utils/test-result-set.js";
 
 // --- Test Entities ---
 
@@ -28,64 +29,7 @@ class Product {
   @Column() price: number = 0;
 }
 
-// --- Mock Helpers ---
-
-function createMockResultSet(rows: Record<string, unknown>[]): ResultSet {
-  let cursor = -1;
-  return {
-    async next() {
-      cursor++;
-      return cursor < rows.length;
-    },
-    getString(col: string | number) {
-      const row = rows[cursor];
-      if (!row) return null;
-      const val = typeof col === "number" ? Object.values(row)[col] : row[col];
-      return val != null ? String(val) : null;
-    },
-    getNumber(col: string | number) {
-      const row = rows[cursor];
-      if (!row) return null;
-      const val = typeof col === "number" ? Object.values(row)[col] : row[col];
-      return val != null ? Number(val) : null;
-    },
-    getBoolean(col: string | number) {
-      const row = rows[cursor];
-      if (!row) return null;
-      const val = typeof col === "number" ? Object.values(row)[col] : row[col];
-      return val != null ? Boolean(val) : null;
-    },
-    getDate(_col: string | number) {
-      return null;
-    },
-    getRow() {
-      return rows[cursor] ?? {};
-    },
-    getMetadata() {
-      if (rows.length === 0) return [];
-      return Object.keys(rows[0]).map((n) => ({
-        name: n,
-        dataType: "text",
-        nullable: true,
-        primaryKey: false,
-      }));
-    },
-    async close() {},
-    [Symbol.asyncIterator]() {
-      return {
-        async next(): Promise<IteratorResult<Record<string, unknown>>> {
-          cursor++;
-          if (cursor < rows.length) {
-            return { value: rows[cursor], done: false };
-          }
-          return { value: undefined as any, done: true };
-        },
-      };
-    },
-  };
-}
-
-function createMockPreparedStatement(rs: ResultSet): PreparedStatement {
+function createMockPreparedStatement(rs: TestResultSet): PreparedStatement {
   return {
     setParameter: vi.fn(),
     executeQuery: vi.fn(async () => rs),
@@ -112,7 +56,7 @@ function createMockDataSource(conn: Connection): DataSource {
 }
 
 function makeDs(): DataSource {
-  const rs = createMockResultSet([]);
+  const rs = new TestResultSet([]);
   const stmt = createMockPreparedStatement(rs);
   const conn = createMockConnection(stmt);
   return createMockDataSource(conn);
@@ -428,7 +372,7 @@ describe("createAutoRepository with method validation", () => {
       findByName(_name: string): any {}
     }
 
-    const rs = createMockResultSet([{ id: 1, name: "Alice", email: "a@test.com", age: 30 }]);
+    const rs = new TestResultSet([{ id: 1, name: "Alice", email: "a@test.com", age: 30 }]);
     const stmt = createMockPreparedStatement(rs);
     const conn = createMockConnection(stmt);
     const ds = createMockDataSource(conn);

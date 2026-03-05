@@ -1,25 +1,13 @@
 import { describe, it, expect } from "vitest";
 import { createRowMapper } from "../../mapping/row-mapper.js";
 import type { EntityMetadata } from "../../mapping/entity-metadata.js";
-import type { ResultSet } from "espalier-jdbc";
+import { TestResultSet } from "../test-utils/test-result-set.js";
 
-function createMockResultSet(row: Record<string, unknown>): ResultSet {
-  return {
-    getRow: () => row,
-    // Unused methods - minimal mock
-    next: async () => false,
-    getString: () => null,
-    getNumber: () => null,
-    getBoolean: () => null,
-    getDate: () => null,
-    getMetadata: () => [],
-    close: async () => {},
-    [Symbol.asyncIterator]: () => ({
-      async next() {
-        return { value: undefined as any, done: true as const };
-      },
-    }),
-  };
+function createTestResultSetAtRow(row: Record<string, unknown>): TestResultSet {
+  const rs = new TestResultSet([row]);
+  // Advance cursor to first row so getRow() works immediately
+  (rs as any).cursor = 0;
+  return rs;
 }
 
 describe("createRowMapper", () => {
@@ -45,7 +33,7 @@ describe("createRowMapper", () => {
     };
 
     const mapper = createRowMapper(User, metadata);
-    const rs = createMockResultSet({ id: 42, name: "Alice" });
+    const rs = createTestResultSetAtRow({ id: 42, name: "Alice" });
     const entity = mapper.mapRow(rs);
 
     expect(entity).toBeInstanceOf(User);
@@ -79,7 +67,7 @@ describe("createRowMapper", () => {
     };
 
     const mapper = createRowMapper(Post, metadata);
-    const rs = createMockResultSet({
+    const rs = createTestResultSetAtRow({
       id: 1,
       created_at: "2024-01-01",
       updated_at: "2024-06-15",
@@ -113,7 +101,7 @@ describe("createRowMapper", () => {
     };
 
     const mapper = createRowMapper(Order, metadata);
-    const rs = createMockResultSet({ id: 7 });
+    const rs = createTestResultSetAtRow({ id: 7 });
     const entity = mapper.mapRow(rs);
 
     expect(entity).toBeInstanceOf(Order);
@@ -142,7 +130,7 @@ describe("createRowMapper", () => {
     };
 
     const mapper = createRowMapper(Item, metadata);
-    const rs = createMockResultSet({ id: 1 }); // item_name missing
+    const rs = createTestResultSetAtRow({ id: 1 }); // item_name missing
     const entity = mapper.mapRow(rs);
 
     expect(entity.id).toBe(1);

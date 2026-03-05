@@ -11,68 +11,53 @@ import {
   reduceResultSet,
   forEachResultSet,
 } from "../../result-set-utils.js";
-import type { ResultSet } from "../../result-set.js";
+import { TestResultSet } from "../test-utils/test-result-set.js";
 
 /**
- * Creates a mock ResultSet with a close spy.
+ * Extended TestResultSet with close spy and optional error injection.
  */
+class AdversarialResultSet extends TestResultSet {
+  closeSpy = vi.fn();
+  private errorAtIndex?: number;
+
+  constructor(rows: Record<string, unknown>[], opts?: { errorAtIndex?: number }) {
+    super(rows, { closeSpy: undefined as any });
+    this.errorAtIndex = opts?.errorAtIndex;
+    // Override the close spy
+    (this as any)._closeSpy = () => this.closeSpy();
+  }
+
+  override async next(): Promise<boolean> {
+    (this as any).cursor++;
+    const cursor = (this as any).cursor;
+    if (this.errorAtIndex !== undefined && cursor === this.errorAtIndex) {
+      throw new Error(`Error at row ${cursor}`);
+    }
+    return cursor < (this as any).rows.length;
+  }
+
+  override [Symbol.asyncIterator](): AsyncIterator<Record<string, unknown>> {
+    return {
+      next: async (): Promise<IteratorResult<Record<string, unknown>>> => {
+        (this as any).cursor++;
+        const cursor = (this as any).cursor;
+        if (this.errorAtIndex !== undefined && cursor === this.errorAtIndex) {
+          throw new Error(`Error at row ${cursor}`);
+        }
+        if (cursor < (this as any).rows.length) {
+          return { value: { ...(this as any).rows[cursor] }, done: false };
+        }
+        return { value: undefined as any, done: true };
+      },
+    };
+  }
+}
+
 function mockResultSet(
   rows: Record<string, unknown>[],
   opts?: { errorAtIndex?: number },
-): ResultSet & { closeSpy: ReturnType<typeof vi.fn> } {
-  let index = -1;
-  const closeSpy = vi.fn();
-
-  const rs: ResultSet & { closeSpy: ReturnType<typeof vi.fn> } = {
-    closeSpy,
-    async next() {
-      index++;
-      if (opts?.errorAtIndex !== undefined && index === opts.errorAtIndex) {
-        throw new Error(`Error at row ${index}`);
-      }
-      return index < rows.length;
-    },
-    getRow() {
-      return { ...rows[index] };
-    },
-    getString(col: string | number) {
-      const val = rows[index][col as string];
-      return val != null ? String(val) : null;
-    },
-    getNumber(col: string | number) {
-      const val = rows[index][col as string];
-      return val != null ? Number(val) : null;
-    },
-    getBoolean(col: string | number) {
-      const val = rows[index][col as string];
-      return val != null ? Boolean(val) : null;
-    },
-    getDate(col: string | number) {
-      const val = rows[index][col as string];
-      return val instanceof Date ? val : null;
-    },
-    getMetadata() {
-      return [];
-    },
-    async close() {
-      closeSpy();
-    },
-    [Symbol.asyncIterator]() {
-      return {
-        async next() {
-          index++;
-          if (opts?.errorAtIndex !== undefined && index === opts.errorAtIndex) {
-            throw new Error(`Error at row ${index}`);
-          }
-          if (index < rows.length) {
-            return { value: { ...rows[index] }, done: false as const };
-          }
-          return { value: undefined as any, done: true as const };
-        },
-      };
-    },
-  };
-  return rs;
+): AdversarialResultSet {
+  return new AdversarialResultSet(rows, opts);
 }
 
 // ══════════════════════════════════════════════════

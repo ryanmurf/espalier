@@ -9,54 +9,7 @@ import {
   reduceResultSet,
   forEachResultSet,
 } from "../result-set-utils.js";
-import type { ResultSet } from "../result-set.js";
-
-/**
- * Creates a mock ResultSet from an array of row objects.
- */
-function mockResultSet(rows: Record<string, unknown>[]): ResultSet {
-  let index = -1;
-  return {
-    async next() {
-      index++;
-      return index < rows.length;
-    },
-    getRow() {
-      return { ...rows[index] };
-    },
-    getString(col: string | number) {
-      const val = rows[index][col as string];
-      return val != null ? String(val) : null;
-    },
-    getNumber(col: string | number) {
-      const val = rows[index][col as string];
-      return val != null ? Number(val) : null;
-    },
-    getBoolean(col: string | number) {
-      const val = rows[index][col as string];
-      return val != null ? Boolean(val) : null;
-    },
-    getDate(col: string | number) {
-      const val = rows[index][col as string];
-      return val instanceof Date ? val : null;
-    },
-    getMetadata() {
-      return [];
-    },
-    async close() {},
-    [Symbol.asyncIterator]() {
-      return {
-        async next() {
-          index++;
-          if (index < rows.length) {
-            return { value: { ...rows[index] }, done: false };
-          }
-          return { value: undefined as any, done: true };
-        },
-      };
-    },
-  };
-}
+import { TestResultSet } from "./test-utils/test-result-set.js";
 
 // ──────────────────────────────────────────────────
 // toArray
@@ -64,13 +17,13 @@ function mockResultSet(rows: Record<string, unknown>[]): ResultSet {
 
 describe("toArray", () => {
   it("returns empty array for empty ResultSet", async () => {
-    const rs = mockResultSet([]);
+    const rs = new TestResultSet([]);
     const result = await toArray(rs);
     expect(result).toEqual([]);
   });
 
   it("returns array of all rows", async () => {
-    const rs = mockResultSet([
+    const rs = new TestResultSet([
       { id: 1, name: "Alice" },
       { id: 2, name: "Bob" },
       { id: 3, name: "Charlie" },
@@ -84,7 +37,7 @@ describe("toArray", () => {
 
   it("preserves row order", async () => {
     const rows = Array.from({ length: 10 }, (_, i) => ({ id: i, name: `Row${i}` }));
-    const rs = mockResultSet(rows);
+    const rs = new TestResultSet(rows);
     const result = await toArray(rs);
     for (let i = 0; i < 10; i++) {
       expect(result[i].id).toBe(i);
@@ -98,7 +51,7 @@ describe("toArray", () => {
 
 describe("mapResultSet", () => {
   it("maps rows to extract single field", async () => {
-    const rs = mockResultSet([
+    const rs = new TestResultSet([
       { id: 1, name: "Alice" },
       { id: 2, name: "Bob" },
     ]);
@@ -110,7 +63,7 @@ describe("mapResultSet", () => {
   });
 
   it("maps rows with transformation", async () => {
-    const rs = mockResultSet([
+    const rs = new TestResultSet([
       { id: 1, price: 10 },
       { id: 2, price: 20 },
     ]);
@@ -122,7 +75,7 @@ describe("mapResultSet", () => {
   });
 
   it("maps empty ResultSet yields nothing", async () => {
-    const rs = mockResultSet([]);
+    const rs = new TestResultSet([]);
     const results: unknown[] = [];
     for await (const val of mapResultSet(rs, row => row)) {
       results.push(val);
@@ -131,7 +84,7 @@ describe("mapResultSet", () => {
   });
 
   it("works with for-await-of", async () => {
-    const rs = mockResultSet([{ x: 1 }, { x: 2 }, { x: 3 }]);
+    const rs = new TestResultSet([{ x: 1 }, { x: 2 }, { x: 3 }]);
     const items: number[] = [];
     for await (const item of mapResultSet(rs, r => r.x as number)) {
       items.push(item);
@@ -146,7 +99,7 @@ describe("mapResultSet", () => {
 
 describe("filterResultSet", () => {
   it("filters by field value", async () => {
-    const rs = mockResultSet([
+    const rs = new TestResultSet([
       { id: 1, active: true },
       { id: 2, active: false },
       { id: 3, active: true },
@@ -161,7 +114,7 @@ describe("filterResultSet", () => {
   });
 
   it("no matches yields nothing", async () => {
-    const rs = mockResultSet([
+    const rs = new TestResultSet([
       { id: 1, status: "active" },
       { id: 2, status: "active" },
     ]);
@@ -173,7 +126,7 @@ describe("filterResultSet", () => {
   });
 
   it("all match yields all", async () => {
-    const rs = mockResultSet([
+    const rs = new TestResultSet([
       { id: 1, valid: true },
       { id: 2, valid: true },
     ]);
@@ -191,7 +144,7 @@ describe("filterResultSet", () => {
 
 describe("reduceResultSet", () => {
   it("sums a numeric field", async () => {
-    const rs = mockResultSet([
+    const rs = new TestResultSet([
       { price: 10 },
       { price: 20 },
       { price: 30 },
@@ -201,7 +154,7 @@ describe("reduceResultSet", () => {
   });
 
   it("reduces to build an object", async () => {
-    const rs = mockResultSet([
+    const rs = new TestResultSet([
       { key: "a", value: 1 },
       { key: "b", value: 2 },
     ]);
@@ -214,7 +167,7 @@ describe("reduceResultSet", () => {
   });
 
   it("empty ResultSet returns initial value", async () => {
-    const rs = mockResultSet([]);
+    const rs = new TestResultSet([]);
     const result = await reduceResultSet(rs, (acc, _row) => acc + 1, 0);
     expect(result).toBe(0);
   });
@@ -226,7 +179,7 @@ describe("reduceResultSet", () => {
 
 describe("forEachResultSet", () => {
   it("callback called for each row", async () => {
-    const rs = mockResultSet([
+    const rs = new TestResultSet([
       { id: 1 },
       { id: 2 },
       { id: 3 },
@@ -239,7 +192,7 @@ describe("forEachResultSet", () => {
   });
 
   it("async callback is awaited", async () => {
-    const rs = mockResultSet([{ id: 1 }, { id: 2 }]);
+    const rs = new TestResultSet([{ id: 1 }, { id: 2 }]);
     const order: string[] = [];
     await forEachResultSet(rs, async row => {
       await new Promise(r => setTimeout(r, 1));
@@ -251,14 +204,14 @@ describe("forEachResultSet", () => {
 
   it("processes all rows", async () => {
     const rows = Array.from({ length: 50 }, (_, i) => ({ i }));
-    const rs = mockResultSet(rows);
+    const rs = new TestResultSet(rows);
     let count = 0;
     await forEachResultSet(rs, () => { count++; });
     expect(count).toBe(50);
   });
 
   it("empty ResultSet calls nothing", async () => {
-    const rs = mockResultSet([]);
+    const rs = new TestResultSet([]);
     const fn = vi.fn();
     await forEachResultSet(rs, fn);
     expect(fn).not.toHaveBeenCalled();

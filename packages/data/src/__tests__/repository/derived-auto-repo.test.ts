@@ -6,6 +6,7 @@ import { Column } from "../../decorators/column.js";
 import { Id } from "../../decorators/id.js";
 import { createAutoRepository } from "../../repository/auto-repository.js";
 import type { CrudRepository } from "../../repository/crud-repository.js";
+import { TestResultSet } from "../test-utils/test-result-set.js";
 
 // --- Test Entities ---
 
@@ -44,61 +45,6 @@ class UserRepository extends (class {} as new (...args: any[]) => CrudRepository
 class OrderRepository extends (class {} as new (...args: any[]) => CrudRepository<Order, number>) {}
 
 // --- Mock Helpers ---
-
-function createMockResultSet(rows: Record<string, unknown>[]): ResultSet {
-  let cursor = -1;
-  return {
-    async next() {
-      cursor++;
-      return cursor < rows.length;
-    },
-    getString(col: string | number) {
-      const row = rows[cursor];
-      if (!row) return null;
-      const val = typeof col === "number" ? Object.values(row)[col] : row[col];
-      return val != null ? String(val) : null;
-    },
-    getNumber(col: string | number) {
-      const row = rows[cursor];
-      if (!row) return null;
-      const val = typeof col === "number" ? Object.values(row)[col] : row[col];
-      return val != null ? Number(val) : null;
-    },
-    getBoolean(col: string | number) {
-      const row = rows[cursor];
-      if (!row) return null;
-      const val = typeof col === "number" ? Object.values(row)[col] : row[col];
-      return val != null ? Boolean(val) : null;
-    },
-    getDate(_col: string | number) {
-      return null;
-    },
-    getRow() {
-      return rows[cursor] ?? {};
-    },
-    getMetadata() {
-      if (rows.length === 0) return [];
-      return Object.keys(rows[0]).map((name) => ({
-        name,
-        dataType: "text",
-        nullable: true,
-        primaryKey: false,
-      }));
-    },
-    async close() {},
-    [Symbol.asyncIterator]() {
-      return {
-        async next(): Promise<IteratorResult<Record<string, unknown>>> {
-          cursor++;
-          if (cursor < rows.length) {
-            return { value: rows[cursor], done: false };
-          }
-          return { value: undefined as any, done: true };
-        },
-      };
-    },
-  };
-}
 
 let lastPreparedSql: string;
 let lastSetParams: Array<{ index: number; value: unknown }>;
@@ -149,7 +95,7 @@ describe("Derived query methods on auto-generated repositories", () => {
 
   describe("findBy queries", () => {
     it("findByName generates correct SQL and returns results", async () => {
-      const rs = createMockResultSet([
+      const rs = new TestResultSet([
         { id: 1, name: "Alice", email: "alice@test.com", age: 30, status: "active", active: true },
       ]);
       const stmt = createMockPreparedStatement(rs);
@@ -167,7 +113,7 @@ describe("Derived query methods on auto-generated repositories", () => {
     });
 
     it("findByEmail generates correct SQL", async () => {
-      const rs = createMockResultSet([
+      const rs = new TestResultSet([
         { id: 2, name: "Bob", email: "bob@test.com", age: 25, status: "active", active: true },
       ]);
       const stmt = createMockPreparedStatement(rs);
@@ -183,7 +129,7 @@ describe("Derived query methods on auto-generated repositories", () => {
     });
 
     it("findByName returns empty array when no matches", async () => {
-      const rs = createMockResultSet([]);
+      const rs = new TestResultSet([]);
       const stmt = createMockPreparedStatement(rs);
       const conn = createMockConnection(() => stmt);
       const ds = createMockDataSource(conn);
@@ -195,7 +141,7 @@ describe("Derived query methods on auto-generated repositories", () => {
     });
 
     it("findByName returns multiple results", async () => {
-      const rs = createMockResultSet([
+      const rs = new TestResultSet([
         { id: 1, name: "Alice", email: "a1@test.com", age: 30, status: "active", active: true },
         { id: 2, name: "Alice", email: "a2@test.com", age: 25, status: "active", active: true },
       ]);
@@ -218,7 +164,7 @@ describe("Derived query methods on auto-generated repositories", () => {
 
   describe("compound queries", () => {
     it("findByNameAndAge generates AND condition with two params", async () => {
-      const rs = createMockResultSet([
+      const rs = new TestResultSet([
         { id: 1, name: "Alice", email: "alice@test.com", age: 30, status: "active", active: true },
       ]);
       const stmt = createMockPreparedStatement(rs);
@@ -239,7 +185,7 @@ describe("Derived query methods on auto-generated repositories", () => {
     });
 
     it("findByNameAndAgeAndStatus generates triple AND condition", async () => {
-      const rs = createMockResultSet([
+      const rs = new TestResultSet([
         { id: 1, name: "Alice", email: "a@test.com", age: 30, status: "active", active: true },
       ]);
       const stmt = createMockPreparedStatement(rs);
@@ -257,7 +203,7 @@ describe("Derived query methods on auto-generated repositories", () => {
     });
 
     it("findByNameOrEmail generates OR condition", async () => {
-      const rs = createMockResultSet([
+      const rs = new TestResultSet([
         { id: 1, name: "Alice", email: "alice@test.com", age: 30, status: "active", active: true },
       ]);
       const stmt = createMockPreparedStatement(rs);
@@ -279,7 +225,7 @@ describe("Derived query methods on auto-generated repositories", () => {
 
   describe("operator variants", () => {
     it("findByAgeGreaterThan generates > condition", async () => {
-      const rs = createMockResultSet([]);
+      const rs = new TestResultSet([]);
       const stmt = createMockPreparedStatement(rs);
       const conn = createMockConnection(() => stmt);
       const ds = createMockDataSource(conn);
@@ -292,7 +238,7 @@ describe("Derived query methods on auto-generated repositories", () => {
     });
 
     it("findByAgeLessThanEqual generates <= condition", async () => {
-      const rs = createMockResultSet([]);
+      const rs = new TestResultSet([]);
       const stmt = createMockPreparedStatement(rs);
       const conn = createMockConnection(() => stmt);
       const ds = createMockDataSource(conn);
@@ -304,7 +250,7 @@ describe("Derived query methods on auto-generated repositories", () => {
     });
 
     it("findByAgeBetween generates BETWEEN condition", async () => {
-      const rs = createMockResultSet([]);
+      const rs = new TestResultSet([]);
       const stmt = createMockPreparedStatement(rs);
       const conn = createMockConnection(() => stmt);
       const ds = createMockDataSource(conn);
@@ -320,7 +266,7 @@ describe("Derived query methods on auto-generated repositories", () => {
     });
 
     it("findByNameLike generates LIKE condition", async () => {
-      const rs = createMockResultSet([]);
+      const rs = new TestResultSet([]);
       const stmt = createMockPreparedStatement(rs);
       const conn = createMockConnection(() => stmt);
       const ds = createMockDataSource(conn);
@@ -333,7 +279,7 @@ describe("Derived query methods on auto-generated repositories", () => {
     });
 
     it("findByNameStartingWith appends trailing %", async () => {
-      const rs = createMockResultSet([]);
+      const rs = new TestResultSet([]);
       const stmt = createMockPreparedStatement(rs);
       const conn = createMockConnection(() => stmt);
       const ds = createMockDataSource(conn);
@@ -346,7 +292,7 @@ describe("Derived query methods on auto-generated repositories", () => {
     });
 
     it("findByNameEndingWith prepends leading %", async () => {
-      const rs = createMockResultSet([]);
+      const rs = new TestResultSet([]);
       const stmt = createMockPreparedStatement(rs);
       const conn = createMockConnection(() => stmt);
       const ds = createMockDataSource(conn);
@@ -359,7 +305,7 @@ describe("Derived query methods on auto-generated repositories", () => {
     });
 
     it("findByNameContaining wraps value with %", async () => {
-      const rs = createMockResultSet([]);
+      const rs = new TestResultSet([]);
       const stmt = createMockPreparedStatement(rs);
       const conn = createMockConnection(() => stmt);
       const ds = createMockDataSource(conn);
@@ -372,7 +318,7 @@ describe("Derived query methods on auto-generated repositories", () => {
     });
 
     it("findByStatusIn generates IN clause", async () => {
-      const rs = createMockResultSet([]);
+      const rs = new TestResultSet([]);
       const stmt = createMockPreparedStatement(rs);
       const conn = createMockConnection(() => stmt);
       const ds = createMockDataSource(conn);
@@ -384,7 +330,7 @@ describe("Derived query methods on auto-generated repositories", () => {
     });
 
     it("findByStatusNotIn generates NOT IN clause", async () => {
-      const rs = createMockResultSet([]);
+      const rs = new TestResultSet([]);
       const stmt = createMockPreparedStatement(rs);
       const conn = createMockConnection(() => stmt);
       const ds = createMockDataSource(conn);
@@ -397,7 +343,7 @@ describe("Derived query methods on auto-generated repositories", () => {
     });
 
     it("findByNameIsNull generates IS NULL", async () => {
-      const rs = createMockResultSet([]);
+      const rs = new TestResultSet([]);
       const stmt = createMockPreparedStatement(rs);
       const conn = createMockConnection(() => stmt);
       const ds = createMockDataSource(conn);
@@ -410,7 +356,7 @@ describe("Derived query methods on auto-generated repositories", () => {
     });
 
     it("findByNameIsNotNull generates IS NOT NULL", async () => {
-      const rs = createMockResultSet([]);
+      const rs = new TestResultSet([]);
       const stmt = createMockPreparedStatement(rs);
       const conn = createMockConnection(() => stmt);
       const ds = createMockDataSource(conn);
@@ -422,7 +368,7 @@ describe("Derived query methods on auto-generated repositories", () => {
     });
 
     it("findByActiveTrue generates = true", async () => {
-      const rs = createMockResultSet([]);
+      const rs = new TestResultSet([]);
       const stmt = createMockPreparedStatement(rs);
       const conn = createMockConnection(() => stmt);
       const ds = createMockDataSource(conn);
@@ -435,7 +381,7 @@ describe("Derived query methods on auto-generated repositories", () => {
     });
 
     it("findByActiveFalse generates = false", async () => {
-      const rs = createMockResultSet([]);
+      const rs = new TestResultSet([]);
       const stmt = createMockPreparedStatement(rs);
       const conn = createMockConnection(() => stmt);
       const ds = createMockDataSource(conn);
@@ -448,7 +394,7 @@ describe("Derived query methods on auto-generated repositories", () => {
     });
 
     it("findByNameNot generates != condition", async () => {
-      const rs = createMockResultSet([]);
+      const rs = new TestResultSet([]);
       const stmt = createMockPreparedStatement(rs);
       const conn = createMockConnection(() => stmt);
       const ds = createMockDataSource(conn);
@@ -461,7 +407,7 @@ describe("Derived query methods on auto-generated repositories", () => {
     });
 
     it("findByAgeGreaterThanEqual generates >= condition", async () => {
-      const rs = createMockResultSet([]);
+      const rs = new TestResultSet([]);
       const stmt = createMockPreparedStatement(rs);
       const conn = createMockConnection(() => stmt);
       const ds = createMockDataSource(conn);
@@ -473,7 +419,7 @@ describe("Derived query methods on auto-generated repositories", () => {
     });
 
     it("findByAgeLessThan generates < condition", async () => {
-      const rs = createMockResultSet([]);
+      const rs = new TestResultSet([]);
       const stmt = createMockPreparedStatement(rs);
       const conn = createMockConnection(() => stmt);
       const ds = createMockDataSource(conn);
@@ -491,7 +437,7 @@ describe("Derived query methods on auto-generated repositories", () => {
 
   describe("countBy queries", () => {
     it("countByStatus generates COUNT query and returns number", async () => {
-      const rs = createMockResultSet([{ "COUNT(*)": 7 }]);
+      const rs = new TestResultSet([{ "COUNT(*)": 7 }]);
       const stmt = createMockPreparedStatement(rs);
       const conn = createMockConnection(() => stmt);
       const ds = createMockDataSource(conn);
@@ -507,7 +453,7 @@ describe("Derived query methods on auto-generated repositories", () => {
     });
 
     it("countByName returns 0 when no matches", async () => {
-      const rs = createMockResultSet([{ "COUNT(*)": 0 }]);
+      const rs = new TestResultSet([{ "COUNT(*)": 0 }]);
       const stmt = createMockPreparedStatement(rs);
       const conn = createMockConnection(() => stmt);
       const ds = createMockDataSource(conn);
@@ -519,7 +465,7 @@ describe("Derived query methods on auto-generated repositories", () => {
     });
 
     it("countByNameAndStatus generates compound COUNT query", async () => {
-      const rs = createMockResultSet([{ "COUNT(*)": 3 }]);
+      const rs = new TestResultSet([{ "COUNT(*)": 3 }]);
       const stmt = createMockPreparedStatement(rs);
       const conn = createMockConnection(() => stmt);
       const ds = createMockDataSource(conn);
@@ -541,7 +487,7 @@ describe("Derived query methods on auto-generated repositories", () => {
 
   describe("existsBy queries", () => {
     it("existsByEmail returns true when row exists", async () => {
-      const rs = createMockResultSet([{ "1": 1 }]);
+      const rs = new TestResultSet([{ "1": 1 }]);
       const stmt = createMockPreparedStatement(rs);
       const conn = createMockConnection(() => stmt);
       const ds = createMockDataSource(conn);
@@ -557,7 +503,7 @@ describe("Derived query methods on auto-generated repositories", () => {
     });
 
     it("existsByEmail returns false when no match", async () => {
-      const rs = createMockResultSet([]);
+      const rs = new TestResultSet([]);
       const stmt = createMockPreparedStatement(rs);
       const conn = createMockConnection(() => stmt);
       const ds = createMockDataSource(conn);
@@ -569,7 +515,7 @@ describe("Derived query methods on auto-generated repositories", () => {
     });
 
     it("existsByNameAndStatus generates compound exists query", async () => {
-      const rs = createMockResultSet([{ "1": 1 }]);
+      const rs = new TestResultSet([{ "1": 1 }]);
       const stmt = createMockPreparedStatement(rs);
       const conn = createMockConnection(() => stmt);
       const ds = createMockDataSource(conn);
@@ -592,7 +538,7 @@ describe("Derived query methods on auto-generated repositories", () => {
 
   describe("deleteBy queries", () => {
     it("deleteByStatus generates DELETE query", async () => {
-      const rs = createMockResultSet([]);
+      const rs = new TestResultSet([]);
       const stmt = createMockPreparedStatement(rs);
       const conn = createMockConnection(() => stmt);
       const ds = createMockDataSource(conn);
@@ -607,7 +553,7 @@ describe("Derived query methods on auto-generated repositories", () => {
     });
 
     it("deleteByNameAndAge generates compound DELETE", async () => {
-      const rs = createMockResultSet([]);
+      const rs = new TestResultSet([]);
       const stmt = createMockPreparedStatement(rs);
       const conn = createMockConnection(() => stmt);
       const ds = createMockDataSource(conn);
@@ -622,7 +568,7 @@ describe("Derived query methods on auto-generated repositories", () => {
     });
 
     it("removeByStatus also works as alias for deleteBy", async () => {
-      const rs = createMockResultSet([]);
+      const rs = new TestResultSet([]);
       const stmt = createMockPreparedStatement(rs);
       const conn = createMockConnection(() => stmt);
       const ds = createMockDataSource(conn);
@@ -641,7 +587,7 @@ describe("Derived query methods on auto-generated repositories", () => {
 
   describe("findFirstBy queries", () => {
     it("findFirstByName generates LIMIT 1 and returns single entity", async () => {
-      const rs = createMockResultSet([
+      const rs = new TestResultSet([
         { id: 1, name: "Alice", email: "a@test.com", age: 30, status: "active", active: true },
       ]);
       const stmt = createMockPreparedStatement(rs);
@@ -657,7 +603,7 @@ describe("Derived query methods on auto-generated repositories", () => {
     });
 
     it("findFirstByName returns null when no match", async () => {
-      const rs = createMockResultSet([]);
+      const rs = new TestResultSet([]);
       const stmt = createMockPreparedStatement(rs);
       const conn = createMockConnection(() => stmt);
       const ds = createMockDataSource(conn);
@@ -669,7 +615,7 @@ describe("Derived query methods on auto-generated repositories", () => {
     });
 
     it("findFirst3ByStatus generates LIMIT 3", async () => {
-      const rs = createMockResultSet([
+      const rs = new TestResultSet([
         { id: 1, name: "A", email: "a@t.com", age: 20, status: "active", active: true },
         { id: 2, name: "B", email: "b@t.com", age: 25, status: "active", active: true },
         { id: 3, name: "C", email: "c@t.com", age: 30, status: "active", active: true },
@@ -693,7 +639,7 @@ describe("Derived query methods on auto-generated repositories", () => {
 
   describe("findDistinctBy queries", () => {
     it("findDistinctByStatus generates SELECT DISTINCT", async () => {
-      const rs = createMockResultSet([
+      const rs = new TestResultSet([
         { id: 1, name: "Alice", email: "a@test.com", age: 30, status: "active", active: true },
       ]);
       const stmt = createMockPreparedStatement(rs);
@@ -709,7 +655,7 @@ describe("Derived query methods on auto-generated repositories", () => {
     });
 
     it("findDistinctByNameAndAge generates DISTINCT with compound condition", async () => {
-      const rs = createMockResultSet([]);
+      const rs = new TestResultSet([]);
       const stmt = createMockPreparedStatement(rs);
       const conn = createMockConnection(() => stmt);
       const ds = createMockDataSource(conn);
@@ -730,7 +676,7 @@ describe("Derived query methods on auto-generated repositories", () => {
 
   describe("OrderBy support", () => {
     it("findByStatusOrderByNameAsc generates ORDER BY", async () => {
-      const rs = createMockResultSet([]);
+      const rs = new TestResultSet([]);
       const stmt = createMockPreparedStatement(rs);
       const conn = createMockConnection(() => stmt);
       const ds = createMockDataSource(conn);
@@ -743,7 +689,7 @@ describe("Derived query methods on auto-generated repositories", () => {
     });
 
     it("findByStatusOrderByAgeDesc generates ORDER BY DESC", async () => {
-      const rs = createMockResultSet([]);
+      const rs = new TestResultSet([]);
       const stmt = createMockPreparedStatement(rs);
       const conn = createMockConnection(() => stmt);
       const ds = createMockDataSource(conn);
@@ -755,7 +701,7 @@ describe("Derived query methods on auto-generated repositories", () => {
     });
 
     it("findByStatusOrderByNameAscAgeDesc generates multi-column ORDER BY", async () => {
-      const rs = createMockResultSet([]);
+      const rs = new TestResultSet([]);
       const stmt = createMockPreparedStatement(rs);
       const conn = createMockConnection(() => stmt);
       const ds = createMockDataSource(conn);
@@ -767,7 +713,7 @@ describe("Derived query methods on auto-generated repositories", () => {
     });
 
     it("findByNameOrderByAge defaults to ASC", async () => {
-      const rs = createMockResultSet([]);
+      const rs = new TestResultSet([]);
       const stmt = createMockPreparedStatement(rs);
       const conn = createMockConnection(() => stmt);
       const ds = createMockDataSource(conn);
@@ -785,7 +731,7 @@ describe("Derived query methods on auto-generated repositories", () => {
 
   describe("custom column name mapping", () => {
     it("findByCustomerName maps to snake_case column", async () => {
-      const rs = createMockResultSet([
+      const rs = new TestResultSet([
         { id: 1, customer_name: "Alice", total_amount: 99.99, status: "shipped" },
       ]);
       const stmt = createMockPreparedStatement(rs);
@@ -801,7 +747,7 @@ describe("Derived query methods on auto-generated repositories", () => {
     });
 
     it("findByTotalAmountGreaterThan maps to snake_case column", async () => {
-      const rs = createMockResultSet([]);
+      const rs = new TestResultSet([]);
       const stmt = createMockPreparedStatement(rs);
       const conn = createMockConnection(() => stmt);
       const ds = createMockDataSource(conn);
@@ -819,7 +765,7 @@ describe("Derived query methods on auto-generated repositories", () => {
 
   describe("CrudRepository methods coexist with derived queries", () => {
     it("findById still works on a repo that also uses derived queries", async () => {
-      const rs = createMockResultSet([
+      const rs = new TestResultSet([
         { id: 1, name: "Alice", email: "a@test.com", age: 30, status: "active", active: true },
       ]);
       const stmt = createMockPreparedStatement(rs);
@@ -832,7 +778,7 @@ describe("Derived query methods on auto-generated repositories", () => {
       await (repo as any).findByName("Alice");
 
       // Then use CRUD method — need fresh RS for the second call
-      const rs2 = createMockResultSet([
+      const rs2 = new TestResultSet([
         { id: 1, name: "Alice", email: "a@test.com", age: 30, status: "active", active: true },
       ]);
       const stmt2 = createMockPreparedStatement(rs2);
@@ -847,7 +793,7 @@ describe("Derived query methods on auto-generated repositories", () => {
     });
 
     it("count() CRUD method is not confused with countBy derived queries", async () => {
-      const rs = createMockResultSet([{ "COUNT(*)": 10 }]);
+      const rs = new TestResultSet([{ "COUNT(*)": 10 }]);
       const stmt = createMockPreparedStatement(rs);
       const conn = createMockConnection(() => stmt);
       const ds = createMockDataSource(conn);
@@ -862,7 +808,7 @@ describe("Derived query methods on auto-generated repositories", () => {
     });
 
     it("existsById() CRUD method still works alongside existsBy derived", async () => {
-      const rs = createMockResultSet([{ "1": 1 }]);
+      const rs = new TestResultSet([{ "1": 1 }]);
       const stmt = createMockPreparedStatement(rs);
       const conn = createMockConnection(() => stmt);
       const ds = createMockDataSource(conn);
@@ -880,7 +826,7 @@ describe("Derived query methods on auto-generated repositories", () => {
 
   describe("error cases", () => {
     it("throws for unknown property in derived method name", async () => {
-      const rs = createMockResultSet([]);
+      const rs = new TestResultSet([]);
       const stmt = createMockPreparedStatement(rs);
       const conn = createMockConnection(() => stmt);
       const ds = createMockDataSource(conn);
@@ -893,7 +839,7 @@ describe("Derived query methods on auto-generated repositories", () => {
     });
 
     it("throws for invalid method name prefix", async () => {
-      const rs = createMockResultSet([]);
+      const rs = new TestResultSet([]);
       const stmt = createMockPreparedStatement(rs);
       const conn = createMockConnection(() => stmt);
       const ds = createMockDataSource(conn);
@@ -906,7 +852,7 @@ describe("Derived query methods on auto-generated repositories", () => {
     });
 
     it("throws for findDistinct without By", async () => {
-      const rs = createMockResultSet([]);
+      const rs = new TestResultSet([]);
       const stmt = createMockPreparedStatement(rs);
       const conn = createMockConnection(() => stmt);
       const ds = createMockDataSource(conn);
@@ -919,7 +865,7 @@ describe("Derived query methods on auto-generated repositories", () => {
     });
 
     it("throws for method with no predicates after By", async () => {
-      const rs = createMockResultSet([]);
+      const rs = new TestResultSet([]);
       const stmt = createMockPreparedStatement(rs);
       const conn = createMockConnection(() => stmt);
       const ds = createMockDataSource(conn);
@@ -933,7 +879,7 @@ describe("Derived query methods on auto-generated repositories", () => {
     });
 
     it("accessing non-method properties does not throw", () => {
-      const rs = createMockResultSet([]);
+      const rs = new TestResultSet([]);
       const stmt = createMockPreparedStatement(rs);
       const conn = createMockConnection(() => stmt);
       const ds = createMockDataSource(conn);
@@ -951,7 +897,7 @@ describe("Derived query methods on auto-generated repositories", () => {
 
   describe("connection lifecycle", () => {
     it("closes connection after derived query execution", async () => {
-      const rs = createMockResultSet([]);
+      const rs = new TestResultSet([]);
       const stmt = createMockPreparedStatement(rs);
       const conn = createMockConnection(() => stmt);
       const ds = createMockDataSource(conn);
@@ -963,7 +909,7 @@ describe("Derived query methods on auto-generated repositories", () => {
     });
 
     it("closes statement after derived query execution", async () => {
-      const rs = createMockResultSet([]);
+      const rs = new TestResultSet([]);
       const stmt = createMockPreparedStatement(rs);
       const conn = createMockConnection(() => stmt);
       const ds = createMockDataSource(conn);
@@ -1002,7 +948,7 @@ describe("Derived query methods on auto-generated repositories", () => {
       let callCount = 0;
       const makeRs = () => {
         callCount++;
-        return createMockResultSet([
+        return new TestResultSet([
           { id: callCount, name: "User" + callCount, email: `u${callCount}@t.com`, age: 20, status: "active", active: true },
         ]);
       };
@@ -1027,7 +973,7 @@ describe("Derived query methods on auto-generated repositories", () => {
 
   describe("custom method declarations", () => {
     it("declared findByNameAndAge works through the proxy", async () => {
-      const rs = createMockResultSet([
+      const rs = new TestResultSet([
         { id: 1, name: "Alice", email: "a@test.com", age: 30, status: "active", active: true },
       ]);
       const stmt = createMockPreparedStatement(rs);
@@ -1045,7 +991,7 @@ describe("Derived query methods on auto-generated repositories", () => {
     });
 
     it("declared countByStatus returns a number", async () => {
-      const rs = createMockResultSet([{ "COUNT(*)": 5 }]);
+      const rs = new TestResultSet([{ "COUNT(*)": 5 }]);
       const stmt = createMockPreparedStatement(rs);
       const conn = createMockConnection(() => stmt);
       const ds = createMockDataSource(conn);
@@ -1058,7 +1004,7 @@ describe("Derived query methods on auto-generated repositories", () => {
 
     it("undeclared derived method names also work", async () => {
       // Methods not declared on the class still resolve through proxy
-      const rs = createMockResultSet([]);
+      const rs = new TestResultSet([]);
       const stmt = createMockPreparedStatement(rs);
       const conn = createMockConnection(() => stmt);
       const ds = createMockDataSource(conn);
@@ -1078,7 +1024,7 @@ describe("Derived query methods on auto-generated repositories", () => {
 
   describe("findAllBy variant", () => {
     it("findAllByStatus is equivalent to findByStatus", async () => {
-      const rs = createMockResultSet([
+      const rs = new TestResultSet([
         { id: 1, name: "Alice", email: "a@test.com", age: 30, status: "active", active: true },
       ]);
       const stmt = createMockPreparedStatement(rs);

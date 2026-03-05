@@ -7,65 +7,13 @@ import { Id } from "../../decorators/id.js";
 import { createAutoRepository } from "../../repository/auto-repository.js";
 import { createRepository } from "../../repository/repository-factory.js";
 import { parseDerivedQueryMethod } from "../../query/derived-query-parser.js";
+import { TestResultSet } from "../test-utils/test-result-set.js";
 
 // ---------------------------------------------------------------------------
 // Mock helpers (reusable across tests)
 // ---------------------------------------------------------------------------
 
-function createMockResultSet(rows: Record<string, unknown>[]): ResultSet {
-  let cursor = -1;
-  return {
-    async next() {
-      cursor++;
-      return cursor < rows.length;
-    },
-    getString(col: string | number) {
-      const row = rows[cursor];
-      if (!row) return null;
-      const val = typeof col === "number" ? Object.values(row)[col] : row[col];
-      return val != null ? String(val) : null;
-    },
-    getNumber(col: string | number) {
-      const row = rows[cursor];
-      if (!row) return null;
-      const val = typeof col === "number" ? Object.values(row)[col] : row[col];
-      return val != null ? Number(val) : null;
-    },
-    getBoolean(col: string | number) {
-      const row = rows[cursor];
-      if (!row) return null;
-      const val = typeof col === "number" ? Object.values(row)[col] : row[col];
-      return val != null ? Boolean(val) : null;
-    },
-    getDate(_col: string | number) {
-      return null;
-    },
-    getRow() {
-      return rows[cursor] ?? {};
-    },
-    getMetadata() {
-      if (rows.length === 0) return [];
-      return Object.keys(rows[0]).map((name) => ({
-        name,
-        dataType: "text",
-        nullable: true,
-        primaryKey: false,
-      }));
-    },
-    async close() {},
-    [Symbol.asyncIterator]() {
-      return {
-        async next(): Promise<IteratorResult<Record<string, unknown>>> {
-          cursor++;
-          if (cursor < rows.length) {
-            return { value: rows[cursor], done: false };
-          }
-          return { value: undefined as any, done: true };
-        },
-      };
-    },
-  };
-}
+// createMockResultSet replaced by TestResultSet
 
 function createMockPreparedStatement(rs: ResultSet): PreparedStatement {
   return {
@@ -94,7 +42,7 @@ function createMockDataSource(conn: Connection): DataSource {
 }
 
 function buildMockStack(rows: Record<string, unknown>[] = []) {
-  const rs = createMockResultSet(rows);
+  const rs = new TestResultSet(rows);
   const stmt = createMockPreparedStatement(rs);
   const conn = createMockConnection(stmt);
   const ds = createMockDataSource(conn);
@@ -756,7 +704,7 @@ describe("Adversarial: @Repository decorator and auto-generated repository", () 
       @Repository({ entity: AdvUser })
       class InsertRepo {}
 
-      const rs = createMockResultSet([{ id: 42, name: "New", email: "new@t" }]);
+      const rs = new TestResultSet([{ id: 42, name: "New", email: "new@t" }]);
       const stmt = createMockPreparedStatement(rs);
       const conn = createMockConnection(stmt);
       const ds = createMockDataSource(conn);
@@ -774,7 +722,7 @@ describe("Adversarial: @Repository decorator and auto-generated repository", () 
       @Repository({ entity: AdvUser })
       class EmptySaveRepo {}
 
-      const rs = createMockResultSet([]);
+      const rs = new TestResultSet([]);
       const stmt = createMockPreparedStatement(rs);
       const conn = createMockConnection(stmt);
       const mockTx = {
@@ -793,7 +741,7 @@ describe("Adversarial: @Repository decorator and auto-generated repository", () 
       @Repository({ entity: AdvUser })
       class EmptyDeleteRepo {}
 
-      const rs = createMockResultSet([]);
+      const rs = new TestResultSet([]);
       const stmt = createMockPreparedStatement(rs);
       const conn = createMockConnection(stmt);
       const mockTx = {

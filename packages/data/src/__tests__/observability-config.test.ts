@@ -23,18 +23,14 @@ import type {
   HealthCheck,
   HealthCheckResult,
 } from "espalier-jdbc";
+import { TestResultSet } from "./test-utils/test-result-set.js";
 
 // ══════════════════════════════════════════════════
 // Mock factories
 // ══════════════════════════════════════════════════
 
-function mockResultSet(): ResultSet {
-  return {
-    next: vi.fn().mockResolvedValue(false),
-    close: vi.fn().mockResolvedValue(undefined),
-    getRow: vi.fn().mockReturnValue({}),
-    [Symbol.asyncIterator]: vi.fn(),
-  } as unknown as ResultSet;
+function mockResultSet(): TestResultSet {
+  return new TestResultSet([]);
 }
 
 function mockStatement(): Statement {

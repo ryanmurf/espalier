@@ -8,6 +8,7 @@ import { DatabaseErrorCode } from "espalier-jdbc";
 import type { Connection, PreparedStatement, ResultSet, Statement } from "espalier-jdbc";
 import { mapSqliteErrorCode } from "../../error-codes.js";
 import { SqliteSchemaIntrospector } from "../../sqlite-schema-introspector.js";
+import { TestResultSet } from "../test-utils/test-result-set.js";
 
 // ─────────────────────────────────────────────────
 // 1. Error code mapping gaps
@@ -94,41 +95,7 @@ describe("mapSqliteErrorCode — missing mappings", () => {
 // 2. Schema introspector — validateIdentifier rejects valid table names
 // ─────────────────────────────────────────────────
 
-function createMockResultSet(rows: Record<string, unknown>[]): ResultSet {
-  let index = -1;
-  return {
-    async next() {
-      index++;
-      return index < rows.length;
-    },
-    getString(column: string) {
-      const row = rows[index];
-      if (!row) return null;
-      const val = row[column];
-      return val == null ? null : String(val);
-    },
-    getNumber(column: string) {
-      const row = rows[index];
-      if (!row) return null;
-      const val = row[column];
-      return val == null ? null : Number(val);
-    },
-    getBoolean() { return null; },
-    getDate() { return null; },
-    getRow() { return rows[index] ?? {}; },
-    getMetadata() { return []; },
-    close: vi.fn(async () => {}),
-    [Symbol.asyncIterator]() {
-      return {
-        async next() {
-          index++;
-          if (index < rows.length) return { value: rows[index], done: false };
-          return { value: undefined, done: true };
-        },
-      };
-    },
-  } as unknown as ResultSet;
-}
+// createMockResultSet replaced by TestResultSet
 
 function createMockPreparedStatement(rs: ResultSet): PreparedStatement {
   return {
@@ -141,7 +108,7 @@ function createMockPreparedStatement(rs: ResultSet): PreparedStatement {
 
 function createMockStatement(rs?: ResultSet): Statement {
   return {
-    executeQuery: vi.fn(async () => rs ?? createMockResultSet([])),
+    executeQuery: vi.fn(async () => rs ?? new TestResultSet([])),
     executeUpdate: vi.fn(async () => 0),
     close: vi.fn(async () => {}),
   } as unknown as Statement;
@@ -153,7 +120,7 @@ function createMockConnection(opts?: {
 }): Connection {
   return {
     prepareStatement: vi.fn((_sql: string) =>
-      opts?.psFactory ? opts.psFactory() : createMockPreparedStatement(createMockResultSet([])),
+      opts?.psFactory ? opts.psFactory() : createMockPreparedStatement(new TestResultSet([])),
     ),
     createStatement: vi.fn(() =>
       opts?.statement ?? createMockStatement(),
@@ -208,7 +175,7 @@ describe("SqliteSchemaIntrospector — quoteIdentifier handles special table nam
   });
 
   it("tableExists() uses parameterized query — accepts any table name", async () => {
-    const rs = createMockResultSet([]);
+    const rs = new TestResultSet([]);
     const ps = createMockPreparedStatement(rs);
     const conn = createMockConnection({ psFactory: () => ps });
     const introspector = new SqliteSchemaIntrospector(conn);
@@ -219,7 +186,7 @@ describe("SqliteSchemaIntrospector — quoteIdentifier handles special table nam
   });
 
   it("getTables() lists all tables including ones with special names", async () => {
-    const rs = createMockResultSet([
+    const rs = new TestResultSet([
       { name: "my-table" },
       { name: "123numbers" },
     ]);
@@ -239,7 +206,7 @@ describe("SqliteSchemaIntrospector — quoteIdentifier handles special table nam
 
 describe("SqliteSchemaIntrospector — resource cleanup (FIXED #89)", () => {
   it("getTables() closes Statement", async () => {
-    const rs = createMockResultSet([{ name: "users" }]);
+    const rs = new TestResultSet([{ name: "users" }]);
     const stmt = createMockStatement(rs);
     const conn = createMockConnection({ statement: stmt });
     const introspector = new SqliteSchemaIntrospector(conn);
@@ -250,7 +217,9 @@ describe("SqliteSchemaIntrospector — resource cleanup (FIXED #89)", () => {
   });
 
   it("getTables() closes ResultSet", async () => {
-    const rs = createMockResultSet([{ name: "users" }]);
+    const closeSpy = vi.fn();
+    const rs = new TestResultSet([{ name: "users" }]);
+    rs.close = vi.fn(async () => { closeSpy(); });
     const stmt = createMockStatement(rs);
     const conn = createMockConnection({ statement: stmt });
     const introspector = new SqliteSchemaIntrospector(conn);
@@ -261,11 +230,11 @@ describe("SqliteSchemaIntrospector — resource cleanup (FIXED #89)", () => {
   });
 
   it("getColumns() closes Statement(s)", async () => {
-    const colRs = createMockResultSet([
+    const colRs = new TestResultSet([
       { name: "id", type: "INTEGER", notnull: 1, dflt_value: null, pk: 1 },
     ]);
     // For getUniqueColumns
-    const indexListRs = createMockResultSet([]);
+    const indexListRs = new TestResultSet([]);
 
     let callCount = 0;
     const results = [colRs, indexListRs];
@@ -290,7 +259,7 @@ describe("SqliteSchemaIntrospector — resource cleanup (FIXED #89)", () => {
   });
 
   it("getPrimaryKeys() closes Statement", async () => {
-    const rs = createMockResultSet([
+    const rs = new TestResultSet([
       { name: "id", type: "INTEGER", notnull: 1, dflt_value: null, pk: 1 },
     ]);
     const stmt = createMockStatement(rs);
@@ -303,7 +272,7 @@ describe("SqliteSchemaIntrospector — resource cleanup (FIXED #89)", () => {
   });
 
   it("tableExists() closes PreparedStatement", async () => {
-    const rs = createMockResultSet([{ "1": 1 }]);
+    const rs = new TestResultSet([{ "1": 1 }]);
     const ps = createMockPreparedStatement(rs);
     const conn = createMockConnection({ psFactory: () => ps });
     const introspector = new SqliteSchemaIntrospector(conn);
