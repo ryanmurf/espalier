@@ -115,7 +115,7 @@ describe("QA Seam: Studio schema extractor + espalier-testing factories", () => 
 
       // Every column in the schema should correspond to a property on the built entity
       for (const col of table.columns) {
-        const value = (order as Record<string, unknown>)[col.fieldName];
+        const value = (order as unknown as Record<string, unknown>)[col.fieldName];
         // Factory should have set defaults for all columns
         expect(value).toBeDefined();
       }

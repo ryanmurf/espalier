@@ -133,9 +133,9 @@ describe.skipIf(!canConnect)("E2E: @SoftDelete", { timeout: 15000 }, () => {
 
     // Recreate repos each test to get fresh query caches
     // (raw SQL seeding bypasses the repository's cache invalidation)
-    itemRepo = createDerivedRepository(SdItem, ds) as SoftDeleteRepo<SdItem, number>;
-    versionedRepo = createDerivedRepository(SdVersioned, ds) as SoftDeleteRepo<SdVersioned, number>;
-    customRepo = createDerivedRepository(SdCustomCol, ds) as SoftDeleteRepo<SdCustomCol, number>;
+    itemRepo = createDerivedRepository(SdItem, ds) as unknown as SoftDeleteRepo<SdItem, number>;
+    versionedRepo = createDerivedRepository(SdVersioned, ds) as unknown as SoftDeleteRepo<SdVersioned, number>;
+    customRepo = createDerivedRepository(SdCustomCol, ds) as unknown as SoftDeleteRepo<SdCustomCol, number>;
   });
 
   afterAll(async () => {

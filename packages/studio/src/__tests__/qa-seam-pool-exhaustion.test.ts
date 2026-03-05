@@ -138,7 +138,7 @@ describe.skipIf(!canConnect)("QA Seam: Studio API + connection pool (E2E)", () =
       for (let i = 0; i < 10; i++) {
         const res = await req(app, `/api/tables/${TEST_TABLE}/rows?size=3`);
         expect(res.status).toBe(200);
-        const body = await res.json();
+        const body: any = await res.json();
         expect(body.rows.length).toBe(3);
       }
     });
@@ -186,7 +186,7 @@ describe.skipIf(!canConnect)("QA Seam: Studio API + connection pool (E2E)", () =
           body: JSON.stringify({ sql: "SELECT 1 AS val" }),
         });
         expect(res.status).toBe(200);
-        const body = await res.json();
+        const body: any = await res.json();
         expect(body.rows).toBeDefined();
       }
       // Pool should still be functional

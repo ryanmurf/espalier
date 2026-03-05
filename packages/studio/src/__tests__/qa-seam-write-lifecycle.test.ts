@@ -156,7 +156,7 @@ describe.skipIf(!canConnect)("QA Seam: Studio write-mode + lifecycle hooks (E2E)
 
       // Verify version was stored as provided (not auto-incremented)
       const getRes = await req(readApp, `/api/tables/${TABLE}/rows/${TEST_ID}`);
-      const body = await getRes.json();
+      const body: any = await getRes.json();
       expect(body.version).toBe(0);
     });
 
@@ -171,7 +171,7 @@ describe.skipIf(!canConnect)("QA Seam: Studio write-mode + lifecycle hooks (E2E)
 
       // Version should remain 0 — studio did NOT increment it
       const getRes = await req(readApp, `/api/tables/${TABLE}/rows/${TEST_ID}`);
-      const body = await getRes.json();
+      const body: any = await getRes.json();
       expect(body.name).toBe("Updated Without Version Check");
       expect(body.version).toBe(0); // NOT incremented — this is the known gap
     });
@@ -192,7 +192,7 @@ describe.skipIf(!canConnect)("QA Seam: Studio write-mode + lifecycle hooks (E2E)
       expect(res.status).toBe(201);
 
       const getRes = await req(readApp, `/api/tables/${TABLE}/rows/${TEST_ID_2}`);
-      const body = await getRes.json();
+      const body: any = await getRes.json();
       // created_at and updated_at should be null — studio does not auto-set them
       expect(body.created_at).toBeNull();
       expect(body.updated_at).toBeNull();
@@ -211,7 +211,7 @@ describe.skipIf(!canConnect)("QA Seam: Studio write-mode + lifecycle hooks (E2E)
 
       // Get the current updated_at
       const beforeRes = await req(readApp, `/api/tables/${TABLE}/rows/${TEST_ID}`);
-      const beforeBody = await beforeRes.json();
+      const beforeBody: any = await beforeRes.json();
       const originalUpdatedAt = beforeBody.updated_at;
 
       // Wait a small amount to ensure timestamp difference
@@ -227,7 +227,7 @@ describe.skipIf(!canConnect)("QA Seam: Studio write-mode + lifecycle hooks (E2E)
 
       // updated_at should NOT have changed — studio does not touch auditing
       const afterRes = await req(readApp, `/api/tables/${TABLE}/rows/${TEST_ID}`);
-      const afterBody = await afterRes.json();
+      const afterBody: any = await afterRes.json();
       expect(afterBody.updated_at).toBe(originalUpdatedAt);
     });
   });
@@ -247,7 +247,7 @@ describe.skipIf(!canConnect)("QA Seam: Studio write-mode + lifecycle hooks (E2E)
 
       // Studio read should return ALL records regardless of tenant
       const res = await req(readApp, `/api/tables/${TABLE}/rows?size=100`);
-      const body = await res.json();
+      const body: any = await res.json();
 
       const tenantARecords = body.rows.filter((r: any) => r.tenant_id === "tenant-a");
       const tenantBRecords = body.rows.filter((r: any) => r.tenant_id === "tenant-b");
@@ -274,7 +274,7 @@ describe.skipIf(!canConnect)("QA Seam: Studio write-mode + lifecycle hooks (E2E)
         readApp,
         `/api/tables/${TABLE}/rows/55555555-5555-5555-5555-555555555555`,
       );
-      const body = await getRes.json();
+      const body: any = await getRes.json();
       expect(body.tenant_id).toBe("tenant-evil");
     });
 
@@ -294,7 +294,7 @@ describe.skipIf(!canConnect)("QA Seam: Studio write-mode + lifecycle hooks (E2E)
         readApp,
         `/api/tables/${TABLE}/rows/55555555-5555-5555-5555-555555555555`,
       );
-      const body = await getRes.json();
+      const body: any = await getRes.json();
       expect(body.tenant_id).toBe("tenant-hijacked");
     });
   });
@@ -320,8 +320,8 @@ describe.skipIf(!canConnect)("QA Seam: Studio write-mode + lifecycle hooks (E2E)
         { method: "DELETE" },
       );
       expect(res.status).toBe(200);
-      const body = await res.json();
-      expect(body.affected).toBe(1);
+      const body: any = await res.json();
+      expect((body as any).affected).toBe(1);
 
       // Verify it's gone
       const getRes = await req(

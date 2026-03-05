@@ -158,9 +158,9 @@ describe.skipIf(!canConnect)("E2E: @Audited + audit log", { timeout: 20000 }, ()
     await c.close();
 
     // Recreate repos to avoid query cache staleness
-    itemRepo = createDerivedRepository(AuditItem, ds) as AuditRepo<AuditItem, number>;
-    partialRepo = createDerivedRepository(AuditPartial, ds) as AuditRepo<AuditPartial, number>;
-    softRepo = createDerivedRepository(AuditSoft, ds) as AuditRepo<AuditSoft, number>;
+    itemRepo = createDerivedRepository(AuditItem, ds) as unknown as AuditRepo<AuditItem, number>;
+    partialRepo = createDerivedRepository(AuditPartial, ds) as unknown as AuditRepo<AuditPartial, number>;
+    softRepo = createDerivedRepository(AuditSoft, ds) as unknown as AuditRepo<AuditSoft, number>;
   });
 
   afterAll(async () => {
@@ -615,7 +615,7 @@ describe.skipIf(!canConnect)("E2E: @Audited + audit log", { timeout: 20000 }, ()
     await c.close();
 
     // Create a new repo (fresh AuditLogWriter) and save — should auto-create table
-    const freshRepo = createDerivedRepository(AuditItem, ds) as AuditRepo<AuditItem, number>;
+    const freshRepo = createDerivedRepository(AuditItem, ds) as unknown as AuditRepo<AuditItem, number>;
     const item = new AuditItem();
     item.name = "AutoCreate";
     item.email = "auto@test.com";

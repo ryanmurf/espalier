@@ -56,10 +56,10 @@ class XfTask {
 
 @Audited()
 @SoftDelete()
-@Filter({
-  name: "activeOnly",
-  filter: () => new (Specifications as any).ComparisonCriteria("eq", "priority", 1),
-})
+@Filter(
+  "activeOnly",
+  () => new (Specifications as any).ComparisonCriteria("eq", "priority", 1),
+)
 @Table("e2e_xf_filtered")
 class XfFiltered {
   @Id @Column({ type: "SERIAL" }) id!: number;
@@ -70,7 +70,6 @@ class XfFiltered {
 
 @Audited()
 @SoftDelete()
-@Version
 @Table("e2e_xf_versioned")
 class XfVersioned {
   @Id @Column({ type: "SERIAL" }) id!: number;
@@ -179,9 +178,9 @@ describe.skipIf(!canConnect)("E2E: Cross-feature integration (Y5 Q2)", { timeout
     await stmt.executeUpdate(`DELETE FROM ${AUDIT_TABLE}`);
     await c.close();
 
-    itemRepo = createDerivedRepository(XfItem, ds) as XfRepo<XfItem, number>;
-    taskRepo = createDerivedRepository(XfTask, ds) as XfRepo<XfTask, number>;
-    versionedRepo = createDerivedRepository(XfVersioned, ds) as XfRepo<XfVersioned, number>;
+    itemRepo = createDerivedRepository(XfItem, ds) as unknown as XfRepo<XfItem, number>;
+    taskRepo = createDerivedRepository(XfTask, ds) as unknown as XfRepo<XfTask, number>;
+    versionedRepo = createDerivedRepository(XfVersioned, ds) as unknown as XfRepo<XfVersioned, number>;
   });
 
   afterAll(async () => {
