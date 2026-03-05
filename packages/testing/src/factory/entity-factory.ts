@@ -3,7 +3,23 @@ import type { EntityMetadata } from "espalier-data";
 import { getColumnMetadataEntries } from "espalier-data";
 import type { ColumnMetadataEntry } from "espalier-data";
 
-declare const crypto: { randomUUID(): string };
+let _counter = 0;
+
+/**
+ * Generate a UUID using globalThis.generateUUID() (available in
+ * Node 19+, Bun, Deno, Cloudflare Workers), with a counter-based
+ * fallback for environments where it's unavailable.
+ */
+function generateUUID(): string {
+  try {
+    return (globalThis as any).generateUUID();
+  } catch {
+    // Fallback: deterministic test-friendly UUID
+    _counter++;
+    const hex = _counter.toString(16).padStart(12, "0");
+    return `00000000-0000-4000-8000-${hex}`;
+  }
+}
 
 /**
  * Options for creating a factory.
@@ -277,7 +293,7 @@ export class EntityFactory<T> {
     const idFieldName = String(this._metadata.idField);
     const idValue = (entity as Record<string, unknown>)[idFieldName];
     if (idValue === undefined || idValue === "") {
-      (entity as Record<string, unknown>)[idFieldName] = crypto.randomUUID();
+      (entity as Record<string, unknown>)[idFieldName] = generateUUID();
     }
   }
 
@@ -293,7 +309,7 @@ export class EntityFactory<T> {
     // SQL type-based inference
     if (sqlType) {
       if (sqlType.includes("uuid")) {
-        return crypto.randomUUID();
+        return generateUUID();
       }
       if (
         sqlType.includes("int") ||
@@ -332,7 +348,7 @@ export class EntityFactory<T> {
 
     // Field name heuristics
     if (fieldName.toLowerCase().includes("id") && fieldName !== String(this._metadata.idField)) {
-      return crypto.randomUUID();
+      return generateUUID();
     }
     if (
       fieldName.toLowerCase().includes("email")
