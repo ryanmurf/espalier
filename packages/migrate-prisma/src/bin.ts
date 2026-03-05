@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
-import { resolve, join } from "node:path";
+import { resolve, join, relative } from "node:path";
 import { parsePrismaSchema } from "./parser.js";
 import { generateEntityFile, generateEnumFile, generateIndexFile } from "./generator.js";
 
@@ -31,8 +31,16 @@ Options:
     }
   }
 
+  const cwd = process.cwd();
   const resolvedSchema = resolve(schemaPath);
   const resolvedOutput = resolve(outputDir);
+
+  // Validate output path is within or relative to CWD (prevent path traversal)
+  const rel = relative(cwd, resolvedOutput);
+  if (rel.startsWith("..") || resolve(rel) !== resolvedOutput && rel.startsWith("/")) {
+    console.error(`Error: Output path must be within the current working directory. Got: ${resolvedOutput}`);
+    process.exit(1);
+  }
 
   if (!existsSync(resolvedSchema)) {
     console.error(`Error: Schema file not found: ${resolvedSchema}`);
@@ -52,19 +60,31 @@ Options:
   let filesWritten = 0;
 
   for (const model of schema.models) {
-    const content = generateEntityFile(model, schema);
-    const fileName = `${toSnakeCase(model.name)}.ts`;
-    writeFileSync(join(resolvedOutput, fileName), content + "\n");
-    console.log(`  Generated ${fileName}`);
-    filesWritten++;
+    try {
+      const content = generateEntityFile(model, schema);
+      const fileName = `${toSnakeCase(model.name)}.ts`;
+      writeFileSync(join(resolvedOutput, fileName), content + "\n");
+      console.log(`  Generated ${fileName}`);
+      filesWritten++;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`Error generating entity for model "${model.name}": ${message}`);
+      process.exit(1);
+    }
   }
 
   for (const prismaEnum of schema.enums) {
-    const content = generateEnumFile(prismaEnum);
-    const fileName = `${toSnakeCase(prismaEnum.name)}.ts`;
-    writeFileSync(join(resolvedOutput, fileName), content + "\n");
-    console.log(`  Generated ${fileName}`);
-    filesWritten++;
+    try {
+      const content = generateEnumFile(prismaEnum);
+      const fileName = `${toSnakeCase(prismaEnum.name)}.ts`;
+      writeFileSync(join(resolvedOutput, fileName), content + "\n");
+      console.log(`  Generated ${fileName}`);
+      filesWritten++;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`Error generating enum "${prismaEnum.name}": ${message}`);
+      process.exit(1);
+    }
   }
 
   const indexContent = generateIndexFile(schema.models, schema.enums);

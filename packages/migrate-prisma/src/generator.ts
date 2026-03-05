@@ -142,10 +142,25 @@ function detectRelation(
 
   if (field.isList) {
     // List of model → check if the other side has a list too (ManyToMany) or not (OneToMany)
+    // True implicit M2M requires: both sides are lists, neither side has fields/references in @relation,
+    // and if relation names are used, they must match.
     const otherModel = allModels.find((m) => m.name === field.type);
-    const reverseField = otherModel?.fields.find(
-      (f) => f.type === model.name && f.isList,
-    );
+    const relationName = relationAttr?.args.find((a) => !a.includes(":") && /^"[^"]+"$/.test(a))?.replace(/"/g, "");
+
+    const reverseField = otherModel?.fields.find((f) => {
+      if (f.type !== model.name || !f.isList) return false;
+      // Neither side should have fields: [...] (that indicates a FK-based relation, not implicit M2M)
+      const thisHasFields = relationAttr?.args.some((a) => a.includes("fields:"));
+      const otherRelAttr = getAttr(f, "relation");
+      const otherHasFields = otherRelAttr?.args.some((a) => a.includes("fields:"));
+      if (thisHasFields || otherHasFields) return false;
+      // If named relations, names must match
+      if (relationName) {
+        const otherRelName = otherRelAttr?.args.find((a) => !a.includes(":") && /^"[^"]+"$/.test(a))?.replace(/"/g, "");
+        return otherRelName === relationName;
+      }
+      return true;
+    });
 
     if (reverseField) {
       return { type: "ManyToMany", target: field.type };
@@ -409,7 +424,7 @@ function resolveType(field: PrismaField, schema: PrismaSchema): string {
   return field.type;
 }
 
-function getFieldDefault(field: PrismaField, tsType: string): string {
+function getFieldDefault(field: PrismaField, tsType: string, schema: PrismaSchema): string {
   if (field.isOptional) return "undefined as any";
 
   switch (tsType) {
@@ -420,7 +435,14 @@ function getFieldDefault(field: PrismaField, tsType: string): string {
     case "Date": return "new Date()";
     case "Uint8Array": return "new Uint8Array()";
     case "Record<string, unknown>": return "{}";
-    default: return "undefined as any";
+    default: {
+      // Check if the type is an enum — use its first value as default
+      const prismaEnum = schema.enums.find((e) => e.name === tsType);
+      if (prismaEnum && prismaEnum.values.length > 0) {
+        return `${tsType}.${prismaEnum.values[0]}`;
+      }
+      return "undefined as any";
+    }
   }
 }
 

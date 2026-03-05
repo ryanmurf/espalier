@@ -93,15 +93,16 @@ function parseField(line: string): PrismaField | null {
   const trimmed = line.trim();
   if (!trimmed || trimmed.startsWith("//") || trimmed.startsWith("@@")) return null;
 
-  // Field format: name Type? @attr1 @attr2(...)
-  const fieldMatch = trimmed.match(/^(\w+)\s+(\w+)(\[\])?\??(\[\])?\s*(.*)?$/);
+  // Field format: name Type?  @attr1 @attr2(...)
+  // Optional marker: ? appears right after the type (or after [])
+  const fieldMatch = trimmed.match(/^(\w+)\s+(\w+)(\[\])?(\?)?(\[\])?\s*(.*)?$/);
   if (!fieldMatch) return null;
 
   const name = fieldMatch[1];
   let type = fieldMatch[2];
-  const isList = !!(fieldMatch[3] || fieldMatch[4]);
-  const isOptional = trimmed.includes("?");
-  const attrPart = fieldMatch[5] || "";
+  const isList = !!(fieldMatch[3] || fieldMatch[5]);
+  const isOptional = fieldMatch[4] === "?";
+  const attrPart = fieldMatch[6] || "";
   const attributes = parseAttributes(attrPart);
 
   return { name, type, isOptional, isList, attributes };
