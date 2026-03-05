@@ -621,6 +621,148 @@ export function createDerivedRepository<T, ID>(
    * same connection. Used by cascade persist/merge to save related entities.
    * Returns the saved entity.
    */
+  /**
+   * Recursively cascades persist/merge on a related entity's own @ManyToOne
+   * and owning @OneToOne relations BEFORE the entity is saved (pre-save phase).
+   * This ensures FK values from parent-side relations are available for INSERT.
+   */
+  async function cascadePreSaveGeneric(
+    entity: unknown,
+    entityMeta: EntityMetadata,
+    conn: Connection,
+    saving: Set<unknown>,
+  ): Promise<void> {
+    const rec = entity as Record<string | symbol, unknown>;
+
+    for (const rel of entityMeta.manyToOneRelations) {
+      if (rel.cascade.size === 0) continue;
+      const related = rec[rel.fieldName];
+      if (related == null || isLazyProxy(related)) continue;
+      const targetClass = rel.target();
+      const targetMeta = getEntityMetadata(targetClass);
+      const targetIdField = targetMeta.idField;
+      if (!targetIdField) continue;
+      const relId = (related as Record<string | symbol, unknown>)[targetIdField];
+      const isNew = isUnassignedRelatedId(relId, targetClass, targetMeta);
+      if ((isNew && rel.cascade.has("persist")) || (!isNew && rel.cascade.has("merge"))) {
+        await cascadeSaveRelatedEntity(related, targetClass, conn, saving);
+      }
+    }
+
+    for (const rel of entityMeta.oneToOneRelations) {
+      if (!rel.isOwning || rel.cascade.size === 0) continue;
+      const related = rec[rel.fieldName];
+      if (related == null || isLazyProxy(related)) continue;
+      const targetClass = rel.target();
+      const targetMeta = getEntityMetadata(targetClass);
+      const targetIdField = targetMeta.idField;
+      if (!targetIdField) continue;
+      const relId = (related as Record<string | symbol, unknown>)[targetIdField];
+      const isNew = isUnassignedRelatedId(relId, targetClass, targetMeta);
+      if ((isNew && rel.cascade.has("persist")) || (!isNew && rel.cascade.has("merge"))) {
+        await cascadeSaveRelatedEntity(related, targetClass, conn, saving);
+      }
+    }
+  }
+
+  /**
+   * Recursively cascades persist/merge on a related entity's own inverse @OneToOne,
+   * @OneToMany, and @ManyToMany relations AFTER the entity is saved (post-save phase).
+   * This ensures the parent's generated ID is available for child FK columns.
+   */
+  async function cascadePostSaveGeneric(
+    entity: unknown,
+    entityMeta: EntityMetadata,
+    conn: Connection,
+    saving: Set<unknown>,
+  ): Promise<void> {
+    const rec = entity as Record<string | symbol, unknown>;
+    const entityId = rec[entityMeta.idField] as SqlValue;
+
+    for (const rel of entityMeta.oneToOneRelations) {
+      if (rel.isOwning || rel.cascade.size === 0) continue;
+      const related = rec[rel.fieldName];
+      if (related == null || isLazyProxy(related)) continue;
+      const targetClass = rel.target();
+      const targetMeta = getEntityMetadata(targetClass);
+      const targetIdField = targetMeta.idField;
+      if (!targetIdField) continue;
+      if (rel.mappedBy) {
+        const owningRel = targetMeta.oneToOneRelations.find(
+          r => r.isOwning && String(r.fieldName) === rel.mappedBy,
+        );
+        if (owningRel) {
+          (related as Record<string | symbol, unknown>)[owningRel.fieldName] = entity;
+        }
+      }
+      const relId = (related as Record<string | symbol, unknown>)[targetIdField];
+      const isNew = isUnassignedRelatedId(relId, targetClass, targetMeta);
+      if ((isNew && rel.cascade.has("persist")) || (!isNew && rel.cascade.has("merge"))) {
+        await cascadeSaveRelatedEntity(related, targetClass, conn, saving);
+      }
+    }
+
+    for (const rel of entityMeta.oneToManyRelations) {
+      if (rel.cascade.size === 0) continue;
+      const children = rec[rel.fieldName];
+      if (!Array.isArray(children)) continue;
+      const targetClass = rel.target();
+      const targetMeta = getEntityMetadata(targetClass);
+      const targetIdField = targetMeta.idField;
+      if (!targetIdField) continue;
+      const owningRel = targetMeta.manyToOneRelations.find(
+        (r) => String(r.fieldName) === rel.mappedBy,
+      );
+      for (const child of children) {
+        if (child == null || isLazyProxy(child)) continue;
+        if (owningRel) {
+          (child as Record<string | symbol, unknown>)[owningRel.fieldName] = entity;
+        }
+        const childId = (child as Record<string | symbol, unknown>)[targetIdField];
+        const isNew = isUnassignedRelatedId(childId, targetClass, targetMeta);
+        if ((isNew && rel.cascade.has("persist")) || (!isNew && rel.cascade.has("merge"))) {
+          await cascadeSaveRelatedEntity(child, targetClass, conn, saving);
+        }
+      }
+    }
+
+    for (const rel of entityMeta.manyToManyRelations) {
+      if (!rel.isOwning || !rel.joinTable || rel.cascade.size === 0) continue;
+      const children = rec[rel.fieldName];
+      if (!Array.isArray(children)) continue;
+      const targetClass = rel.target();
+      const targetMeta = getEntityMetadata(targetClass);
+      const targetIdField = targetMeta.idField;
+      if (!targetIdField) continue;
+      const jt = rel.joinTable;
+      for (const child of children) {
+        if (child == null || isLazyProxy(child)) continue;
+        const childId = (child as Record<string | symbol, unknown>)[targetIdField];
+        const isNew = isUnassignedRelatedId(childId, targetClass, targetMeta);
+        if ((isNew && rel.cascade.has("persist")) || (!isNew && rel.cascade.has("merge"))) {
+          await cascadeSaveRelatedEntity(child, targetClass, conn, saving);
+        }
+        const savedChildId = (child as Record<string | symbol, unknown>)[targetIdField] as SqlValue;
+        if (savedChildId != null && entityId != null) {
+          const insertJt = new InsertBuilder(jt.name);
+          insertJt.set(jt.joinColumn, entityId);
+          insertJt.set(jt.inverseJoinColumn, savedChildId);
+          const jtQuery = insertJt.build();
+          const jtSql = jtQuery.sql + " ON CONFLICT DO NOTHING";
+          const jtStmt = conn.prepareStatement(jtSql);
+          try {
+            for (let i = 0; i < jtQuery.params.length; i++) {
+              jtStmt.setParameter(i + 1, jtQuery.params[i]);
+            }
+            await jtStmt.executeUpdate();
+          } finally {
+            await jtStmt.close().catch(() => {});
+          }
+        }
+      }
+    }
+  }
+
   async function cascadeSaveRelatedEntity(
     relatedEntity: unknown,
     relatedClass: new (...args: any[]) => any,
@@ -631,6 +773,9 @@ export function createDerivedRepository<T, ID>(
     saving.add(relatedEntity);
     try {
       const relMeta = getEntityMetadata(relatedClass);
+
+      // Pre-save: cascade on related entity's own @ManyToOne/owning @OneToOne first
+      await cascadePreSaveGeneric(relatedEntity, relMeta, conn, saving);
       const relIdField = relMeta.idField;
       const relIdValue = (relatedEntity as Record<string | symbol, unknown>)[relIdField];
       const relRowMapper = createRowMapper(relatedClass, relMeta);
@@ -706,18 +851,21 @@ export function createDerivedRepository<T, ID>(
         updateBuilder.returning("*");
         const query = updateBuilder.build();
         const stmt = conn.prepareStatement(query.sql);
+        let result: unknown = relatedEntity;
         try {
           for (let i = 0; i < query.params.length; i++) {
             stmt.setParameter(i + 1, query.params[i]);
           }
           const rs = await stmt.executeQuery();
           if (await rs.next()) {
-            return relRowMapper.mapRow(rs);
+            result = relRowMapper.mapRow(rs);
           }
         } finally {
           await stmt.close().catch(() => {});
         }
-        return relatedEntity;
+        // Post-save: cascade on related entity's children
+        await cascadePostSaveGeneric(relatedEntity, relMeta, conn, saving);
+        return result;
       } else {
         // Insert new related entity
         // Multi-tenancy: auto-set @TenantId from context on cascade INSERT
@@ -770,6 +918,7 @@ export function createDerivedRepository<T, ID>(
         insertBuilder.returning("*");
         const query = insertBuilder.build();
         const stmt = conn.prepareStatement(query.sql);
+        let result: unknown = relatedEntity;
         try {
           for (let i = 0; i < query.params.length; i++) {
             stmt.setParameter(i + 1, query.params[i]);
@@ -780,12 +929,14 @@ export function createDerivedRepository<T, ID>(
             // Copy generated ID back to the original entity
             (relatedEntity as Record<string | symbol, unknown>)[relIdField] =
               (saved as Record<string | symbol, unknown>)[relIdField];
-            return saved;
+            result = saved;
           }
         } finally {
           await stmt.close().catch(() => {});
         }
-        return relatedEntity;
+        // Post-save: cascade on related entity's children
+        await cascadePostSaveGeneric(relatedEntity, relMeta, conn, saving);
+        return result;
       }
     } finally {
       saving.delete(relatedEntity);
