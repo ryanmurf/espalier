@@ -52,6 +52,22 @@ importers:
         specifier: ^5.7.3
         version: 5.9.3
 
+  packages/d1:
+    dependencies:
+      espalier-jdbc:
+        specifier: workspace:*
+        version: link:../jdbc
+    devDependencies:
+      '@cloudflare/workers-types':
+        specifier: ^4.20241230.0
+        version: 4.20260305.1
+      tsup:
+        specifier: ^8.4.0
+        version: 8.5.1(postcss@8.5.6)(typescript@5.9.3)
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+
   packages/data:
     dependencies:
       espalier-jdbc:
@@ -303,6 +319,9 @@ packages:
   '@azure/msal-node@3.8.8':
     resolution: {integrity: sha512-+f1VrJH1iI517t4zgmuhqORja0bL6LDQXfBqkjuMmfTYXTQQnh1EvwwxO3UbKLT05N0obF72SRHFrC1RBDv5Gg==}
     engines: {node: '>=16'}
+
+  '@cloudflare/workers-types@4.20260305.1':
+    resolution: {integrity: sha512-835BZaIcgjuYIUqgOWJSpwQxFSJ8g/X1OCZFLO7bmirM6TGmVgIGwiGItBgkjUXXCPrYzJEldsJkuFuK7ePuMw==}
 
   '@emnapi/runtime@1.8.1':
     resolution: {integrity: sha512-mehfKSMWjjNol8659Z8KxEMrdSJDDot5SXMq00dM8BN4o+CLNXQ0xH2V7EchNHV4RmbZLmmPdEaXZc5H2FXmDg==}
@@ -1817,6 +1836,8 @@ snapshots:
       '@azure/msal-common': 15.15.0
       jsonwebtoken: 9.0.3
       uuid: 8.3.2
+
+  '@cloudflare/workers-types@4.20260305.1': {}
 
   '@emnapi/runtime@1.8.1':
     dependencies:
