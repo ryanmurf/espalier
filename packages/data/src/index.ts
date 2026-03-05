@@ -45,6 +45,10 @@ export { createProjectionMapper } from "./mapping/projection-mapper.js";
 export type { FieldChange } from "./mapping/change-tracker.js";
 export { EntityChangeTracker } from "./mapping/change-tracker.js";
 
+export type { Snapshot } from "./snapshot/index.js";
+export type { DiffResult, FieldDiff } from "./snapshot/index.js";
+export { snapshot, diff, diffEntity } from "./snapshot/index.js";
+
 export type { Criteria, CriteriaType, BuiltQuery, JoinType, SortDirection } from "./query/index.js";
 export {
   ComparisonCriteria,

@@ -2,6 +2,10 @@ import type { EntityMetadata, FieldMapping } from "./entity-metadata.js";
 import { getGlobalLogger, LogLevel } from "espalier-jdbc";
 import { getFieldValue } from "./field-access.js";
 import { getIdField } from "../decorators/id.js";
+import type { Snapshot } from "../snapshot/entity-snapshot.js";
+import type { DiffResult } from "../snapshot/entity-diff.js";
+import { snapshot as createSnapshot } from "../snapshot/entity-snapshot.js";
+import { diff as diffSnapshots } from "../snapshot/entity-diff.js";
 
 export interface FieldChange {
   field: string | symbol;
@@ -115,6 +119,7 @@ function cloneValue(value: unknown): unknown {
 
 export class EntityChangeTracker<T> {
   private readonly snapshots = new WeakMap<object, Record<string | symbol, unknown>>();
+  private readonly _entitySnapshots = new WeakMap<object, Snapshot>();
   private readonly metadata: EntityMetadata;
 
   constructor(metadata: EntityMetadata) {
@@ -270,6 +275,46 @@ export class EntityChangeTracker<T> {
 
   getSnapshot(entity: T): Record<string | symbol, unknown> | undefined {
     return this.snapshots.get(entity as object);
+  }
+
+  /**
+   * Returns an immutable Snapshot of the entity's current @Column fields.
+   * Returns undefined if the entity class lacks @Table or @Id decorators.
+   */
+  getEntitySnapshot(entity: T): Snapshot<T> | undefined {
+    try {
+      return createSnapshot(entity as object) as Snapshot<T>;
+    } catch {
+      return undefined;
+    }
+  }
+
+  /**
+   * Diffs the entity's current state against the last entity snapshot taken
+   * via `getEntitySnapshot`. Returns undefined if no previous snapshot exists.
+   */
+  diffFromSnapshot(entity: T): DiffResult | undefined {
+    const previous = this._entitySnapshots.get(entity as object) as Snapshot<T> | undefined;
+    if (!previous) return undefined;
+    try {
+      const current = createSnapshot(entity as object) as Snapshot<T>;
+      return diffSnapshots(previous, current);
+    } catch {
+      return undefined;
+    }
+  }
+
+  /**
+   * Takes and stores an entity snapshot for later diffing via `diffFromSnapshot`.
+   */
+  takeEntitySnapshot(entity: T): Snapshot<T> | undefined {
+    try {
+      const snap = createSnapshot(entity as object) as Snapshot<T>;
+      this._entitySnapshots.set(entity as object, snap);
+      return snap;
+    } catch {
+      return undefined;
+    }
   }
 
   clearSnapshot(entity: T): void {
