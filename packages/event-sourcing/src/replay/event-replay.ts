@@ -22,7 +22,6 @@ export class EventReplayer {
     let processed = 0;
     let lastSequence = 0;
 
-    // eslint-disable-next-line no-constant-condition
     while (true) {
       const events = await this.eventStore.loadAllEvents(connection, {
         aggregateTypes: options?.aggregateTypes,
@@ -35,12 +34,17 @@ export class EventReplayer {
 
       if (events.length === 0) break;
 
+      const prevSequence = lastSequence;
       for (const event of events) {
         await handler(event);
         processed++;
-        lastSequence = event.sequence;
+        if (typeof event.sequence === "number") {
+          lastSequence = event.sequence;
+        }
       }
 
+      // Safety: break if sequence didn't advance (prevents infinite loop)
+      if (lastSequence === prevSequence && events.length === batchSize) break;
       if (events.length < batchSize) break;
     }
 

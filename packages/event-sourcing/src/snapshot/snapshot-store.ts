@@ -54,7 +54,7 @@ DO UPDATE SET "version" = $3, "state" = $4, "timestamp" = $5`;
       stmt.setParameter(2, snapshot.aggregateType);
       stmt.setParameter(3, snapshot.version);
       stmt.setParameter(4, snapshot.state);
-      stmt.setParameter(5, snapshot.timestamp as unknown as string);
+      stmt.setParameter(5, snapshot.timestamp instanceof Date ? snapshot.timestamp.toISOString() : String(snapshot.timestamp));
       await stmt.executeUpdate();
     } finally {
       await stmt.close();

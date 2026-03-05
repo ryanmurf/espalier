@@ -46,13 +46,19 @@ import type { SchemaIntrospector, ColumnInfo, Connection } from "espalier-jdbc";
 // Helpers
 // ============================================================
 
+type PartialColumnInfo = Pick<ColumnInfo, "columnName" | "dataType" | "nullable"> & Partial<ColumnInfo>;
+
+function toColumnInfo(p: PartialColumnInfo): ColumnInfo {
+  return { defaultValue: null, primaryKey: false, unique: false, maxLength: null, ...p };
+}
+
 function makeMockIntrospector(
   tables: { tableName: string }[] = [],
-  columnsMap: Record<string, ColumnInfo[]> = {},
+  columnsMap: Record<string, PartialColumnInfo[]> = {},
 ): SchemaIntrospector {
   return {
     getTables: vi.fn(async () => tables),
-    getColumns: vi.fn(async (tableName: string) => columnsMap[tableName] ?? []),
+    getColumns: vi.fn(async (tableName: string) => (columnsMap[tableName] ?? []).map(toColumnInfo)),
     tableExists: vi.fn(async (tableName: string) =>
       tables.some((t) => t.tableName.toLowerCase() === tableName.toLowerCase()),
     ),

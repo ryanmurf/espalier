@@ -105,16 +105,15 @@ describe("@Temporal decorator — adversarial", () => {
     expect(instance).toBeInstanceOf(Identity);
   });
 
-  it("handles empty string column names", () => {
-    @Temporal({
-      validFromColumn: "",
-      validToColumn: "",
-    })
-    class EmptyCols {}
-
-    const meta = getTemporalMetadata(EmptyCols)!;
-    expect(meta.validFromColumn).toBe("");
-    expect(meta.validToColumn).toBe("");
+  it("rejects empty string column names", () => {
+    expect(() => {
+      @Temporal({
+        validFromColumn: "",
+        validToColumn: "",
+      })
+      class EmptyCols {}
+      void EmptyCols;
+    }).toThrow("Invalid validFromColumn");
   });
 });
 

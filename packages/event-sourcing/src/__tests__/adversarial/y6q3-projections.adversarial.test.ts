@@ -182,7 +182,7 @@ describe("ProjectionRunner — adversarial", () => {
     expect(handler.handle).toHaveBeenCalledTimes(2);
     expect(mockEventStore.loadAllEvents).toHaveBeenCalledWith(
       mockConn,
-      { eventTypes: ["OrderCreated"] },
+      { eventTypes: ["OrderCreated"], fromSequence: undefined, limit: 100 },
     );
   });
 
@@ -233,7 +233,7 @@ describe("ProjectionRunner — adversarial", () => {
 
     expect(mockEventStore.loadAllEvents).toHaveBeenCalledWith(
       mockConn,
-      { eventTypes: ["OrderCreated"], fromSequence: 42 },
+      { eventTypes: ["OrderCreated"], fromSequence: 42, limit: 100 },
     );
   });
 
@@ -256,7 +256,7 @@ describe("ProjectionRunner — adversarial", () => {
 
     expect(mockEventStore.loadAllEvents).toHaveBeenCalledWith(
       mockConn,
-      { eventTypes: ["X"], fromSequence: undefined },
+      { eventTypes: ["X"], fromSequence: undefined, limit: 100 },
     );
   });
 

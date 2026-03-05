@@ -1,3 +1,11 @@
+const IDENT_RE = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
+
+function validateTemporalIdentifier(value: string, name: string): void {
+  if (!IDENT_RE.test(value)) {
+    throw new Error(`Invalid ${name}: "${value}". Must be a valid SQL identifier.`);
+  }
+}
+
 export interface TemporalOptions {
   /** History table name (default: entityTable + "_history"). */
   historyTable?: string;
@@ -29,13 +37,28 @@ export function Temporal(options?: TemporalOptions) {
     target: TClass,
     _context: ClassDecoratorContext<TClass>,
   ): TClass {
+    const historyTable = options?.historyTable ?? "";
+    const validFromColumn = options?.validFromColumn ?? "valid_from";
+    const validToColumn = options?.validToColumn ?? "valid_to";
+    const transactionFromColumn = options?.transactionFromColumn ?? "transaction_from";
+    const transactionToColumn = options?.transactionToColumn ?? "transaction_to";
+
+    // Validate all identifier options
+    if (historyTable) validateTemporalIdentifier(historyTable, "historyTable");
+    validateTemporalIdentifier(validFromColumn, "validFromColumn");
+    validateTemporalIdentifier(validToColumn, "validToColumn");
+    if (options?.bitemporal) {
+      validateTemporalIdentifier(transactionFromColumn, "transactionFromColumn");
+      validateTemporalIdentifier(transactionToColumn, "transactionToColumn");
+    }
+
     const resolved: ResolvedTemporalMetadata = {
-      historyTable: options?.historyTable ?? "",
+      historyTable,
       bitemporal: options?.bitemporal ?? false,
-      validFromColumn: options?.validFromColumn ?? "valid_from",
-      validToColumn: options?.validToColumn ?? "valid_to",
-      transactionFromColumn: options?.transactionFromColumn ?? "transaction_from",
-      transactionToColumn: options?.transactionToColumn ?? "transaction_to",
+      validFromColumn,
+      validToColumn,
+      transactionFromColumn,
+      transactionToColumn,
     };
 
     temporalMetadata.set(target, resolved);
