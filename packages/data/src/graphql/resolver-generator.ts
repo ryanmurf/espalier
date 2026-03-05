@@ -7,6 +7,8 @@ import { getTenantIdField } from "../decorators/tenant.js";
 import { equal, Specifications } from "../query/specification.js";
 import { createPageable } from "../repository/paging.js";
 import { TenantContext } from "../tenant/tenant-context.js";
+import type { GraphQLPaginationAdapter } from "./pagination-adapter.js";
+import { OffsetPaginationAdapter } from "./pagination-adapter.js";
 
 /**
  * A resolver function that can be used by any GraphQL server.
@@ -40,6 +42,10 @@ export interface ResolverGeneratorOptions {
   getTenantId?: (context: any) => string | number | undefined;
   /** Maximum nesting depth for relation resolvers. Default: 10. */
   maxDepth?: number;
+  /** Default pagination adapter. Default: OffsetPaginationAdapter. */
+  paginationAdapter?: GraphQLPaginationAdapter;
+  /** Per-entity pagination adapter overrides. */
+  entityPaginationAdapters?: Map<new (...args: any[]) => any, GraphQLPaginationAdapter>;
 }
 
 /**
@@ -63,7 +69,16 @@ export class ResolverGenerator {
       tenantAware: options?.tenantAware ?? true,
       getTenantId: options?.getTenantId ?? ((ctx: any) => ctx?.tenantId),
       maxDepth: options?.maxDepth ?? 10,
+      paginationAdapter: options?.paginationAdapter ?? new OffsetPaginationAdapter(),
+      entityPaginationAdapters: options?.entityPaginationAdapters ?? new Map(),
     };
+  }
+
+  /**
+   * Get the pagination adapter for a specific entity class.
+   */
+  getAdapterForEntity(entityClass: new (...args: any[]) => any): GraphQLPaginationAdapter {
+    return this.options.entityPaginationAdapters.get(entityClass) ?? this.options.paginationAdapter;
   }
 
   /**
@@ -83,7 +98,8 @@ export class ResolverGenerator {
       query[camelName] = this.createFindByIdResolver(repository, metadata, entityClass);
 
       if (this.options.pagination) {
-        query[`${camelName}s`] = this.createFindAllPagedResolver(repository, metadata, entityClass);
+        const adapter = this.getAdapterForEntity(entityClass);
+        query[`${camelName}s`] = this.createAdapterPagedResolver(repository, metadata, entityClass, adapter);
       } else {
         query[`${camelName}s`] = this.createFindAllResolver(repository, metadata, entityClass);
       }
@@ -133,6 +149,30 @@ export class ResolverGenerator {
             size: page.size,
           },
         };
+      });
+    };
+  }
+
+  private createAdapterPagedResolver(
+    repository: CrudRepository<any, any>,
+    metadata: EntityMetadata,
+    entityClass: new (...args: any[]) => any,
+    adapter: GraphQLPaginationAdapter,
+  ): ResolverFn {
+    // For offset adapter, use existing findAll(pageable) path
+    if (adapter.name === "offset") {
+      return this.createFindAllPagedResolver(repository, metadata, entityClass);
+    }
+
+    // For other adapters, pass through args mapped by the adapter
+    return async (_parent: any, args: Record<string, unknown>, context: any) => {
+      return this.withTenantContext(context, metadata, entityClass, async () => {
+        const request = adapter.mapResolverArgs(args);
+        // The repository.findAll with pageable returns Page<T>.
+        // For cursor/keyset strategies, callers should use the pagination system
+        // directly. Here we pass through the mapped args as a pageable.
+        const page = await repository.findAll(request as any);
+        return adapter.mapResult(page);
       });
     };
   }

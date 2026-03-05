@@ -4,6 +4,8 @@ import { getIdField } from "../decorators/id.js";
 import { getColumnTypeMappings } from "../decorators/column.js";
 import { getCreatedDateField, getLastModifiedDateField } from "../decorators/auditing.js";
 import { getVersionField } from "../decorators/version.js";
+import type { GraphQLPaginationAdapter } from "./pagination-adapter.js";
+import { OffsetPaginationAdapter } from "./pagination-adapter.js";
 
 /**
  * Maps TypeScript/SQL types to GraphQL scalar types.
@@ -59,6 +61,16 @@ export interface GraphQLSchemaOptions {
   excludeFromInput?: string[];
   /** Custom mapping from entity class to GraphQL type name. */
   typeNameMapper?: (entityClass: new (...args: any[]) => any) => string;
+  /**
+   * Default pagination adapter for all entities.
+   * Default: OffsetPaginationAdapter (backward compatible).
+   */
+  paginationAdapter?: GraphQLPaginationAdapter;
+  /**
+   * Per-entity pagination adapter overrides.
+   * Map from entity class to its specific adapter.
+   */
+  entityPaginationAdapters?: Map<new (...args: any[]) => any, GraphQLPaginationAdapter>;
 }
 
 /**
@@ -91,7 +103,16 @@ export class GraphQLSchemaGenerator {
       pagination: options?.pagination ?? true,
       excludeFromInput: options?.excludeFromInput ?? [],
       typeNameMapper: options?.typeNameMapper ?? toTypeName,
+      paginationAdapter: options?.paginationAdapter ?? new OffsetPaginationAdapter(),
+      entityPaginationAdapters: options?.entityPaginationAdapters ?? new Map(),
     };
+  }
+
+  /**
+   * Get the pagination adapter for a specific entity class.
+   */
+  getAdapterForEntity(entityClass: new (...args: any[]) => any): GraphQLPaginationAdapter {
+    return this.options.entityPaginationAdapters.get(entityClass) ?? this.options.paginationAdapter;
   }
 
   /**
@@ -102,6 +123,7 @@ export class GraphQLSchemaGenerator {
     const inputTypes = new Map<string, string>();
     const queryFields: string[] = [];
     const mutationFields: string[] = [];
+    const entityAdapters = new Map<string, GraphQLPaginationAdapter>();
 
     for (const entityClass of entityClasses) {
       const typeName = this.options.typeNameMapper(entityClass);
@@ -122,7 +144,11 @@ export class GraphQLSchemaGenerator {
         queryFields.push(`  ${camelCase(typeName)}(id: ID!): ${typeName}`);
       }
       if (this.options.pagination) {
-        queryFields.push(`  ${camelCase(typeName)}s(page: Int = 0, size: Int = 20, sort: String): ${typeName}Connection!`);
+        const adapter = this.getAdapterForEntity(entityClass);
+        entityAdapters.set(typeName, adapter);
+        const args = adapter.generateQueryArgs();
+        const resultType = adapter.name === "keyset" ? `${typeName}KeysetPage` : `${typeName}Connection`;
+        queryFields.push(`  ${camelCase(typeName)}s(${args}): ${resultType}!`);
       } else {
         queryFields.push(`  ${camelCase(typeName)}s: [${typeName}!]!`);
       }
@@ -139,7 +165,7 @@ export class GraphQLSchemaGenerator {
     }
 
     const typeNames = entityClasses.map((ec) => this.options.typeNameMapper(ec));
-    const sdl = this.assembleSdl(types, inputTypes, queryFields, mutationFields, typeNames);
+    const sdl = this.assembleSdl(types, inputTypes, queryFields, mutationFields, typeNames, entityAdapters);
 
     return { sdl, types, inputTypes, queryFields, mutationFields };
   }
@@ -263,6 +289,7 @@ export class GraphQLSchemaGenerator {
     queryFields: string[],
     mutationFields: string[],
     typeNames: string[],
+    entityAdapters: Map<string, GraphQLPaginationAdapter>,
   ): string {
     const parts: string[] = [];
 
@@ -272,17 +299,18 @@ export class GraphQLSchemaGenerator {
     }
     parts.push("");
 
-    // Pagination types
+    // Pagination shared types (deduplicated by adapter name)
     if (this.options.pagination) {
-      parts.push(`type PageInfo {
-  hasNextPage: Boolean!
-  hasPreviousPage: Boolean!
-  totalElements: Int!
-  totalPages: Int!
-  page: Int!
-  size: Int!
-}`);
-      parts.push("");
+      const emittedAdapters = new Set<string>();
+      for (const adapter of entityAdapters.values()) {
+        if (emittedAdapters.has(adapter.name)) continue;
+        emittedAdapters.add(adapter.name);
+        const sharedTypes = adapter.generateSharedTypes();
+        if (sharedTypes) {
+          parts.push(sharedTypes);
+          parts.push("");
+        }
+      }
     }
 
     // Object types
@@ -291,14 +319,14 @@ export class GraphQLSchemaGenerator {
       parts.push(typeDef);
       parts.push("");
 
-      // Connection type for pagination
+      // Connection/page type for pagination
       if (this.options.pagination) {
         const typeName = typeNames[typeIdx];
-        parts.push(`type ${typeName}Connection {
-  content: [${typeName}!]!
-  pageInfo: PageInfo!
-}`);
-        parts.push("");
+        const adapter = entityAdapters.get(typeName);
+        if (adapter) {
+          parts.push(adapter.generateConnectionType(typeName));
+          parts.push("");
+        }
       }
       typeIdx++;
     }
