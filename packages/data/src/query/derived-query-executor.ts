@@ -94,6 +94,8 @@ function buildCriteriaForExpression(
       return new ComparisonCriteria("eq", columnName, true as SqlValue);
     case "False":
       return new ComparisonCriteria("eq", columnName, false as SqlValue);
+    default:
+      throw new Error(`Unsupported derived query operator: ${expr.operator}`);
   }
 }
 

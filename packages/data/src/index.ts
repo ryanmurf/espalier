@@ -49,7 +49,7 @@ export type { Snapshot } from "./snapshot/index.js";
 export type { DiffResult, FieldDiff } from "./snapshot/index.js";
 export { snapshot, diff, diffEntity } from "./snapshot/index.js";
 
-export type { Criteria, CriteriaType, BuiltQuery, JoinType, SortDirection } from "./query/index.js";
+export type { Criteria, CriteriaType, VectorMetric, BuiltQuery, JoinType, SortDirection } from "./query/index.js";
 export {
   ComparisonCriteria,
   RawComparisonCriteria,
@@ -58,6 +58,8 @@ export {
   NullCriteria,
   LogicalCriteria,
   NotCriteria,
+  VectorDistanceCriteria,
+  VectorOrderExpression,
   and,
   or,
   not,
@@ -184,6 +186,9 @@ export { Filter, getFilters, registerFilter, unregisterFilter, resolveActiveFilt
 
 export type { SoftDeleteOptions } from "./decorators/soft-delete.js";
 export { SoftDelete, getSoftDeleteMetadata, isSoftDeleteEntity } from "./decorators/soft-delete.js";
+
+export type { VectorOptions, VectorMetadataEntry } from "./decorators/vector.js";
+export { Vector, getVectorFields, getVectorFieldMetadata } from "./decorators/vector.js";
 
 export type { AuditedOptions } from "./decorators/audited.js";
 export { Audited, getAuditedMetadata, isAuditedEntity } from "./decorators/audited.js";
