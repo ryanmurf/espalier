@@ -733,17 +733,37 @@ export function createDerivedRepository<T, ID>(
         repoLogger.debug("findAll", { operation: "findAll", entityType: entityName });
       }
 
-      // Detect Pageable
+      // Detect Pageable — must have numeric, finite page >= 0 and size > 0
       if (
         specOrProjectionOrPageable != null &&
         typeof specOrProjectionOrPageable === "object" &&
         !("toPredicate" in specOrProjectionOrPageable) &&
         "page" in specOrProjectionOrPageable &&
-        "size" in specOrProjectionOrPageable &&
-        typeof (specOrProjectionOrPageable as Pageable).page === "number" &&
-        typeof (specOrProjectionOrPageable as Pageable).size === "number"
+        "size" in specOrProjectionOrPageable
       ) {
-        const pageable = specOrProjectionOrPageable as Pageable;
+        const rawPage = (specOrProjectionOrPageable as any).page;
+        const rawSize = (specOrProjectionOrPageable as any).size;
+        const page = typeof rawPage === "string" ? Number(rawPage) : rawPage;
+        const size = typeof rawSize === "string" ? Number(rawSize) : rawSize;
+
+        if (typeof page !== "number" || typeof size !== "number" ||
+            !Number.isFinite(page) || !Number.isFinite(size)) {
+          throw new Error(
+            `Invalid Pageable: page and size must be finite numbers. Got page=${rawPage}, size=${rawSize}.`,
+          );
+        }
+        if (page < 0) {
+          throw new Error(`Invalid Pageable: page must be >= 0. Got ${page}.`);
+        }
+        if (size <= 0) {
+          throw new Error(`Invalid Pageable: size must be > 0. Got ${size}.`);
+        }
+
+        const pageable: Pageable = {
+          page,
+          size,
+          sort: (specOrProjectionOrPageable as any).sort,
+        };
 
         const countBuilder = new SelectBuilder(metadata.tableName).columns("COUNT(*)");
         applyTenantFilter(countBuilder);
@@ -851,7 +871,24 @@ export function createDerivedRepository<T, ID>(
         }
       }
 
-      const spec = specOrProjectionOrPageable as Specification<T> | undefined;
+      // Validate Specification — must have toPredicate method
+      let spec: Specification<T> | undefined;
+      if (specOrProjectionOrPageable != null) {
+        if (
+          typeof specOrProjectionOrPageable === "object" &&
+          "toPredicate" in specOrProjectionOrPageable &&
+          typeof (specOrProjectionOrPageable as any).toPredicate === "function"
+        ) {
+          spec = specOrProjectionOrPageable as Specification<T>;
+        } else {
+          throw new Error(
+            `Invalid argument to findAll(): expected Specification (with toPredicate method), ` +
+            `Pageable (with page and size), or a projection class. ` +
+            `Got ${typeof specOrProjectionOrPageable}: ${JSON.stringify(specOrProjectionOrPageable)}`,
+          );
+        }
+      }
+
       const useJoinFetch = joinFetchSpecs.length > 0;
       const builder = new SelectBuilder(metadata.tableName);
 

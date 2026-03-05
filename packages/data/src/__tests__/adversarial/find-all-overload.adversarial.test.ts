@@ -319,21 +319,22 @@ describe("findAll overload adversarial tests", () => {
   // ──────────────────────────────────────────────
 
   describe("Pageable detection edge cases", () => {
-    it("BUG: object with page and size as strings crashes — not Pageable, not Spec", async () => {
-      // typeof "0" !== "number", so Pageable detection fails
-      // Falls through to Specification path where spec.toPredicate() is called
-      // on the raw object, which has no toPredicate method → TypeError
-      const rs = new TestResultSet(makeWidgetRows(1));
-      const stmt = createMockPreparedStatement(rs);
-      const conn = createSequentialMockConnection([stmt]);
+    it("object with page and size as strings is coerced to Pageable", async () => {
+      // String values are coerced to numbers and treated as valid Pageable
+      const countRs = new TestResultSet([{ "COUNT(*)": 1 }]);
+      const dataRs = new TestResultSet(makeWidgetRows(1));
+      const countStmt = createMockPreparedStatement(countRs);
+      const dataStmt = createMockPreparedStatement(dataRs);
+      const conn = createSequentialMockConnection([countStmt, dataStmt]);
       const ds = createMockDataSource(conn);
 
       const repo = createAutoRepository<Widget, number>(WidgetRepository, ds);
-      // BUG: Should either coerce to Pageable or throw a clear error,
-      // not crash with "spec.toPredicate is not a function"
-      await expect((repo as any).findAll({ page: "0", size: "10" })).rejects.toThrow(
-        /toPredicate is not a function/,
-      );
+      const page = await (repo as any).findAll({ page: "0", size: "10" }) as Page<Widget>;
+
+      // Coerced to valid Pageable — COUNT query issued
+      expect(preparedSqls.length).toBe(2);
+      expect(preparedSqls[0]).toContain("COUNT");
+      expect(page.content).toHaveLength(1);
     });
 
     it("object with toPredicate AND page/size is treated as Specification, not Pageable", async () => {
@@ -357,9 +358,7 @@ describe("findAll overload adversarial tests", () => {
       expect(preparedSqls[0]).not.toContain("COUNT");
     });
 
-    it("BUG: object with page but no size crashes — not Pageable, not Spec", async () => {
-      // Missing 'size' means Pageable detection fails, but the object is truthy
-      // so it's treated as a Specification and toPredicate is called on it → crash
+    it("object with page but no size throws clear validation error", async () => {
       const rs = new TestResultSet(makeWidgetRows(1));
       const stmt = createMockPreparedStatement(rs);
       const conn = createSequentialMockConnection([stmt]);
@@ -367,13 +366,11 @@ describe("findAll overload adversarial tests", () => {
 
       const repo = createAutoRepository<Widget, number>(WidgetRepository, ds);
       await expect((repo as any).findAll({ page: 0 })).rejects.toThrow(
-        /toPredicate is not a function/,
+        /Invalid argument to findAll/,
       );
     });
 
-    it("BUG: empty object {} crashes — not Pageable, not Spec", async () => {
-      // {} is truthy, passes isProjectionClass check as false, then falls
-      // through to spec path where toPredicate is called → crash
+    it("empty object {} throws clear validation error", async () => {
       const rs = new TestResultSet(makeWidgetRows(1));
       const stmt = createMockPreparedStatement(rs);
       const conn = createSequentialMockConnection([stmt]);
@@ -381,47 +378,32 @@ describe("findAll overload adversarial tests", () => {
 
       const repo = createAutoRepository<Widget, number>(WidgetRepository, ds);
       await expect((repo as any).findAll({})).rejects.toThrow(
-        /toPredicate is not a function/,
+        /Invalid argument to findAll/,
       );
     });
 
-    it("Pageable with page=NaN is NOT treated as Pageable (typeof NaN is number but...)", async () => {
-      // typeof NaN === "number" is true in JS! So NaN passes the type check.
-      // This means { page: NaN, size: 10 } WILL be detected as Pageable.
-      // The OFFSET would be NaN * 10 = NaN, which is a bad SQL param.
-      const countRs = new TestResultSet([{ "COUNT(*)": 5 }]);
-      const dataRs = new TestResultSet(makeWidgetRows(5));
-      const countStmt = createMockPreparedStatement(countRs);
-      const dataStmt = createMockPreparedStatement(dataRs);
-      const conn = createSequentialMockConnection([countStmt, dataStmt]);
+    it("Pageable with page=NaN throws validation error", async () => {
+      const rs = new TestResultSet(makeWidgetRows(1));
+      const stmt = createMockPreparedStatement(rs);
+      const conn = createSequentialMockConnection([stmt]);
       const ds = createMockDataSource(conn);
 
       const repo = createAutoRepository<Widget, number>(WidgetRepository, ds);
-
-      // typeof NaN === "number", so it PASSES the Pageable detection
-      // This is a potential bug: NaN * size = NaN passed to OFFSET
-      const page = await repo.findAll({ page: NaN, size: 10 } as Pageable) as Page<Widget>;
-
-      // Should still return something — the DB may handle NaN offset as 0 or error
-      // Key thing: it was detected as Pageable (COUNT query issued)
-      expect(preparedSqls.length).toBe(2);
-      expect(preparedSqls[0]).toContain("COUNT");
+      await expect(repo.findAll({ page: NaN, size: 10 } as Pageable)).rejects.toThrow(
+        /must be finite numbers/,
+      );
     });
 
-    it("Pageable with page=Infinity passes type check", async () => {
-      // typeof Infinity === "number", so it passes the detection
-      const countRs = new TestResultSet([{ "COUNT(*)": 5 }]);
-      const dataRs = new TestResultSet([]);
-      const countStmt = createMockPreparedStatement(countRs);
-      const dataStmt = createMockPreparedStatement(dataRs);
-      const conn = createSequentialMockConnection([countStmt, dataStmt]);
+    it("Pageable with page=Infinity throws validation error", async () => {
+      const rs = new TestResultSet(makeWidgetRows(1));
+      const stmt = createMockPreparedStatement(rs);
+      const conn = createSequentialMockConnection([stmt]);
       const ds = createMockDataSource(conn);
 
       const repo = createAutoRepository<Widget, number>(WidgetRepository, ds);
-      const page = await repo.findAll({ page: Infinity, size: 10 } as Pageable) as Page<Widget>;
-
-      // Infinity * 10 = Infinity OFFSET — will be sent to DB
-      expect(preparedSqls.length).toBe(2);
+      await expect(repo.findAll({ page: Infinity, size: 10 } as Pageable)).rejects.toThrow(
+        /must be finite numbers/,
+      );
     });
   });
 
@@ -463,47 +445,27 @@ describe("findAll overload adversarial tests", () => {
       expect(page.hasNext).toBe(false);
     });
 
-    it("size=0 produces LIMIT 0 and totalPages=Infinity (division by zero)", async () => {
-      const countRs = new TestResultSet([{ "COUNT(*)": 10 }]);
-      const dataRs = new TestResultSet([]);
-      const countStmt = createMockPreparedStatement(countRs);
-      const dataStmt = createMockPreparedStatement(dataRs);
-      const conn = createSequentialMockConnection([countStmt, dataStmt]);
+    it("size=0 throws validation error", async () => {
+      const rs = new TestResultSet(makeWidgetRows(1));
+      const stmt = createMockPreparedStatement(rs);
+      const conn = createSequentialMockConnection([stmt]);
       const ds = createMockDataSource(conn);
 
       const repo = createAutoRepository<Widget, number>(WidgetRepository, ds);
-      const page = await repo.findAll({ page: 0, size: 0 }) as Page<Widget>;
-
-      // Math.ceil(10 / 0) = Infinity
-      expect(page.totalPages).toBe(Infinity);
-      expect(page.content).toHaveLength(0);
+      await expect(repo.findAll({ page: 0, size: 0 })).rejects.toThrow(
+        /size must be > 0/,
+      );
     });
 
-    it("size=0 with 0 total elements produces totalPages=NaN", async () => {
-      const countRs = new TestResultSet([{ "COUNT(*)": 0 }]);
-      const dataRs = new TestResultSet([]);
-      const countStmt = createMockPreparedStatement(countRs);
-      const dataStmt = createMockPreparedStatement(dataRs);
-      const conn = createSequentialMockConnection([countStmt, dataStmt]);
-      const ds = createMockDataSource(conn);
-
-      const repo = createAutoRepository<Widget, number>(WidgetRepository, ds);
-      const page = await repo.findAll({ page: 0, size: 0 }) as Page<Widget>;
-
-      // Math.ceil(0 / 0) = NaN
-      expect(page.totalPages).toBeNaN();
-    });
-
-    it("negative size throws from query builder (LIMIT must be non-negative)", async () => {
-      const countRs = new TestResultSet([{ "COUNT(*)": 10 }]);
-      const countStmt = createMockPreparedStatement(countRs);
-      const dataStmt = createMockPreparedStatement(new TestResultSet([]));
-      const conn = createSequentialMockConnection([countStmt, dataStmt]);
+    it("negative size throws validation error", async () => {
+      const rs = new TestResultSet(makeWidgetRows(1));
+      const stmt = createMockPreparedStatement(rs);
+      const conn = createSequentialMockConnection([stmt]);
       const ds = createMockDataSource(conn);
 
       const repo = createAutoRepository<Widget, number>(WidgetRepository, ds);
       await expect(repo.findAll({ page: 0, size: -1 })).rejects.toThrow(
-        /LIMIT must be non-negative/,
+        /size must be > 0/,
       );
     });
   });
