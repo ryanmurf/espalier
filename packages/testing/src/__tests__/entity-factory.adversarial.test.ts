@@ -9,76 +9,76 @@ import { EntityFactory, createFactory } from "../factory/entity-factory.js";
 @Table("users")
 class User {
   @Id
-  accessor id: string = "";
+  id!: string;
 
-  @Column("VARCHAR(255)")
-  accessor name: string = "";
+  @Column()
+  name!: string;
 
-  @Column("VARCHAR(255)")
-  accessor email: string = "";
+  @Column()
+  email!: string;
 
-  @Column("BOOLEAN")
-  accessor isActive: boolean = true;
+  @Column()
+  isActive!: boolean;
 
-  @Column("INTEGER")
-  accessor age: number = 0;
+  @Column()
+  age!: number;
 
-  @Column("TIMESTAMP")
-  accessor createdAt: Date = new Date();
+  @Column()
+  createdAt!: Date;
 }
 
 @Table("profiles")
 class Profile {
   @Id
-  accessor id: string = "";
+  id!: string;
 
-  @Column("VARCHAR(255)")
-  accessor bio: string = "";
+  @Column()
+  bio!: string;
 
-  @Column("VARCHAR(255)")
-  accessor userId: string = "";
+  @Column()
+  userId!: string;
 }
 
 @Table("posts")
 class Post {
   @Id
-  accessor id: string = "";
+  id!: string;
 
-  @Column("VARCHAR(255)")
-  accessor title: string = "";
+  @Column()
+  title!: string;
 
-  @Column("TEXT")
-  accessor body: string = "";
+  @Column()
+  body!: string;
 
-  @Column("VARCHAR(255)")
-  accessor authorId: string = "";
+  @Column()
+  authorId!: string;
 }
 
 @Table("versioned_items")
 class VersionedItem {
   @Id
-  accessor id: string = "";
+  id!: string;
 
-  @Column("VARCHAR(255)")
-  accessor name: string = "";
+  @Column()
+  name!: string;
 
   @Version
-  accessor version: number = 0;
+  version!: number;
 }
 
 @Table("audited_items")
 class AuditedItem {
   @Id
-  accessor id: string = "";
+  id!: string;
 
-  @Column("VARCHAR(255)")
-  accessor name: string = "";
+  @Column()
+  name!: string;
 
   @CreatedDate
-  accessor createdDate: Date = new Date();
+  createdDate!: Date;
 
   @LastModifiedDate
-  accessor lastModifiedDate: Date = new Date();
+  lastModifiedDate!: Date;
 }
 
 // ==========================================================================
@@ -111,8 +111,8 @@ describe("EntityFactory — entity without @Id", () => {
   it("throws helpful error when entity has @Table but no @Id", () => {
     @Table("no_id_entities")
     class NoIdEntity {
-      @Column("VARCHAR(255)")
-      accessor name: string = "";
+      @Column()
+      name!: string;
     }
 
     expect(() => createFactory(NoIdEntity)).toThrow(/@Id/);

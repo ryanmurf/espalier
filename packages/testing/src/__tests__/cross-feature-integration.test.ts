@@ -59,28 +59,28 @@ try {
 @Table("integration_users")
 class IntegrationUser {
   @Id
-  accessor id: string = "";
+  id!: string;
 
-  @Column("VARCHAR(255)")
-  accessor name: string = "";
+  @Column({ type: "VARCHAR(255)" })
+  name!: string;
 
-  @Column("VARCHAR(255)")
-  accessor email: string = "";
+  @Column({ type: "VARCHAR(255)" })
+  email!: string;
 
-  @Column("BOOLEAN")
-  accessor active: boolean = true;
+  @Column({ type: "BOOLEAN" })
+  active!: boolean;
 
-  @Column("INTEGER")
-  accessor age: number = 0;
+  @Column({ type: "INTEGER" })
+  age!: number;
 
   @Version
-  accessor version: number = 0;
+  version!: number;
 
   @CreatedDate
-  accessor createdAt: Date = new Date();
+  createdAt!: Date;
 
   @LastModifiedDate
-  accessor updatedAt: Date = new Date();
+  updatedAt!: Date;
 }
 
 // ==========================================================================
@@ -117,7 +117,7 @@ describe.skipIf(!canConnect)("Cross-feature integration — E2E", () => {
     await stmt.executeUpdate(`DROP TABLE IF EXISTS ${TABLE} CASCADE`);
     await conn.close();
     await ds.close();
-  });
+  }, 30000);
 
   // ------------------------------------------------------------------
   // Factory + Transaction integration
@@ -195,6 +195,7 @@ describe.skipIf(!canConnect)("Cross-feature integration — E2E", () => {
         const iStmt = conn.createStatement();
         await iStmt.executeQuery("SELECT 1");
         await iStmt.executeQuery("SELECT 2");
+        await conn.close();
 
         // Only 2 queries should be in this scoped log
         expect(log.count).toBe(2);

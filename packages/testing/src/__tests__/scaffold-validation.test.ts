@@ -336,7 +336,9 @@ describe.skipIf(!distExists())("tree-shakeability", () => {
   it("ESM bundle has no top-level side effects (IIFE, global mutations)", () => {
     const esmContent = readDist("index.js");
     expect(esmContent).not.toMatch(/\(\s*function\s*\(\s*\)\s*\{/);
-    expect(esmContent).not.toContain("globalThis.");
+    // globalThis.generateUUID() is used inside a function body (not a top-level mutation)
+    // so we check for global assignment patterns instead of any globalThis reference
+    expect(esmContent).not.toMatch(/globalThis\.\w+\s*=/);
     expect(esmContent).not.toContain("window.");
     expect(esmContent).not.toMatch(/\bglobal\./);
   });

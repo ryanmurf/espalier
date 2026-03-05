@@ -554,10 +554,10 @@ describe("withTestTransaction — unit tests (mocked)", () => {
     @Table("mock_users")
     class MockUser {
       @Id
-      accessor id: string = "";
+      id!: string;
 
-      @Column("VARCHAR(255)")
-      accessor name: string = "";
+      @Column()
+      name!: string;
     }
 
     await withTestTransaction(ds, async (ctx) => {
@@ -575,10 +575,10 @@ describe("withTestTransaction — unit tests (mocked)", () => {
     @Table("mock_items")
     class MockItem {
       @Id
-      accessor id: string = "";
+      id!: string;
 
-      @Column("VARCHAR(255)")
-      accessor name: string = "";
+      @Column()
+      name!: string;
     }
 
     await withTestTransaction(ds, async (ctx) => {
