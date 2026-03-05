@@ -28,8 +28,8 @@
     "clean": "rm -rf dist"
   },
   "peerDependencies": {
-    "espalier-jdbc": "workspace:*",
-    "espalier-data": "workspace:*"
+    "espalier-data": "workspace:*",
+    "espalier-jdbc": "workspace:*"
   },
   "peerDependenciesMeta": {
     "espalier-jdbc": {
@@ -40,8 +40,9 @@
     }
   },
   "devDependencies": {
-    "espalier-jdbc": "workspace:*",
     "espalier-data": "workspace:*",
+    "espalier-jdbc": "workspace:*",
+    "espalier-jdbc-pg": "workspace:^",
     "tsup": "^8.4.0",
     "typescript": "^5.7.3"
   }

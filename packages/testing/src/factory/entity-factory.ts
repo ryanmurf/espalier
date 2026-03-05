@@ -262,8 +262,9 @@ export class EntityFactory<T> {
       // Skip transient fields
       if (this._transientKeys.has(fieldName)) continue;
 
-      // Skip if already set by constructor
-      if ((entity as Record<string, unknown>)[fieldName] !== undefined) continue;
+      // Skip if already set by constructor (but not empty strings — those need defaults)
+      const currentValue = (entity as Record<string, unknown>)[fieldName];
+      if (currentValue !== undefined && currentValue !== "") continue;
 
       const columnEntry = this._columnEntries.get(field.fieldName);
       const value = this._generateDefault(fieldName, columnEntry);
@@ -272,9 +273,10 @@ export class EntityFactory<T> {
       }
     }
 
-    // Also set ID field if not already set
+    // Also set ID field if not already set (treat empty string as unset)
     const idFieldName = String(this._metadata.idField);
-    if ((entity as Record<string, unknown>)[idFieldName] === undefined) {
+    const idValue = (entity as Record<string, unknown>)[idFieldName];
+    if (idValue === undefined || idValue === "") {
       (entity as Record<string, unknown>)[idFieldName] = crypto.randomUUID();
     }
   }

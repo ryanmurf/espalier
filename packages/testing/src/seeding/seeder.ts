@@ -135,7 +135,7 @@ export class SeedRunner {
     try {
       const rs = await stmt.executeQuery(`SELECT name FROM ${SEED_TABLE}`);
       const names = new Set<string>();
-      while (rs.next()) {
+      while (await rs.next()) {
         const name = rs.getString("name");
         if (name !== null) names.add(name);
       }
