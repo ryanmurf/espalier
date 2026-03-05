@@ -176,6 +176,12 @@ export { DEFAULT_MIGRATION_TABLE, DEFAULT_SCHEMA } from "./migration/migration.j
 export type { DataMigration } from "./migration/data-migration.js";
 export { isDataMigration, createDataMigration } from "./migration/data-migration.js";
 
+export type { SchemaDiff, TableDiff, TableModification, ColumnDiff, ColumnModification } from "./migration/schema-diff.js";
+export { SchemaDiffEngine } from "./migration/schema-diff.js";
+
+export type { TenantMigrationProgress, TenantMigrationOptions } from "./migration/tenant-migration-runner.js";
+export { TenantAwareMigrationRunner } from "./migration/tenant-migration-runner.js";
+
 export type { DeprecatedOptions } from "./decorators/deprecated.js";
 export { Deprecated, getDeprecatedFields, isDeprecatedField } from "./decorators/deprecated.js";
 
