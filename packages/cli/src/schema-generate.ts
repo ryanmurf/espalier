@@ -40,7 +40,9 @@ export function generateMigrationFromDiff(options: GenerateMigrationOptions): Ge
   }
 
   const version = generateVersion();
-  const description = name ? name.replace(/[\s-]+/g, "_").toLowerCase() : "auto_generated";
+  const rawDescription = name ? name.replace(/[\s-]+/g, "_").toLowerCase() : "auto_generated";
+  // Sanitize description to prevent code injection in generated TS files
+  const description = rawDescription.replace(/[^a-z0-9_]/g, "");
   const fileName = `${version}_${description}.ts`;
   const filePath = join(migrationsDir, fileName);
 

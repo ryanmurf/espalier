@@ -191,6 +191,11 @@ export class MysqlMigrationRunner implements MigrationRunner {
     const downSql = migration.down();
     const statements = Array.isArray(downSql) ? downSql : [downSql];
 
+    // Execute undo data migration if present (before DDL rollback)
+    if (typeof migration.undoData === "function") {
+      await migration.undoData(conn);
+    }
+
     // MySQL implicitly commits DDL statements, so we execute DDL outside a
     // transaction, then use a transaction only for the tracking-table DELETE.
     const stmt = conn.createStatement();
@@ -224,6 +229,11 @@ export class MysqlMigrationRunner implements MigrationRunner {
     const stmt = conn.createStatement();
     for (const sql of statements) {
       await stmt.executeUpdate(sql);
+    }
+
+    // Execute data migration if present
+    if (typeof migration.data === "function") {
+      await migration.data(conn);
     }
 
     const tx = await conn.beginTransaction();

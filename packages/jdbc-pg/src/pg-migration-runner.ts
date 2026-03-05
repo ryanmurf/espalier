@@ -197,6 +197,11 @@ export class PgMigrationRunner implements MigrationRunner {
 
     const tx = await conn.beginTransaction();
     try {
+      // Execute undo data migration if present (before DDL rollback)
+      if (typeof migration.undoData === "function") {
+        await migration.undoData(conn);
+      }
+
       const stmt = conn.createStatement();
       for (const sql of statements) {
         await stmt.executeUpdate(sql);
@@ -227,6 +232,11 @@ export class PgMigrationRunner implements MigrationRunner {
       const stmt = conn.createStatement();
       for (const sql of statements) {
         await stmt.executeUpdate(sql);
+      }
+
+      // Execute data migration if present (within same transaction)
+      if (typeof migration.data === "function") {
+        await migration.data(conn);
       }
 
       const ps = conn.prepareStatement(
