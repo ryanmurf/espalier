@@ -109,7 +109,7 @@ describe.skipIf(!canConnect)("E2E: Entity Cache with Repository", { timeout: 150
   // Save and cache integration
   // ──────────────────────────────────────────────
 
-  it("save new entity caches it, subsequent findById hits cache", async () => {
+  it("save new entity evicts cache, first findById goes to DB then second hits cache", async () => {
     const repo = createRepo();
     const entity = Object.assign(Object.create(CacheTestUser.prototype), {
       name: "Carol",
@@ -118,9 +118,14 @@ describe.skipIf(!canConnect)("E2E: Entity Cache with Repository", { timeout: 150
     const saved = await repo.save(entity);
     const cache = getCache(repo);
 
+    // save() evicts the cache entry, so first findById is a miss (goes to DB)
+    const first = await repo.findById(saved.id);
+    expect(first).not.toBeNull();
+
+    // Second findById should be a cache hit
     const hitsBefore = cache.getStats().hits;
-    const result = await repo.findById(saved.id);
-    expect(result).not.toBeNull();
+    const second = await repo.findById(saved.id);
+    expect(second).not.toBeNull();
     expect(cache.getStats().hits).toBeGreaterThan(hitsBefore);
   });
 
@@ -296,13 +301,15 @@ describe.skipIf(!canConnect)("E2E: Entity Cache with Repository", { timeout: 150
     }) as CacheTestUser;
     const saved = await repo.save(entity);
 
-    const statsAfterSave = cache.getStats();
-    expect(statsAfterSave.puts).toBeGreaterThanOrEqual(1);
+    // save() evicts rather than puts, so first findById populates cache
+    await repo.findById(saved.id);
+    const statsAfterLoad = cache.getStats();
+    expect(statsAfterLoad.puts).toBeGreaterThanOrEqual(1);
 
-    // Cache hit
+    // Second findById should be a cache hit
     await repo.findById(saved.id);
     const statsAfterHit = cache.getStats();
-    expect(statsAfterHit.hits).toBeGreaterThan(statsAfterSave.hits);
+    expect(statsAfterHit.hits).toBeGreaterThan(statsAfterLoad.hits);
   });
 
   // ──────────────────────────────────────────────
@@ -321,6 +328,11 @@ describe.skipIf(!canConnect)("E2E: Entity Cache with Repository", { timeout: 150
       }) as CacheTestUser;
       const saved = await repo.save(entity);
       ids.push(saved.id);
+    }
+
+    // save() evicts rather than puts, so populate cache via findById
+    for (const id of ids) {
+      await repo.findById(id);
     }
 
     // Only 5 should be in cache

@@ -232,8 +232,8 @@ describe("TenantSchemaHealthCheck (unit)", () => {
 
     const result = await check.check();
     expect(result.status).toBe("UP");
-    expect(result.details.presentSchemas).toEqual(["tenant_a", "tenant_b"]);
-    expect(result.details.missingSchemas).toEqual([]);
+    expect(result.details.presentCount).toBe(2);
+    expect(result.details.missingCount).toBe(0);
   });
 
   it("some schemas missing returns DEGRADED", async () => {
@@ -242,7 +242,7 @@ describe("TenantSchemaHealthCheck (unit)", () => {
 
     const result = await check.check();
     expect(result.status).toBe("DEGRADED");
-    expect(result.details.missingSchemas).toEqual(["tenant_b"]);
+    expect(result.details.missingCount).toBe(1);
   });
 
   it("no expected schemas present returns DOWN", async () => {
@@ -251,7 +251,7 @@ describe("TenantSchemaHealthCheck (unit)", () => {
 
     const result = await check.check();
     expect(result.status).toBe("DOWN");
-    expect((result.details.missingSchemas as string[]).length).toBe(2);
+    expect(result.details.missingCount).toBe(2);
   });
 
   it("empty expected list returns UP (vacuous truth)", async () => {
@@ -272,7 +272,7 @@ describe("TenantSchemaHealthCheck (unit)", () => {
 
     const result = await check.check();
     expect(result.status).toBe("UP");
-    expect(result.details.presentSchemas).toEqual(["schema_alpha", "schema_beta"]);
+    expect(result.details.presentCount).toBe(2);
   });
 
   it("schema resolver mismatch causes DEGRADED", async () => {
@@ -312,7 +312,7 @@ describe("TenantSchemaHealthCheck (unit)", () => {
 
     const result = await check.check();
     expect(result.status).toBe("DEGRADED");
-    expect(result.details.missingSchemas).toEqual(["t4"]);
+    expect(result.details.missingCount).toBe(1);
   });
 
   it("duplicate tenantIds are not deduplicated", async () => {
@@ -322,7 +322,7 @@ describe("TenantSchemaHealthCheck (unit)", () => {
     const result = await check.check();
     expect(result.status).toBe("UP");
     // All 3 duplicates resolve to present
-    expect((result.details.presentSchemas as string[]).length).toBe(3);
+    expect(result.details.presentCount).toBe(3);
   });
 });
 
@@ -385,7 +385,7 @@ describe.skipIf(!canConnect)("E2E: Replica Lag & Tenant Schema Health Checks", {
 
       const result = await check.check();
       expect(result.status).toBe("UP");
-      expect((result.details.presentSchemas as string[])).toContain(testSchema);
+      expect(result.details.presentCount).toBe(1);
     });
 
     it("missing schema returns DEGRADED", async () => {
@@ -396,7 +396,7 @@ describe.skipIf(!canConnect)("E2E: Replica Lag & Tenant Schema Health Checks", {
 
       const result = await check.check();
       expect(result.status).toBe("DEGRADED");
-      expect((result.details.missingSchemas as string[])).toContain("nonexistent_schema_xyz_abc_123");
+      expect(result.details.missingCount).toBe(1);
     });
 
     it("all missing schemas returns DOWN", async () => {

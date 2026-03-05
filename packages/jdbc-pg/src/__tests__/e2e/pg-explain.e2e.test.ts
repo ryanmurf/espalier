@@ -297,23 +297,16 @@ describe.skipIf(!canConnect)("E2E: EXPLAIN / EXPLAIN ANALYZE", { timeout: 30000 
       expect(plan.rootNode.nodeType).toBeTruthy();
     });
 
-    it("EXPLAIN ANALYZE on INSERT actually inserts (then clean up)", async () => {
-      const plan = await analyzer.explain(
-        conn,
-        `INSERT INTO ${TABLE_A} (name, value) VALUES ('analyze_insert', 888)`,
-        undefined,
-        { analyze: true },
-      );
-
-      expect(plan.rootNode.actualRows).toBeDefined();
-
-      // Clean up the inserted row
-      const stmt = conn.createStatement();
-      try {
-        await stmt.executeUpdate(`DELETE FROM ${TABLE_A} WHERE name = 'analyze_insert'`);
-      } finally {
-        await stmt.close();
-      }
+    it("EXPLAIN ANALYZE on INSERT is blocked by security guard", async () => {
+      // Security fix: EXPLAIN ANALYZE is only allowed on SELECT/WITH to prevent side effects
+      await expect(
+        analyzer.explain(
+          conn,
+          `INSERT INTO ${TABLE_A} (name, value) VALUES ('analyze_insert', 888)`,
+          undefined,
+          { analyze: true },
+        ),
+      ).rejects.toThrow(/EXPLAIN ANALYZE is only allowed on SELECT\/WITH/);
     });
   });
 

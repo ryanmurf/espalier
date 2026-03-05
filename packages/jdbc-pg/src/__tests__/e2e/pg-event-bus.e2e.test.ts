@@ -262,7 +262,10 @@ describe.skipIf(!canConnect)("E2E: EventBus Integration with Repository", { time
     const repo = createRepo();
     const saved = await repo.save(makeItem("CachedLoad", "active"));
 
-    // Entity is in cache from the save — findById should use cache
+    // save() evicts cache, so first findById populates it (emits loaded)
+    await repo.findById(saved.id);
+
+    // Now it's cached — second findById should use cache and NOT emit loaded
     listenAll();
     await repo.findById(saved.id);
 
@@ -368,11 +371,12 @@ describe.skipIf(!canConnect)("E2E: EventBus Integration with Repository", { time
     await repo.save(loaded!);
     expect(eventTypes).toEqual(["persisted", "loaded", "updated"]);
 
-    // 4. DELETE
+    // 4. DELETE — save() evicts cache, so findById goes to DB and emits loaded
     const toDelete = await repo.findById(saved.id);
-    // findById hits cache, so no loaded event
+    expect(eventTypes).toEqual(["persisted", "loaded", "updated", "loaded"]);
+
     await repo.delete(toDelete!);
-    expect(eventTypes).toEqual(["persisted", "loaded", "updated", "removed"]);
+    expect(eventTypes).toEqual(["persisted", "loaded", "updated", "loaded", "removed"]);
   });
 
   // ──────────────────────────────────────────────

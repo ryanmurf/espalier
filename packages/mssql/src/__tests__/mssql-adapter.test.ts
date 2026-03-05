@@ -154,15 +154,15 @@ describe("MssqlStatement", () => {
     );
   });
 
-  it("SQL snippet is truncated to 50 chars", async () => {
+  it("error message does not contain SQL snippet (redacted for security)", async () => {
     const longSql = "SELECT " + "a".repeat(100) + " FROM t";
     const stmt = new MssqlStatement(null);
     try {
       await stmt.executeQuery(longSql);
     } catch (e: any) {
-      // The error message should contain at most 50 chars of the SQL
-      const sqlInError = e.message.split("SQL: ")[1];
-      expect(sqlInError.length).toBeLessThanOrEqual(50);
+      // SQL snippets are no longer included in error messages (#64)
+      expect(e.message).not.toContain("SQL:");
+      expect(e.message).not.toContain("SELECT");
     }
   });
 
@@ -472,21 +472,17 @@ describe("mssqlPagination", () => {
     );
   });
 
-  // BUG CANDIDATE: negative offset/limit not validated
-  it("does NOT validate negative offset (potential bug)", () => {
-    const result = mssqlPagination(-1, 10);
-    expect(result).toBe("OFFSET -1 ROWS FETCH NEXT 10 ROWS ONLY");
-    // MSSQL would reject this, but the helper doesn't guard it
+  // Validation was added as a security fix — negative/zero values now throw
+  it("validates negative offset (throws)", () => {
+    expect(() => mssqlPagination(-1, 10)).toThrow(/Invalid offset/);
   });
 
-  it("does NOT validate negative limit (potential bug)", () => {
-    const result = mssqlPagination(0, -5);
-    expect(result).toBe("OFFSET 0 ROWS FETCH NEXT -5 ROWS ONLY");
+  it("validates negative limit (throws)", () => {
+    expect(() => mssqlPagination(0, -5)).toThrow(/Invalid limit/);
   });
 
-  it("does NOT validate zero limit (potential bug)", () => {
-    const result = mssqlPagination(0, 0);
-    expect(result).toBe("OFFSET 0 ROWS FETCH NEXT 0 ROWS ONLY");
+  it("validates zero limit (throws)", () => {
+    expect(() => mssqlPagination(0, 0)).toThrow(/Invalid limit/);
   });
 });
 
