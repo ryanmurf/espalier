@@ -250,6 +250,25 @@ importers:
         specifier: ^5.7.3
         version: 5.9.3
 
+  packages/playground:
+    dependencies:
+      sql.js:
+        specifier: ^1.11.0
+        version: 1.14.1
+    devDependencies:
+      '@types/node':
+        specifier: ^25.0.0
+        version: 25.3.0
+      tsup:
+        specifier: ^8.4.0
+        version: 8.5.1(postcss@8.5.6)(typescript@5.9.3)
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/node@25.3.0)
+
   packages/proxy:
     dependencies:
       espalier-jdbc:
@@ -265,6 +284,24 @@ importers:
       typescript:
         specifier: ^5.7.3
         version: 5.9.3
+
+  packages/realtime:
+    devDependencies:
+      espalier-data:
+        specifier: workspace:*
+        version: link:../data
+      espalier-jdbc:
+        specifier: workspace:*
+        version: link:../jdbc
+      tsup:
+        specifier: ^8.4.0
+        version: 8.5.1(postcss@8.5.6)(typescript@5.9.3)
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.1.1
+        version: 3.2.4(@types/node@25.3.0)
 
   packages/sqlite:
     dependencies:
@@ -1672,6 +1709,9 @@ packages:
   sql-escaper@1.3.3:
     resolution: {integrity: sha512-BsTCV265VpTp8tm1wyIm1xqQCS+Q9NHx2Sr+WcnUrgLrQ6yiDIvHYJV5gHxsj1lMBy2zm5twLaZao8Jd+S8JJw==}
     engines: {bun: '>=1.0.0', deno: '>=2.0.0', node: '>=12.0.0'}
+
+  sql.js@1.14.1:
+    resolution: {integrity: sha512-gcj8zBWU5cFsi9WUP+4bFNXAyF1iRpA3LLyS/DP5xlrNzGmPIizUeBggKa8DbDwdqaKwUcTEnChtd2grWo/x/A==}
 
   stackback@0.0.2:
     resolution: {integrity: sha512-1XMJE5fQo1jGH6Y/7ebnwPOBEkIEnT4QF32d5R1+VXdXveM0IBMJt8zfaxX1P3QhVwrYe+576+jkANtSS2mBbw==}
@@ -3156,6 +3196,8 @@ snapshots:
   sprintf-js@1.1.3: {}
 
   sql-escaper@1.3.3: {}
+
+  sql.js@1.14.1: {}
 
   stackback@0.0.2: {}
 
