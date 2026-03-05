@@ -1,0 +1,62 @@
+[
+  {
+    "name": "espalier-jdbc (full)",
+    "path": "packages/jdbc/dist/index.js",
+    "limit": "15 KB",
+    "gzip": true
+  },
+  {
+    "name": "espalier-data/core",
+    "path": "packages/data/dist/core.js",
+    "limit": "50 KB",
+    "gzip": true
+  },
+  {
+    "name": "espalier-data/relations",
+    "path": "packages/data/dist/relations.js",
+    "limit": "5 KB",
+    "gzip": true
+  },
+  {
+    "name": "espalier-data/tenant",
+    "path": "packages/data/dist/tenant-entry.js",
+    "limit": "5 KB",
+    "gzip": true
+  },
+  {
+    "name": "espalier-data/observability",
+    "path": "packages/data/dist/observability-entry.js",
+    "limit": "5 KB",
+    "gzip": true
+  },
+  {
+    "name": "espalier-data/graphql",
+    "path": "packages/data/dist/graphql-entry.js",
+    "limit": "5 KB",
+    "gzip": true
+  },
+  {
+    "name": "espalier-data/rest",
+    "path": "packages/data/dist/rest-entry.js",
+    "limit": "5 KB",
+    "gzip": true
+  },
+  {
+    "name": "espalier-data/plugins",
+    "path": "packages/data/dist/plugins-entry.js",
+    "limit": "5 KB",
+    "gzip": true
+  },
+  {
+    "name": "espalier-data (full index)",
+    "path": "packages/data/dist/index.js",
+    "limit": "15 KB",
+    "gzip": true
+  },
+  {
+    "name": "espalier-proxy",
+    "path": "packages/proxy/dist/index.js",
+    "limit": "5 KB",
+    "gzip": true
+  }
+]
