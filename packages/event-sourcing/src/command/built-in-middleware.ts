@@ -8,16 +8,33 @@ export interface Logger {
   info(msg: string, ...args: unknown[]): void;
 }
 
+export interface LoggingMiddlewareOptions {
+  logger?: Logger;
+  /** When true, omit the command payload from log output (default: true). */
+  redact?: boolean;
+}
+
 /**
  * Logging middleware — logs command dispatch and results.
+ * By default the command payload is redacted to avoid info leakage.
  */
 export function loggingMiddleware(
-  logger?: Logger,
+  loggerOrOptions?: Logger | LoggingMiddlewareOptions,
 ): CommandMiddlewareFn {
+  const opts: LoggingMiddlewareOptions =
+    loggerOrOptions && "info" in loggerOrOptions
+      ? { logger: loggerOrOptions }
+      : (loggerOrOptions ?? {});
+  const redact = opts.redact ?? true;
+
   return async (command: Command, next: () => Promise<CommandResult>) => {
-    const log = logger ?? console as Logger;
+    const log = opts.logger ?? console as Logger;
     const start = Date.now();
-    log.info(`Dispatching command: ${command.commandType}`, command.payload);
+    if (redact) {
+      log.info(`Dispatching command: ${command.commandType}`);
+    } else {
+      log.info(`Dispatching command: ${command.commandType}`, command.payload);
+    }
     const result = await next();
     const duration = Date.now() - start;
     if (result.success) {
@@ -53,6 +70,12 @@ export function validationMiddleware(
 
 /**
  * Retry middleware — retries failed commands with exponential backoff.
+ *
+ * **Important:** Register this middleware LAST (closest to the handler) in the
+ * middleware chain. Because retry calls `next()` multiple times, any middleware
+ * registered *after* retryMiddleware (i.e., earlier in the chain / farther from
+ * the handler) will also be replayed on each retry attempt. Placing retry last
+ * ensures only the handler itself is re-executed.
  */
 export function retryMiddleware(maxRetries: number = 3, baseDelayMs: number = 100): CommandMiddlewareFn {
   return async (command: Command, next: () => Promise<CommandResult>) => {
