@@ -101,3 +101,12 @@ export type { HealthStatus, HealthCheckResult, HealthCheck } from "./health.js";
 export { HealthCheckRegistry, CompositeHealthCheck, PoolHealthCheck, ConnectivityHealthCheck } from "./health.js";
 export type { AdapterComplianceOptions, VitestRunner } from "./adapter-compliance.js";
 export { runAdapterComplianceTests } from "./adapter-compliance.js";
+export type {
+  DriverAdapter,
+  DriverCapabilities,
+  DriverRow,
+  DriverExecResult,
+  DriverQueryResult,
+  RuntimeInfo,
+} from "./driver-adapter.js";
+export { detectRuntime } from "./runtime-detect.js";

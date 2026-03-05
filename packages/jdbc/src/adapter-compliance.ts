@@ -1,5 +1,6 @@
 import type { DataSource } from "./data-source.js";
 import type { Connection } from "./connection.js";
+import type { DriverAdapter } from "./driver-adapter.js";
 import { IsolationLevel } from "./transaction.js";
 
 /**
@@ -36,6 +37,8 @@ export interface AdapterComplianceOptions {
   supportsNamedParams?: boolean;
   /** Isolation levels supported (defaults to all). */
   supportedIsolationLevels?: IsolationLevel[];
+  /** Optional DriverAdapter instance for lower-level adapter testing. */
+  driverAdapter?: DriverAdapter;
   /** Vitest runner utilities. Pass { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest". */
   runner?: VitestRunner;
 }
