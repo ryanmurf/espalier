@@ -43,3 +43,11 @@ export { OutboxPublisher } from "./outbox/index.js";
 export type { OutboxPublishFn } from "./outbox/index.js";
 export { Outbox, getOutboxMetadata, isOutboxEntity } from "./outbox/index.js";
 export type { OutboxDecoratorOptions } from "./outbox/index.js";
+
+// Adapter
+export type { ExternalEventBusAdapter } from "./adapter/index.js";
+export { InMemoryEventBusAdapter } from "./adapter/index.js";
+
+// Plugin
+export type { EventSourcingPluginConfig } from "./plugin/index.js";
+export { EventSourcingPlugin } from "./plugin/index.js";
