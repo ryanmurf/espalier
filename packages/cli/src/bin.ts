@@ -6,6 +6,7 @@ import { createMigration } from "./migrate-create.js";
 import { migrateUp } from "./migrate-up.js";
 import { migrateDown } from "./migrate-down.js";
 import { migrateStatus, formatStatusTable } from "./migrate-status.js";
+import { migrateDryRun, formatDryRunOutput } from "./migrate-dry-run.js";
 import { seedRun, seedStatus, formatSeedStatusTable } from "./seed-run.js";
 
 function main(): void {
@@ -116,6 +117,18 @@ function handleMigrateUp(flags: Record<string, string | boolean>): void {
     : getMigrationsDir(config, configDir);
 
   const toVersion = typeof flags.to === "string" ? flags.to : undefined;
+
+  if (flags["dry-run"]) {
+    migrateDryRun({ config, migrationsDir, toVersion })
+      .then((result) => {
+        process.stdout.write(formatDryRunOutput(result));
+      })
+      .catch((err: Error) => {
+        process.stderr.write(`Error: ${err.message}\n`);
+        process.exitCode = 1;
+      });
+    return;
+  }
 
   migrateUp({ config, migrationsDir, toVersion })
     .then((result) => {
