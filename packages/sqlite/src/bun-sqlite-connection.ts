@@ -127,6 +127,7 @@ export class BunSqliteConnection implements TypeAwareConnection {
   }
 
   async close(): Promise<void> {
+    if (this.closed) return;
     this.closed = true;
   }
 

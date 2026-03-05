@@ -38,11 +38,19 @@ function truncateSql(sql: string): string {
 export class BunSqliteStatementImpl implements Statement {
   constructor(protected readonly db: BunSqliteDatabase) {}
 
+  /**
+   * Execute a raw SQL query and return a ResultSet.
+   *
+   * WARNING: The `sql` parameter is passed directly to the database engine without
+   * parameterization. Do NOT interpolate user input into the SQL string — use
+   * PreparedStatement with setParameter() instead to prevent SQL injection.
+   */
   async executeQuery(sql: string): Promise<ResultSet> {
     const logger = getGlobalLogger().child("bun-sqlite-query");
     const startTime = Date.now();
+    let stmt: ReturnType<BunSqliteDatabase["query"]> | undefined;
     try {
-      const stmt = this.db.query(sql);
+      stmt = this.db.query(sql);
       const columns = stmt.columns();
       const rows = stmt.all() as Record<string, unknown>[];
       if (logger.isEnabled(LogLevel.DEBUG)) {
@@ -56,14 +64,24 @@ export class BunSqliteStatementImpl implements Statement {
         sql,
         err as Error,
       );
+    } finally {
+      stmt?.finalize();
     }
   }
 
+  /**
+   * Execute a raw SQL update/insert/delete statement and return the number of affected rows.
+   *
+   * WARNING: The `sql` parameter is passed directly to the database engine without
+   * parameterization. Do NOT interpolate user input into the SQL string — use
+   * PreparedStatement with setParameter() instead to prevent SQL injection.
+   */
   async executeUpdate(sql: string): Promise<number> {
     const logger = getGlobalLogger().child("bun-sqlite-query");
     const startTime = Date.now();
+    let stmt: ReturnType<BunSqliteDatabase["query"]> | undefined;
     try {
-      const stmt = this.db.query(sql);
+      stmt = this.db.query(sql);
       const result = stmt.run();
       if (logger.isEnabled(LogLevel.DEBUG)) {
         logger.debug("update executed", { sql: truncateSql(sql), duration: Date.now() - startTime });
@@ -76,6 +94,8 @@ export class BunSqliteStatementImpl implements Statement {
         sql,
         err as Error,
       );
+    } finally {
+      stmt?.finalize();
     }
   }
 
@@ -104,8 +124,9 @@ export class BunSqlitePreparedStatement extends BunSqliteStatementImpl implement
     const params = this.collectParameters();
     const logger = getGlobalLogger().child("bun-sqlite-query");
     const startTime = Date.now();
+    let stmt: ReturnType<BunSqliteDatabase["query"]> | undefined;
     try {
-      const stmt = this.db.query(queryText);
+      stmt = this.db.query(queryText);
       const columns = stmt.columns();
       const rows = stmt.all(...params) as Record<string, unknown>[];
       if (logger.isEnabled(LogLevel.DEBUG)) {
@@ -119,6 +140,8 @@ export class BunSqlitePreparedStatement extends BunSqliteStatementImpl implement
         queryText,
         err as Error,
       );
+    } finally {
+      stmt?.finalize();
     }
   }
 
@@ -128,8 +151,9 @@ export class BunSqlitePreparedStatement extends BunSqliteStatementImpl implement
     const params = this.collectParameters();
     const logger = getGlobalLogger().child("bun-sqlite-query");
     const startTime = Date.now();
+    let stmt: ReturnType<BunSqliteDatabase["query"]> | undefined;
     try {
-      const stmt = this.db.query(queryText);
+      stmt = this.db.query(queryText);
       const result = stmt.run(...params);
       if (logger.isEnabled(LogLevel.DEBUG)) {
         logger.debug("prepared update executed", { sql: truncateSql(queryText), paramCount: params.length, duration: Date.now() - startTime });
@@ -142,6 +166,8 @@ export class BunSqlitePreparedStatement extends BunSqliteStatementImpl implement
         queryText,
         err as Error,
       );
+    } finally {
+      stmt?.finalize();
     }
   }
 
