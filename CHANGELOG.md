@@ -1,5 +1,28 @@
 # Changelog
 
+## [1.7.0] - Y5 Q3 — Vector & AI Integration
+
+### Features
+- **@Vector Decorator**: Field decorator for vector/embedding columns with configurable dimensions (1–65535), distance metric (L2, cosine, inner product), and index type (HNSW, IVFFlat, none)
+- **pgvector Support**: Vector column types (`vector(N)`), distance operators (`<->`, `<=>`, `<#>`), and operator classes
+- **Similarity Search**: `findBySimilarity()` and `findBySimilarityWithDistance()` repository methods with configurable limit, maxDistance, and metric
+- **Hybrid Search**: Combine vector similarity with traditional WHERE via derived queries (`findByCategoryAndSimilarToEmbedding`)
+- **Vector Index Management**: `VectorIndexManager` generates HNSW and IVFFlat index DDL with configurable parameters (m, ef_construction, lists)
+- **Embedding Hooks**: `createEmbeddingHook()` and `registerEmbeddingHook()` for auto-generating embeddings via @PrePersist/@PreUpdate lifecycle integration
+- **Vector Specifications**: `similarTo()` and `nearestTo()` specification functions for programmatic vector queries
+- **DDL Generation**: `DdlGenerator.generateVectorExtension()`, `generateVectorIndexes()`, auto-detected in `generateAllDdl()`
+- **Derived Query Support**: `SimilarTo` operator in derived query parser and compiler with proper ORDER BY (not WHERE)
+- **GraphQL Integration**: `similarTo` query for entities with @Vector fields
+- **REST Integration**: `POST /entities/similar` endpoint for vector search
+- **SelectBuilder Extensions**: `orderByRaw()`, `addRawColumn()`, `orderByExpression()` for raw SQL expressions
+
+### New Exports (espalier-data/core)
+- Vector decorator: `@Vector`, `getVectorFields`, `getVectorFieldMetadata`, `VectorOptions`, `VectorMetadataEntry`
+- Index manager: `VectorIndexManager`, `VectorIndexOptions`
+- Embedding hooks: `createEmbeddingHook`, `registerEmbeddingHook`, `EmbeddingProvider`, `EmbeddingHookOptions`
+- Specifications: `similarTo`, `nearestTo`, `NearestToResult`
+- Query criteria: `VectorDistanceCriteria`, `VectorOrderExpression`, `VectorMetric`
+
 ## [1.6.0] - Y5 Q2 — Soft Deletes & Audit Trail
 
 ### Features

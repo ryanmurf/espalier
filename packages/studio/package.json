@@ -1,6 +1,6 @@
 {
   "name": "espalier-studio",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "description": "Web-based data browser and schema visualization tool for Espalier entities",
   "type": "module",
   "main": "./dist/index.cjs",
