@@ -68,6 +68,21 @@ export class ClosureTableManager {
   ): Promise<void> {
     const ct = quoteIdentifier(this.closureTable);
 
+    // Prevent circular reference: newParentId must not be a descendant of nodeId
+    const checkSql = `SELECT 1 FROM ${ct} WHERE "ancestor_id" = $1 AND "descendant_id" = $2 AND "depth" > 0`;
+    const checkStmt = connection.prepareStatement(checkSql);
+    checkStmt.setParameter(1, nodeId);
+    checkStmt.setParameter(2, newParentId);
+    const checkRs = await checkStmt.executeQuery();
+    if (await checkRs.next()) {
+      throw new Error("Cannot move node under its own descendant — this would create a cycle.");
+    }
+
+    // Also prevent moving a node to itself
+    if (nodeId === newParentId) {
+      throw new Error("Cannot move node under itself.");
+    }
+
     // Step 1: Delete all paths from ancestors of nodeId to descendants of nodeId,
     // except the subtree-internal paths.
     const deleteSql =

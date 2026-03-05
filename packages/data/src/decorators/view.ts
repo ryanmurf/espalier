@@ -66,6 +66,7 @@ export function MaterializedView(options: MaterializedViewOptions) {
     materializedViewMetadata.set(target, {
       withData: true,
       ...options,
+      unique: options.unique ? [...options.unique] : undefined,
     });
     return target;
   };

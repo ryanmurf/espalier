@@ -305,9 +305,13 @@ export class DdlGenerator {
         statements.push(...this.generateClosureTableDdl(entityClass, options));
       }
     }
-    const joinTableStatements = this.generateJoinTables(entityClasses, options);
+    // Filter out view entities — they don't have join tables or search indexes
+    const tableEntities = entityClasses.filter(
+      (ec) => !getViewMetadata(ec) && !getMaterializedViewMetadata(ec),
+    );
+    const joinTableStatements = this.generateJoinTables(tableEntities, options);
     statements.push(...joinTableStatements);
-    for (const entityClass of entityClasses) {
+    for (const entityClass of tableEntities) {
       statements.push(...this.generateSearchIndexes(entityClass, options));
     }
     return statements;
