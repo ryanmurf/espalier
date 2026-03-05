@@ -24,5 +24,7 @@ export interface CrudRepository<T, ID> extends Repository<T, ID> {
 export interface PagingAndSortingRepository<T, ID>
   extends CrudRepository<T, ID> {
   findAll(): Promise<T[]>;
+  findAll(spec: Specification<T>): Promise<T[]>;
+  findAll<P>(projectionClass: new (...args: any[]) => P): Promise<P[]>;
   findAll(pageable: Pageable): Promise<Page<T>>;
 }

@@ -596,12 +596,11 @@ describe("DerivedQueryHandler: edge cases", () => {
       expect(descriptor.limit).toBe(1);
     });
 
-    it("findTopN syntax is NOT supported — parser rejects it", () => {
-      // This documents a limitation: findTopN is not in the parser's prefix list.
-      // Spring Data supports it, but Espalier does not (yet).
-      expect(() => parseDerivedQueryMethod("findTop3ByAge")).toThrow(
-        /must start with/,
-      );
+    it("findTopN syntax is supported — parser accepts it", () => {
+      const descriptor = parseDerivedQueryMethod("findTop3ByAge");
+      expect(descriptor.limit).toBe(3);
+      expect(descriptor.action).toBe("find");
+      expect(descriptor.properties[0].property).toBe("age");
     });
   });
 
