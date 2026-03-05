@@ -81,8 +81,8 @@ function parsePrefix(methodName: string): { prefix: PrefixResult; rest: string }
     );
   }
 
-  // findFirst<N>By... or findFirstBy...
-  const firstMatch = methodName.match(/^findFirst(\d*)By(.*)$/);
+  // findFirst<N>By... or findFirstBy... or findTop<N>By... or findTopBy...
+  const firstMatch = methodName.match(/^find(?:First|Top)(\d*)By(.*)$/);
   if (firstMatch) {
     const limit = firstMatch[1] ? parseInt(firstMatch[1], 10) : 1;
     return {
@@ -137,7 +137,7 @@ function parsePrefix(methodName: string): { prefix: PrefixResult; rest: string }
 
   throw new Error(
     `Invalid derived query method name "${methodName}": ` +
-      `must start with findBy, findAllBy, findFirstBy, findDistinctBy, ` +
+      `must start with findBy, findAllBy, findFirstBy, findTopBy, findDistinctBy, ` +
       `countBy, deleteBy, removeBy, or existsBy.`,
   );
 }
