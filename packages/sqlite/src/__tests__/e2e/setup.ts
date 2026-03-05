@@ -1,7 +1,20 @@
-import { SqliteDataSource } from "../../sqlite-data-source.js";
+export let isSqliteAvailable = true;
+let SqliteDataSourceClass: any;
 
-export function createTestDataSource(): SqliteDataSource {
-  return new SqliteDataSource({ filename: ":memory:" });
+try {
+  const mod = await import("../../sqlite-data-source.js");
+  SqliteDataSourceClass = mod.SqliteDataSource;
+  const ds = new SqliteDataSourceClass({ filename: ":memory:" });
+  ds.close();
+} catch {
+  isSqliteAvailable = false;
+}
+
+export function createTestDataSource() {
+  if (!SqliteDataSourceClass) {
+    throw new Error("SQLite native module not available");
+  }
+  return new SqliteDataSourceClass({ filename: ":memory:" });
 }
 
 export function testTableDDL(tableName: string): string {

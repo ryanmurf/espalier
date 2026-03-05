@@ -384,7 +384,7 @@ export function createDerivedRepository<T, ID>(
 
     for (const relation of metadata.manyToOneRelations) {
       if (!relation.lazy) continue;
-      if (rec[relation.fieldName] !== undefined && !isLazyProxy(rec[relation.fieldName])) continue;
+      if (isLazyProxy(rec[relation.fieldName])) continue;
 
       const fkColumn = relation.joinColumn;
       rec[relation.fieldName] = createLazySingleProxy(async () => {
@@ -443,7 +443,7 @@ export function createDerivedRepository<T, ID>(
 
     for (const relation of metadata.oneToOneRelations) {
       if (!relation.lazy) continue;
-      if (rec[relation.fieldName] !== undefined && !isLazyProxy(rec[relation.fieldName])) continue;
+      if (isLazyProxy(rec[relation.fieldName])) continue;
 
       rec[relation.fieldName] = createLazySingleProxy(async () => {
         const targetClass = relation.target();
@@ -526,7 +526,7 @@ export function createDerivedRepository<T, ID>(
 
     for (const relation of metadata.oneToManyRelations) {
       if (!relation.lazy) continue;
-      if (rec[relation.fieldName] !== undefined && !isLazyProxy(rec[relation.fieldName])) continue;
+      if (isLazyProxy(rec[relation.fieldName])) continue;
 
       rec[relation.fieldName] = createLazyCollectionProxy(async () => {
         const conn = await dataSource.getConnection();
@@ -541,7 +541,7 @@ export function createDerivedRepository<T, ID>(
 
     for (const relation of metadata.manyToManyRelations) {
       if (!relation.lazy) continue;
-      if (rec[relation.fieldName] !== undefined && !isLazyProxy(rec[relation.fieldName])) continue;
+      if (isLazyProxy(rec[relation.fieldName])) continue;
 
       rec[relation.fieldName] = createLazyCollectionProxy(async () => {
         const conn = await dataSource.getConnection();

@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import type { Connection } from "espalier-jdbc";
 import type { SqliteDataSource } from "../../sqlite-data-source.js";
-import { SqliteStatement } from "../../sqlite-statement.js";
-import { createTestDataSource, dropTestTable } from "./setup.js";
+import type { SqliteStatement } from "../../sqlite-statement.js";
+import { createTestDataSource, dropTestTable, isSqliteAvailable } from "./setup.js";
 
 const TABLE = "e2e_streaming_test";
 
-describe("E2E: SQLite streaming/cursor result set", () => {
+describe.skipIf(!isSqliteAvailable)("E2E: SQLite streaming/cursor result set", () => {
   let ds: SqliteDataSource;
   let conn: Connection;
 

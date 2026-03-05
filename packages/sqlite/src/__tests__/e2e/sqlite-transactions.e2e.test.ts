@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import type { Connection } from "espalier-jdbc";
 import type { SqliteDataSource } from "../../sqlite-data-source.js";
-import { createTestDataSource, testTableDDL, dropTestTable } from "./setup.js";
+import { createTestDataSource, testTableDDL, dropTestTable, isSqliteAvailable } from "./setup.js";
 
 const TABLE = "e2e_tx_test";
 
-describe("E2E: SQLite transactions", () => {
+describe.skipIf(!isSqliteAvailable)("E2E: SQLite transactions", () => {
   let ds: SqliteDataSource;
   let conn: Connection;
 

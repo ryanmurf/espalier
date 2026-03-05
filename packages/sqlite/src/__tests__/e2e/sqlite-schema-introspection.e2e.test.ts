@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import type { Connection } from "espalier-jdbc";
 import type { SqliteDataSource } from "../../sqlite-data-source.js";
-import { SqliteSchemaIntrospector } from "../../sqlite-schema-introspector.js";
-import { createTestDataSource, dropTestTable } from "./setup.js";
+import type { SqliteSchemaIntrospector } from "../../sqlite-schema-introspector.js";
+import { createTestDataSource, dropTestTable, isSqliteAvailable } from "./setup.js";
 
 const TABLE = "e2e_introspect_test";
 
-describe("E2E: SQLite schema introspection", () => {
+describe.skipIf(!isSqliteAvailable)("E2E: SQLite schema introspection", () => {
   let ds: SqliteDataSource;
   let conn: Connection;
   let introspector: SqliteSchemaIntrospector;
@@ -25,7 +25,8 @@ describe("E2E: SQLite schema introspection", () => {
         created_at TEXT DEFAULT (datetime('now'))
       )
     `);
-    introspector = new SqliteSchemaIntrospector(conn);
+    const mod = await import("../../sqlite-schema-introspector.js");
+    introspector = new mod.SqliteSchemaIntrospector(conn);
   });
 
   afterAll(async () => {

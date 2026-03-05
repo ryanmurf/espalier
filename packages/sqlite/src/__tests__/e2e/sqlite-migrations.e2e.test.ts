@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import type { Migration } from "espalier-data";
 import type { SqliteDataSource } from "../../sqlite-data-source.js";
-import { SqliteMigrationRunner } from "../../sqlite-migration-runner.js";
-import { createTestDataSource, dropTestTable } from "./setup.js";
+import type { SqliteMigrationRunner } from "../../sqlite-migration-runner.js";
+import { createTestDataSource, dropTestTable, isSqliteAvailable } from "./setup.js";
 
 const MIGRATION_TABLE = "e2e_migration_tracking";
 
@@ -20,7 +20,7 @@ function createMigration(
   };
 }
 
-describe("E2E: SQLite migrations", () => {
+describe.skipIf(!isSqliteAvailable)("E2E: SQLite migrations", () => {
   let ds: SqliteDataSource;
   let runner: SqliteMigrationRunner;
 
@@ -41,7 +41,8 @@ describe("E2E: SQLite migrations", () => {
 
   beforeAll(async () => {
     ds = createTestDataSource();
-    runner = new SqliteMigrationRunner(ds, {
+    const mod = await import("../../sqlite-migration-runner.js");
+    runner = new mod.SqliteMigrationRunner(ds, {
       tableName: MIGRATION_TABLE,
     });
 
