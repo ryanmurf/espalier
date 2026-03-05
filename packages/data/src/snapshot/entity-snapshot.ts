@@ -53,7 +53,7 @@ export function snapshot<T extends object>(entity: T): Snapshot<T> {
   const result: Snapshot<T> = {
     entityType: tableName,
     entityId: cloneValue(entityId),
-    fields,
+    fields: Object.freeze(fields),
     timestamp: new Date(),
   };
 

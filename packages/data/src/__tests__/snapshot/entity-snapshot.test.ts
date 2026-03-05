@@ -13,29 +13,29 @@ import { Id } from "../../decorators/id.js";
 class User {
   @Id
   @Column()
-  accessor id: number = 0;
+  id: number = 0;
 
   @Column()
-  accessor name: string = "";
+  name: string = "";
 
   @Column()
-  accessor email: string = "";
+  email: string = "";
 
   @Column()
-  accessor age: number = 0;
+  age: number = 0;
 }
 
 @Table("posts")
 class Post {
   @Id
   @Column()
-  accessor id: number = 0;
+  id: number = 0;
 
   @Column()
-  accessor title: string = "";
+  title: string = "";
 
   @Column()
-  accessor tags: string[] = [];
+  tags: string[] = [];
 }
 
 // No decorators — should fail
