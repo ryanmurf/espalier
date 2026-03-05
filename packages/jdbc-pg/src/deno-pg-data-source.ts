@@ -54,7 +54,10 @@ export class DenoPgDataSource implements DataSource {
     if (this.pool) return this.pool;
 
     if (!this.initPromise) {
-      this.initPromise = this.initializePool();
+      this.initPromise = this.initializePool().catch((err) => {
+        this.initPromise = undefined;
+        throw err;
+      });
     }
     await this.initPromise;
     return this.pool!;
@@ -63,17 +66,16 @@ export class DenoPgDataSource implements DataSource {
   private async initializePool(): Promise<void> {
     const logger = getGlobalLogger().child("deno-pg-datasource");
 
-    // Try deno-postgres first
+    // Try deno-postgres first (Deno URL import — use variable to avoid TS module resolution)
+    const denoPostgresUrl = "https://deno.land/x/postgres/mod.ts";
     try {
-      const denoPostgres = await (globalThis as any).Deno?.land?.import?.(
-        "https://deno.land/x/postgres/mod.ts",
-      );
+      const denoPostgres = await import(/* @vite-ignore */ denoPostgresUrl);
       if (denoPostgres) {
         const { Pool } = denoPostgres;
         const connectionString = this.config.url ??
           this.buildConnectionString();
 
-        this.pool = new Pool(connectionString, this.config.max ?? 5) as DenoPool;
+        this.pool = new Pool(connectionString, this.config.max ?? 10) as DenoPool;
         logger.info("using deno-postgres driver");
         return;
       }
@@ -100,7 +102,7 @@ export class DenoPgDataSource implements DataSource {
         if (this.config.username) poolConfig.user = this.config.username;
         if (this.config.password) poolConfig.password = this.config.password;
       }
-      if (this.config.max) poolConfig.max = this.config.max;
+      poolConfig.max = this.config.max ?? 10;
 
       const pool = new Pool(poolConfig);
 
@@ -131,8 +133,12 @@ export class DenoPgDataSource implements DataSource {
 
       logger.info("using pg driver via npm compat");
     } catch (err) {
+      const message = ((err as Error).message ?? "").replace(
+        /password[=:]\s*\S+/gi,
+        "password=***",
+      );
       throw new ConnectionError(
-        `Failed to initialize PostgreSQL pool for Deno: ${(err as Error).message}. ` +
+        `Failed to initialize PostgreSQL pool for Deno: ${message}. ` +
         `Install either deno-postgres or pg (via npm:pg).`,
         err as Error,
         DatabaseErrorCode.CONNECTION_FAILED,

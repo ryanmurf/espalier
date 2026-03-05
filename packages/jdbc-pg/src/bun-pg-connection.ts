@@ -1,7 +1,7 @@
-import type { Connection, TypeAwareConnection, PreparedStatement, Statement, TypeConverterRegistry } from "espalier-jdbc";
+import type { TypeAwareConnection, PreparedStatement, Statement, TypeConverterRegistry } from "espalier-jdbc";
 import {
   type Transaction,
-  type IsolationLevel,
+  IsolationLevel,
   ConnectionError,
   TransactionError,
   DatabaseErrorCode,
@@ -10,6 +10,8 @@ import {
 } from "espalier-jdbc";
 import type { BunSqlClient } from "./bun-pg-statement.js";
 import { BunPgStatementImpl, BunPgPreparedStatement } from "./bun-pg-statement.js";
+
+const VALID_ISOLATION_LEVELS: ReadonlySet<string> = new Set(Object.values(IsolationLevel));
 
 export class BunPgConnection implements TypeAwareConnection {
   private closed = false;
@@ -36,6 +38,14 @@ export class BunPgConnection implements TypeAwareConnection {
   async beginTransaction(isolation?: IsolationLevel): Promise<Transaction> {
     this.ensureOpen();
     const txLogger = getGlobalLogger().child("bun-pg-transaction");
+
+    if (isolation && !VALID_ISOLATION_LEVELS.has(isolation)) {
+      throw new TransactionError(
+        `Invalid isolation level: "${isolation}"`,
+        undefined,
+        DatabaseErrorCode.TX_BEGIN_FAILED,
+      );
+    }
 
     try {
       if (isolation) {
@@ -131,7 +141,10 @@ export class BunPgConnection implements TypeAwareConnection {
   }
 
   async close(): Promise<void> {
-    this.closed = true;
+    if (!this.closed) {
+      this.closed = true;
+      await this.client.close();
+    }
   }
 
   isClosed(): boolean {

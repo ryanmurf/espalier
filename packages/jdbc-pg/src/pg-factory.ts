@@ -27,11 +27,11 @@ export interface PgFactoryConfig {
  * - **Deno**: uses `deno-postgres` or `pg` via npm compat via `DenoPgDataSource`
  * - **Node / Edge**: uses `pg` via `PgDataSource`
  */
-export function createPgDataSource(config: PgFactoryConfig): DataSource {
+export async function createPgDataSource(config: PgFactoryConfig): Promise<DataSource> {
   const runtime = detectRuntime();
 
   if (runtime.runtime === "bun") {
-    const { BunPgDataSource } = require("./bun-pg-data-source.js") as typeof import("./bun-pg-data-source.js");
+    const { BunPgDataSource } = await import("./bun-pg-data-source.js");
     return new BunPgDataSource({
       url: config.url,
       hostname: config.hostname,
@@ -45,7 +45,7 @@ export function createPgDataSource(config: PgFactoryConfig): DataSource {
   }
 
   if (runtime.runtime === "deno") {
-    const { DenoPgDataSource } = require("./deno-pg-data-source.js") as typeof import("./deno-pg-data-source.js");
+    const { DenoPgDataSource } = await import("./deno-pg-data-source.js");
     return new DenoPgDataSource({
       url: config.url,
       hostname: config.hostname,
@@ -59,7 +59,7 @@ export function createPgDataSource(config: PgFactoryConfig): DataSource {
   }
 
   // Default to node-pg
-  const { PgDataSource } = require("./pg-data-source.js") as typeof import("./pg-data-source.js");
+  const { PgDataSource } = await import("./pg-data-source.js");
   return new PgDataSource({
     pg: {
       connectionString: config.url,

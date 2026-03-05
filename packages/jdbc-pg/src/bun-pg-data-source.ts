@@ -41,7 +41,10 @@ export class BunPgDataSource implements DataSource {
         throw new Error("bun:sql is not available. BunPgDataSource requires the Bun runtime.");
       }
 
-      const SQL = BunSQL.SQL ?? BunSQL.default;
+      const SQL = BunSQL.default ?? BunSQL.SQL ?? BunSQL;
+      if (typeof SQL !== "function") {
+        throw new Error("Could not resolve SQL constructor from bun:sql");
+      }
       const connectionOpts: Record<string, unknown> = {};
 
       if (config.url) {
@@ -53,7 +56,7 @@ export class BunPgDataSource implements DataSource {
         if (config.database) connectionOpts.database = config.database;
         if (config.username) connectionOpts.username = config.username;
         if (config.password) connectionOpts.password = config.password;
-        if (config.max) connectionOpts.max = config.max;
+        connectionOpts.max = config.max ?? 10;
         if (config.idleTimeout) connectionOpts.idleTimeout = config.idleTimeout;
         this.client = new SQL(connectionOpts) as BunSqlClient;
       }
