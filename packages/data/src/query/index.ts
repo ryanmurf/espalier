@@ -1,4 +1,4 @@
-export type { Criteria, CriteriaType } from "./criteria.js";
+export type { Criteria, CriteriaType, VectorMetric } from "./criteria.js";
 export {
   ComparisonCriteria,
   RawComparisonCriteria,
@@ -8,6 +8,8 @@ export {
   NullCriteria,
   LogicalCriteria,
   NotCriteria,
+  VectorDistanceCriteria,
+  VectorOrderExpression,
   and,
   or,
   not,
@@ -15,7 +17,7 @@ export {
 
 export { ColumnRef, ExpressionRef, col, expr } from "./column-ref.js";
 
-export type { BuiltQuery, JoinType, SortDirection } from "./query-builder.js";
+export type { BuiltQuery, JoinType, OrderByExpressionArg, SortDirection } from "./query-builder.js";
 export {
   QueryBuilder,
   SelectBuilder,

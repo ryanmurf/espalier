@@ -59,7 +59,7 @@ export { createProjectionMapper } from "./mapping/projection-mapper.js";
 export type { FieldChange } from "./mapping/change-tracker.js";
 export { EntityChangeTracker } from "./mapping/change-tracker.js";
 
-export type { Criteria, CriteriaType, BuiltQuery, JoinType, SortDirection } from "./query/index.js";
+export type { Criteria, CriteriaType, VectorMetric, BuiltQuery, JoinType, SortDirection } from "./query/index.js";
 export {
   ComparisonCriteria,
   RawComparisonCriteria,
@@ -68,6 +68,8 @@ export {
   NullCriteria,
   LogicalCriteria,
   NotCriteria,
+  VectorDistanceCriteria,
+  VectorOrderExpression,
   and,
   or,
   not,

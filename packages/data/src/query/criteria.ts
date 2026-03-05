@@ -14,7 +14,10 @@ export type CriteriaType =
   | "isNotNull"
   | "and"
   | "or"
-  | "not";
+  | "not"
+  | "vectorDistance";
+
+export type VectorMetric = "l2" | "cosine" | "inner_product";
 
 export interface Criteria {
   readonly type: CriteriaType;
@@ -170,6 +173,52 @@ export class RawInCriteria implements Criteria {
     return {
       sql: `${this.expression} IN (${placeholders.join(", ")})`,
       params: [...this.values],
+    };
+  }
+}
+
+const vectorOperatorMap: Record<VectorMetric, string> = {
+  l2: "<->",
+  cosine: "<=>",
+  inner_product: "<#>",
+};
+
+export class VectorDistanceCriteria implements Criteria {
+  readonly type = "vectorDistance" as const;
+
+  constructor(
+    readonly column: string,
+    readonly queryVector: number[],
+    readonly metric: VectorMetric,
+    readonly operator: "lt" | "lte",
+    readonly threshold: number,
+  ) {}
+
+  toSql(paramOffset: number): { sql: string; params: SqlValue[] } {
+    const distOp = vectorOperatorMap[this.metric];
+    const cmpOp = this.operator === "lt" ? "<" : "<=";
+    const vectorLiteral = `[${this.queryVector.join(",")}]`;
+    return {
+      sql: `(${quoteIdentifier(this.column)} ${distOp} $${paramOffset}) ${cmpOp} $${paramOffset + 1}`,
+      params: [vectorLiteral, this.threshold],
+    };
+  }
+}
+
+export class VectorOrderExpression {
+  constructor(
+    readonly column: string,
+    readonly queryVector: number[],
+    readonly metric: VectorMetric,
+    readonly direction: "ASC" | "DESC",
+  ) {}
+
+  toSql(paramOffset: number): { sql: string; params: SqlValue[] } {
+    const distOp = vectorOperatorMap[this.metric];
+    const vectorLiteral = `[${this.queryVector.join(",")}]`;
+    return {
+      sql: `(${quoteIdentifier(this.column)} ${distOp} $${paramOffset}) ${this.direction}`,
+      params: [vectorLiteral],
     };
   }
 }
