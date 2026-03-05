@@ -4,6 +4,31 @@
 
 import type { PrismaSchema, PrismaModel, PrismaField, PrismaEnum, PrismaAttribute } from "./parser.js";
 
+const SAFE_IDENTIFIER = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/;
+
+const SAFE_DEFAULT_PATTERNS = [
+  /^-?\d+(\.\d+)?$/, // numbers
+  /^"[^"\\]*"$/, // simple strings (no escapes)
+  /^true$/, // boolean
+  /^false$/, // boolean
+  /^now\(\)$/, // Prisma functions
+  /^autoincrement\(\)$/,
+  /^uuid\(\)$/,
+  /^cuid\(\)$/,
+  /^dbgenerated\(\)$/,
+  /^sequence\(\)$/,
+];
+
+function assertSafeIdentifier(name: string, context: string): void {
+  if (!SAFE_IDENTIFIER.test(name)) {
+    throw new Error(`Unsafe ${context}: "${name}" does not match allowed identifier pattern.`);
+  }
+}
+
+function isSafeDefault(value: string): boolean {
+  return SAFE_DEFAULT_PATTERNS.some((p) => p.test(value));
+}
+
 const PRISMA_TO_TS_TYPE: Record<string, string> = {
   String: "string",
   Int: "number",
@@ -32,12 +57,31 @@ function toSnakeCase(name: string): string {
   return name.replace(/([a-z])([A-Z])/g, "$1_$2").toLowerCase();
 }
 
+function pluralize(word: string): string {
+  if (word.endsWith("s") || word.endsWith("sh") || word.endsWith("ch") || word.endsWith("x") || word.endsWith("z")) {
+    return word + "es";
+  }
+  if (word.endsWith("y") && word.length > 1 && !/[aeiou]/.test(word[word.length - 2])) {
+    return word.slice(0, -1) + "ies";
+  }
+  if (word.endsWith("fe")) {
+    return word.slice(0, -2) + "ves";
+  }
+  if (word.endsWith("f")) {
+    return word.slice(0, -1) + "ves";
+  }
+  return word + "s";
+}
+
 function getTableName(model: PrismaModel): string {
   const mapAttr = getModelAttr(model, "map");
   if (mapAttr && mapAttr.args.length > 0) {
     return mapAttr.args[0].replace(/"/g, "");
   }
-  return toSnakeCase(model.name) + "s";
+  const snake = toSnakeCase(model.name);
+  const parts = snake.split("_");
+  parts[parts.length - 1] = pluralize(parts[parts.length - 1]);
+  return parts.join("_");
 }
 
 function getColumnName(field: PrismaField): string | undefined {
@@ -58,6 +102,7 @@ function getDefaultValue(field: PrismaField): string | undefined {
   if (raw === "uuid()") return undefined; // could map to a generator
   if (raw === "cuid()") return undefined;
   if (raw === "true" || raw === "false") return raw;
+  if (!isSafeDefault(raw)) return undefined;
   return raw;
 }
 
@@ -179,6 +224,8 @@ export function generateEntityFile(
   const relationImports = new Set<string>();
   const auditingImports = new Set<string>();
 
+  assertSafeIdentifier(model.name, "model name");
+
   // Always need Table, Column, Id
   imports.add("Table");
   imports.add("Column");
@@ -204,11 +251,11 @@ export function generateEntityFile(
     }
   }
 
-  // Import statements
-  const coreImports = [...imports].sort();
-  if (auditingImports.size > 0) {
-    coreImports.push(...[...auditingImports].sort());
+  // Import statements — merge auditing imports before sorting
+  for (const ai of auditingImports) {
+    imports.add(ai);
   }
+  const coreImports = [...imports].sort();
   lines.push(`import { ${coreImports.join(", ")} } from "espalier-data/core";`);
 
   if (relationImports.size > 0) {
@@ -250,13 +297,14 @@ export function generateEntityFile(
     }
 
     // Regular field
+    assertSafeIdentifier(field.name, "field name");
     const decorators = generateFieldDecorators(field);
     for (const dec of decorators) {
       lines.push(`  ${dec}`);
     }
 
     const tsType = resolveType(field, schema);
-    const defaultVal = getFieldDefault(field, tsType);
+    const defaultVal = getFieldDefault(field, tsType, schema);
     const optional = field.isOptional ? "?" : "";
 
     lines.push(`  accessor ${field.name}${optional} = ${defaultVal};`);
@@ -306,6 +354,11 @@ function generateRelationField(
   relation: RelationInfo,
 ): string[] {
   const decs: string[] = [];
+
+  assertSafeIdentifier(field.name, "relation field name");
+  assertSafeIdentifier(relation.target, "relation target");
+  if (relation.foreignKey) assertSafeIdentifier(relation.foreignKey, "foreign key");
+  if (relation.mappedBy) assertSafeIdentifier(relation.mappedBy, "mappedBy field");
 
   switch (relation.type) {
     case "ManyToOne":
@@ -372,9 +425,11 @@ function getFieldDefault(field: PrismaField, tsType: string): string {
 }
 
 export function generateEnumFile(prismaEnum: PrismaEnum): string {
+  assertSafeIdentifier(prismaEnum.name, "enum name");
   const lines: string[] = [];
   lines.push(`export enum ${prismaEnum.name} {`);
   for (const value of prismaEnum.values) {
+    assertSafeIdentifier(value, `enum value in ${prismaEnum.name}`);
     lines.push(`  ${value} = "${value}",`);
   }
   lines.push("}");

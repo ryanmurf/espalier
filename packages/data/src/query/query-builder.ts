@@ -90,7 +90,11 @@ export class SelectBuilder {
   }
 
   orderBy(column: string, direction: SortDirection = "ASC"): SelectBuilder {
-    this._orderBy.push({ column, direction });
+    const normalized = String(direction).toUpperCase();
+    if (normalized !== "ASC" && normalized !== "DESC") {
+      throw new Error(`Invalid sort direction: ${direction}. Must be "ASC" or "DESC".`);
+    }
+    this._orderBy.push({ column, direction: normalized as SortDirection });
     return this;
   }
 
