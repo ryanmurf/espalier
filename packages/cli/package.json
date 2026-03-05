@@ -30,7 +30,8 @@
   },
   "dependencies": {
     "espalier-data": "workspace:*",
-    "espalier-jdbc": "workspace:*"
+    "espalier-jdbc": "workspace:*",
+    "espalier-studio": "workspace:*"
   },
   "peerDependencies": {
     "espalier-jdbc-pg": "workspace:*",

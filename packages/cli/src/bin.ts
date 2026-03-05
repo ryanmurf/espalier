@@ -27,6 +27,16 @@ function main(): void {
     return;
   }
 
+  if (parsed.command === "studio") {
+    handleStudio(parsed.flags);
+    return;
+  }
+
+  if (parsed.command === "diagram") {
+    handleDiagram(parsed.flags);
+    return;
+  }
+
   process.stderr.write(`Unknown command: "${parsed.command}"\n`);
   process.stdout.write(printUsage());
   process.exitCode = 1;
@@ -306,6 +316,86 @@ function handleSeed(
   process.stderr.write(`Unknown seed subcommand: "${subcommand}"\n`);
   process.stderr.write("Available: run, status, reset\n");
   process.exitCode = 1;
+}
+
+function handleStudio(flags: Record<string, string | boolean>): void {
+  const configDir = typeof flags.config === "string" ? flags.config : undefined;
+
+  let config;
+  try {
+    config = loadConfig(configDir);
+  } catch (err) {
+    process.stderr.write(`Error: ${(err as Error).message}\n`);
+    process.stderr.write("A config file is required for `espalier studio`.\n");
+    process.exitCode = 1;
+    return;
+  }
+
+  const port = typeof flags.port === "string" ? parseInt(flags.port, 10) : undefined;
+  const host = typeof flags.host === "string" ? flags.host : undefined;
+  const writeMode = flags["write-mode"] === true;
+  const noOpen = flags["no-open"] === true;
+
+  Promise.all([
+    import("espalier-studio/cli"),
+    import("./adapter-factory.js"),
+  ]).then(([{ startStudio }, { createAdapter }]) => {
+    return createAdapter(config!).then((resources) => {
+      const entities = (config as any)?.entities ?? [];
+      if (entities.length === 0) {
+        process.stderr.write("Error: No entities configured. Add 'entities' to your espalier.config.json.\n");
+        process.exitCode = 1;
+        return;
+      }
+      return startStudio({
+        entities,
+        dataSource: resources.dataSource,
+        port,
+        host,
+        writeMode,
+        open: !noOpen,
+      });
+    });
+  }).catch((err: Error) => {
+    process.stderr.write(`Error: ${err.message}\n`);
+    process.exitCode = 1;
+  });
+}
+
+function handleDiagram(flags: Record<string, string | boolean>): void {
+  const configDir = typeof flags.config === "string" ? flags.config : undefined;
+
+  let config;
+  try {
+    config = loadConfig(configDir);
+  } catch (err) {
+    process.stderr.write(`Error: ${(err as Error).message}\n`);
+    process.stderr.write("A config file is required for `espalier diagram`.\n");
+    process.exitCode = 1;
+    return;
+  }
+
+  const format = typeof flags.format === "string" ? flags.format : "mermaid";
+  const output = typeof flags.output === "string" ? flags.output : undefined;
+  const title = typeof flags.title === "string" ? flags.title : undefined;
+
+  import("espalier-studio/cli").then(({ runDiagramCommand }) => {
+    const entities = (config as any)?.entities ?? [];
+    if (entities.length === 0) {
+      process.stderr.write("Error: No entities configured. Add 'entities' to your espalier.config.json.\n");
+      process.exitCode = 1;
+      return;
+    }
+    runDiagramCommand({
+      entities,
+      format: format as any,
+      output,
+      title,
+    });
+  }).catch((err: Error) => {
+    process.stderr.write(`Error: ${err.message}\n`);
+    process.exitCode = 1;
+  });
 }
 
 main();

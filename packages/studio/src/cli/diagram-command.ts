@@ -1,11 +1,24 @@
+import { extractSchema } from "../schema/index.js";
+import { generateDiagram } from "../diagram/index.js";
 import type { DiagramFormat } from "../diagram/diagram-generator.js";
+import { writeFileSync } from "node:fs";
 
 export interface DiagramCommandOptions {
   format?: DiagramFormat;
   output?: string;
-  config?: string;
+  entities: (new (...args: any[]) => any)[];
+  title?: string;
 }
 
-export function runDiagramCommand(_options: DiagramCommandOptions): void {
-  // Placeholder — will generate diagram to stdout or file
+export function runDiagramCommand(options: DiagramCommandOptions): void {
+  const format = options.format ?? "mermaid";
+  const schema = extractSchema({ entities: options.entities });
+  const diagram = generateDiagram(schema, { format, title: options.title });
+
+  if (options.output) {
+    writeFileSync(options.output, diagram, "utf-8");
+    process.stdout.write(`Diagram written to ${options.output}\n`);
+  } else {
+    process.stdout.write(diagram);
+  }
 }
