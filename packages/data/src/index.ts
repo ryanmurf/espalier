@@ -178,6 +178,9 @@ export { TenantId, getTenantIdField } from "./decorators/tenant.js";
 export type { FilterDefinition, FilterRegistration, FilterOptions } from "./filter/index.js";
 export { Filter, getFilters, registerFilter, unregisterFilter, resolveActiveFilters, FilterContext } from "./filter/index.js";
 
+export type { SoftDeleteOptions } from "./decorators/soft-delete.js";
+export { SoftDelete, getSoftDeleteMetadata, isSoftDeleteEntity } from "./decorators/soft-delete.js";
+
 export type { RoutingDataSourceOptions } from "./tenant/index.js";
 export { RoutingDataSource, TenantRoutingDataSource, RoutingError } from "./tenant/index.js";
 

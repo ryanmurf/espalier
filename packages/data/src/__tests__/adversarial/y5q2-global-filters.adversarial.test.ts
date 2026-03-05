@@ -291,30 +291,18 @@ describe("mutation safety", () => {
     class MutTarget {}
     registerFilter(MutTarget, "original", makeFilter());
 
-    const filters = getFilters(MutTarget);
-    // NOTE: This is a potential bug — if getFilters returns the internal array
+    // getFilters returns readonly — cast to mutable to test defense
+    const filters = [...getFilters(MutTarget)];
     filters.push({
       name: "injected",
       filter: makeFilter(),
       enabledByDefault: true,
     });
 
-    // Check if the registry was corrupted
+    // Registry should NOT be corrupted — getFilters returns a copy
     const fresh = getFilters(MutTarget);
-    // If the registry returns a direct reference, this will be 2 (bug)
-    // If it returns a copy, this will be 1 (correct)
-    if (fresh.length === 2) {
-      // BUG: getFilters returns mutable internal array
-      // Attacker could inject filters into any entity's filter list
-      expect(fresh).toHaveLength(2);
-      // Flag this as a finding
-      console.warn(
-        "FINDING: getFilters() returns mutable internal array. " +
-        "An attacker could inject arbitrary filters via mutation.",
-      );
-    } else {
-      expect(fresh).toHaveLength(1);
-    }
+    expect(fresh).toHaveLength(1);
+    expect(fresh[0].name).toBe("original");
   });
 
   it("resolveActiveFilters returns a new array each time", () => {

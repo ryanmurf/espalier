@@ -129,7 +129,7 @@ export interface FilterOptions {
  * and the per-query FilterOptions.
  */
 export function resolveActiveFilters(
-  registrations: FilterRegistration[],
+  registrations: readonly FilterRegistration[],
   options?: FilterOptions,
 ): FilterRegistration[] {
   if (!registrations.length) return [];

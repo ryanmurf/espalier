@@ -8,7 +8,7 @@ import { getEntityMetadata } from "../mapping/entity-metadata.js";
 import { createRowMapper } from "../mapping/row-mapper.js";
 import type { ProjectionMapper } from "../mapping/projection-mapper.js";
 import { getProjectionMetadata } from "../decorators/projection.js";
-import { SelectBuilder, DeleteBuilder, InsertBuilder } from "../query/query-builder.js";
+import { SelectBuilder, DeleteBuilder, InsertBuilder, UpdateBuilder } from "../query/query-builder.js";
 import { BulkOperationBuilder } from "../query/bulk-operation-builder.js";
 import { ComparisonCriteria, RawComparisonCriteria, LogicalCriteria } from "../query/criteria.js";
 import type { Criteria } from "../query/criteria.js";
@@ -51,6 +51,8 @@ import { DerivedQueryHandler } from "./derived-query-handler.js";
 import { getFilters, resolveActiveFilters } from "../filter/filter-registry.js";
 import type { FilterRegistration } from "../filter/filter-registry.js";
 import { FilterContext } from "../filter/filter-context.js";
+import { getSoftDeleteMetadata } from "../decorators/soft-delete.js";
+import { NullCriteria } from "../query/criteria.js";
 
 function isProjectionClass(arg: unknown): arg is new (...args: any[]) => any {
   return typeof arg === "function" && getProjectionMetadata(arg) !== undefined;
@@ -97,6 +99,11 @@ export function createDerivedRepository<T, ID>(
   const tenantColumn = getTenantColumn(metadata);
   const tenantIdField = metadata.tenantIdField;
 
+  // Soft-delete
+  const softDeleteMeta = getSoftDeleteMetadata(entityClass);
+  const softDeleteColumn = softDeleteMeta?.columnName;
+  const softDeleteField = softDeleteMeta?.fieldName;
+
   // Auto-generated ID detection
   const AUTO_ID_TYPES = /^(SMALL|BIG)?SERIAL$/i;
   const columnTypes = getColumnTypeMappings(entityClass);
@@ -140,7 +147,7 @@ export function createDerivedRepository<T, ID>(
   }
 
   // Global query filters
-  const filterRegistrations: FilterRegistration[] = getFilters(entityClass);
+  const filterRegistrations: readonly FilterRegistration[] = getFilters(entityClass);
 
   function applyGlobalFilters(builder: { and(criteria: Criteria): unknown }): void {
     if (!filterRegistrations.length) return;
@@ -298,6 +305,8 @@ export function createDerivedRepository<T, ID>(
     copyRelationFields,
     getOneToOneFkValue,
     getManyToOneFkValue,
+    softDeleteColumn,
+    softDeleteField,
   });
 
   // Create derived query handler
@@ -1321,26 +1330,53 @@ export function createDerivedRepository<T, ID>(
         repoLogger.debug("deleteById", { operation: "deleteById", entityType: entityName, id: String(id) });
       }
       const idCol = getIdColumn();
-      const builder = new DeleteBuilder(metadata.tableName)
-        .where(new ComparisonCriteria("eq", idCol, id as SqlValue));
-      applyAllFilters(builder);
 
-      const query = builder.build();
-      const conn = await dataSource.getConnection();
-      try {
-        const stmt = conn.prepareStatement(query.sql);
+      if (softDeleteColumn) {
+        // Soft delete: UPDATE SET deleted_at = NOW()
+        const updateBuilder = new UpdateBuilder(metadata.tableName)
+          .set(softDeleteColumn, new Date() as SqlValue)
+          .where(new ComparisonCriteria("eq", idCol, id as SqlValue));
+        applyTenantFilter(updateBuilder);
+
+        const query = updateBuilder.build();
+        const conn = await dataSource.getConnection();
         try {
-          for (let i = 0; i < query.params.length; i++) {
-            stmt.setParameter(i + 1, query.params[i]);
+          const stmt = conn.prepareStatement(query.sql);
+          try {
+            for (let i = 0; i < query.params.length; i++) {
+              stmt.setParameter(i + 1, query.params[i]);
+            }
+            await stmt.executeUpdate();
+            entityCache.evict(entityClass, tenantCacheKey(id));
+            queryCache.invalidate(entityClass);
+          } finally {
+            await stmt.close().catch(() => {});
           }
-          await stmt.executeUpdate();
-          entityCache.evict(entityClass, tenantCacheKey(id));
-          queryCache.invalidate(entityClass);
         } finally {
-          await stmt.close().catch(() => {});
+          await conn.close();
         }
-      } finally {
-        await conn.close();
+      } else {
+        const builder = new DeleteBuilder(metadata.tableName)
+          .where(new ComparisonCriteria("eq", idCol, id as SqlValue));
+        applyAllFilters(builder);
+
+        const query = builder.build();
+        const conn = await dataSource.getConnection();
+        try {
+          const stmt = conn.prepareStatement(query.sql);
+          try {
+            for (let i = 0; i < query.params.length; i++) {
+              stmt.setParameter(i + 1, query.params[i]);
+            }
+            await stmt.executeUpdate();
+            entityCache.evict(entityClass, tenantCacheKey(id));
+            queryCache.invalidate(entityClass);
+          } finally {
+            await stmt.close().catch(() => {});
+          }
+        } finally {
+          await conn.close();
+        }
       }
     },
 
@@ -1633,6 +1669,57 @@ export function createDerivedRepository<T, ID>(
     },
   };
 
+  // Soft-delete specific methods
+  if (softDeleteColumn && softDeleteField) {
+    (crudMethods as any).restore = async (entity: T): Promise<void> => {
+      const conn = await dataSource.getConnection();
+      try {
+        await persister.restoreWithConnection(entity, conn);
+      } finally {
+        await conn.close();
+      }
+    };
+
+    (crudMethods as any).findIncludingDeleted = async (specOrPageable?: any): Promise<any> => {
+      return FilterContext.withFilters({ disableFilters: ["softDelete"] }, () => {
+        return crudMethods.findAll(specOrPageable);
+      });
+    };
+
+    (crudMethods as any).findOnlyDeleted = async (specOrPageable?: any): Promise<any> => {
+      return FilterContext.withFilters({ disableFilters: ["softDelete"] }, async () => {
+        // Build query with deleted_at IS NOT NULL
+        const col = softDeleteColumn!;
+        const deletedSpec: Specification<T> = {
+          toPredicate() {
+            return new NullCriteria("isNotNull", col);
+          },
+        };
+
+        if (specOrPageable && typeof specOrPageable === "object" && "toPredicate" in specOrPageable) {
+          // Combine with user spec
+          const combinedSpec: Specification<T> = {
+            toPredicate(meta: EntityMetadata) {
+              return new LogicalCriteria("and", deletedSpec.toPredicate(meta), specOrPageable.toPredicate(meta));
+            },
+          };
+          return crudMethods.findAll(combinedSpec);
+        }
+
+        return crudMethods.findAll(deletedSpec);
+      });
+    };
+
+    (crudMethods as any).softDelete = async (entity: T): Promise<void> => {
+      const conn = await dataSource.getConnection();
+      try {
+        await persister.softDeleteWithConnection(entity, conn);
+      } finally {
+        await conn.close();
+      }
+    };
+  }
+
   const knownMethods = new Set<string>([
     "findById",
     "existsById",
@@ -1651,11 +1738,17 @@ export function createDerivedRepository<T, ID>(
     "getChangeTracker",
     "isDirty",
     "getDirtyFields",
+    // Soft-delete methods (only functional when @SoftDelete is present)
+    "restore",
+    "findIncludingDeleted",
+    "findOnlyDeleted",
+    "softDelete",
   ]);
 
   const tracedMethods = new Set<string>([
     "findById", "existsById", "findAll", "save", "saveAll", "upsertAll",
     "delete", "deleteAll", "deleteById", "refresh", "count",
+    "restore", "findIncludingDeleted", "findOnlyDeleted", "softDelete",
   ]);
 
   (crudMethods as any).getEntityCache = () => entityCache;

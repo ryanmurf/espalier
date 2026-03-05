@@ -37,6 +37,10 @@ export interface EntityPersisterDeps<T> {
   copyRelationFields: (target: T, source: T) => void;
   getOneToOneFkValue: (entity: T, relation: OneToOneRelation) => SqlValue | undefined;
   getManyToOneFkValue: (entity: T, relation: import("../decorators/relations.js").ManyToOneRelation) => SqlValue;
+  /** Soft-delete column name (e.g. "deleted_at"), undefined if not soft-deletable */
+  softDeleteColumn?: string;
+  /** Soft-delete field name on the entity (e.g. "deletedAt") */
+  softDeleteField?: string;
 }
 
 export class EntityPersister<T> {
@@ -59,6 +63,8 @@ export class EntityPersister<T> {
   private readonly copyRelationFields: (target: T, source: T) => void;
   private readonly getOneToOneFkValue: (entity: T, relation: OneToOneRelation) => SqlValue | undefined;
   private readonly getManyToOneFkValue: (entity: T, relation: import("../decorators/relations.js").ManyToOneRelation) => SqlValue;
+  private readonly softDeleteColumn: string | undefined;
+  private readonly softDeleteField: string | undefined;
   private readonly entityName: string;
   private readonly repoLogger: Logger;
 
@@ -82,6 +88,8 @@ export class EntityPersister<T> {
     this.copyRelationFields = deps.copyRelationFields;
     this.getOneToOneFkValue = deps.getOneToOneFkValue;
     this.getManyToOneFkValue = deps.getManyToOneFkValue;
+    this.softDeleteColumn = deps.softDeleteColumn;
+    this.softDeleteField = deps.softDeleteField;
     this.entityName = deps.entityClass.name;
     this.repoLogger = getGlobalLogger().child("repository");
   }
@@ -416,6 +424,117 @@ export class EntityPersister<T> {
   }
 
   async deleteWithConnection(entity: T, conn: Connection): Promise<void> {
+    if (this.softDeleteColumn && this.softDeleteField) {
+      return this.softDeleteWithConnection(entity, conn);
+    }
+    return this.hardDeleteWithConnection(entity, conn);
+  }
+
+  /**
+   * Performs a soft delete: UPDATE SET deleted_at = NOW() instead of physical DELETE.
+   */
+  async softDeleteWithConnection(entity: T, conn: Connection): Promise<void> {
+    await this.invokeLifecycleCallbacks(entity, "PreRemove");
+    const idField = this.metadata.idField;
+    const idValue = (entity as Record<string | symbol, unknown>)[idField] as SqlValue;
+    const idCol = this.getIdColumn();
+    const versionCol = this.getVersionColumn();
+    const versionField = this.metadata.versionField;
+
+    // Cascade soft-delete to children that also have @SoftDelete
+    await this.cascadeManager.cascadePreDelete(entity, conn, new Set<unknown>());
+
+    const now = new Date();
+    const updateBuilder = new UpdateBuilder(this.metadata.tableName)
+      .set(this.softDeleteColumn!, now as SqlValue);
+
+    if (versionField && versionCol) {
+      const currentVersion = (entity as Record<string | symbol, unknown>)[versionField] as number;
+      updateBuilder
+        .set(versionCol, (currentVersion + 1) as SqlValue)
+        .where(
+          new LogicalCriteria(
+            "and",
+            new ComparisonCriteria("eq", idCol, idValue),
+            new ComparisonCriteria("eq", versionCol, currentVersion as SqlValue),
+          ),
+        );
+    } else {
+      updateBuilder.where(new ComparisonCriteria("eq", idCol, idValue));
+    }
+    this.applyTenantFilter(updateBuilder);
+
+    const query = updateBuilder.build();
+    const stmt = conn.prepareStatement(query.sql);
+    try {
+      for (let i = 0; i < query.params.length; i++) {
+        stmt.setParameter(i + 1, query.params[i]);
+      }
+      const affected = await stmt.executeUpdate();
+      if (versionField && versionCol && affected === 0) {
+        const currentVersion = (entity as Record<string | symbol, unknown>)[versionField] as number;
+        throw new OptimisticLockException(this.entityClass.name, idValue, currentVersion, null);
+      }
+
+      // Update entity state
+      (entity as Record<string, unknown>)[this.softDeleteField!] = now;
+      if (versionField) {
+        const cur = (entity as Record<string | symbol, unknown>)[versionField] as number;
+        (entity as Record<string | symbol, unknown>)[versionField] = cur + 1;
+      }
+
+      await this.invokeLifecycleCallbacks(entity, "PostRemove");
+      await this.emitEntityEvent(ENTITY_EVENTS.REMOVED, `${ENTITY_EVENTS.REMOVED}:${this.entityName}`, {
+        type: "removed",
+        entityClass: this.entityClass,
+        entityName: this.entityName,
+        entity,
+        id: idValue,
+        timestamp: now,
+      } satisfies EntityRemovedEvent<T>);
+      this.changeTracker.snapshot(entity);
+      this.entityCache.evict(this.entityClass, this.tenantCacheKey(idValue));
+      this.queryCache.invalidate(this.entityClass);
+    } finally {
+      await stmt.close().catch(() => {});
+    }
+  }
+
+  /**
+   * Restores a soft-deleted entity by setting deleted_at = NULL.
+   */
+  async restoreWithConnection(entity: T, conn: Connection): Promise<void> {
+    if (!this.softDeleteColumn || !this.softDeleteField) {
+      throw new Error(`Entity ${this.entityClass.name} is not soft-deletable.`);
+    }
+
+    const idField = this.metadata.idField;
+    const idValue = (entity as Record<string | symbol, unknown>)[idField] as SqlValue;
+    const idCol = this.getIdColumn();
+
+    const updateBuilder = new UpdateBuilder(this.metadata.tableName)
+      .set(this.softDeleteColumn, null as SqlValue)
+      .where(new ComparisonCriteria("eq", idCol, idValue));
+    this.applyTenantFilter(updateBuilder);
+
+    const query = updateBuilder.build();
+    const stmt = conn.prepareStatement(query.sql);
+    try {
+      for (let i = 0; i < query.params.length; i++) {
+        stmt.setParameter(i + 1, query.params[i]);
+      }
+      await stmt.executeUpdate();
+
+      (entity as Record<string, unknown>)[this.softDeleteField] = null;
+      this.changeTracker.snapshot(entity);
+      this.entityCache.evict(this.entityClass, this.tenantCacheKey(idValue));
+      this.queryCache.invalidate(this.entityClass);
+    } finally {
+      await stmt.close().catch(() => {});
+    }
+  }
+
+  private async hardDeleteWithConnection(entity: T, conn: Connection): Promise<void> {
     const cascadeDeleting = new Set<unknown>();
 
     await this.invokeLifecycleCallbacks(entity, "PreRemove");
