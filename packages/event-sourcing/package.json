@@ -1,6 +1,6 @@
 {
   "name": "espalier-event-sourcing",
-  "version": "1.11.0",
+  "version": "2.0.0",
   "description": "Event sourcing and outbox pattern for Espalier",
   "type": "module",
   "main": "./dist/index.cjs",

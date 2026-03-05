@@ -1,5 +1,59 @@
 # Changelog
 
+## [2.0.0] - Y6 Q4 — Real-Time, Documentation & 2.0 Launch
+
+### Features
+- **New Package: espalier-realtime**: Real-time data change capabilities
+  - **ChangeNotificationListener**: PostgreSQL LISTEN/NOTIFY integration with async iterable API
+  - **PollingChangeDetector**: Polling fallback for non-PG databases with configurable interval (100ms-60s)
+  - **EntityChangeCapture**: Generate trigger DDL for automatic change notification on INSERT/UPDATE/DELETE
+  - **ChangeStream**: High-level async iterable with operation type and field name filtering
+  - **SseEndpointGenerator**: Server-Sent Events handlers for Express, Fastify, Hono, and generic HTTP
+  - **generateRealtimeDdl**: DDL generation for all entity change capture triggers
+- **New Package: espalier-playground**: Interactive browser-based sandbox
+  - **PlaygroundEngine**: Execute SQL against in-memory SQLite (sql.js WASM) with preloaded entities/data
+  - **ExampleRegistry**: Built-in example library (Hello World, Relations, Derived Queries, Specifications, Soft Delete, Audit Trail)
+  - **PlaygroundSerializer**: Base64url encoding for shareable playground links with input size limits
+- **Documentation Website**: Comprehensive getting-started guide, API overview, feature index
+- **Starter Templates**: Next.js App Router, Hono, and Fastify starter guides with full examples
+- **Migration Guides**: Step-by-step guides for migrating from TypeORM, Drizzle, and MikroORM
+- **Contributing Guide**: Development setup, workflow, code style, and PR guidelines
+
+### New Exports (espalier-realtime)
+- Notifications: `ChangeNotificationListener`, `PollingChangeDetector`, `EntityChangeCapture`, `ChangeNotification`, `PollingOptions`
+- Streams: `ChangeStream`, `ChangeEvent`, `WatchOptions`, `OperationType`, `ParsedPayload`
+- SSE: `SseEndpointGenerator`, `SseRequest`, `SseResponse`, `SseOptions`
+- DDL: `generateRealtimeDdl`
+
+### New Exports (espalier-playground)
+- Engine: `PlaygroundEngine`, `PlaygroundOptions`, `PlaygroundResult`
+- Examples: `ExampleRegistry`, `PlaygroundExample`, `builtInExamples`
+- Share: `PlaygroundSerializer`
+
+### Security
+- EntityChangeCapture escapes single quotes in pg_notify channel name (defense-in-depth)
+- PlaygroundEngine quotes all identifiers in preloads, validates column types against safe pattern
+- PollingChangeDetector NaN guard prevents infinite tight polling loops
+- ChangeNotificationListener: bounded queue (10K max), throws if raw PG client unavailable
+- SseEndpointGenerator validates event type against newline injection, NaN-safe Last-Event-ID
+- All SQL identifiers validated against identifier regex before embedding in DDL
+
+### Bug Fixes
+- ChangeNotificationListener removes notification event listener on cleanup (prevents memory leak)
+- ChangeNotificationListener avoids double connection.close() on setup errors
+- ChangeStream validates operation type before cast (validate-first pattern)
+
+### Tests
+- 131 adversarial tests across 2 test files (70 realtime, 61 playground)
+- 27 unit tests for realtime package core functionality
+
+### Documentation
+- Getting started guide with entity, repository, and query examples
+- Starter templates for Next.js App Router, Hono, and Fastify
+- Migration guides from TypeORM, Drizzle, and MikroORM
+- Contributing guide with development setup and workflow
+- Full package and feature listing with 20+ decorators documented
+
 ## [1.11.0] - Y6 Q3 — Temporal Data & Event Sourcing Advanced
 
 ### Features
