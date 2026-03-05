@@ -1,0 +1,68 @@
+{
+  "name": "espalier-studio",
+  "version": "1.4.0",
+  "description": "Web-based data browser and schema visualization tool for Espalier entities",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./core": {
+      "import": {
+        "types": "./dist/core.d.ts",
+        "default": "./dist/core.js"
+      },
+      "require": {
+        "types": "./dist/core.d.cts",
+        "default": "./dist/core.cjs"
+      }
+    },
+    "./diagram": {
+      "import": {
+        "types": "./dist/diagram.d.ts",
+        "default": "./dist/diagram.js"
+      },
+      "require": {
+        "types": "./dist/diagram.d.cts",
+        "default": "./dist/diagram.cjs"
+      }
+    },
+    "./cli": {
+      "import": {
+        "types": "./dist/cli.d.ts",
+        "default": "./dist/cli.js"
+      },
+      "require": {
+        "types": "./dist/cli.d.cts",
+        "default": "./dist/cli.cjs"
+      }
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "espalier-data": "workspace:*",
+    "espalier-jdbc": "workspace:*",
+    "hono": "^4.7.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.0.0",
+    "tsup": "^8.4.0",
+    "typescript": "^5.7.3"
+  }
+}
