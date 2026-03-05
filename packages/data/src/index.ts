@@ -79,6 +79,9 @@ export { parseDerivedQueryMethod, buildDerivedQuery } from "./query/index.js";
 export type { CompiledQuery, ParamBinding, QueryMetadata } from "./query/index.js";
 export { bindCompiledQuery, QueryCompiler } from "./query/index.js";
 
+export type { QueryBatcherConfig } from "./query/index.js";
+export { QueryBatcher, QueryBatcherRegistry } from "./query/index.js";
+
 export type { Specification } from "./query/index.js";
 export {
   Specifications,
