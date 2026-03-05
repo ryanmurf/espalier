@@ -69,8 +69,8 @@ function validateCteName(name: string): void {
 
 function buildFrameBound(bound: FrameBound): string {
   if (bound.type === "PRECEDING" || bound.type === "FOLLOWING") {
-    if (bound.offset == null || bound.offset < 0) {
-      throw new Error(`Frame bound ${bound.type} requires a non-negative offset.`);
+    if (bound.offset == null || !Number.isFinite(bound.offset) || bound.offset < 0) {
+      throw new Error(`Frame bound ${bound.type} requires a non-negative finite offset.`);
     }
     return `${bound.offset} ${bound.type}`;
   }
