@@ -173,6 +173,9 @@ export type {
 } from "./migration/migration.js";
 export { DEFAULT_MIGRATION_TABLE, DEFAULT_SCHEMA } from "./migration/migration.js";
 
+export type { DataMigration } from "./migration/data-migration.js";
+export { isDataMigration, createDataMigration } from "./migration/data-migration.js";
+
 export type { DeprecatedOptions } from "./decorators/deprecated.js";
 export { Deprecated, getDeprecatedFields, isDeprecatedField } from "./decorators/deprecated.js";
 

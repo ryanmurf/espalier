@@ -1,8 +1,14 @@
+import type { Connection } from "espalier-jdbc";
+
 export interface Migration {
   version: string;
   description: string;
   up(): string | string[];
   down(): string | string[];
+  /** Optional data transform — called after up() DDL in same transaction. */
+  data?(connection: Connection): Promise<void>;
+  /** Optional reverse data transform — called before down() DDL. */
+  undoData?(connection: Connection): Promise<void>;
 }
 
 export interface MigrationRecord {
