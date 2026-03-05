@@ -1,0 +1,48 @@
+{
+  "name": "espalier-testing",
+  "version": "1.4.0",
+  "description": "Testing utilities for espalier — entity factories, seeding, test isolation, and query assertions",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "peerDependencies": {
+    "espalier-jdbc": "workspace:*",
+    "espalier-data": "workspace:*"
+  },
+  "peerDependenciesMeta": {
+    "espalier-jdbc": {
+      "optional": false
+    },
+    "espalier-data": {
+      "optional": false
+    }
+  },
+  "devDependencies": {
+    "espalier-jdbc": "workspace:*",
+    "espalier-data": "workspace:*",
+    "tsup": "^8.4.0",
+    "typescript": "^5.7.3"
+  }
+}
