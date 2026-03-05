@@ -16,5 +16,14 @@ export { Seeder } from "./seeding/seeder.js";
 export { withTestTransaction, withNestedTransaction } from "./isolation/test-transaction.js";
 export type { TestTransactionContext, TestTransactionOptions } from "./isolation/test-transaction.js";
 
-// Query assertions (placeholder)
-export { QueryAssertions } from "./assertions/query-assertions.js";
+// Query log capture and assertions
+export {
+  QueryLog,
+  createInstrumentedDataSource,
+  withQueryLog,
+  assertQueryCount,
+  assertMaxQueries,
+  assertNoQueriesMatching,
+  assertQueriesMatching,
+} from "./assertions/query-assertions.js";
+export type { CapturedQuery, AssertionResult } from "./assertions/query-assertions.js";
