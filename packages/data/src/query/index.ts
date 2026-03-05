@@ -44,6 +44,16 @@ export { QueryBatcher, QueryBatcherRegistry } from "./query-batcher.js";
 export type { BulkDialect, BulkOperationOptions, BulkQuery } from "./bulk-operation-builder.js";
 export { BulkOperationBuilder } from "./bulk-operation-builder.js";
 
+export type {
+  PreparedStatementPoolConfig,
+  PreparedStatementPoolMetrics,
+} from "./prepared-statement-pool.js";
+export {
+  PreparedStatementPool,
+  getGlobalPreparedStatementPool,
+  setGlobalPreparedStatementPool,
+} from "./prepared-statement-pool.js";
+
 export type { Specification } from "./specification.js";
 export {
   Specifications,
