@@ -6,7 +6,7 @@ import { mapSqliteErrorCode } from "./error-codes.js";
 /** Convert SqlValue to a type that better-sqlite3 accepts. */
 function toBindValue(val: SqlValue): unknown {
   if (val instanceof Date) return val.toISOString();
-  if (val instanceof Uint8Array) return Buffer.from(val);
+  if (val instanceof Uint8Array) return val;
   return val;
 }
 

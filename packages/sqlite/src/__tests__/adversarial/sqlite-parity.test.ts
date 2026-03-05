@@ -447,16 +447,15 @@ describe("toBindValue edge cases", () => {
     const date = new Date("2024-01-15T12:00:00.000Z");
     // We can't call the private function directly, but we know:
     // - Date → toISOString()
-    // - Uint8Array → Buffer.from()
+    // - Uint8Array → passed through as-is
     // - everything else → pass through
     expect(date.toISOString()).toBe("2024-01-15T12:00:00.000Z");
   });
 
-  it("Uint8Array is converted to Buffer", () => {
+  it("Uint8Array is passed through as-is", () => {
     const arr = new Uint8Array([1, 2, 3]);
-    const buf = Buffer.from(arr);
-    expect(buf).toBeInstanceOf(Buffer);
-    expect(buf.length).toBe(3);
+    expect(arr).toBeInstanceOf(Uint8Array);
+    expect(arr.length).toBe(3);
   });
 
   it("null/undefined/boolean/number pass through unchanged", () => {

@@ -184,7 +184,7 @@ describe.skipIf(!canConnect)(
       );
       expect(await rs.next()).toBe(true);
       const row = rs.getRow();
-      const retrieved = row.bytea_col as Buffer;
+      const retrieved = row.bytea_col as Uint8Array;
       expect(retrieved).toBeTruthy();
       expect(retrieved[0]).toBe(0x00);
       expect(retrieved[1]).toBe(0x01);
