@@ -20,8 +20,10 @@ function sanitizeIdentifier(name: string): string {
 }
 
 function parsePageParams(query: Record<string, string>): { offset: number; limit: number } {
-  const page = Math.max(0, parseInt(query.page ?? "0", 10) || 0);
-  let size = parseInt(query.size ?? String(DEFAULT_PAGE_SIZE), 10) || DEFAULT_PAGE_SIZE;
+  const parsedPage = parseInt(query.page ?? "", 10);
+  const page = Math.max(0, Number.isNaN(parsedPage) ? 0 : parsedPage);
+  const parsedSize = parseInt(query.size ?? "", 10);
+  let size = Number.isNaN(parsedSize) ? DEFAULT_PAGE_SIZE : parsedSize;
   if (size < 1) size = 1;
   if (size > MAX_PAGE_SIZE) size = MAX_PAGE_SIZE;
   return { offset: page * size, limit: size };
