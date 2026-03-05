@@ -230,6 +230,12 @@ export { createEmbeddingHook, registerEmbeddingHook } from "./vector/embedding-h
 export type { NearestToResult } from "./vector/vector-specifications.js";
 export { similarTo, nearestTo } from "./vector/vector-specifications.js";
 
+export type { TemporalOptions } from "./decorators/temporal.js";
+export { Temporal, getTemporalMetadata, isTemporalEntity } from "./decorators/temporal.js";
+
+export { TemporalQueryBuilder } from "./temporal/temporal-query.js";
+export { generateTemporalDdl } from "./temporal/temporal-ddl.js";
+
 export type { AuditedOptions } from "./decorators/audited.js";
 export { Audited, getAuditedMetadata, isAuditedEntity } from "./decorators/audited.js";
 
