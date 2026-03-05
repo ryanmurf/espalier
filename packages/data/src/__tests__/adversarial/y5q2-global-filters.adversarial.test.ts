@@ -479,3 +479,485 @@ describe("FilterContext", () => {
     });
   });
 });
+
+// ══════════════════════════════════════════════════════
+// EXTENDED ADVERSARIAL TESTS — FilterContext edge cases
+// ══════════════════════════════════════════════════════
+
+describe("FilterContext — nested scope edge cases", () => {
+  it("triple-nested scopes restore correctly at each level", () => {
+    const l1: FilterOptions = { disableFilters: ["a"] };
+    const l2: FilterOptions = { enableFilters: ["b"] };
+    const l3: FilterOptions = { disableAllFilters: true };
+
+    FilterContext.withFilters(l1, () => {
+      expect(FilterContext.current()).toBe(l1);
+      FilterContext.withFilters(l2, () => {
+        expect(FilterContext.current()).toBe(l2);
+        FilterContext.withFilters(l3, () => {
+          expect(FilterContext.current()).toBe(l3);
+        });
+        // l3 popped, l2 restored
+        expect(FilterContext.current()).toBe(l2);
+      });
+      // l2 popped, l1 restored
+      expect(FilterContext.current()).toBe(l1);
+    });
+    expect(FilterContext.current()).toBeUndefined();
+  });
+
+  it("nested withoutFilters inside withFilters", () => {
+    const opts: FilterOptions = { enableFilters: ["x"] };
+    FilterContext.withFilters(opts, () => {
+      expect(FilterContext.current()?.enableFilters).toEqual(["x"]);
+      FilterContext.withoutFilters(() => {
+        expect(FilterContext.current()?.disableAllFilters).toBe(true);
+        // The outer enableFilters should NOT bleed through
+        expect(FilterContext.current()?.enableFilters).toBeUndefined();
+      });
+      expect(FilterContext.current()).toBe(opts);
+    });
+  });
+
+  it("nested withFilters inside withoutFilters re-enables filters", () => {
+    FilterContext.withoutFilters(() => {
+      expect(FilterContext.current()?.disableAllFilters).toBe(true);
+      const inner: FilterOptions = { enableFilters: ["a"] };
+      FilterContext.withFilters(inner, () => {
+        // Inner scope completely replaces outer — disableAllFilters should NOT be set
+        expect(FilterContext.current()?.disableAllFilters).toBeUndefined();
+        expect(FilterContext.current()?.enableFilters).toEqual(["a"]);
+      });
+      expect(FilterContext.current()?.disableAllFilters).toBe(true);
+    });
+  });
+});
+
+describe("FilterContext — async boundary edge cases", () => {
+  it("context survives across multiple awaits", async () => {
+    const opts: FilterOptions = { disableFilters: ["slow"] };
+    await FilterContext.withFilters(opts, async () => {
+      await new Promise(resolve => setTimeout(resolve, 1));
+      expect(FilterContext.current()).toBe(opts);
+      await new Promise(resolve => setTimeout(resolve, 1));
+      expect(FilterContext.current()).toBe(opts);
+      await new Promise(resolve => setTimeout(resolve, 1));
+      expect(FilterContext.current()).toBe(opts);
+    });
+  });
+
+  it("nested async scopes do not interfere", async () => {
+    const outer: FilterOptions = { disableFilters: ["a"] };
+    await FilterContext.withFilters(outer, async () => {
+      const inner: FilterOptions = { disableFilters: ["b"] };
+      await FilterContext.withFilters(inner, async () => {
+        await new Promise(resolve => setTimeout(resolve, 5));
+        expect(FilterContext.current()).toBe(inner);
+      });
+      expect(FilterContext.current()).toBe(outer);
+    });
+  });
+
+  it("many concurrent async operations with different configs", async () => {
+    const count = 50;
+    const results: string[] = [];
+
+    await Promise.all(
+      Array.from({ length: count }, (_, i) => {
+        const opts: FilterOptions = { disableFilters: [`filter_${i}`] };
+        return FilterContext.withFilters(opts, async () => {
+          // Random delay to interleave
+          await new Promise(resolve => setTimeout(resolve, Math.random() * 10));
+          const current = FilterContext.current();
+          results.push(`${i}:${current?.disableFilters?.[0]}`);
+        });
+      }),
+    );
+
+    // Each async operation should see its own filter config
+    expect(results).toHaveLength(count);
+    for (let i = 0; i < count; i++) {
+      expect(results).toContain(`${i}:filter_${i}`);
+    }
+  });
+
+  it("exception in nested async withFilters does not leak context", async () => {
+    const outer: FilterOptions = { disableFilters: ["a"] };
+    await FilterContext.withFilters(outer, async () => {
+      try {
+        await FilterContext.withFilters({ disableAllFilters: true }, async () => {
+          await new Promise(resolve => setTimeout(resolve, 1));
+          throw new Error("async boom");
+        });
+      } catch {
+        // expected
+      }
+      // Outer context should be restored
+      expect(FilterContext.current()).toBe(outer);
+    });
+    expect(FilterContext.current()).toBeUndefined();
+  });
+});
+
+// ══════════════════════════════════════════════════════
+// Filter function that mutates metadata — corruption test
+// ══════════════════════════════════════════════════════
+
+describe("filter function metadata mutation", () => {
+  it("filter that mutates metadata object corrupts shared state", () => {
+    // A malicious filter function that modifies the metadata it receives
+    const mutatingFilter = (meta: EntityMetadata) => {
+      // Try to mutate the metadata
+      (meta as any).tableName = "HACKED";
+      (meta as any).fields.push({ fieldName: "injected", columnName: "injected_col" });
+      return dummyCriteria("active", true);
+    };
+
+    const reg: FilterRegistration = {
+      name: "mutator",
+      filter: mutatingFilter,
+      enabledByDefault: true,
+    };
+
+    // Create a fresh metadata object
+    const meta = {
+      tableName: "original",
+      idField: "id",
+      fields: [
+        { fieldName: "id", columnName: "id" },
+      ],
+      manyToOneRelations: [],
+      oneToManyRelations: [],
+      manyToManyRelations: [],
+      oneToOneRelations: [],
+      embeddedFields: [],
+      lifecycleCallbacks: new Map(),
+    } as EntityMetadata;
+
+    const active = resolveActiveFilters([reg]);
+    active[0].filter(meta);
+
+    // BUG: The filter was able to mutate the metadata object directly.
+    // The registry does NOT defensively copy metadata before passing to filter functions.
+    // A malicious or buggy filter can corrupt shared metadata state.
+    expect(meta.tableName).toBe("HACKED");
+    expect(meta.fields).toHaveLength(2); // was 1, now 2 due to push
+  });
+});
+
+// ══════════════════════════════════════════════════════
+// Filter returning wrong types
+// ══════════════════════════════════════════════════════
+
+describe("filter returning wrong types", () => {
+  it("filter returning a string instead of Criteria — no type safety at runtime", () => {
+    const badFilter = (_meta: EntityMetadata) => {
+      return "WHERE active = true" as any; // returns string, not Criteria
+    };
+
+    const reg: FilterRegistration = {
+      name: "bad",
+      filter: badFilter,
+      enabledByDefault: true,
+    };
+
+    const active = resolveActiveFilters([reg]);
+    const result = active[0].filter(fakeMetadata);
+
+    // The registry/resolver does NOT validate the return type at runtime.
+    // It's just a string, and calling toSql on it will fail.
+    expect(typeof result).toBe("string");
+    expect(() => (result as any).toSql(1)).toThrow(); // .toSql is not a function
+  });
+
+  it("filter returning a number — no runtime validation", () => {
+    const numFilter = (_meta: EntityMetadata) => 42 as any;
+    const reg: FilterRegistration = {
+      name: "num",
+      filter: numFilter,
+      enabledByDefault: true,
+    };
+    const active = resolveActiveFilters([reg]);
+    const result = active[0].filter(fakeMetadata);
+    expect(result).toBe(42);
+    // No runtime validation means this silently passes through
+  });
+
+  it("filter returning null (not undefined) — truthy check may accept it", () => {
+    const nullFilter = (_meta: EntityMetadata) => null as any;
+    const reg: FilterRegistration = {
+      name: "nuller",
+      filter: nullFilter,
+      enabledByDefault: true,
+    };
+    const active = resolveActiveFilters([reg]);
+    const result = active[0].filter(fakeMetadata);
+    // null is falsy, so the `if (criteria)` check in applyGlobalFilters will skip it
+    // This is actually safe behavior — null is treated like undefined (skip)
+    expect(result).toBeNull();
+    expect(!result).toBe(true); // falsy — will be skipped by `if (criteria)`
+  });
+
+  it("filter returning an object with toSql but wrong shape — silent corruption", () => {
+    const fakeObjFilter = (_meta: EntityMetadata) => ({
+      type: "eq" as const,
+      toSql: () => ({ sql: "1=1; DROP TABLE users; --", params: [] }),
+    });
+    const reg: FilterRegistration = {
+      name: "fakeObj",
+      filter: fakeObjFilter,
+      enabledByDefault: true,
+    };
+    const active = resolveActiveFilters([reg]);
+    const result = active[0].filter(fakeMetadata);
+    // BUG: No validation that the Criteria object is a genuine Criteria instance.
+    // A filter can return any object with a toSql method and inject arbitrary SQL.
+    const sql = result!.toSql(1);
+    expect(sql.sql).toContain("DROP TABLE users");
+  });
+});
+
+// ══════════════════════════════════════════════════════
+// Stress: 1000 filters on a single entity
+// ══════════════════════════════════════════════════════
+
+describe("stress: 1000 filters", () => {
+  it("handles 1000 filters without OOM and resolves in <100ms", () => {
+    class MegaEntity {}
+    for (let i = 0; i < 1000; i++) {
+      registerFilter(MegaEntity, `f_${i}`, makeFilter(`col_${i}`, i));
+    }
+
+    const filters = getFilters(MegaEntity);
+    expect(filters).toHaveLength(1000);
+
+    const start = performance.now();
+    const active = resolveActiveFilters(filters);
+    const elapsed = performance.now() - start;
+
+    expect(active).toHaveLength(1000);
+    expect(elapsed).toBeLessThan(100); // Should be fast — just array filtering
+
+    // Generate SQL for all 1000 criteria
+    const sqlStart = performance.now();
+    for (const reg of active) {
+      const criteria = reg.filter(fakeMetadata);
+      if (criteria) criteria.toSql(1);
+    }
+    const sqlElapsed = performance.now() - sqlStart;
+    expect(sqlElapsed).toBeLessThan(500);
+  });
+
+  it("disable half of 1000 filters by name", () => {
+    class HalfEntity {}
+    for (let i = 0; i < 1000; i++) {
+      registerFilter(HalfEntity, `h_${i}`, makeFilter());
+    }
+    const filters = getFilters(HalfEntity);
+    const disableNames = Array.from({ length: 500 }, (_, i) => `h_${i * 2}`);
+    const active = resolveActiveFilters(filters, { disableFilters: disableNames });
+    expect(active).toHaveLength(500);
+  });
+});
+
+// ══════════════════════════════════════════════════════
+// Filter name edge cases
+// ══════════════════════════════════════════════════════
+
+describe("filter name edge cases", () => {
+  it("empty string as filter name is accepted", () => {
+    class EmptyName {}
+    registerFilter(EmptyName, "", makeFilter());
+    const filters = getFilters(EmptyName);
+    expect(filters).toHaveLength(1);
+    expect(filters[0].name).toBe("");
+  });
+
+  it("empty string filter can be disabled by name", () => {
+    class EmptyDisable {}
+    registerFilter(EmptyDisable, "", makeFilter());
+    const active = resolveActiveFilters(getFilters(EmptyDisable), { disableFilters: [""] });
+    expect(active).toHaveLength(0);
+  });
+
+  it("filter name with spaces", () => {
+    class SpaceName {}
+    registerFilter(SpaceName, "my filter name", makeFilter());
+    const filters = getFilters(SpaceName);
+    expect(filters[0].name).toBe("my filter name");
+  });
+
+  it("filter name with unicode characters", () => {
+    class UnicodeName {}
+    registerFilter(UnicodeName, "\u{1F525}fire-filter\u{1F525}", makeFilter());
+    const filters = getFilters(UnicodeName);
+    expect(filters[0].name).toBe("\u{1F525}fire-filter\u{1F525}");
+  });
+
+  it("very long filter name (10000 chars)", () => {
+    class LongName {}
+    const longName = "x".repeat(10000);
+    registerFilter(LongName, longName, makeFilter());
+    const filters = getFilters(LongName);
+    expect(filters[0].name).toBe(longName);
+    // Can disable by the long name
+    const active = resolveActiveFilters(filters, { disableFilters: [longName] });
+    expect(active).toHaveLength(0);
+  });
+
+  it("filter name with null bytes", () => {
+    class NullByteName {}
+    registerFilter(NullByteName, "filter\0name", makeFilter());
+    const filters = getFilters(NullByteName);
+    expect(filters[0].name).toBe("filter\0name");
+  });
+
+  it("filter names differing only by whitespace are treated as distinct", () => {
+    class WhitespaceDiff {}
+    registerFilter(WhitespaceDiff, "filter", makeFilter());
+    registerFilter(WhitespaceDiff, " filter", makeFilter());
+    registerFilter(WhitespaceDiff, "filter ", makeFilter());
+    expect(getFilters(WhitespaceDiff)).toHaveLength(3);
+  });
+});
+
+// ══════════════════════════════════════════════════════
+// registerFilter after entity already in use
+// ══════════════════════════════════════════════════════
+
+describe("late registration", () => {
+  it("registerFilter after getFilters was called — new filter IS visible in fresh getFilters", () => {
+    class LateReg {}
+    registerFilter(LateReg, "early", makeFilter());
+
+    // Simulate repository creation: snapshot filters
+    const snapshot = getFilters(LateReg);
+    expect(snapshot).toHaveLength(1);
+
+    // Late registration
+    registerFilter(LateReg, "late", makeFilter());
+
+    // Fresh getFilters sees the new filter
+    const fresh = getFilters(LateReg);
+    expect(fresh).toHaveLength(2);
+
+    // But the snapshot (as used in derived-repository) does NOT see it
+    // BUG: derived-repository.ts caches getFilters() at creation time (line 150).
+    // Filters registered after repository creation are silently ignored.
+    // This is a design issue, not necessarily a bug — but it's surprising behavior.
+    expect(snapshot).toHaveLength(1); // stale snapshot
+  });
+
+  it("unregisterFilter after getFilters was called — snapshot is stale", () => {
+    class UnregLate {}
+    registerFilter(UnregLate, "a", makeFilter());
+    registerFilter(UnregLate, "b", makeFilter());
+
+    const snapshot = getFilters(UnregLate);
+    expect(snapshot).toHaveLength(2);
+
+    unregisterFilter(UnregLate, "a");
+
+    // Fresh call sees removal
+    expect(getFilters(UnregLate)).toHaveLength(1);
+    // Snapshot is stale — still shows 2
+    expect(snapshot).toHaveLength(2);
+  });
+});
+
+// ══════════════════════════════════════════════════════
+// Thread safety: concurrent async operations with FilterContext
+// ══════════════════════════════════════════════════════
+
+describe("FilterContext thread safety (ALS isolation)", () => {
+  it("100 concurrent operations each see their own context", async () => {
+    const errors: string[] = [];
+    const n = 100;
+
+    await Promise.all(
+      Array.from({ length: n }, (_, i) =>
+        FilterContext.withFilters({ disableFilters: [`f${i}`] }, async () => {
+          // Yield multiple times to maximize interleaving
+          for (let j = 0; j < 5; j++) {
+            await new Promise(resolve => setTimeout(resolve, 0));
+            const ctx = FilterContext.current();
+            if (ctx?.disableFilters?.[0] !== `f${i}`) {
+              errors.push(`op ${i}, iter ${j}: expected f${i} got ${ctx?.disableFilters?.[0]}`);
+            }
+          }
+        }),
+      ),
+    );
+
+    expect(errors).toEqual([]);
+  });
+
+  it("promise.all inside withFilters — child promises inherit parent context", async () => {
+    const opts: FilterOptions = { disableFilters: ["parent"] };
+    await FilterContext.withFilters(opts, async () => {
+      const results = await Promise.all([
+        (async () => {
+          await new Promise(resolve => setTimeout(resolve, 1));
+          return FilterContext.current();
+        })(),
+        (async () => {
+          await new Promise(resolve => setTimeout(resolve, 2));
+          return FilterContext.current();
+        })(),
+        (async () => {
+          await new Promise(resolve => setTimeout(resolve, 3));
+          return FilterContext.current();
+        })(),
+      ]);
+
+      // All child promises should see the parent's context
+      for (const ctx of results) {
+        expect(ctx).toBe(opts);
+      }
+    });
+  });
+
+  it("setImmediate inside withFilters preserves context", async () => {
+    const opts: FilterOptions = { disableFilters: ["imm"] };
+    const result = await FilterContext.withFilters(opts, () => {
+      return new Promise<FilterOptions | undefined>(resolve => {
+        setImmediate(() => {
+          resolve(FilterContext.current());
+        });
+      });
+    });
+    expect(result).toBe(opts);
+  });
+});
+
+// ══════════════════════════════════════════════════════
+// Prototype pollution / object identity attacks
+// ══════════════════════════════════════════════════════
+
+describe("prototype and identity edge cases", () => {
+  it("registering filter on Object.prototype does NOT affect other classes", () => {
+    // This would be extremely bad — but WeakMap requires object keys
+    // and Object.prototype is an object, so it could technically be a key
+    // We won't actually register on Object.prototype (too dangerous for test isolation),
+    // but we verify that normal classes are isolated
+    class A {}
+    class B {}
+    registerFilter(A, "only_a", makeFilter());
+    expect(getFilters(B)).toHaveLength(0);
+  });
+
+  it("filter registered on class is not visible via instance", () => {
+    class InstEntity {}
+    registerFilter(InstEntity, "cls", makeFilter());
+    const inst = new InstEntity();
+    // getFilters expects constructor, not instance
+    // Passing instance should return empty (WeakMap keyed on constructor, not instance)
+    expect(getFilters(inst as any)).toHaveLength(0);
+  });
+
+  it("null/undefined entityClass in getFilters does not crash", () => {
+    // These should return empty or throw — not crash with cryptic error
+    expect(getFilters(null as any)).toEqual([]);
+    expect(getFilters(undefined as any)).toEqual([]);
+  });
+});
