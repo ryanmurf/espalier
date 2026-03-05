@@ -246,8 +246,7 @@ export class MssqlDataSource implements DataSource {
 
   async getConnection(): Promise<Connection> {
     if (this.closed) throw new Error("DataSource is closed");
-    // Stub: In a real implementation, this would create a tedious connection
-    return new MssqlConnection(null);
+    throw new Error("MssqlDataSource is a stub adapter. Install and configure a real MSSQL driver to use connections.");
   }
 
   async close(): Promise<void> {

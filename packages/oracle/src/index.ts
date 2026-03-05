@@ -245,8 +245,7 @@ export class OracleDataSource implements DataSource {
 
   async getConnection(): Promise<Connection> {
     if (this.closed) throw new Error("DataSource is closed");
-    // Stub: In a real implementation, this would create an oracledb connection
-    return new OracleConnection(null);
+    throw new Error("OracleDataSource is a stub adapter. Install and configure a real Oracle driver to use connections.");
   }
 
   async close(): Promise<void> {

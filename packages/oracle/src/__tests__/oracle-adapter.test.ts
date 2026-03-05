@@ -40,11 +40,11 @@ describe("OracleDataSource", () => {
     password: "oracle",
   };
 
-  it("returns a connection", async () => {
+  it("throws stub error on getConnection", async () => {
     const ds = new OracleDataSource(config);
-    const conn = await ds.getConnection();
-    expect(conn).toBeDefined();
-    expect(conn.isClosed()).toBe(false);
+    await expect(ds.getConnection()).rejects.toThrow(
+      "OracleDataSource is a stub adapter. Install and configure a real Oracle driver to use connections.",
+    );
     await ds.close();
   });
 
@@ -60,13 +60,9 @@ describe("OracleDataSource", () => {
     await expect(ds.close()).resolves.toBeUndefined();
   });
 
-  it("multiple connections are independent", async () => {
+  it("throws stub error before closed check", async () => {
     const ds = new OracleDataSource(config);
-    const c1 = await ds.getConnection();
-    const c2 = await ds.getConnection();
-    expect(c1).not.toBe(c2);
-    await c1.close();
-    expect(c2.isClosed()).toBe(false);
+    await expect(ds.getConnection()).rejects.toThrow(/stub adapter/);
     await ds.close();
   });
 
