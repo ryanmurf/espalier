@@ -10,6 +10,25 @@ import { getTenantColumn } from "../tenant/tenant-filter.js";
 import { TenantContext, NoTenantException } from "../tenant/tenant-context.js";
 import { isLazyProxy } from "./lazy-proxy.js";
 
+/**
+ * Detects whether an error represents a unique constraint violation.
+ * Works across PostgreSQL, MySQL, and SQLite dialects.
+ */
+function isUniqueConstraintViolation(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  const msg = err.message.toLowerCase();
+  const errObj = err as Error & { code?: string; errno?: number };
+  // PostgreSQL: code 23505 — unique_violation
+  if (errObj.code === "23505") return true;
+  // MySQL: code ER_DUP_ENTRY (errno 1062)
+  if (errObj.code === "ER_DUP_ENTRY" || errObj.errno === 1062) return true;
+  // SQLite: UNIQUE constraint failed / SQLITE_CONSTRAINT_UNIQUE
+  if (msg.includes("unique constraint") || msg.includes("sqlite_constraint")) return true;
+  // Generic fallback: duplicate key
+  if (msg.includes("duplicate key") || msg.includes("duplicate entry")) return true;
+  return false;
+}
+
 export interface CascadeManagerDeps<T> {
   metadata: EntityMetadata;
   getEntityId: (entity: T) => unknown;
@@ -176,13 +195,15 @@ export class CascadeManager<T> {
           insertJt.set(jt.joinColumn, parentId);
           insertJt.set(jt.inverseJoinColumn, savedChildId);
           const jtQuery = insertJt.build();
-          const jtSql = jtQuery.sql + " ON CONFLICT DO NOTHING";
-          const jtStmt = conn.prepareStatement(jtSql);
+          const jtStmt = conn.prepareStatement(jtQuery.sql);
           try {
             for (let i = 0; i < jtQuery.params.length; i++) {
               jtStmt.setParameter(i + 1, jtQuery.params[i]);
             }
             await jtStmt.executeUpdate();
+          } catch (err) {
+            if (!isUniqueConstraintViolation(err)) throw err;
+            // Row already exists in join table — ignore
           } finally {
             await jtStmt.close().catch(() => {});
           }
@@ -500,13 +521,15 @@ export class CascadeManager<T> {
           insertJt.set(jt.joinColumn, entityId);
           insertJt.set(jt.inverseJoinColumn, savedChildId);
           const jtQuery = insertJt.build();
-          const jtSql = jtQuery.sql + " ON CONFLICT DO NOTHING";
-          const jtStmt = conn.prepareStatement(jtSql);
+          const jtStmt = conn.prepareStatement(jtQuery.sql);
           try {
             for (let i = 0; i < jtQuery.params.length; i++) {
               jtStmt.setParameter(i + 1, jtQuery.params[i]);
             }
             await jtStmt.executeUpdate();
+          } catch (err) {
+            if (!isUniqueConstraintViolation(err)) throw err;
+            // Row already exists in join table — ignore
           } finally {
             await jtStmt.close().catch(() => {});
           }

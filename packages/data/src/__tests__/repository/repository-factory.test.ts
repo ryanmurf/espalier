@@ -7,6 +7,7 @@ import { Id } from "../../decorators/id.js";
 import { Version } from "../../decorators/version.js";
 import { Repository } from "../../decorators/repository.js";
 import type { DataSource, Connection, PreparedStatement, ResultSet } from "espalier-jdbc";
+import { TestResultSet } from "../test-utils/test-result-set.js";
 
 @Table("products")
 class Product {
@@ -37,22 +38,6 @@ class VersionedItem {
 
 @Repository({ entity: Product })
 class ProductRepository {}
-
-function createMockResultSet(rows: Record<string, unknown>[]): ResultSet {
-  let index = -1;
-  return {
-    next: vi.fn(async () => {
-      index++;
-      return index < rows.length;
-    }),
-    getString: vi.fn((col: string) => rows[index]?.[col] as string),
-    getNumber: vi.fn((col: string) => rows[index]?.[col] as number),
-    getDate: vi.fn(() => null),
-    getBoolean: vi.fn(() => false),
-    getRow: vi.fn(() => rows[index] ?? {}),
-    close: vi.fn().mockResolvedValue(undefined),
-  } as unknown as ResultSet;
-}
 
 function createMockPreparedStatement(rs: ResultSet): PreparedStatement {
   return {
@@ -98,7 +83,7 @@ describe("createRepository", () => {
   });
 
   it("findById queries the database", async () => {
-    const rs = createMockResultSet([{ id: 1, name: "Widget", price: 9.99 }]);
+    const rs = new TestResultSet([{ id: 1, name: "Widget", price: 9.99 }]);
     const stmt = createMockPreparedStatement(rs);
     const conn = createMockConnection([stmt]);
     const ds = createMockDataSource(conn);
@@ -112,7 +97,7 @@ describe("createRepository", () => {
   });
 
   it("findById returns null when not found", async () => {
-    const rs = createMockResultSet([]);
+    const rs = new TestResultSet([]);
     const stmt = createMockPreparedStatement(rs);
     const conn = createMockConnection([stmt]);
     const ds = createMockDataSource(conn);
@@ -124,7 +109,7 @@ describe("createRepository", () => {
   });
 
   it("count executes a COUNT query", async () => {
-    const rs = createMockResultSet([{ "COUNT(*)": 42 }]);
+    const rs = new TestResultSet([{ "COUNT(*)": 42 }]);
     const stmt = createMockPreparedStatement(rs);
     const conn = createMockConnection([stmt]);
     const ds = createMockDataSource(conn);

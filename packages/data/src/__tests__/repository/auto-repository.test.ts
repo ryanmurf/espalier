@@ -5,6 +5,7 @@ import { Table } from "../../decorators/table.js";
 import { Column } from "../../decorators/column.js";
 import { Id } from "../../decorators/id.js";
 import { createAutoRepository } from "../../repository/auto-repository.js";
+import { TestResultSet } from "../test-utils/test-result-set.js";
 
 // --- Test Entities ---
 
@@ -31,63 +32,6 @@ class UserRepository {}
 class ProductRepository {}
 
 class PlainRepository {}
-
-// --- Mock Helpers ---
-
-function createMockResultSet(rows: Record<string, unknown>[]): ResultSet {
-  let cursor = -1;
-  return {
-    async next() {
-      cursor++;
-      return cursor < rows.length;
-    },
-    getString(col: string | number) {
-      const row = rows[cursor];
-      if (!row) return null;
-      const val = typeof col === "number" ? Object.values(row)[col] : row[col];
-      return val != null ? String(val) : null;
-    },
-    getNumber(col: string | number) {
-      const row = rows[cursor];
-      if (!row) return null;
-      const val = typeof col === "number" ? Object.values(row)[col] : row[col];
-      return val != null ? Number(val) : null;
-    },
-    getBoolean(col: string | number) {
-      const row = rows[cursor];
-      if (!row) return null;
-      const val = typeof col === "number" ? Object.values(row)[col] : row[col];
-      return val != null ? Boolean(val) : null;
-    },
-    getDate(_col: string | number) {
-      return null;
-    },
-    getRow() {
-      return rows[cursor] ?? {};
-    },
-    getMetadata() {
-      if (rows.length === 0) return [];
-      return Object.keys(rows[0]).map((name) => ({
-        name,
-        dataType: "text",
-        nullable: true,
-        primaryKey: false,
-      }));
-    },
-    async close() {},
-    [Symbol.asyncIterator]() {
-      return {
-        async next(): Promise<IteratorResult<Record<string, unknown>>> {
-          cursor++;
-          if (cursor < rows.length) {
-            return { value: rows[cursor], done: false };
-          }
-          return { value: undefined as any, done: true };
-        },
-      };
-    },
-  };
-}
 
 function createMockPreparedStatement(rs: ResultSet): PreparedStatement {
   return {
@@ -126,7 +70,7 @@ describe("createAutoRepository", () => {
   });
 
   it("creates a repository with CrudRepository methods", () => {
-    const rs = createMockResultSet([]);
+    const rs = new TestResultSet([]);
     const stmt = createMockPreparedStatement(rs);
     const conn = createMockConnection(stmt);
     const ds = createMockDataSource(conn);
@@ -145,7 +89,7 @@ describe("createAutoRepository", () => {
   });
 
   it("findById returns entity from mock data source", async () => {
-    const rs = createMockResultSet([{ id: 1, name: "Alice", email: "alice@example.com" }]);
+    const rs = new TestResultSet([{ id: 1, name: "Alice", email: "alice@example.com" }]);
     const stmt = createMockPreparedStatement(rs);
     const conn = createMockConnection(stmt);
     const ds = createMockDataSource(conn);
@@ -160,7 +104,7 @@ describe("createAutoRepository", () => {
   });
 
   it("findById returns null when no rows match", async () => {
-    const rs = createMockResultSet([]);
+    const rs = new TestResultSet([]);
     const stmt = createMockPreparedStatement(rs);
     const conn = createMockConnection(stmt);
     const ds = createMockDataSource(conn);
@@ -172,7 +116,7 @@ describe("createAutoRepository", () => {
   });
 
   it("findAll returns all entities", async () => {
-    const rs = createMockResultSet([
+    const rs = new TestResultSet([
       { id: 1, name: "Alice", email: "a@test.com" },
       { id: 2, name: "Bob", email: "b@test.com" },
     ]);
@@ -189,7 +133,7 @@ describe("createAutoRepository", () => {
   });
 
   it("count returns the count from the result set", async () => {
-    const rs = createMockResultSet([{ "COUNT(*)": 5 }]);
+    const rs = new TestResultSet([{ "COUNT(*)": 5 }]);
     const stmt = createMockPreparedStatement(rs);
     const conn = createMockConnection(stmt);
     const ds = createMockDataSource(conn);
@@ -201,7 +145,7 @@ describe("createAutoRepository", () => {
   });
 
   it("supports derived query methods via proxy", async () => {
-    const rs = createMockResultSet([
+    const rs = new TestResultSet([
       { id: 1, name: "Alice", email: "alice@example.com" },
     ]);
     const stmt = createMockPreparedStatement(rs);
@@ -216,7 +160,7 @@ describe("createAutoRepository", () => {
   });
 
   it("supports derived countBy methods via proxy", async () => {
-    const rs = createMockResultSet([{ "COUNT(*)": 3 }]);
+    const rs = new TestResultSet([{ "COUNT(*)": 3 }]);
     const stmt = createMockPreparedStatement(rs);
     const conn = createMockConnection(stmt);
     const ds = createMockDataSource(conn);
@@ -228,7 +172,7 @@ describe("createAutoRepository", () => {
   });
 
   it("supports derived existsBy methods via proxy", async () => {
-    const rs = createMockResultSet([{ "1": 1 }]);
+    const rs = new TestResultSet([{ "1": 1 }]);
     const stmt = createMockPreparedStatement(rs);
     const conn = createMockConnection(stmt);
     const ds = createMockDataSource(conn);
@@ -240,7 +184,7 @@ describe("createAutoRepository", () => {
   });
 
   it("passes options through to the underlying derived repository", () => {
-    const rs = createMockResultSet([]);
+    const rs = new TestResultSet([]);
     const stmt = createMockPreparedStatement(rs);
     const conn = createMockConnection(stmt);
     const ds = createMockDataSource(conn);
@@ -255,7 +199,7 @@ describe("createAutoRepository", () => {
   });
 
   it("works with ProductRepository (different entity)", async () => {
-    const rs = createMockResultSet([{ id: 1, title: "Widget", price: 9.99 }]);
+    const rs = new TestResultSet([{ id: 1, title: "Widget", price: 9.99 }]);
     const stmt = createMockPreparedStatement(rs);
     const conn = createMockConnection(stmt);
     const ds = createMockDataSource(conn);
@@ -269,7 +213,7 @@ describe("createAutoRepository", () => {
   });
 
   it("deleteById calls executeUpdate on the connection", async () => {
-    const rs = createMockResultSet([]);
+    const rs = new TestResultSet([]);
     const stmt = createMockPreparedStatement(rs);
     const conn = createMockConnection(stmt);
     const ds = createMockDataSource(conn);
@@ -281,7 +225,7 @@ describe("createAutoRepository", () => {
   });
 
   it("existsById returns true when entity exists", async () => {
-    const rs = createMockResultSet([{ "1": 1 }]);
+    const rs = new TestResultSet([{ "1": 1 }]);
     const stmt = createMockPreparedStatement(rs);
     const conn = createMockConnection(stmt);
     const ds = createMockDataSource(conn);
@@ -293,7 +237,7 @@ describe("createAutoRepository", () => {
   });
 
   it("existsById returns false when entity does not exist", async () => {
-    const rs = createMockResultSet([]);
+    const rs = new TestResultSet([]);
     const stmt = createMockPreparedStatement(rs);
     const conn = createMockConnection(stmt);
     const ds = createMockDataSource(conn);
