@@ -17,6 +17,9 @@ export type { CursorPayload } from "./cursor-encoding.js";
 export { RelayCursorStrategy } from "./relay-cursor-strategy.js";
 export type { RelayCursorStrategyOptions } from "./relay-cursor-strategy.js";
 
+export { KeysetPaginationStrategy } from "./keyset-strategy.js";
+export type { KeysetStrategyOptions } from "./keyset-strategy.js";
+
 export {
   PaginationStrategyRegistry,
   getGlobalPaginationRegistry,
