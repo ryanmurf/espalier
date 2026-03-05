@@ -185,6 +185,14 @@ export { Filter, getFilters, registerFilter, unregisterFilter, resolveActiveFilt
 export type { SoftDeleteOptions } from "./decorators/soft-delete.js";
 export { SoftDelete, getSoftDeleteMetadata, isSoftDeleteEntity } from "./decorators/soft-delete.js";
 
+export type { AuditedOptions } from "./decorators/audited.js";
+export { Audited, getAuditedMetadata, isAuditedEntity } from "./decorators/audited.js";
+
+export type { AuditUser } from "./audit/index.js";
+export type { AuditEntry, AuditFieldChange, AuditOperation } from "./audit/index.js";
+export { AuditContext, AuditLogWriter } from "./audit/index.js";
+export { getAuditLog, getAuditLogForEntity, getFieldHistory } from "./audit/index.js";
+
 export type { RoutingDataSourceOptions } from "./tenant/index.js";
 export { RoutingDataSource, TenantRoutingDataSource, RoutingError } from "./tenant/index.js";
 

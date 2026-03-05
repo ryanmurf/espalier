@@ -53,6 +53,8 @@ import type { FilterRegistration } from "../filter/filter-registry.js";
 import { FilterContext } from "../filter/filter-context.js";
 import { getSoftDeleteMetadata } from "../decorators/soft-delete.js";
 import { NullCriteria } from "../query/criteria.js";
+import { isAuditedEntity } from "../decorators/audited.js";
+import { AuditLogWriter } from "../audit/audit-log.js";
 
 function isProjectionClass(arg: unknown): arg is new (...args: any[]) => any {
   return typeof arg === "function" && getProjectionMetadata(arg) !== undefined;
@@ -284,6 +286,9 @@ export function createDerivedRepository<T, ID>(
     isUnassignedRelatedId,
   });
 
+  // Audit log writer (only instantiated for @Audited entities)
+  const auditLogWriter = isAuditedEntity(entityClass) ? new AuditLogWriter() : undefined;
+
   // Create entity persister
   const persister = new EntityPersister<T>({
     entityClass,
@@ -307,6 +312,7 @@ export function createDerivedRepository<T, ID>(
     getManyToOneFkValue,
     softDeleteColumn,
     softDeleteField,
+    auditLogWriter,
   });
 
   // Create derived query handler
@@ -1720,6 +1726,19 @@ export function createDerivedRepository<T, ID>(
     };
   }
 
+  // Audit log repository method
+  if (auditLogWriter) {
+    (crudMethods as any).getAuditLog = async (entityId: unknown): Promise<any[]> => {
+      const { getAuditLog } = await import("../audit/audit-query.js");
+      const conn = await dataSource.getConnection();
+      try {
+        return await getAuditLog(entityClass, entityId, conn);
+      } finally {
+        await conn.close();
+      }
+    };
+  }
+
   const knownMethods = new Set<string>([
     "findById",
     "existsById",
@@ -1743,6 +1762,8 @@ export function createDerivedRepository<T, ID>(
     "findIncludingDeleted",
     "findOnlyDeleted",
     "softDelete",
+    // Audit log method (only functional when @Audited is present)
+    "getAuditLog",
   ]);
 
   const tracedMethods = new Set<string>([

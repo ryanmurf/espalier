@@ -16,6 +16,8 @@ import { ENTITY_EVENTS } from "../events/entity-events.js";
 import type { OneToOneRelation } from "../decorators/relations.js";
 import { getFieldValue } from "../mapping/field-access.js";
 import type { CascadeManager } from "./cascade-manager.js";
+import type { AuditLogWriter, AuditFieldChange } from "../audit/audit-log.js";
+import { getAuditedMetadata, isAuditedEntity } from "../decorators/audited.js";
 
 export interface EntityPersisterDeps<T> {
   entityClass: new (...args: any[]) => T;
@@ -41,6 +43,8 @@ export interface EntityPersisterDeps<T> {
   softDeleteColumn?: string;
   /** Soft-delete field name on the entity (e.g. "deletedAt") */
   softDeleteField?: string;
+  /** AuditLogWriter instance; if provided and entity is @Audited, changes are logged */
+  auditLogWriter?: AuditLogWriter;
 }
 
 export class EntityPersister<T> {
@@ -65,6 +69,9 @@ export class EntityPersister<T> {
   private readonly getManyToOneFkValue: (entity: T, relation: import("../decorators/relations.js").ManyToOneRelation) => SqlValue;
   private readonly softDeleteColumn: string | undefined;
   private readonly softDeleteField: string | undefined;
+  private readonly auditLogWriter: AuditLogWriter | undefined;
+  private readonly auditedFields: string[] | undefined;
+  private readonly isAudited: boolean;
   private readonly entityName: string;
   private readonly repoLogger: Logger;
 
@@ -90,6 +97,9 @@ export class EntityPersister<T> {
     this.getManyToOneFkValue = deps.getManyToOneFkValue;
     this.softDeleteColumn = deps.softDeleteColumn;
     this.softDeleteField = deps.softDeleteField;
+    this.auditLogWriter = deps.auditLogWriter;
+    this.isAudited = isAuditedEntity(deps.entityClass);
+    this.auditedFields = this.isAudited ? getAuditedMetadata(deps.entityClass)?.fields : undefined;
     this.entityName = deps.entityClass.name;
     this.repoLogger = getGlobalLogger().child("repository");
   }
@@ -299,6 +309,9 @@ export class EntityPersister<T> {
           changes: hasSnapshot ? dirtyFields : undefined,
           timestamp: new Date(),
         } satisfies EntityUpdatedEvent<T>);
+        if (hasSnapshot && dirtyFields.length > 0) {
+          await this.writeAuditEntry(conn, this.getEntityId(saved), "UPDATE", this.toAuditFieldChanges(dirtyFields));
+        }
         return saved;
       }
 
@@ -415,6 +428,7 @@ export class EntityPersister<T> {
           id: this.getEntityId(saved),
           timestamp: new Date(),
         } satisfies EntityPersistedEvent<T>);
+        await this.writeAuditEntry(conn, this.getEntityId(saved), "INSERT", this.buildInsertChanges(saved));
         return saved;
       }
       return entity;
@@ -492,6 +506,11 @@ export class EntityPersister<T> {
         id: idValue,
         timestamp: now,
       } satisfies EntityRemovedEvent<T>);
+      await this.writeAuditEntry(conn, idValue, "DELETE", [{
+        field: this.softDeleteField!,
+        oldValue: null,
+        newValue: now,
+      }]);
       this.changeTracker.snapshot(entity);
       this.entityCache.evict(this.entityClass, this.tenantCacheKey(idValue));
       this.queryCache.invalidate(this.entityClass);
@@ -608,12 +627,78 @@ export class EntityPersister<T> {
         id: idValue,
         timestamp: new Date(),
       } satisfies EntityRemovedEvent<T>);
+      await this.writeAuditEntry(conn, idValue, "DELETE", []);
       this.changeTracker.clearSnapshot(entity);
       this.entityCache.evict(this.entityClass, this.tenantCacheKey(idValue));
       this.queryCache.invalidate(this.entityClass);
     } finally {
       await stmt.close().catch(() => {});
     }
+  }
+
+  /**
+   * Writes an audit log entry if the entity is @Audited and a writer is configured.
+   */
+  private async writeAuditEntry(
+    conn: Connection,
+    entityId: unknown,
+    operation: "INSERT" | "UPDATE" | "DELETE",
+    changes: AuditFieldChange[],
+  ): Promise<void> {
+    if (!this.isAudited || !this.auditLogWriter) return;
+
+    // Filter changes to audited fields only if a specific field list is configured
+    let filteredChanges = changes;
+    if (this.auditedFields) {
+      filteredChanges = changes.filter(c => this.auditedFields!.includes(c.field));
+      if (filteredChanges.length === 0 && operation === "UPDATE") return;
+    }
+
+    try {
+      await this.auditLogWriter.writeEntry(
+        conn,
+        this.entityName,
+        String(entityId),
+        operation,
+        filteredChanges,
+      );
+    } catch (err) {
+      // Log but don't fail the operation — audit is non-blocking
+      this.repoLogger.warn("Failed to write audit log entry", {
+        entityType: this.entityName,
+        entityId: String(entityId),
+        operation,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  /**
+   * Builds AuditFieldChange[] for an INSERT (all fields as new, old = null).
+   */
+  private buildInsertChanges(entity: T): AuditFieldChange[] {
+    const changes: AuditFieldChange[] = [];
+    for (const field of this.metadata.fields) {
+      if (field.fieldName === this.metadata.idField) continue;
+      const value = getFieldValue(entity as Record<string | symbol, unknown>, field.fieldName);
+      changes.push({
+        field: String(field.fieldName),
+        oldValue: null,
+        newValue: value,
+      });
+    }
+    return changes;
+  }
+
+  /**
+   * Converts FieldChange[] from the change tracker to AuditFieldChange[].
+   */
+  private toAuditFieldChanges(dirtyFields: import("../mapping/change-tracker.js").FieldChange[]): AuditFieldChange[] {
+    return dirtyFields.map(c => ({
+      field: String(c.field),
+      oldValue: c.oldValue,
+      newValue: c.newValue,
+    }));
   }
 
   applyTenantFilter(builder: { and(criteria: import("../query/criteria.js").Criteria): unknown }): void {
