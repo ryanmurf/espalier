@@ -6,6 +6,7 @@ import { getCreatedDateField, getLastModifiedDateField } from "../decorators/aud
 import { getVersionField } from "../decorators/version.js";
 import { getSoftDeleteMetadata } from "../decorators/soft-delete.js";
 import { isAuditedEntity } from "../decorators/audited.js";
+import { getVectorFields } from "../decorators/vector.js";
 import type { GraphQLPaginationAdapter } from "./pagination-adapter.js";
 import { OffsetPaginationAdapter } from "./pagination-adapter.js";
 
@@ -179,6 +180,12 @@ export class GraphQLSchemaGenerator {
         queryFields.push(`  ${camelCase(typeName)}AuditLog(entityId: ID!, limit: Int): [AuditEntry!]!`);
       }
 
+      // Vector similarity queries
+      const vectorFields = getVectorFields(entityClass);
+      if (vectorFields.size > 0) {
+        queryFields.push(`  ${camelCase(typeName)}SimilarTo(field: String!, vector: [Float!]!, limit: Int, maxDistance: Float, metric: String): [${typeName}!]!`);
+      }
+
       // Generate mutation fields
       if (this.options.mutations) {
         mutationFields.push(`  create${typeName}(input: ${typeName}Input!): ${typeName}!`);
@@ -265,6 +272,10 @@ export class GraphQLSchemaGenerator {
     for (const e of this.options.excludeFromInput) {
       exclude.add(e);
     }
+    // Exclude vector fields from input types (embedding arrays shouldn't be in create/update)
+    for (const vecFieldName of getVectorFields(entityClass).keys()) {
+      exclude.add(vecFieldName);
+    }
 
     const typeMappings = getColumnTypeMappings(entityClass);
 
@@ -297,6 +308,10 @@ export class GraphQLSchemaGenerator {
     );
     for (const e of this.options.excludeFromInput) {
       exclude.add(e);
+    }
+    // Exclude vector fields from update input types
+    for (const vecFieldName of getVectorFields(entityClass).keys()) {
+      exclude.add(vecFieldName);
     }
 
     const typeMappings = getColumnTypeMappings(entityClass);

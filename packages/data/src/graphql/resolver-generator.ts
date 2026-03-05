@@ -6,6 +6,7 @@ import { getEntityMetadata } from "../mapping/entity-metadata.js";
 import { getTenantIdField } from "../decorators/tenant.js";
 import { getSoftDeleteMetadata } from "../decorators/soft-delete.js";
 import { isAuditedEntity } from "../decorators/audited.js";
+import { getVectorFields } from "../decorators/vector.js";
 import { equal, Specifications } from "../query/specification.js";
 import { createPageable } from "../repository/paging.js";
 import { TenantContext } from "../tenant/tenant-context.js";
@@ -117,6 +118,12 @@ export class ResolverGenerator {
       // Audit log query resolver
       if (isAuditedEntity(entityClass)) {
         query[`${camelName}AuditLog`] = this.createAuditLogResolver(repository, metadata, entityClass);
+      }
+
+      // Vector similarity query resolver
+      const vectorFields = getVectorFields(entityClass);
+      if (vectorFields.size > 0) {
+        query[`${camelName}SimilarTo`] = this.createSimilarToResolver(repository, metadata, entityClass);
       }
 
       // Mutation resolvers
@@ -336,6 +343,26 @@ export class ResolverGenerator {
           return entries;
         }
         return [];
+      });
+    };
+  }
+
+  private createSimilarToResolver(
+    repository: CrudRepository<any, any>,
+    metadata: EntityMetadata,
+    entityClass: new (...args: any[]) => any,
+  ): ResolverFn {
+    return async (_parent: any, args: { field: string; vector: number[]; limit?: number; maxDistance?: number; metric?: string }, context: any) => {
+      return this.withTenantContext(context, metadata, entityClass, async () => {
+        const repo = repository as any;
+        if (typeof repo.findBySimilarity !== "function") {
+          return [];
+        }
+        return repo.findBySimilarity(args.field, args.vector, {
+          limit: args.limit,
+          maxDistance: args.maxDistance,
+          metric: args.metric as any,
+        });
       });
     };
   }
