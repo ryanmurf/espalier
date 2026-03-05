@@ -145,29 +145,28 @@ describe("OffsetPaginationStrategy — adversarial", () => {
 // ==========================================================================
 
 describe("createPage — adversarial", () => {
-  it("size 0 causes division by zero — totalPages is Infinity", () => {
-    // BUG DETECTION: Math.ceil(10 / 0) = Infinity
-    const page = createPage([], { page: 0, size: 0 }, 10);
-    expect(page.totalPages).toBe(Infinity);
+  it("size 0 throws validation error", () => {
+    expect(() => createPage([], { page: 0, size: 0 }, 10)).toThrow(
+      "Page size must be a positive number",
+    );
   });
 
-  it("negative totalElements — produces negative totalPages", () => {
-    // BUG DETECTION: no input validation
-    const page = createPage([], { page: 0, size: 10 }, -5);
-    expect(page.totalPages).toBe(0); // ceil(-0.5) = 0
+  it("negative totalElements throws validation error", () => {
+    expect(() => createPage([], { page: 0, size: 10 }, -5)).toThrow(
+      "Total elements must be a non-negative number",
+    );
   });
 
-  it("negative page number — hasPrevious still reflects comparison", () => {
-    const page = createPage([], { page: -1, size: 10 }, 100);
-    // page(-1) > 0 => false
-    expect(page.hasPrevious).toBe(false);
-    // page(-1) < totalPages(10) - 1 => -1 < 9 => true
-    expect(page.hasNext).toBe(true);
+  it("negative page number throws validation error", () => {
+    expect(() => createPage([], { page: -1, size: 10 }, 100)).toThrow(
+      "Page number must be a non-negative number",
+    );
   });
 
-  it("NaN size — totalPages is NaN", () => {
-    const page = createPage([], { page: 0, size: NaN }, 10);
-    expect(page.totalPages).toBeNaN();
+  it("NaN size throws validation error", () => {
+    expect(() => createPage([], { page: 0, size: NaN }, 10)).toThrow(
+      "Page size must be a positive number",
+    );
   });
 
   it("fractional page and size — no rounding applied to inputs", () => {

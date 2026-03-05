@@ -136,7 +136,10 @@ describe("KeysetPaginationStrategy.applyToQuery — adversarial", () => {
     }));
     const q = builder.build();
     expect(q.sql).toContain("WHERE");
-    expect(q.sql).not.toContain("OR");
+    // Single column cursor uses simple comparison, no OR in the WHERE clause
+    // (note: "ORDER" contains "OR" so we check the WHERE clause specifically)
+    const whereClause = q.sql.split("ORDER")[0];
+    expect(whereClause).not.toContain(" OR ");
   });
 
   it("DESC cursor — uses < operator", () => {
@@ -187,8 +190,8 @@ describe("KeysetPaginationStrategy.applyToQuery — adversarial", () => {
     expect(q.sql).not.toContain("WHERE");
   });
 
-  it("afterValue=null and afterId=null — both are not undefined, cursor applied", () => {
-    // null !== undefined, so the condition IS applied
+  it("afterValue=null and afterId=null — cursor is NOT applied (null means no cursor)", () => {
+    // null should be treated as "no cursor" — skip cursor condition
     const s = makeStrategy();
     const builder = new SelectBuilder("t").columns("*");
     s.applyToQuery(builder, makePageable({
@@ -196,8 +199,7 @@ describe("KeysetPaginationStrategy.applyToQuery — adversarial", () => {
       afterId: null,
     }));
     const q = builder.build();
-    // The condition checks `!== undefined`, null passes
-    expect(q.sql).toContain("WHERE");
+    expect(q.sql).not.toContain("WHERE");
   });
 
   it("size 1 — LIMIT 2 (1+1)", () => {
@@ -408,7 +410,9 @@ describe("KeysetPaginationStrategy — cursor SQL generation", () => {
       afterId: 50,
     }));
     const q = builder.build();
-    expect(q.sql).not.toContain("OR");
+    // Single column cursor: no OR in WHERE clause ("ORDER" contains "OR")
+    const whereClause = q.sql.split("ORDER")[0];
+    expect(whereClause).not.toContain(" OR ");
     // Single param for cursor + LIMIT
     const nonLimitParams = q.params.filter((p) => p !== 51); // 50+1 LIMIT
     expect(nonLimitParams).toContain(50);

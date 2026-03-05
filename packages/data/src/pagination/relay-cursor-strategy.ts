@@ -152,7 +152,6 @@ export class RelayCursorStrategy implements PaginationStrategy<CursorPageable, C
 
       // Current column comparison
       const col = columns[depth];
-      const isLastCol = depth === columns.length - 1;
       const sortDir = depth < this.sortColumns.length
         ? this.sortColumns[depth].direction
         : "ASC"; // ID column default
@@ -206,9 +205,14 @@ export class RelayCursorStrategy implements PaginationStrategy<CursorPageable, C
   private buildCursorForRow<T>(row: T): string {
     const values: unknown[] = [];
     for (const col of this.sortColumns) {
-      values.push((row as any)[col.column] ?? (row as any)[this.toCamelCase(col.column)]);
+      const obj = row as Record<string, unknown>;
+      const val = col.column in obj ? obj[col.column] : obj[this.toCamelCase(col.column)];
+      values.push(val);
     }
-    const id = (row as any)[this.idField] ?? (row as any)[this.idColumn];
+    const obj = row as Record<string, unknown>;
+    const id = this.idField in obj ? obj[this.idField]
+      : this.idColumn in obj ? obj[this.idColumn]
+      : null;
     return encodeCursor({ values, id });
   }
 

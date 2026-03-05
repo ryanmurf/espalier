@@ -45,7 +45,7 @@ export class KeysetPaginationStrategy
     const sortCol = request.sortColumn;
     const sortDir = request.sortDirection;
 
-    if (request.afterValue !== undefined && request.afterId !== undefined) {
+    if (request.afterValue != null && request.afterId != null) {
       this.applyCursorCondition(
         builder,
         sortCol,
@@ -73,12 +73,10 @@ export class KeysetPaginationStrategy
 
     const lastRow = rows.length > 0 ? rows[rows.length - 1] : null;
     const lastValue = lastRow
-      ? (lastRow as any)[request.sortColumn] ??
-        (lastRow as any)[this.toCamelCase(request.sortColumn)] ??
-        null
+      ? this.extractField(lastRow, request.sortColumn)
       : null;
     const lastId = lastRow
-      ? (lastRow as any)[this.idField] ?? (lastRow as any)[this.idColumn] ?? null
+      ? this.extractField(lastRow, this.idField, this.idColumn)
       : null;
 
     return {
@@ -128,6 +126,23 @@ export class KeysetPaginationStrategy
         },
       });
     }
+  }
+
+  /**
+   * Extract a field value from a row, trying the column name, its camelCase form,
+   * and an optional fallback. Uses `in` operator to distinguish null from missing.
+   */
+  private extractField(row: unknown, field: string, fallbackField?: string): unknown {
+    const obj = row as Record<string, unknown>;
+    if (field in obj) return obj[field];
+    const camel = this.toCamelCase(field);
+    if (camel !== field && camel in obj) return obj[camel];
+    if (fallbackField !== undefined) {
+      if (fallbackField in obj) return obj[fallbackField];
+      const camelFallback = this.toCamelCase(fallbackField);
+      if (camelFallback !== fallbackField && camelFallback in obj) return obj[camelFallback];
+    }
+    return null;
   }
 
   private toCamelCase(snakeCase: string): string {
