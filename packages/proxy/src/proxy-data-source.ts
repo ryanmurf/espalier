@@ -49,6 +49,7 @@ export class ProxyDataSource implements DataSource {
   private cleanupTimer: ReturnType<typeof setInterval> | null = null;
   private _closed = false;
   private _coldStart: boolean;
+  private _shutdownCleanup: (() => void) | null = null;
 
   constructor(inner: DataSource, options?: ProxyDataSourceOptions) {
     this.inner = inner;
@@ -59,7 +60,11 @@ export class ProxyDataSource implements DataSource {
     this.maxConnections = options?.maxConnections ?? defaults.maxConnections;
     this.maxIdleTimeMs = options?.maxIdleTimeMs ?? defaults.maxIdleTimeMs;
     this.validateOnBorrow = options?.validateOnBorrow ?? defaults.validateOnBorrow;
-    this.validationQuery = options?.validationQuery ?? "SELECT 1";
+    const query = options?.validationQuery ?? "SELECT 1";
+    if (!/^\s*SELECT\s/i.test(query)) {
+      throw new Error("validationQuery must be a SELECT statement.");
+    }
+    this.validationQuery = query;
     this.validationTimeoutMs = options?.validationTimeoutMs ?? 3000;
     this.onEvict = options?.onEvict;
 
@@ -128,6 +133,8 @@ export class ProxyDataSource implements DataSource {
       this.cleanupTimer = null;
     }
 
+    this.removeShutdownHooks();
+
     const closePromises = this.pool.map((p) =>
       p.connection.close().catch(() => {}),
     );
@@ -174,18 +181,21 @@ export class ProxyDataSource implements DataSource {
       },
       async close() {
         // Return to pool instead of closing
-        if (proxy._closed) {
-          await conn.close();
-          return;
-        }
-
-        if (conn.isClosed()) {
+        if (proxy._closed || conn.isClosed()) {
+          if (!conn.isClosed()) {
+            await conn.close();
+          }
           return;
         }
 
         // If pool is full, actually close
         if (proxy.pool.length >= proxy.maxConnections) {
           await conn.close();
+          return;
+        }
+
+        // Final isClosed() check immediately before pool return
+        if (conn.isClosed()) {
           return;
         }
 
@@ -199,16 +209,20 @@ export class ProxyDataSource implements DataSource {
   }
 
   private async validate(conn: Connection): Promise<boolean> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
     try {
       const stmt = conn.prepareStatement(this.validationQuery);
-      const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("Validation timeout")), this.validationTimeoutMs),
-      );
-      await Promise.race([stmt.executeQuery(), timeoutPromise]);
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error("Validation timeout")), this.validationTimeoutMs);
+      });
+      const rs = await Promise.race([stmt.executeQuery(), timeoutPromise]);
+      await rs.close().catch(() => {});
       await stmt.close().catch(() => {});
       return true;
     } catch {
       return false;
+    } finally {
+      if (timer !== undefined) clearTimeout(timer);
     }
   }
 
@@ -253,9 +267,18 @@ export class ProxyDataSource implements DataSource {
       };
 
       process.on("beforeExit", cleanup);
-
       // SIGTERM is sent by Lambda when the execution environment is being shut down
       process.on("SIGTERM", cleanup);
+
+      this._shutdownCleanup = cleanup;
+    }
+  }
+
+  private removeShutdownHooks(): void {
+    if (this._shutdownCleanup && typeof process !== "undefined" && process.removeListener) {
+      process.removeListener("beforeExit", this._shutdownCleanup);
+      process.removeListener("SIGTERM", this._shutdownCleanup);
+      this._shutdownCleanup = null;
     }
   }
 }

@@ -41,10 +41,24 @@ const ENV_DEFAULTS: Record<ServerlessEnvironment, EnvironmentDefaults> = {
  * Detect the current serverless environment from environment variables.
  */
 export function detectEnvironment(): ServerlessEnvironment {
+  // Cloudflare Workers: no process.env, but has global caches API with default property
+  if (
+    typeof globalThis !== "undefined" &&
+    "caches" in globalThis &&
+    typeof (globalThis as any).caches?.default !== "undefined"
+  ) {
+    return "cloudflare-workers";
+  }
+  if (
+    typeof navigator !== "undefined" &&
+    typeof navigator.userAgent === "string" &&
+    navigator.userAgent.includes("Cloudflare-Workers")
+  ) {
+    return "cloudflare-workers";
+  }
   if (typeof process !== "undefined" && process.env) {
     if (process.env.AWS_LAMBDA_FUNCTION_NAME) return "aws-lambda";
     if (process.env.VERCEL) return "vercel";
-    if (process.env.CF_PAGES || process.env.CF_WORKER) return "cloudflare-workers";
   }
   return "unknown";
 }
