@@ -17,7 +17,17 @@ export {
 
 export { ColumnRef, ExpressionRef, col, expr } from "./column-ref.js";
 
-export type { BuiltQuery, JoinType, OrderByExpressionArg, SortDirection } from "./query-builder.js";
+export type {
+  BuiltQuery,
+  FrameBound,
+  FrameBoundType,
+  FrameSpec,
+  JoinType,
+  OrderByExpressionArg,
+  SortDirection,
+  WindowFunctionDef,
+  WindowSpec,
+} from "./query-builder.js";
 export {
   QueryBuilder,
   SelectBuilder,
