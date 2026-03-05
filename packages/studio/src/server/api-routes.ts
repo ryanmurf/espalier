@@ -19,6 +19,27 @@ function sanitizeIdentifier(name: string): string {
   return name.replace(/[^a-zA-Z0-9_]/g, "");
 }
 
+function containsSemicolon(sql: string): boolean {
+  // Check for semicolons outside of single-quoted string literals
+  let inString = false;
+  for (let i = 0; i < sql.length; i++) {
+    const ch = sql[i];
+    if (ch === "'" && !inString) {
+      inString = true;
+    } else if (ch === "'" && inString) {
+      // Handle escaped quotes ('')
+      if (i + 1 < sql.length && sql[i + 1] === "'") {
+        i++;
+      } else {
+        inString = false;
+      }
+    } else if (ch === ";" && !inString) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function parsePageParams(query: Record<string, string>): { offset: number; limit: number } {
   const parsedPage = parseInt(query.page ?? "", 10);
   const page = Math.max(0, Number.isNaN(parsedPage) ? 0 : parsedPage);
@@ -348,6 +369,14 @@ export function createApiRoutes(app: Hono, ctx: ApiRouteContext): void {
       return c.json({ error: "Query too long (max 10000 characters)" }, 400);
     }
 
+    // Reject multi-statement queries (semicolons outside string literals)
+    if (containsSemicolon(sql)) {
+      return c.json(
+        { error: "Multi-statement queries are not allowed. Remove semicolons." },
+        400,
+      );
+    }
+
     const isReadQuery = /^\s*(SELECT|SHOW|DESCRIBE|EXPLAIN|WITH)\b/i.test(sql);
 
     if (!isReadQuery && ctx.readOnly) {
@@ -361,7 +390,39 @@ export function createApiRoutes(app: Hono, ctx: ApiRouteContext): void {
 
     const conn = await ctx.dataSource.getConnection();
     try {
-      if (isReadQuery) {
+      if (ctx.readOnly) {
+        // Use a read-only transaction as defense-in-depth
+        const tx = await conn.beginTransaction();
+        try {
+          const setupStmt = conn.createStatement();
+          await setupStmt.executeQuery("SET TRANSACTION READ ONLY");
+          await setupStmt.close();
+
+          const ps = conn.prepareStatement(sql);
+          try {
+            for (let i = 0; i < params.length; i++) {
+              ps.setParameter(i + 1, params[i] as any);
+            }
+            const rs = await ps.executeQuery();
+            const rows: Record<string, unknown>[] = [];
+            let count = 0;
+            const maxRows = 1000;
+            while (await rs.next()) {
+              if (count >= maxRows) break;
+              rows.push(rs.getRow());
+              count++;
+            }
+            await rs.close();
+            await tx.commit();
+            return c.json({ rows, truncated: count >= maxRows });
+          } finally {
+            await ps.close();
+          }
+        } catch (err) {
+          await tx.rollback().catch(() => {});
+          throw err;
+        }
+      } else if (isReadQuery) {
         const ps = conn.prepareStatement(sql);
         try {
           for (let i = 0; i < params.length; i++) {
