@@ -3,6 +3,26 @@ import type { Criteria, CriteriaType } from "../query/criteria.js";
 
 export type SearchMode = "plain" | "phrase" | "websearch";
 
+/** Sanitize a string for embedding in a SQL single-quoted literal (escape single quotes). */
+function sanitizeSqlLiteral(value: string): string {
+  return value.replace(/'/g, "''");
+}
+
+/** Validate and sanitize a PG text search language identifier. */
+function sanitizeLanguage(lang: string): string {
+  // Language names in PG are simple identifiers — reject anything suspicious
+  if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(lang)) {
+    throw new Error(`Invalid search language: "${lang}". Must be a valid identifier.`);
+  }
+  return lang;
+}
+
+/** Sanitize ts_headline tag options — only allow simple HTML-like tags. */
+function sanitizeTag(tag: string): string {
+  // Only allow alphanumeric chars, <, >, /, =, ", space — reject everything else
+  return tag.replace(/[^a-zA-Z0-9<>\/=" ]/g, "");
+}
+
 const SEARCH_MODE_FUNCTIONS: Record<SearchMode, string> = {
   plain: "plainto_tsquery",
   phrase: "phraseto_tsquery",
@@ -26,11 +46,12 @@ export class FullTextSearchCriteria implements Criteria {
 
   toSql(paramOffset: number): { sql: string; params: SqlValue[] } {
     const queryFn = SEARCH_MODE_FUNCTIONS[this.mode];
+    const lang = sanitizeLanguage(this.language);
 
     // Build tsvector expression, optionally with weights
     const tsvectorParts = this.columns.map((col) => {
       const weight = this.weights?.[col];
-      const tsvec = `to_tsvector('${this.language}', ${quoteIdentifier(col)})`;
+      const tsvec = `to_tsvector('${lang}', ${quoteIdentifier(col)})`;
       return weight ? `setweight(${tsvec}, '${weight}')` : tsvec;
     });
 
@@ -39,7 +60,7 @@ export class FullTextSearchCriteria implements Criteria {
       : tsvectorParts.join(" || ");
 
     return {
-      sql: `(${tsvectorExpr}) @@ ${queryFn}('${this.language}', $${paramOffset})`,
+      sql: `(${tsvectorExpr}) @@ ${queryFn}('${lang}', $${paramOffset})`,
       params: [this.searchTerm],
     };
   }
@@ -59,10 +80,11 @@ export class SearchRankExpression {
 
   toSql(paramOffset: number): { sql: string; params: SqlValue[] } {
     const queryFn = SEARCH_MODE_FUNCTIONS[this.mode];
+    const lang = sanitizeLanguage(this.language);
 
     const tsvectorParts = this.columns.map((col) => {
       const weight = this.weights?.[col];
-      const tsvec = `to_tsvector('${this.language}', ${quoteIdentifier(col)})`;
+      const tsvec = `to_tsvector('${lang}', ${quoteIdentifier(col)})`;
       return weight ? `setweight(${tsvec}, '${weight}')` : tsvec;
     });
 
@@ -71,7 +93,7 @@ export class SearchRankExpression {
       : tsvectorParts.join(" || ");
 
     return {
-      sql: `ts_rank(${tsvectorExpr}, ${queryFn}('${this.language}', $${paramOffset}))`,
+      sql: `ts_rank(${tsvectorExpr}, ${queryFn}('${lang}', $${paramOffset}))`,
       params: [this.searchTerm],
     };
   }
@@ -91,22 +113,32 @@ export class SearchHighlightExpression {
 
   toSql(paramOffset: number): { sql: string; params: SqlValue[] } {
     const queryFn = SEARCH_MODE_FUNCTIONS[this.mode];
+    const lang = sanitizeLanguage(this.language);
 
     let optString = "";
     if (this.options) {
       const parts: string[] = [];
-      if (this.options.startTag) parts.push(`StartSel=${this.options.startTag}`);
-      if (this.options.stopTag) parts.push(`StopSel=${this.options.stopTag}`);
-      if (this.options.maxWords != null) parts.push(`MaxWords=${this.options.maxWords}`);
-      if (this.options.minWords != null) parts.push(`MinWords=${this.options.minWords}`);
-      if (this.options.maxFragments != null) parts.push(`MaxFragments=${this.options.maxFragments}`);
+      if (this.options.startTag) parts.push(`StartSel=${sanitizeTag(this.options.startTag)}`);
+      if (this.options.stopTag) parts.push(`StopSel=${sanitizeTag(this.options.stopTag)}`);
+      if (this.options.maxWords != null) {
+        const n = Math.floor(Number(this.options.maxWords));
+        if (Number.isFinite(n) && n > 0) parts.push(`MaxWords=${n}`);
+      }
+      if (this.options.minWords != null) {
+        const n = Math.floor(Number(this.options.minWords));
+        if (Number.isFinite(n) && n > 0) parts.push(`MinWords=${n}`);
+      }
+      if (this.options.maxFragments != null) {
+        const n = Math.floor(Number(this.options.maxFragments));
+        if (Number.isFinite(n) && n >= 0) parts.push(`MaxFragments=${n}`);
+      }
       if (parts.length > 0) {
         optString = `, '${parts.join(", ")}'`;
       }
     }
 
     return {
-      sql: `ts_headline('${this.language}', ${quoteIdentifier(this.column)}, ${queryFn}('${this.language}', $${paramOffset})${optString})`,
+      sql: `ts_headline('${lang}', ${quoteIdentifier(this.column)}, ${queryFn}('${lang}', $${paramOffset})${optString})`,
       params: [this.searchTerm],
     };
   }
