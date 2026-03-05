@@ -3,6 +3,7 @@ import { serve } from "@hono/node-server";
 import type { SchemaModel } from "../schema/schema-model.js";
 import type { DataSource } from "espalier-jdbc";
 import { createApiRoutes } from "./api-routes.js";
+import { getStudioHtml } from "../ui/html-template.js";
 
 export interface StudioServerOptions {
   schema: SchemaModel;
@@ -26,6 +27,12 @@ export function createStudioServer(options: StudioServerOptions): StudioServer {
 
   const app = new Hono();
   let server: ReturnType<typeof serve> | null = null;
+
+  const studioHtml = getStudioHtml({ readOnly });
+
+  app.get("/", (c) => {
+    return c.html(studioHtml);
+  });
 
   createApiRoutes(app, {
     schema: options.schema,
