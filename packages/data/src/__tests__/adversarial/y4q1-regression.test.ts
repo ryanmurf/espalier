@@ -421,10 +421,6 @@ describe("Y4Q1: findAll validation regression", () => {
     it("object with page, size, AND extra unrelated properties is still valid Pageable", async () => {
       const { TestResultSet, Table, Column, Id, Repository, createAutoRepository } =
         await getTestUtils();
-      const { CrudRepository: _CR } = await import(
-        "../../repository/crud-repository.js"
-      );
-
       @Table("fa_items")
       class FaItem {
         @Id @Column() id: number = 0;

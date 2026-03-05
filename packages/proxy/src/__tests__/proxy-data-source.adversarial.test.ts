@@ -402,14 +402,25 @@ describe("ProxyDataSource adversarial tests", () => {
       expect(detectEnvironment()).toBe("vercel");
     });
 
-    it("detects cloudflare from CF_PAGES", () => {
-      process.env = { ...originalEnv, CF_PAGES: "1" };
+    it("detects cloudflare from globalThis.caches.default", () => {
+      (globalThis as any).caches = { default: {} };
       expect(detectEnvironment()).toBe("cloudflare-workers");
+      delete (globalThis as any).caches;
     });
 
-    it("detects cloudflare from CF_WORKER", () => {
-      process.env = { ...originalEnv, CF_WORKER: "1" };
+    it("detects cloudflare from navigator.userAgent", () => {
+      const origNavigator = globalThis.navigator;
+      Object.defineProperty(globalThis, "navigator", {
+        value: { userAgent: "Cloudflare-Workers" },
+        writable: true,
+        configurable: true,
+      });
       expect(detectEnvironment()).toBe("cloudflare-workers");
+      Object.defineProperty(globalThis, "navigator", {
+        value: origNavigator,
+        writable: false,
+        configurable: true,
+      });
     });
 
     it("returns unknown when no env vars set", () => {
