@@ -71,11 +71,11 @@ describe("no Node-specific APIs in espalier-data", () => {
     }
   });
 
-  it("only tenant and observability files use node:async_hooks", () => {
-    // AsyncLocalStorage is used in tenant context and N1 detection scoping
+  it("only tenant, observability, and filter files use node:async_hooks", () => {
+    // AsyncLocalStorage is used in tenant context, N1 detection scoping, and filter context
     const nonAllowedViolations: string[] = [];
     for (const file of srcFiles) {
-      if (file.includes("/tenant/") || file.includes("/observability/")) continue;
+      if (file.includes("/tenant/") || file.includes("/observability/") || file.includes("/filter/")) continue;
       const content = fs.readFileSync(file, "utf-8");
       if (/from\s+["']node:async_hooks["']/.test(content)) {
         nonAllowedViolations.push(path.relative(ROOT, file));
