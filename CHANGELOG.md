@@ -1,5 +1,49 @@
 # Changelog
 
+## [1.9.0] - Y6 Q1 — Full-Text Search, Views & Tree Data
+
+### Features
+- **@Searchable Decorator**: Field decorator for PostgreSQL full-text search with tsvector, configurable language, weight (A-D), and index type (GIN/GiST)
+- **FullTextSearchCriteria**: Parameterized WHERE clause for tsvector @@ tsquery matching with plainto_tsquery, phraseto_tsquery, and websearch_to_tsquery modes
+- **SearchRankExpression**: ts_rank expression for relevance scoring with weighted tsvector columns
+- **SearchHighlightExpression**: ts_headline expression for search result highlighting with configurable start/stop tags and fragment options
+- **Faceted Search**: FacetedSearchSpecification for grouped search results with counts via Specification pattern
+- **Window Functions**: ROW_NUMBER, RANK, DENSE_RANK, NTILE, LAG, LEAD, FIRST_VALUE, LAST_VALUE, NTH_VALUE, PERCENT_RANK, CUME_DIST with OVER/PARTITION BY/ORDER BY/frame specs (ROWS, RANGE, GROUPS)
+- **Named Windows**: defineWindow() for reusable WINDOW clause definitions
+- **Common Table Expressions (CTEs)**: with() for non-recursive CTEs, withRecursive() for recursive CTEs with UNION/UNION ALL, CTE name validation
+- **@View Decorator**: Class decorator for database view entities with read-only enforcement, checkOption (LOCAL/CASCADED)
+- **@MaterializedView Decorator**: Class decorator for materialized view entities with WITH DATA/NO DATA, unique index columns for REFRESH CONCURRENTLY
+- **@Tree Decorator**: Class decorator for hierarchical data with closure-table and materialized-path strategies
+- **ClosureTableManager**: Full closure table operations — insertNode, moveNode (with circular reference detection), deleteNode, findDescendants, findAncestors, findRoots, findChildren, findLeaves, getDepth
+- **MaterializedPathManager**: Path-based tree operations with LIKE wildcard escaping, circular reference prevention, buildPath, findDescendants, findAncestors, moveNode, findRoots, findLeaves
+- **DDL Generation**: generateSearchIndexes, generateViewDdl, generateMaterializedViewDdl, refreshMaterializedView, generateClosureTableDdl — all integrated into generateAllDdl
+- **GraphQL Integration**: Search query resolver for @Searchable entities
+- **REST Integration**: GET /entities/search endpoint for searchable entities
+
+### Security
+- Runtime validation of search weights (A-D) prevents SQL injection via crafted weight values
+- Runtime validation of search modes rejects invalid mode strings
+- sanitizeLanguage() validates PG text search language identifiers against identifier pattern
+- sanitizeTag() strips dangerous characters from ts_headline tag options
+- Numeric highlight options (maxWords, minWords, maxFragments) reject NaN/Infinity/negative
+- Window function names validated against allowlist
+- CTE names validated against identifier pattern
+- Frame bound offsets reject NaN/Infinity
+- @View checkOption validated at runtime (DDL injection prevention)
+- @View/@MaterializedView definitions validated as non-empty
+- MaterializedPathManager validates nodeId does not contain path separator
+- DDL generator re-validates search language and index type before embedding in SQL
+
+### Bug Fixes
+- ClosureTableManager.moveNode now detects circular references before moving
+- MaterializedView unique array deep-cloned to prevent shared mutation
+- getMaterializedViewMetadata returns deep-cloned unique array
+- generateAllDdl skips view entities for join table and search index generation
+- MaterializedPathManager.moveNode eliminates redundant double-update
+
+### Tests
+- 238 adversarial tests across 3 test files (window/CTE, search, view/tree)
+
 ## [1.8.0] - Y5 Q4 — Event Sourcing & Outbox Pattern
 
 ### Features

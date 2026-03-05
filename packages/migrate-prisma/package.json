@@ -1,6 +1,6 @@
 {
   "name": "espalier-migrate-prisma",
-  "version": "1.8.0",
+  "version": "1.9.0",
   "description": "Convert Prisma schema files to Espalier entity classes",
   "type": "module",
   "main": "./dist/index.cjs",
