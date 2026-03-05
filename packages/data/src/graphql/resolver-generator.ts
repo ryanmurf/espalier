@@ -352,14 +352,24 @@ export class ResolverGenerator {
     metadata: EntityMetadata,
     entityClass: new (...args: any[]) => any,
   ): ResolverFn {
+    const VALID_METRICS = new Set(["l2", "cosine", "inner_product"]);
+
     return async (_parent: any, args: { field: string; vector: number[]; limit?: number; maxDistance?: number; metric?: string }, context: any) => {
+      // Validate metric
+      if (args.metric != null && !VALID_METRICS.has(args.metric)) {
+        throw new Error(`Invalid metric "${args.metric}". Must be one of: l2, cosine, inner_product`);
+      }
+
+      // Cap limit at 1000
+      const limit = args.limit != null ? Math.min(Math.max(1, args.limit), 1000) : undefined;
+
       return this.withTenantContext(context, metadata, entityClass, async () => {
         const repo = repository as any;
         if (typeof repo.findBySimilarity !== "function") {
           return [];
         }
         return repo.findBySimilarity(args.field, args.vector, {
-          limit: args.limit,
+          limit,
           maxDistance: args.maxDistance,
           metric: args.metric as any,
         });

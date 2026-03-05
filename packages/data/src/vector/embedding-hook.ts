@@ -106,11 +106,15 @@ export function createEmbeddingHook(options: EmbeddingHookOptions): (this: Recor
 // Counter for generating unique method names
 let hookCounter = 0;
 
+// Track registered entity+vectorField combos to prevent duplicate registration
+const registeredHooks = new Set<string>();
+
 /**
  * Programmatically registers an embedding hook on an entity class.
  *
  * This attaches a @PrePersist and @PreUpdate lifecycle callback that
  * auto-generates embeddings from source fields before persistence.
+ * Duplicate registrations for the same entity+vectorField combo are ignored.
  *
  * @example
  * ```ts
@@ -125,6 +129,13 @@ export function registerEmbeddingHook(
   entityClass: new (...args: unknown[]) => unknown,
   options: EmbeddingHookOptions,
 ): void {
+  // Deduplicate by entity class name + vector field to prevent double-registration
+  const key = `${entityClass.name}::${options.vectorField}`;
+  if (registeredHooks.has(key)) {
+    return;
+  }
+  registeredHooks.add(key);
+
   const hook = createEmbeddingHook(options);
   const methodName = `__embeddingHook_${options.vectorField}_${hookCounter++}`;
 

@@ -425,9 +425,34 @@ export class RouteGenerator {
         return { status: 400, body: { error: "vector must be an array of numbers" } };
       }
 
+      // Validate metric
+      const VALID_METRICS = new Set(["l2", "cosine", "inner_product"]);
+      if (metric != null && (typeof metric !== "string" || !VALID_METRICS.has(metric))) {
+        return {
+          status: 400,
+          body: { error: `Invalid metric. Must be one of: l2, cosine, inner_product` },
+        };
+      }
+
+      // Validate limit: must be a positive finite integer, capped at 1000
+      const parsedLimit = limit != null ? Number(limit) : undefined;
+      if (parsedLimit !== undefined) {
+        if (!Number.isFinite(parsedLimit) || parsedLimit < 1 || !Number.isInteger(parsedLimit)) {
+          return { status: 400, body: { error: "limit must be a positive integer" } };
+        }
+      }
+
+      // Validate maxDistance: must be a positive finite number
+      const parsedMaxDistance = maxDistance != null ? Number(maxDistance) : undefined;
+      if (parsedMaxDistance !== undefined) {
+        if (!Number.isFinite(parsedMaxDistance) || parsedMaxDistance <= 0) {
+          return { status: 400, body: { error: "maxDistance must be a positive finite number" } };
+        }
+      }
+
       const options: Record<string, unknown> = {};
-      if (limit != null) options.limit = Number(limit);
-      if (maxDistance != null) options.maxDistance = Number(maxDistance);
+      if (parsedLimit != null) options.limit = Math.min(parsedLimit, 1000);
+      if (parsedMaxDistance != null) options.maxDistance = parsedMaxDistance;
       if (metric != null) options.metric = metric;
 
       const includeDistance = String(req.query.includeDistance) === "true";
