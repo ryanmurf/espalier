@@ -11,6 +11,9 @@ export interface SchemaColumn {
   isCreatedDate: boolean;
   isLastModifiedDate: boolean;
   isTenantId: boolean;
+  isVector?: boolean;
+  vectorDimensions?: number;
+  vectorMetric?: "l2" | "cosine" | "inner_product";
 }
 
 export type RelationType = "ManyToOne" | "OneToMany" | "ManyToMany" | "OneToOne";

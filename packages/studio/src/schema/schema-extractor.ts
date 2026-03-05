@@ -3,8 +3,9 @@ import {
   getColumnMetadataEntries,
   getSoftDeleteMetadata,
   isAuditedEntity,
+  getVectorFields,
 } from "espalier-data";
-import type { EntityMetadata, ColumnMetadataEntry } from "espalier-data";
+import type { EntityMetadata, ColumnMetadataEntry, VectorMetadataEntry } from "espalier-data";
 import type {
   SchemaModel,
   SchemaTable,
@@ -36,11 +37,14 @@ function buildColumns(
 ): SchemaColumn[] {
   const columnEntries: Map<string | symbol, ColumnMetadataEntry> =
     getColumnMetadataEntries(entityClass);
+  const vectorEntries: Map<string | symbol, VectorMetadataEntry> =
+    getVectorFields(entityClass);
 
   const columns: SchemaColumn[] = [];
   for (const field of meta.fields) {
     const entry = columnEntries.get(field.fieldName);
-    columns.push({
+    const vecEntry = vectorEntries.get(field.fieldName);
+    const col: SchemaColumn = {
       fieldName: String(field.fieldName),
       columnName: field.columnName,
       type: entry?.type,
@@ -53,7 +57,13 @@ function buildColumns(
       isCreatedDate: field.fieldName === meta.createdDateField,
       isLastModifiedDate: field.fieldName === meta.lastModifiedDateField,
       isTenantId: field.fieldName === meta.tenantIdField,
-    });
+    };
+    if (vecEntry) {
+      col.isVector = true;
+      col.vectorDimensions = vecEntry.dimensions;
+      col.vectorMetric = vecEntry.metric;
+    }
+    columns.push(col);
   }
 
   return columns;

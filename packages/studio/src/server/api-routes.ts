@@ -568,6 +568,127 @@ export function createApiRoutes(app: Hono, ctx: ApiRouteContext): void {
     }
   });
 
+  app.post("/api/tables/:table/similar", async (c) => {
+    const tableName = c.req.param("table");
+    const table = findTable(ctx.schema, tableName);
+    if (!table) {
+      return c.json({ error: `Table "${tableName}" not found` }, 404);
+    }
+
+    const vectorColumns = table.columns.filter((col) => col.isVector);
+    if (vectorColumns.length === 0) {
+      return c.json(
+        { error: `Table "${tableName}" has no vector fields` },
+        400,
+      );
+    }
+
+    let body: {
+      field?: string;
+      vector?: number[];
+      limit?: number;
+      maxDistance?: number;
+      metric?: "l2" | "cosine" | "inner_product";
+    };
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: "Invalid JSON body" }, 400);
+    }
+
+    if (!body.field || typeof body.field !== "string") {
+      return c.json({ error: "field is required and must be a string" }, 400);
+    }
+
+    const targetCol = vectorColumns.find(
+      (col) => col.columnName === body.field || col.fieldName === body.field,
+    );
+    if (!targetCol) {
+      return c.json(
+        {
+          error: `Field "${body.field}" is not a vector field. Vector fields: ${vectorColumns.map((c) => c.columnName).join(", ")}`,
+        },
+        400,
+      );
+    }
+
+    if (!Array.isArray(body.vector) || body.vector.length === 0) {
+      return c.json({ error: "vector is required and must be a non-empty array of numbers" }, 400);
+    }
+
+    if (
+      targetCol.vectorDimensions &&
+      body.vector.length !== targetCol.vectorDimensions
+    ) {
+      return c.json(
+        {
+          error: `Vector dimension mismatch: expected ${targetCol.vectorDimensions}, got ${body.vector.length}`,
+        },
+        400,
+      );
+    }
+
+    if (!body.vector.every((v) => typeof v === "number" && Number.isFinite(v))) {
+      return c.json({ error: "All vector elements must be finite numbers" }, 400);
+    }
+
+    const limit = Math.min(
+      Math.max(1, Math.floor(body.limit ?? 10)),
+      MAX_PAGE_SIZE,
+    );
+
+    const metric = body.metric ?? targetCol.vectorMetric ?? "l2";
+    const distanceOps: Record<string, string> = {
+      l2: "<->",
+      cosine: "<=>",
+      inner_product: "<#>",
+    };
+    const distOp = distanceOps[metric];
+    if (!distOp) {
+      return c.json(
+        { error: `Invalid metric: "${metric}". Must be one of: l2, cosine, inner_product` },
+        400,
+      );
+    }
+
+    const safeTable = sanitizeIdentifier(table.tableName);
+    const safeCol = sanitizeIdentifier(targetCol.columnName);
+    const vectorLiteral = `[${body.vector.join(",")}]`;
+
+    let sql = `SELECT *, (${safeCol} ${distOp} $1::vector) AS distance FROM ${safeTable}`;
+    const params: unknown[] = [vectorLiteral];
+
+    if (body.maxDistance != null && typeof body.maxDistance === "number" && Number.isFinite(body.maxDistance)) {
+      sql += ` WHERE (${safeCol} ${distOp} $1::vector) <= $2`;
+      params.push(body.maxDistance);
+    }
+
+    sql += ` ORDER BY ${safeCol} ${distOp} $1::vector LIMIT ${limit}`;
+
+    const conn = await ctx.dataSource.getConnection();
+    try {
+      const ps = conn.prepareStatement(sql);
+      try {
+        for (let i = 0; i < params.length; i++) {
+          ps.setParameter(i + 1, params[i] as any);
+        }
+        const rs = await ps.executeQuery();
+        const rows: Record<string, unknown>[] = [];
+        while (await rs.next()) {
+          rows.push(rs.getRow());
+        }
+        await rs.close();
+        return c.json({ rows, metric, limit });
+      } finally {
+        await ps.close();
+      }
+    } catch (err) {
+      return c.json({ error: sanitizeErrorMessage(err) }, 500);
+    } finally {
+      await conn.close();
+    }
+  });
+
   app.post("/api/query", async (c) => {
     let body: { sql?: string; params?: unknown[] };
     try {
