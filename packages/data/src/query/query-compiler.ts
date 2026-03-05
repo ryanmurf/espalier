@@ -75,9 +75,9 @@ function operatorToSql(
     case "IsNotNull":
       return { sql: `${col} IS NOT NULL`, bindings: [], argCount: 0, paramCount: 0 };
     case "True":
-      return { sql: `${col} = $${paramIdx}`, bindings: [{ argIndex: -1, transform: "identity" }], argCount: 0, paramCount: 1 };
+      return { sql: `${col} = TRUE`, bindings: [], argCount: 0, paramCount: 0 };
     case "False":
-      return { sql: `${col} = $${paramIdx}`, bindings: [{ argIndex: -1, transform: "identity" }], argCount: 0, paramCount: 1 };
+      return { sql: `${col} = FALSE`, bindings: [], argCount: 0, paramCount: 0 };
   }
 }
 
@@ -90,74 +90,43 @@ export class QueryCompiler {
     descriptor: DerivedQueryDescriptor,
     metadata: EntityMetadata,
   ): CompiledQuery {
-    const allBindings: ParamBinding[] = [];
+    const bindings: ParamBinding[] = [];
     const whereParts: string[] = [];
     let paramIdx = 1;
     let argIdx = 0;
 
-    // Build WHERE clause
+    // Build WHERE clause in a single pass
     for (const expr of descriptor.properties) {
       const columnName = resolveColumn(expr.property, metadata);
       const result = operatorToSql(expr.operator, columnName, paramIdx);
 
-      // Set argIndex on each binding
+      whereParts.push(result.sql);
+
+      // Set argIndex on each binding and track arg consumption
       for (const binding of result.bindings) {
-        if (expr.operator === "True") {
-          // True/False don't consume method args — they use static values
-          // We'll handle this by not incrementing argIdx but pushing static params
-        } else if (expr.operator === "False") {
-          // Same as True
-        } else {
-          binding.argIndex = argIdx;
-          argIdx += (binding.transform === "spread" ? 1 : 1);
-        }
+        binding.argIndex = argIdx;
+        argIdx++;
+      }
+      // Between consumes 2 args but has 2 bindings, so argIdx is already correct.
+      // In/NotIn consumes 1 arg and has 1 binding, also correct.
+      // Adjust for operators where argCount differs from binding count:
+      // (currently all operators have bindings.length === argCount, but use
+      // the explicit argCount to stay correct if that changes)
+      if (result.argCount !== result.bindings.length) {
+        argIdx = argIdx - result.bindings.length + result.argCount;
       }
 
-      // For True/False, the bindings have static values, not arg bindings
-      if (expr.operator === "True" || expr.operator === "False") {
-        // These are zero-arg operators with a static param
-        // We handle them specially: no param binding, embed in SQL directly
-        const col = quoteIdentifier(columnName);
-        const val = expr.operator === "True" ? "TRUE" : "FALSE";
-        whereParts.push(`${col} = ${val}`);
-      } else {
-        whereParts.push(result.sql);
-        allBindings.push(...result.bindings);
-        paramIdx += result.paramCount;
-      }
-    }
-
-    // Fix argIdx tracking for Between (2 args from 1 property)
-    // Re-walk to properly set argIndex
-    const correctedBindings: ParamBinding[] = [];
-    let correctedArgIdx = 0;
-    let bindingIdx = 0;
-    for (const expr of descriptor.properties) {
-      if (expr.operator === "True" || expr.operator === "False") continue;
-      const paramCount = expr.paramCount;
-      for (let p = 0; p < paramCount; p++) {
-        if (bindingIdx < allBindings.length) {
-          correctedBindings.push({
-            ...allBindings[bindingIdx],
-            argIndex: correctedArgIdx + p,
-          });
-          bindingIdx++;
-        }
-      }
-      // For spread (In/NotIn), only 1 binding but 1 arg
-      if (paramCount === 0 && bindingIdx < allBindings.length) {
-        // IsNull/IsNotNull have 0 params and 0 bindings
-      }
-      correctedArgIdx += paramCount;
+      bindings.push(...result.bindings);
+      paramIdx += result.paramCount;
     }
 
     const connector = descriptor.connector === "And" ? " AND " : " OR ";
     const whereClause = whereParts.length > 0 ? whereParts.join(connector) : "";
 
-    const expectedArgCount = correctedArgIdx;
+    const expectedArgCount = argIdx;
 
     // Build the full SQL
-    const sql = this.buildSql(descriptor, metadata, whereClause, paramIdx, correctedBindings);
+    const sql = this.buildSql(descriptor, metadata, whereClause);
 
     const queryMetadata: QueryMetadata = {
       action: descriptor.action,
@@ -168,7 +137,7 @@ export class QueryCompiler {
 
     return {
       sql,
-      paramBindings: correctedBindings,
+      paramBindings: bindings,
       metadata: queryMetadata,
     };
   }
@@ -177,8 +146,6 @@ export class QueryCompiler {
     descriptor: DerivedQueryDescriptor,
     metadata: EntityMetadata,
     whereClause: string,
-    nextParamIdx: number,
-    bindings: ParamBinding[],
   ): string {
     const table = quoteIdentifier(metadata.tableName);
     const parts: string[] = [];
@@ -198,11 +165,6 @@ export class QueryCompiler {
     if (descriptor.action === "exists") {
       parts.push(`SELECT 1 FROM ${table}`);
       if (whereClause) parts.push(`WHERE ${whereClause}`);
-      parts.push(`LIMIT $${nextParamIdx}`);
-      // Add a static limit binding (value 1) - but we'll handle this differently
-      // Actually, for exists we can hardcode LIMIT 1 directly
-      // Remove the parameterized LIMIT and use literal
-      parts.pop();
       parts.push("LIMIT 1");
       return parts.join(" ");
     }

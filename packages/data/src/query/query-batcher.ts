@@ -86,7 +86,10 @@ export class QueryBatcher<T> {
   }
 
   private async executeChunk(chunk: PendingRequest<T>[]): Promise<void> {
-    // Deduplicate IDs
+    // Deduplicate IDs by string representation.
+    // Note: IDs are deduplicated by string representation. Integer 1 and
+    // string "1" are treated as the same ID. This matches typical DB behavior
+    // where parameter binding normalizes types.
     const idMap = new Map<string, PendingRequest<T>[]>();
     for (const req of chunk) {
       const key = String(req.id);

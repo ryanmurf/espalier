@@ -8,6 +8,8 @@ export interface CreateRepositoryOptions {
   entityCache?: EntityCacheConfig;
   queryCache?: import("../cache/query-cache.js").QueryCacheConfig;
   eventBus?: import("../events/event-bus.js").EventBus;
+  /** SQL dialect for bulk operations. Default: "postgres". */
+  dialect?: import("../query/bulk-operation-builder.js").BulkDialect;
 }
 
 export function createRepository<T, ID>(
@@ -20,6 +22,7 @@ export function createRepository<T, ID>(
         entityCache: options.entityCache,
         queryCache: options.queryCache,
         eventBus: options.eventBus,
+        dialect: options.dialect,
       }
     : undefined;
 

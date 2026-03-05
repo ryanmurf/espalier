@@ -65,7 +65,7 @@ function normalizeSql(sql: string): string {
   return sql
     .replace(/'(?:[^'\\]|\\.)*'/g, "'?'")
     .replace(/\b0x[0-9a-f]+\b/gi, "?")
-    .replace(/\b\d+(\.\d+)?\b/g, "?")
+    .replace(/(?<![a-zA-Z_])\d+(\.\d+)?(?![a-zA-Z_])/g, "?")
     .replace(/\s+/g, " ")
     .trim();
 }

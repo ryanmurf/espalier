@@ -22,6 +22,8 @@ export interface RelayCursorStrategyOptions {
    * Default: "id".
    */
   idField?: string;
+  /** Maximum allowed page size (first/last). Default: 1000. */
+  maxPageSize?: number;
 }
 
 /**
@@ -40,6 +42,7 @@ export class RelayCursorStrategy implements PaginationStrategy<CursorPageable, C
   private readonly idColumn: string;
   private readonly sortColumns: Array<{ column: string; direction: "ASC" | "DESC" }>;
   private readonly idField: string;
+  private readonly maxPageSize: number;
 
   constructor(options: RelayCursorStrategyOptions) {
     this.idColumn = options.idColumn;
@@ -47,6 +50,7 @@ export class RelayCursorStrategy implements PaginationStrategy<CursorPageable, C
     this.sortColumns = options.sortColumns ?? [
       { column: options.idColumn, direction: "ASC" },
     ];
+    this.maxPageSize = options.maxPageSize ?? 1000;
   }
 
   applyToQuery(builder: SelectBuilder, request: CursorPageable): void {
@@ -73,13 +77,15 @@ export class RelayCursorStrategy implements PaginationStrategy<CursorPageable, C
     }
 
     // Limit: fetch one extra to determine hasNextPage/hasPreviousPage
-    const limit = isBackward ? (request.last ?? 10) : (request.first ?? 10);
+    const rawLimit = isBackward ? (request.last ?? 10) : (request.first ?? 10);
+    const limit = Math.min(rawLimit, this.maxPageSize);
     builder.limit(limit + 1);
   }
 
   buildResult<T>(rows: T[], request: CursorPageable, totalCount: number): CursorPage<T> {
     const isBackward = request.last != null && request.last > 0;
-    const limit = isBackward ? (request.last ?? 10) : (request.first ?? 10);
+    const rawLimit = isBackward ? (request.last ?? 10) : (request.first ?? 10);
+    const limit = Math.min(rawLimit, this.maxPageSize);
 
     // If we got more rows than the limit, there are more pages
     const hasMore = rows.length > limit;
@@ -139,8 +145,6 @@ export class RelayCursorStrategy implements PaginationStrategy<CursorPageable, C
     // (a > x) OR (a = x AND b > y) OR (a = x AND b = y AND id > idVal)
     // Direction depends on sort direction and backward/forward
     const parts: string[] = [];
-    const params: SqlValue[] = [];
-    let paramIdx = 1000; // Use high offset to avoid collision with existing params
 
     for (let depth = 0; depth < columns.length; depth++) {
       const conditions: string[] = [];
@@ -175,11 +179,8 @@ export class RelayCursorStrategy implements PaginationStrategy<CursorPageable, C
     let finalSql = whereSql;
     const cursorParams: SqlValue[] = [];
     for (let i = 0; i < values.length; i++) {
-      // Each cursor value may appear multiple times in the expanded form
-      // We need to use a unique parameter for each occurrence
-      const placeholder = `$__cursor_${i}__`;
-      // Count occurrences and replace with sequential params
-      let occurrence = 0;
+      // Each cursor value may appear multiple times in the expanded form;
+      // replace each occurrence with a unique final placeholder
       finalSql = finalSql.replace(new RegExp(`\\$__cursor_${i}__`, "g"), () => {
         cursorParams.push(values[i] as SqlValue);
         return `$__cursor_final_${cursorParams.length - 1}__`;

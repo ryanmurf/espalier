@@ -56,6 +56,8 @@ export interface DerivedRepositoryOptions {
   entityCache?: EntityCacheConfig;
   queryCache?: QueryCacheConfig;
   eventBus?: EventBus;
+  /** SQL dialect for bulk operations. Default: "postgres". */
+  dialect?: import("../query/bulk-operation-builder.js").BulkDialect;
 }
 
 export function createDerivedRepository<T, ID>(
@@ -67,11 +69,13 @@ export function createDerivedRepository<T, ID>(
   let entityCacheConfig: EntityCacheConfig | undefined;
   let queryCacheConfig: QueryCacheConfig | undefined;
   let eventBus: EventBus | undefined;
-  if (cacheConfig && ("entityCache" in cacheConfig || "queryCache" in cacheConfig || "eventBus" in cacheConfig)) {
+  let bulkDialect: import("../query/bulk-operation-builder.js").BulkDialect = "postgres";
+  if (cacheConfig && ("entityCache" in cacheConfig || "queryCache" in cacheConfig || "eventBus" in cacheConfig || "dialect" in cacheConfig)) {
     const opts = cacheConfig as DerivedRepositoryOptions;
     entityCacheConfig = opts.entityCache;
     queryCacheConfig = opts.queryCache;
     eventBus = opts.eventBus;
+    bulkDialect = opts.dialect ?? "postgres";
   } else {
     entityCacheConfig = cacheConfig as EntityCacheConfig | undefined;
   }
@@ -667,7 +671,7 @@ export function createDerivedRepository<T, ID>(
     }
 
     const bulkBuilder = new BulkOperationBuilder({
-      dialect: "postgres",
+      dialect: bulkDialect,
       chunkSize: 1000,
       returning: ["*"],
     });
@@ -1151,7 +1155,7 @@ export function createDerivedRepository<T, ID>(
       const idCol = getIdColumn();
       const columns = metadata.fields.map((f) => f.columnName);
       const bulkBuilder = new BulkOperationBuilder({
-        dialect: "postgres",
+        dialect: bulkDialect,
         chunkSize: 1000,
         returning: ["*"],
       });
