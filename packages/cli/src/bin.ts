@@ -8,6 +8,8 @@ import { migrateDown } from "./migrate-down.js";
 import { migrateStatus, formatStatusTable } from "./migrate-status.js";
 import { migrateDryRun, formatDryRunOutput } from "./migrate-dry-run.js";
 import { seedRun, seedStatus, formatSeedStatusTable } from "./seed-run.js";
+import { schemaDiff, formatSchemaDiff } from "./schema-diff.js";
+import { generateMigrationFromDiff } from "./schema-generate.js";
 
 function main(): void {
   const parsed = parseArgs(process.argv);
@@ -34,6 +36,11 @@ function main(): void {
 
   if (parsed.command === "diagram") {
     handleDiagram(parsed.flags);
+    return;
+  }
+
+  if (parsed.command === "schema") {
+    handleSchema(parsed.subcommand, parsed.flags);
     return;
   }
 
@@ -396,6 +403,89 @@ function handleDiagram(flags: Record<string, string | boolean>): void {
     process.stderr.write(`Error: ${err.message}\n`);
     process.exitCode = 1;
   });
+}
+
+function handleSchema(
+  subcommand: string,
+  flags: Record<string, string | boolean>,
+): void {
+  const configDir = typeof flags.config === "string" ? flags.config : undefined;
+
+  let config;
+  try {
+    config = loadConfig(configDir);
+  } catch (err) {
+    process.stderr.write(`Error: ${(err as Error).message}\n`);
+    process.stderr.write("A config file is required for `espalier schema`.\n");
+    process.exitCode = 1;
+    return;
+  }
+
+  if (subcommand === "diff" || subcommand === "generate") {
+    Promise.all([
+      import("./adapter-factory.js"),
+    ]).then(([{ createAdapter }]) => {
+      return createAdapter(config!).then(async (resources) => {
+        const entities = (config as any)?.entities ?? [];
+        if (entities.length === 0) {
+          process.stderr.write("Error: No entities configured. Add 'entities' to your espalier.config.json.\n");
+          process.exitCode = 1;
+          return;
+        }
+
+        const introspector = resources.introspector;
+        if (!introspector) {
+          process.stderr.write("Error: Schema introspection not available for this adapter.\n");
+          process.exitCode = 1;
+          return;
+        }
+        const schema = typeof flags.schema === "string" ? flags.schema : undefined;
+
+        const result = await schemaDiff({
+          config: config!,
+          introspector,
+          entityClasses: entities,
+          schema,
+        });
+
+        if (subcommand === "diff") {
+          process.stdout.write(formatSchemaDiff(result));
+        } else {
+          // generate
+          if (!result.hasChanges) {
+            process.stdout.write("Schema is up to date. No migration needed.\n");
+            return;
+          }
+
+          const migrationsDir = typeof flags.dir === "string"
+            ? flags.dir
+            : getMigrationsDir(config!, configDir);
+
+          const name = typeof flags.name === "string" ? flags.name : undefined;
+
+          const genResult = generateMigrationFromDiff({
+            diffResult: result,
+            migrationsDir,
+            name,
+          });
+
+          process.stdout.write(`Generated migration: ${genResult.filePath}\n`);
+          process.stdout.write(`  Version: ${genResult.version}\n`);
+          process.stdout.write(`  Statements: ${genResult.statementsCount}\n`);
+        }
+
+        await resources.dataSource.close();
+      });
+    }).catch((err: Error) => {
+      process.stderr.write(`Error: ${err.message}\n`);
+      process.exitCode = 1;
+    });
+    return;
+  }
+
+  process.stderr.write(`Unknown schema subcommand: "${subcommand}"\n`);
+  process.stderr.write("Available: diff, generate\n");
+  process.exitCode = 1;
 }
 
 main();

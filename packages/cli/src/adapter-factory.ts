@@ -1,10 +1,11 @@
-import type { DataSource } from "espalier-jdbc";
+import type { DataSource, SchemaIntrospector } from "espalier-jdbc";
 import type { MigrationRunner, MigrationRunnerConfig } from "espalier-data";
 import type { EspalierConfig } from "./config.js";
 
 export interface AdapterResources {
   dataSource: DataSource;
   runner: MigrationRunner;
+  introspector?: SchemaIntrospector;
 }
 
 export async function createAdapter(config: EspalierConfig): Promise<AdapterResources> {
@@ -40,10 +41,12 @@ async function createPgAdapter(
 
   const PgDataSource = mod.PgDataSource as new (config: { pg: Record<string, unknown> }) => DataSource;
   const PgMigrationRunner = mod.PgMigrationRunner as new (ds: DataSource, config?: MigrationRunnerConfig) => MigrationRunner;
+  const PgSchemaIntrospector = mod.PgSchemaIntrospector as (new (ds: DataSource) => SchemaIntrospector) | undefined;
 
   const dataSource = new PgDataSource({ pg: config.connection });
   const runner = new PgMigrationRunner(dataSource, runnerConfig);
-  return { dataSource, runner };
+  const introspector = PgSchemaIntrospector ? new PgSchemaIntrospector(dataSource) : undefined;
+  return { dataSource, runner, introspector };
 }
 
 async function createMysqlAdapter(

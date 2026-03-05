@@ -18,3 +18,7 @@ export { migrateDryRun, formatDryRunOutput } from "./migrate-dry-run.js";
 export type { MigrateDryRunOptions, MigrateDryRunResult, DryRunStatement } from "./migrate-dry-run.js";
 export { seedRun, seedStatus, formatSeedStatusTable } from "./seed-run.js";
 export type { SeedRunOptions, SeedRunResult, SeedStatusEntry } from "./seed-run.js";
+export { schemaDiff, formatSchemaDiff } from "./schema-diff.js";
+export type { SchemaDiffOptions, SchemaDiffResult } from "./schema-diff.js";
+export { generateMigrationFromDiff } from "./schema-generate.js";
+export type { GenerateMigrationOptions, GenerateMigrationResult } from "./schema-generate.js";
