@@ -125,7 +125,9 @@ export function createDerivedRepository<T, ID>(
   function applyTenantFilter(builder: { and(criteria: import("../query/criteria.js").Criteria): unknown }): void {
     const tid = requireTenantForRead();
     if (!tid || !tenantColumn) return;
-    builder.and(new ComparisonCriteria("eq", tenantColumn, tid as SqlValue));
+    // Qualify with table name to avoid ambiguity in JOINs
+    const qualifiedCol = `${quoteIdentifier(metadata.tableName)}.${quoteIdentifier(tenantColumn)}`;
+    builder.and(new RawComparisonCriteria("eq", qualifiedCol, tid as SqlValue));
   }
 
   function tenantCacheKey(id: unknown): unknown {
@@ -719,7 +721,11 @@ export function createDerivedRepository<T, ID>(
             stmt.setParameter(i + 1, query.params[i]);
           }
           const rs = await stmt.executeQuery();
-          return await rs.next();
+          try {
+            return await rs.next();
+          } finally {
+            await rs.close().catch(() => {});
+          }
         } finally {
           await stmt.close().catch(() => {});
         }
@@ -759,20 +765,27 @@ export function createDerivedRepository<T, ID>(
           throw new Error(`Invalid Pageable: size must be > 0. Got ${size}.`);
         }
 
+        const pageableSpec = (specOrProjectionOrPageable as any).spec;
         const pageable: Pageable = {
           page,
           size,
           sort: (specOrProjectionOrPageable as any).sort,
+          spec: pageableSpec,
         };
 
         const countBuilder = new SelectBuilder(metadata.tableName).columns("COUNT(*)");
+        if (pageableSpec && typeof pageableSpec.toPredicate === "function") {
+          countBuilder.where(pageableSpec.toPredicate(metadata));
+        }
         applyTenantFilter(countBuilder);
         const countQuery = countBuilder.build();
 
-        const conn = await dataSource.getConnection();
+        // Run count query on its own connection to avoid holding a connection
+        // across both queries, which deadlocks with pool size 1
+        let totalElements = 0;
+        const countConn = await dataSource.getConnection();
         try {
-          let totalElements = 0;
-          const countStmt = conn.prepareStatement(countQuery.sql);
+          const countStmt = countConn.prepareStatement(countQuery.sql);
           try {
             for (let i = 0; i < countQuery.params.length; i++) {
               countStmt.setParameter(i + 1, countQuery.params[i]);
@@ -786,7 +799,12 @@ export function createDerivedRepository<T, ID>(
           } finally {
             await countStmt.close().catch(() => {});
           }
+        } finally {
+          await countConn.close();
+        }
 
+        const conn = await dataSource.getConnection();
+        try {
           const useJoinFetch = joinFetchSpecs.length > 0;
           const builder = new SelectBuilder(metadata.tableName);
 
@@ -798,6 +816,9 @@ export function createDerivedRepository<T, ID>(
             builder.columns(...metadata.fields.map((f: FieldMapping) => f.columnName));
           }
 
+          if (pageableSpec && typeof pageableSpec.toPredicate === "function") {
+            builder.where(pageableSpec.toPredicate(metadata));
+          }
           applyTenantFilter(builder);
 
           if (pageable.sort) {
@@ -1317,8 +1338,9 @@ export function createDerivedRepository<T, ID>(
       const query = builder.build();
       const cacheKey = { sql: query.sql, params: query.params as unknown[] };
       const cachedResult = queryCache.get(cacheKey);
-      if (cachedResult !== undefined) {
-        return cachedResult[0] as number;
+      if (cachedResult !== undefined && Array.isArray(cachedResult) && cachedResult.length > 0) {
+        const val = cachedResult[0];
+        return typeof val === "number" ? val : Number(val);
       }
 
       const conn = await dataSource.getConnection();

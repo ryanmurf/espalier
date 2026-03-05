@@ -7,6 +7,8 @@ export interface Pageable {
   page: number;
   size: number;
   sort?: Sort[];
+  /** Optional specification to filter both data and count queries. */
+  spec?: { toPredicate(metadata: any): any };
 }
 
 export interface Page<T> {

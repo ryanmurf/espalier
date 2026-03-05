@@ -185,12 +185,21 @@ import type { RouteDefinition as _RD } from "./rest/index.js";
 import type { EntityRouteConfig as _ERC } from "./rest/index.js";
 
 // -- Observability (lazy) --
+let _obsMod: typeof import("./observability/index.js") | undefined;
+
+/**
+ * Configures observability for a DataSource. Lazy-loads the observability module
+ * on first call. Returns a Promise for compatibility; if you need a sync call,
+ * use `import { configureObservability } from 'espalier-data/observability'`.
+ */
 export async function configureObservability(
   dataSource: _DS,
   config?: _ObsConfig,
 ): Promise<_ObsHandle> {
-  const mod = await import("./observability/index.js");
-  return mod.configureObservability(dataSource, config);
+  if (!_obsMod) {
+    _obsMod = await import("./observability/index.js");
+  }
+  return _obsMod.configureObservability(dataSource, config);
 }
 
 // -- GraphQL (lazy) --

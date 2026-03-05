@@ -5,22 +5,33 @@
  * for Server Actions in the App Router.
  */
 
-import type { Connection } from "espalier-jdbc";
+import type { Connection, Transaction } from "espalier-jdbc";
 import type { CrudRepository } from "espalier-data/core";
 import { createRepository } from "espalier-data/core";
 import type { CreateRepositoryOptions } from "espalier-data/core";
 import { getDataSource } from "./data-source.js";
 
+const _repoCache = new WeakMap<new (...args: any[]) => any, CrudRepository<any, any>>();
+
 /**
  * Get a repository for a given entity class.
  * Uses the singleton DataSource configured via `configureEspalier()`.
+ * Repositories are cached per entity class for the lifetime of the process.
  */
 export async function getRepository<T, ID = unknown>(
   entityClass: new (...args: any[]) => T,
   options?: CreateRepositoryOptions,
 ): Promise<CrudRepository<T, ID>> {
+  if (!options) {
+    const cached = _repoCache.get(entityClass);
+    if (cached) return cached as CrudRepository<T, ID>;
+  }
   const ds = await getDataSource();
-  return createRepository<T, ID>(entityClass, ds, options);
+  const repo = createRepository<T, ID>(entityClass, ds, options);
+  if (!options) {
+    _repoCache.set(entityClass, repo as CrudRepository<any, any>);
+  }
+  return repo;
 }
 
 /**
@@ -48,14 +59,17 @@ export async function withTransaction<R>(
 ): Promise<R> {
   const ds = await getDataSource();
   const conn = await ds.getConnection();
-  const tx = await conn.beginTransaction();
 
+  let tx: Transaction | undefined;
   try {
+    tx = await conn.beginTransaction();
     const result = await action(conn);
     await tx.commit();
     return result;
   } catch (err) {
-    await tx.rollback();
+    if (tx) {
+      await tx.rollback();
+    }
     throw err;
   } finally {
     await conn.close();

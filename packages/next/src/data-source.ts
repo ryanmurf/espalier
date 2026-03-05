@@ -58,10 +58,17 @@ export async function getDataSource(): Promise<DataSource> {
     );
   }
 
-  _initPromise = Promise.resolve(_factory()).then((ds) => {
-    _global[GLOBAL_KEY] = ds;
-    return ds;
-  });
+  _initPromise = Promise.resolve(_factory()).then(
+    (ds) => {
+      _global[GLOBAL_KEY] = ds;
+      return ds;
+    },
+    (err) => {
+      // Reset so next call retries instead of returning a stale rejection
+      _initPromise = undefined;
+      throw err;
+    },
+  );
 
   return _initPromise;
 }
