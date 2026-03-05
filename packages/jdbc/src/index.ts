@@ -110,7 +110,7 @@ export type {
   RuntimeInfo,
 } from "./driver-adapter.js";
 export { detectRuntime } from "./runtime-detect.js";
-export { sha256 } from "./crypto-utils.js";
+export { sha256, timingSafeEqual } from "./crypto-utils.js";
 export type { Dialect, DataSourceConfig, DataSourceFactory } from "./driver-factory.js";
 export {
   createDataSource,

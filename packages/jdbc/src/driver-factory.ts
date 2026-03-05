@@ -64,9 +64,19 @@ export function registerDataSourceFactory(
   factoryOrRuntime: DataSourceFactory | RuntimeInfo["runtime"],
   factory?: DataSourceFactory,
 ): void {
+  if (!dialect || typeof dialect !== "string" || !/^[a-z][a-z0-9_-]*$/.test(dialect)) {
+    throw new Error(`Invalid dialect: "${dialect}". Must be a non-empty lowercase alphanumeric string.`);
+  }
+
   if (typeof factoryOrRuntime === "function") {
     registry.set(dialect, factoryOrRuntime);
-  } else if (factory) {
+  } else if (typeof factoryOrRuntime === "string") {
+    if (!/^[a-z][a-z0-9_-]*$/.test(factoryOrRuntime)) {
+      throw new Error(`Invalid runtime: "${factoryOrRuntime}". Must be a non-empty lowercase alphanumeric string.`);
+    }
+    if (!factory) {
+      throw new Error("Factory function is required when specifying a runtime.");
+    }
     registry.set(`${dialect}:${factoryOrRuntime}`, factory);
   }
 }
@@ -128,10 +138,15 @@ export function createDataSource(dialect: Dialect, config: DataSourceConfig): Da
 
 /**
  * Check if a factory is registered for a given dialect and optional runtime.
+ *
+ * When `runtime` is specified, returns true ONLY if a runtime-specific factory
+ * exists for that dialect+runtime combination. It does NOT fall back to checking
+ * the dialect-level factory. Use `hasDataSourceFactory(dialect)` (without runtime)
+ * to check for any factory, including dialect-level ones.
  */
 export function hasDataSourceFactory(dialect: Dialect, runtime?: RuntimeInfo["runtime"]): boolean {
   if (runtime) {
-    return registry.has(`${dialect}:${runtime}`) || registry.has(dialect);
+    return registry.has(`${dialect}:${runtime}`);
   }
   return registry.has(dialect);
 }

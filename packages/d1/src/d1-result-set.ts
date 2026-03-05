@@ -56,12 +56,12 @@ export class D1ResultSet implements ResultSet {
   }
 
   [Symbol.asyncIterator](): AsyncIterator<Record<string, unknown>> {
-    let index = 0;
-    const rows = this.rows;
+    const rs = this;
     return {
       async next() {
-        if (index < rows.length) {
-          return { value: rows[index++], done: false };
+        const hasNext = await rs.next();
+        if (hasNext) {
+          return { value: rs.getRow(), done: false };
         }
         return { value: undefined, done: true };
       },

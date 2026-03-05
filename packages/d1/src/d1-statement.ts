@@ -19,7 +19,14 @@ function truncateSql(sql: string): string {
 function convertPositionalParams(sql: string): { sql: string; indices: number[] } {
   const indices: number[] = [];
   const converted = sql.replace(/\$(\d+)/g, (_match, num) => {
-    indices.push(parseInt(num, 10));
+    const parsed = parseInt(num, 10);
+    if (!Number.isSafeInteger(parsed) || parsed < 1 || parsed > 65535) {
+      throw new QueryError(
+        `Invalid parameter index $${num}: must be between 1 and 65535`,
+        sql,
+      );
+    }
+    indices.push(parsed);
     return "?";
   });
   return { sql: converted, indices };
@@ -40,11 +47,15 @@ export class D1StatementImpl implements Statement {
     try {
       const stmt = this.db.prepare(sql);
       const result = await stmt.all();
+      if (result.success === false) {
+        throw new QueryError(`D1 query failed (success=false)`, sql);
+      }
       if (logger.isEnabled(LogLevel.DEBUG)) {
         logger.debug("query executed", { sql: truncateSql(sql), duration: Date.now() - startTime });
       }
       return new D1ResultSet(result);
     } catch (err) {
+      if (err instanceof QueryError) throw err;
       logger.error("query failed", { sql: truncateSql(sql), duration: Date.now() - startTime, error: (err as Error).message });
       throw new QueryError(
         `Failed to execute query: ${(err as Error).message}`,
@@ -60,11 +71,15 @@ export class D1StatementImpl implements Statement {
     try {
       const stmt = this.db.prepare(sql);
       const result = await stmt.run();
+      if (result.success === false) {
+        throw new QueryError(`D1 update failed (success=false)`, sql);
+      }
       if (logger.isEnabled(LogLevel.DEBUG)) {
         logger.debug("update executed", { sql: truncateSql(sql), duration: Date.now() - startTime });
       }
       return result.meta.changes ?? 0;
     } catch (err) {
+      if (err instanceof QueryError) throw err;
       logger.error("update failed", { sql: truncateSql(sql), duration: Date.now() - startTime, error: (err as Error).message });
       throw new QueryError(
         `Failed to execute update: ${(err as Error).message}`,
@@ -103,11 +118,15 @@ export class D1PreparedStatementImpl extends D1StatementImpl implements Prepared
     try {
       const stmt = this.db.prepare(queryText).bind(...params);
       const result = await stmt.all();
+      if (result.success === false) {
+        throw new QueryError(`D1 prepared query failed (success=false)`, rawSql);
+      }
       if (logger.isEnabled(LogLevel.DEBUG)) {
         logger.debug("prepared query executed", { sql: truncateSql(queryText), paramCount: params.length, duration: Date.now() - startTime });
       }
       return new D1ResultSet(result);
     } catch (err) {
+      if (err instanceof QueryError) throw err;
       logger.error("prepared query failed", { sql: truncateSql(queryText), paramCount: params.length, duration: Date.now() - startTime, error: (err as Error).message });
       throw new QueryError(
         `Failed to execute prepared query: ${(err as Error).message}`,
@@ -127,11 +146,15 @@ export class D1PreparedStatementImpl extends D1StatementImpl implements Prepared
     try {
       const stmt = this.db.prepare(queryText).bind(...params);
       const result = await stmt.run();
+      if (result.success === false) {
+        throw new QueryError(`D1 prepared update failed (success=false)`, rawSql);
+      }
       if (logger.isEnabled(LogLevel.DEBUG)) {
         logger.debug("prepared update executed", { sql: truncateSql(queryText), paramCount: params.length, duration: Date.now() - startTime });
       }
       return result.meta.changes ?? 0;
     } catch (err) {
+      if (err instanceof QueryError) throw err;
       logger.error("prepared update failed", { sql: truncateSql(queryText), paramCount: params.length, duration: Date.now() - startTime, error: (err as Error).message });
       throw new QueryError(
         `Failed to execute prepared update: ${(err as Error).message}`,
@@ -142,7 +165,7 @@ export class D1PreparedStatementImpl extends D1StatementImpl implements Prepared
   }
 
   private collectParameters(indices?: number[]): unknown[] {
-    if (this.parameters.size === 0) return [];
+    if (this.parameters.size === 0 && (!indices || indices.length === 0)) return [];
 
     if (indices && indices.length > 0) {
       return indices.map((i) => toBindValue(this.parameters.get(i) ?? null));

@@ -84,7 +84,12 @@ export class D1Connection implements TypeAwareConnection {
           );
         }
         completed = true;
-        txLogger.warn("D1 rollback is a no-op — statements already executed");
+        throw new TransactionError(
+          "D1 does not support rollback — statements execute immediately and cannot be undone. " +
+          "Use D1DataSource.batch() for atomic operations.",
+          undefined,
+          DatabaseErrorCode.TX_ROLLBACK_FAILED,
+        );
       },
 
       async setSavepoint(_name: string): Promise<void> {

@@ -7,7 +7,7 @@
     "test": "vitest",
     "test:node": "vitest",
     "test:bun": "bun run vitest",
-    "test:deno": "deno run -A npm:vitest",
+    "test:deno": "deno run --allow-read --allow-net --allow-env --allow-sys npm:vitest",
     "clean": "pnpm -r clean",
     "size": "size-limit",
     "size:report": "size-limit --json",
