@@ -11,6 +11,12 @@ export type {
 
 export { OffsetPaginationStrategy } from "./offset-strategy.js";
 
+export { encodeCursor, decodeCursor } from "./cursor-encoding.js";
+export type { CursorPayload } from "./cursor-encoding.js";
+
+export { RelayCursorStrategy } from "./relay-cursor-strategy.js";
+export type { RelayCursorStrategyOptions } from "./relay-cursor-strategy.js";
+
 export {
   PaginationStrategyRegistry,
   getGlobalPaginationRegistry,
