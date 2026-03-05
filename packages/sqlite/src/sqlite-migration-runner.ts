@@ -1,6 +1,5 @@
-import { createHash } from "node:crypto";
 import type { DataSource, Connection } from "espalier-jdbc";
-import { validateIdentifier, quoteIdentifier } from "espalier-jdbc";
+import { validateIdentifier, quoteIdentifier, sha256 } from "espalier-jdbc";
 import type {
   Migration,
   MigrationRecord,
@@ -92,7 +91,7 @@ export class SqliteMigrationRunner implements MigrationRunner {
     for (const migration of migrations) {
       const record = appliedMap.get(migration.version);
       if (record) {
-        const currentChecksum = computeChecksum(migration);
+        const currentChecksum = await computeChecksum(migration);
         if (record.checksum !== currentChecksum) {
           throw new Error(
             `Migration "${migration.version}" checksum mismatch: ` +
@@ -216,7 +215,7 @@ export class SqliteMigrationRunner implements MigrationRunner {
   private async applyMigration(conn: Connection, migration: Migration): Promise<void> {
     const upSql = migration.up();
     const statements = Array.isArray(upSql) ? upSql : [upSql];
-    const checksum = computeChecksum(migration);
+    const checksum = await computeChecksum(migration);
 
     // SQLite DDL is transactional, so we can wrap everything in one transaction
     const tx = await conn.beginTransaction();
@@ -244,11 +243,11 @@ export class SqliteMigrationRunner implements MigrationRunner {
   }
 }
 
-export function computeChecksum(migration: Migration): string {
+export async function computeChecksum(migration: Migration): Promise<string> {
   const upSql = migration.up();
   const downSql = migration.down();
   const upNorm = Array.isArray(upSql) ? upSql.join("\n") : upSql;
   const downNorm = Array.isArray(downSql) ? downSql.join("\n") : downSql;
   const content = `version:${migration.version}\ndescription:${migration.description}\nup:${upNorm}\ndown:${downNorm}`;
-  return createHash("sha256").update(content).digest("hex");
+  return sha256(content);
 }

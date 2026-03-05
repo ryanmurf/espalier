@@ -351,7 +351,7 @@ describe("MysqlMigrationRunner", () => {
     });
 
     it("skips already-applied migrations", async () => {
-      const checksum = computeChecksum(
+      const checksum = await computeChecksum(
         createMigration("001", "Create users", "CREATE TABLE users (id INT)"),
       );
       const appliedRs = createMockResultSet([
@@ -409,7 +409,7 @@ describe("MysqlMigrationRunner", () => {
         "Create users",
         "CREATE TABLE users (id INT)",
       );
-      const checksum = computeChecksum(m1);
+      const checksum = await computeChecksum(m1);
       const appliedRs = createMockResultSet([
         {
           version: "001",
@@ -529,7 +529,7 @@ describe("MysqlMigrationRunner", () => {
         "Create users",
         "CREATE TABLE users (id INT)",
       );
-      const expectedChecksum = computeChecksum(m1);
+      const expectedChecksum = await computeChecksum(m1);
 
       await runner.run([m1]);
 
@@ -590,19 +590,21 @@ describe("MysqlMigrationRunner", () => {
         "ALTER TABLE users ADD COLUMN email TEXT",
         "ALTER TABLE users DROP COLUMN email",
       );
+      const cs1 = await computeChecksum(m1);
+      const cs2 = await computeChecksum(m2);
 
       const appliedRs = createMockResultSet([
         {
           version: "001",
           description: "Create users",
           applied_at: new Date(),
-          checksum: computeChecksum(m1),
+          checksum: cs1,
         },
         {
           version: "002",
           description: "Add email",
           applied_at: new Date(),
-          checksum: computeChecksum(m2),
+          checksum: cs2,
         },
       ]);
       const appliedPs = createMockPreparedStatement(appliedRs);
@@ -650,19 +652,21 @@ describe("MysqlMigrationRunner", () => {
         "ALTER TABLE users ADD email TEXT",
         "ALTER TABLE users DROP COLUMN email",
       );
+      const cs1 = await computeChecksum(m1);
+      const cs2 = await computeChecksum(m2);
 
       const appliedRs = createMockResultSet([
         {
           version: "001",
           description: "Create users",
           applied_at: new Date(),
-          checksum: computeChecksum(m1),
+          checksum: cs1,
         },
         {
           version: "002",
           description: "Add email",
           applied_at: new Date(),
-          checksum: computeChecksum(m2),
+          checksum: cs2,
         },
       ]);
       const appliedPs = createMockPreparedStatement(appliedRs);
@@ -758,25 +762,28 @@ describe("MysqlMigrationRunner", () => {
         "ALTER TABLE users ADD age INT",
         "ALTER TABLE users DROP COLUMN age",
       );
+      const cs1 = await computeChecksum(m1);
+      const cs2 = await computeChecksum(m2);
+      const cs3 = await computeChecksum(m3);
 
       const appliedRs = createMockResultSet([
         {
           version: "001",
           description: "Create users",
           applied_at: new Date(),
-          checksum: computeChecksum(m1),
+          checksum: cs1,
         },
         {
           version: "002",
           description: "Add email",
           applied_at: new Date(),
-          checksum: computeChecksum(m2),
+          checksum: cs2,
         },
         {
           version: "003",
           description: "Add age",
           applied_at: new Date(),
-          checksum: computeChecksum(m3),
+          checksum: cs3,
         },
       ]);
       const appliedPs = createMockPreparedStatement(appliedRs);
@@ -814,13 +821,14 @@ describe("MysqlMigrationRunner", () => {
         "CREATE TABLE users (id INT)",
         "DROP TABLE users",
       );
+      const cs1 = await computeChecksum(m1);
 
       const appliedRs = createMockResultSet([
         {
           version: "001",
           description: "Create users",
           applied_at: new Date(),
-          checksum: computeChecksum(m1),
+          checksum: cs1,
         },
       ]);
       const appliedPs = createMockPreparedStatement(appliedRs);
@@ -853,7 +861,7 @@ describe("MysqlMigrationRunner", () => {
         "ALTER TABLE users ADD age INT",
       );
 
-      const checksum = computeChecksum(m1);
+      const checksum = await computeChecksum(m1);
       const appliedRs = createMockResultSet([
         {
           version: "001",
@@ -893,7 +901,7 @@ describe("MysqlMigrationRunner", () => {
 
     it("returns empty array when all applied", async () => {
       const m1 = createMigration("001", "First", "SELECT 1");
-      const checksum = computeChecksum(m1);
+      const checksum = await computeChecksum(m1);
 
       const appliedRs = createMockResultSet([
         {
@@ -915,39 +923,39 @@ describe("MysqlMigrationRunner", () => {
   });
 
   describe("computeChecksum()", () => {
-    it("computes SHA-256 hash of up() SQL", () => {
+    it("computes SHA-256 hash of up() SQL", async () => {
       const m = createMigration(
         "001",
         "test",
         "CREATE TABLE users (id INT)",
       );
-      const checksum = computeChecksum(m);
+      const checksum = await computeChecksum(m);
 
       expect(checksum).toMatch(/^[a-f0-9]{64}$/);
     });
 
-    it("produces consistent checksum for identical migrations", () => {
+    it("produces consistent checksum for identical migrations", async () => {
       const m1 = createMigration("001", "test", "SELECT 1");
       const m2 = createMigration("001", "test", "SELECT 1");
 
-      expect(computeChecksum(m1)).toBe(computeChecksum(m2));
+      expect(await computeChecksum(m1)).toBe(await computeChecksum(m2));
     });
 
-    it("produces different checksum when version or description differs", () => {
+    it("produces different checksum when version or description differs", async () => {
       const m1 = createMigration("001", "test", "SELECT 1");
       const m2 = createMigration("002", "other", "SELECT 1");
 
-      expect(computeChecksum(m1)).not.toBe(computeChecksum(m2));
+      expect(await computeChecksum(m1)).not.toBe(await computeChecksum(m2));
     });
 
-    it("produces different checksum for different SQL", () => {
+    it("produces different checksum for different SQL", async () => {
       const m1 = createMigration("001", "test", "SELECT 1");
       const m2 = createMigration("001", "test", "SELECT 2");
 
-      expect(computeChecksum(m1)).not.toBe(computeChecksum(m2));
+      expect(await computeChecksum(m1)).not.toBe(await computeChecksum(m2));
     });
 
-    it("joins array SQL with newline for checksum", () => {
+    it("joins array SQL with newline for checksum", async () => {
       const mArray = createMigration("001", "test", [
         "CREATE TABLE a (id INT)",
         "CREATE TABLE b (id INT)",
@@ -958,7 +966,7 @@ describe("MysqlMigrationRunner", () => {
         "CREATE TABLE a (id INT)\nCREATE TABLE b (id INT)",
       );
 
-      expect(computeChecksum(mArray)).toBe(computeChecksum(mString));
+      expect(await computeChecksum(mArray)).toBe(await computeChecksum(mString));
     });
   });
 });

@@ -117,7 +117,7 @@ describe.skipIf(!canConnect)("PgMigrationRunner E2E", () => {
       expect(applied[2].description).toBe("Add age column");
 
       for (let i = 0; i < migrations.length; i++) {
-        expect(applied[i].checksum).toBe(computeChecksum(migrations[i]));
+        expect(applied[i].checksum).toBe(await computeChecksum(migrations[i]));
       }
     });
 

@@ -12,7 +12,7 @@ import type { RuntimeInfo } from "./driver-adapter.js";
  */
 export function detectRuntime(): RuntimeInfo {
   // Bun sets globalThis.Bun
-  if (typeof (globalThis as any).Bun !== "undefined") {
+  if ((globalThis as any).Bun != null) {
     return {
       runtime: "bun",
       version: String((globalThis as any).Bun.version ?? "unknown"),
@@ -20,7 +20,7 @@ export function detectRuntime(): RuntimeInfo {
   }
 
   // Deno sets globalThis.Deno
-  if (typeof (globalThis as any).Deno !== "undefined") {
+  if ((globalThis as any).Deno != null) {
     const deno = (globalThis as any).Deno;
     return {
       runtime: "deno",

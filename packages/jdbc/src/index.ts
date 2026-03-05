@@ -110,3 +110,4 @@ export type {
   RuntimeInfo,
 } from "./driver-adapter.js";
 export { detectRuntime } from "./runtime-detect.js";
+export { sha256 } from "./crypto-utils.js";

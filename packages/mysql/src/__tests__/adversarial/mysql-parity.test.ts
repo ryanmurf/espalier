@@ -301,7 +301,7 @@ describe("MySQL migration runner edge cases", () => {
     };
 
     // FIXED: different checksums because version, description, and down() are included
-    expect(computeChecksum(migration1)).not.toBe(computeChecksum(migration2));
+    expect(await computeChecksum(migration1)).not.toBe(await computeChecksum(migration2));
   });
 
   it("computeChecksum with array up() joins with newline", async () => {
@@ -315,7 +315,7 @@ describe("MySQL migration runner edge cases", () => {
     };
 
     // Verify it doesn't crash and produces a hash
-    const hash = computeChecksum(migration);
+    const hash = await computeChecksum(migration);
     expect(hash).toMatch(/^[a-f0-9]{64}$/);
   });
 
@@ -329,7 +329,7 @@ describe("MySQL migration runner edge cases", () => {
       down: () => "",
     };
 
-    const hash = computeChecksum(migration);
+    const hash = await computeChecksum(migration);
     expect(hash).toMatch(/^[a-f0-9]{64}$/);
   });
 
@@ -343,7 +343,7 @@ describe("MySQL migration runner edge cases", () => {
       down: () => "",
     };
 
-    const hash = computeChecksum(migration);
+    const hash = await computeChecksum(migration);
     expect(hash).toMatch(/^[a-f0-9]{64}$/);
   });
 });
