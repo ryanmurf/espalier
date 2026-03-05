@@ -1,6 +1,6 @@
 {
   "name": "espalier-jdbc-mssql",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "description": "MSSQL driver adapter for espalier-jdbc",
   "type": "module",
   "main": "./dist/index.cjs",

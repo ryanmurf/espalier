@@ -1,5 +1,46 @@
 # Changelog
 
+## [1.8.0] - Y5 Q4 — Event Sourcing & Outbox Pattern
+
+### Features
+- **New Package: espalier-event-sourcing**: Complete event sourcing and CQRS infrastructure
+- **Event Store**: Append-only event storage with optimistic concurrency control via `EventStore`
+- **@AggregateRoot Decorator**: Marks classes as aggregate roots with configurable type and snapshot settings
+- **AggregateBase**: Abstract base class with `apply(event)`, `loadFromHistory()`, and version tracking
+- **@EventHandler Decorator**: Method decorator for event-type-specific state transition handlers
+- **Command Bus**: `CommandBus` with `register()`, `dispatch()`, and middleware pipeline
+- **@CommandHandler Decorator**: Auto-registers command handler classes with the global command bus
+- **Built-in Middleware**: `loggingMiddleware`, `validationMiddleware`, `retryMiddleware`
+- **Transactional Outbox**: `OutboxStore` for atomic event publishing with business data
+- **Outbox Publisher**: `OutboxPublisher` with configurable polling interval and batch size
+- **@Outbox Decorator**: Marks entities for automatic outbox event capture
+- **Event Bus Adapter Interface**: `ExternalEventBusAdapter` for Redis Streams, Kafka, NATS integration
+- **InMemoryEventBusAdapter**: Testing/single-process adapter implementing the adapter interface
+- **EventSourcingPlugin**: Integrates with espalier-data plugin system for lifecycle hooks
+- **DDL Generation**: `generateCreateTableDdl()` and `generateIndexesDdl()` for event store and outbox tables
+
+### New Exports (espalier-event-sourcing)
+- Event store: `EventStore`, `ConcurrencyError`
+- Aggregates: `@AggregateRoot`, `AggregateBase`, `@EventHandler`, `getAggregateRootMetadata`
+- Commands: `CommandBus`, `@CommandHandler`, `getGlobalCommandBus`, `loggingMiddleware`, `validationMiddleware`, `retryMiddleware`
+- Outbox: `OutboxStore`, `OutboxPublisher`, `@Outbox`, `getOutboxMetadata`, `isOutboxEntity`
+- Adapters: `ExternalEventBusAdapter`, `InMemoryEventBusAdapter`
+- Plugin: `EventSourcingPlugin`
+- Types: `DomainEvent`, `StoredEvent`, `Command`, `CommandResult`, `OutboxEntry`
+
+### Review Fixes
+- SQL identifier injection prevention (escapeIdent + name validation)
+- Defense-in-depth for optimistic concurrency (unique constraint catch)
+- Null-prototype JSON.parse for prototype pollution prevention
+- Chunked markPublished IN-clause (max 1000 per batch)
+- Clamped batchSize/pollIntervalMs to safe ranges
+- OutboxPublisher onError callback for error visibility
+- Defensive copies from metadata getters
+- InMemoryEventBusAdapter connected state guards
+- EventHandler per-class registration (not per-instance)
+- Event ordering validation in loadFromHistory
+- Plugin transactional limitations documented
+
 ## [1.7.0] - Y5 Q3 — Vector & AI Integration
 
 ### Features

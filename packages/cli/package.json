@@ -1,6 +1,6 @@
 {
   "name": "espalier-cli",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "description": "CLI for Espalier database migrations and code generation",
   "type": "module",
   "main": "./dist/index.cjs",

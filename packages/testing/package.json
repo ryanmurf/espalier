@@ -1,6 +1,6 @@
 {
   "name": "espalier-testing",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "description": "Testing utilities for espalier — entity factories, seeding, test isolation, and query assertions",
   "type": "module",
   "main": "./dist/index.cjs",
