@@ -79,7 +79,9 @@ function operatorToSql(
     case "False":
       return { sql: `${col} = FALSE`, bindings: [], argCount: 0, paramCount: 0 };
     case "SimilarTo":
-      return { sql: `${col} <=> $${paramIdx}`, bindings: [{ argIndex: -1, transform: "identity" }], argCount: 1, paramCount: 1 };
+      // SimilarTo is not a WHERE predicate — it contributes ORDER BY distance.
+      // Return empty sql so it is excluded from the WHERE clause.
+      return { sql: "", bindings: [{ argIndex: -1, transform: "vector-literal" }], argCount: 1, paramCount: 1 };
   }
 }
 
@@ -97,29 +99,38 @@ export class QueryCompiler {
     let paramIdx = 1;
     let argIdx = 0;
 
+    // Track SimilarTo expressions separately — they contribute ORDER BY, not WHERE.
+    const similarToExprs: Array<{ column: string; paramIdx: number }> = [];
+
     // Build WHERE clause in a single pass
     for (const expr of descriptor.properties) {
       const columnName = resolveColumn(expr.property, metadata);
       const result = operatorToSql(expr.operator, columnName, paramIdx);
 
-      whereParts.push(result.sql);
-
-      // Set argIndex on each binding and track arg consumption
-      for (const binding of result.bindings) {
+      if (expr.operator === "SimilarTo") {
+        // SimilarTo does not go in WHERE — track for ORDER BY
+        const binding = result.bindings[0];
         binding.argIndex = argIdx;
-        argIdx++;
-      }
-      // Between consumes 2 args but has 2 bindings, so argIdx is already correct.
-      // In/NotIn consumes 1 arg and has 1 binding, also correct.
-      // Adjust for operators where argCount differs from binding count:
-      // (currently all operators have bindings.length === argCount, but use
-      // the explicit argCount to stay correct if that changes)
-      if (result.argCount !== result.bindings.length) {
-        argIdx = argIdx - result.bindings.length + result.argCount;
-      }
+        similarToExprs.push({ column: columnName, paramIdx });
+        bindings.push(binding);
+        argIdx += result.argCount;
+        paramIdx += 1; // reserve one param slot for the vector literal
+      } else {
+        whereParts.push(result.sql);
 
-      bindings.push(...result.bindings);
-      paramIdx += result.paramCount;
+        // Set argIndex on each binding and track arg consumption
+        for (const binding of result.bindings) {
+          binding.argIndex = argIdx;
+          argIdx++;
+        }
+        // Adjust for operators where argCount differs from binding count
+        if (result.argCount !== result.bindings.length) {
+          argIdx = argIdx - result.bindings.length + result.argCount;
+        }
+
+        bindings.push(...result.bindings);
+        paramIdx += result.paramCount;
+      }
     }
 
     const connector = descriptor.connector === "And" ? " AND " : " OR ";
@@ -128,7 +139,7 @@ export class QueryCompiler {
     const expectedArgCount = argIdx;
 
     // Build the full SQL
-    const sql = this.buildSql(descriptor, metadata, whereClause);
+    const sql = this.buildSql(descriptor, metadata, whereClause, similarToExprs);
 
     const queryMetadata: QueryMetadata = {
       action: descriptor.action,
@@ -148,6 +159,7 @@ export class QueryCompiler {
     descriptor: DerivedQueryDescriptor,
     metadata: EntityMetadata,
     whereClause: string,
+    similarToExprs: Array<{ column: string; paramIdx: number }> = [],
   ): string {
     const table = quoteIdentifier(metadata.tableName);
     const parts: string[] = [];
@@ -178,11 +190,22 @@ export class QueryCompiler {
 
     if (whereClause) parts.push(`WHERE ${whereClause}`);
 
+    // Build ORDER BY: vector similarity ordering + explicit orderBy clauses
+    const orderClauses: string[] = [];
+
+    // Vector similarity ORDER BY comes first (most relevant ordering)
+    for (const sim of similarToExprs) {
+      orderClauses.push(`(${quoteIdentifier(sim.column)} <=> $${sim.paramIdx}) ASC`);
+    }
+
     if (descriptor.orderBy) {
-      const orderClauses = descriptor.orderBy.map((ob) => {
+      for (const ob of descriptor.orderBy) {
         const col = resolveColumn(ob.property, metadata);
-        return `${quoteIdentifier(col)} ${ob.direction === "Desc" ? "DESC" : "ASC"}`;
-      });
+        orderClauses.push(`${quoteIdentifier(col)} ${ob.direction === "Desc" ? "DESC" : "ASC"}`);
+      }
+    }
+
+    if (orderClauses.length > 0) {
       parts.push(`ORDER BY ${orderClauses.join(", ")}`);
     }
 

@@ -14,7 +14,7 @@ export interface ParamBinding {
    * - "wrap-wildcard": wrap with '%' (Containing)
    * - "spread": IN-list — spread array elements into individual params
    */
-  transform: "identity" | "prefix-wildcard" | "suffix-wildcard" | "wrap-wildcard" | "spread";
+  transform: "identity" | "prefix-wildcard" | "suffix-wildcard" | "wrap-wildcard" | "spread" | "vector-literal";
 }
 
 /**
@@ -164,5 +164,14 @@ function applyTransform(
     case "spread":
       // Should not reach here in the fast path
       return arg as SqlValue;
+    case "vector-literal": {
+      // Convert number[] to pgvector string format '[0.1,0.2,...]'
+      const vec = arg as number[];
+      return `[${vec.join(",")}]` as SqlValue;
+    }
+    default: {
+      const _exhaustive: never = transform;
+      throw new Error(`Unknown transform: ${_exhaustive}`);
+    }
   }
 }

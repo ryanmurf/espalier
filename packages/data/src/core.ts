@@ -41,7 +41,7 @@ export { createPageable, createPage } from "./repository/paging.js";
 export type { StreamOptions } from "./repository/streaming.js";
 export type { LazyInitializer } from "./repository/lazy-proxy.js";
 export { isLazyProxy, isInitialized, initializeProxy } from "./repository/lazy-proxy.js";
-export type { DerivedRepositoryOptions } from "./repository/derived-repository.js";
+export type { DerivedRepositoryOptions, SimilarityOptions, SimilarityResult } from "./repository/derived-repository.js";
 export { createDerivedRepository } from "./repository/derived-repository.js";
 export { createRepository } from "./repository/repository-factory.js";
 export type { CreateRepositoryOptions } from "./repository/repository-factory.js";
@@ -147,3 +147,13 @@ export { AuditContext, AuditLogWriter, getAuditLog, getAuditLogForEntity, getFie
 export type { Snapshot } from "./snapshot/index.js";
 export type { DiffResult, FieldDiff } from "./snapshot/index.js";
 export { snapshot, diff, diffEntity } from "./snapshot/index.js";
+
+// Vector & AI
+export type { VectorOptions, VectorMetadataEntry } from "./vector/index.js";
+export { Vector, getVectorFields, getVectorFieldMetadata } from "./vector/index.js";
+export type { VectorIndexOptions } from "./vector/index.js";
+export { VectorIndexManager } from "./vector/index.js";
+export type { EmbeddingProvider, EmbeddingHookOptions } from "./vector/index.js";
+export { createEmbeddingHook, registerEmbeddingHook } from "./vector/index.js";
+export type { NearestToResult } from "./vector/index.js";
+export { similarTo, nearestTo } from "./vector/index.js";

@@ -9,7 +9,7 @@ export type LifecycleEvent =
 
 const lifecycleMetadata = new WeakMap<object, Map<LifecycleEvent, (string | symbol)[]>>();
 
-function addLifecycleCallback(
+export function addLifecycleCallback(
   constructor: object,
   event: LifecycleEvent,
   methodName: string | symbol,

@@ -10,8 +10,10 @@ import type { ProjectionMapper } from "../mapping/projection-mapper.js";
 import { getProjectionMetadata } from "../decorators/projection.js";
 import { SelectBuilder, DeleteBuilder, InsertBuilder, UpdateBuilder } from "../query/query-builder.js";
 import { BulkOperationBuilder } from "../query/bulk-operation-builder.js";
-import { ComparisonCriteria, RawComparisonCriteria, LogicalCriteria } from "../query/criteria.js";
-import type { Criteria } from "../query/criteria.js";
+import { ComparisonCriteria, RawComparisonCriteria, LogicalCriteria, VectorDistanceCriteria } from "../query/criteria.js";
+import type { Criteria, VectorMetric } from "../query/criteria.js";
+import { getVectorFields } from "../decorators/vector.js";
+import type { VectorMetadataEntry } from "../decorators/vector.js";
 import type { Specification } from "../query/specification.js";
 import { EntityNotFoundException } from "./entity-not-found.js";
 import { EntityCache } from "../cache/entity-cache.js";
@@ -66,6 +68,17 @@ export interface DerivedRepositoryOptions {
   eventBus?: EventBus;
   /** SQL dialect for bulk operations. Default: "postgres". */
   dialect?: import("../query/bulk-operation-builder.js").BulkDialect;
+}
+
+export interface SimilarityOptions {
+  limit?: number;
+  maxDistance?: number;
+  metric?: VectorMetric;
+}
+
+export interface SimilarityResult<T> {
+  entity: T;
+  distance: number;
 }
 
 export function createDerivedRepository<T, ID>(
@@ -1754,6 +1767,189 @@ export function createDerivedRepository<T, ID>(
     };
   }
 
+  // Vector similarity search methods
+  const vectorFields = getVectorFields(entityClass);
+
+  function resolveVectorField(fieldName: string): VectorMetadataEntry {
+    const entry = vectorFields.get(fieldName);
+    if (!entry) {
+      const available = [...vectorFields.keys()].map(String).join(", ") || "(none)";
+      throw new Error(
+        `Field "${fieldName}" is not a @Vector field on ${entityName}. Available vector fields: ${available}`,
+      );
+    }
+    return entry;
+  }
+
+  const vectorOperators: Record<VectorMetric, string> = {
+    l2: "<->",
+    cosine: "<=>",
+    inner_product: "<#>",
+  };
+
+  (crudMethods as any).findBySimilarity = async (
+    fieldName: string,
+    vector: number[],
+    options?: SimilarityOptions,
+  ): Promise<T[]> => {
+    const vecMeta = resolveVectorField(fieldName);
+    const metric = options?.metric ?? vecMeta.metric;
+    const limit = options?.limit ?? 10;
+    const maxDistance = options?.maxDistance;
+    const distOp = vectorOperators[metric];
+    const vectorLiteral = `[${vector.join(",")}]`;
+
+    const builder = new SelectBuilder(metadata.tableName)
+      .columns(...metadata.fields.map((f: FieldMapping) => f.columnName));
+
+    if (maxDistance !== undefined) {
+      builder.where(new VectorDistanceCriteria(
+        vecMeta.columnName,
+        vector,
+        metric,
+        "lte",
+        maxDistance,
+      ));
+    }
+
+    applyAllFilters(builder);
+
+    // Order by distance ascending (closest first) using parameterized expression
+    builder.orderByExpression({
+      direction: "ASC" as const,
+      toSql(paramOffset: number) {
+        return {
+          sql: `(${quoteIdentifier(vecMeta.columnName)} ${distOp} $${paramOffset})`,
+          params: [vectorLiteral as SqlValue],
+        };
+      },
+    });
+
+    builder.limit(limit);
+
+    const query = builder.build();
+    const conn = await dataSource.getConnection();
+    try {
+      const stmt = conn.prepareStatement(query.sql);
+      try {
+        for (let i = 0; i < query.params.length; i++) {
+          stmt.setParameter(i + 1, query.params[i]);
+        }
+        const rs = await stmt.executeQuery();
+        const results: T[] = [];
+        while (await rs.next()) {
+          const entity = rowMapper.mapRow(rs);
+          results.push(entity);
+        }
+
+        // Post-load processing: relations, lifecycle, caching
+        if (results.length > 0) {
+          await batchLoadCollections(results, conn);
+          for (const entity of results) {
+            const id = getEntityId(entity);
+            await postLoadEntity(entity, id);
+          }
+        }
+
+        return results;
+      } finally {
+        await stmt.close().catch(() => {});
+      }
+    } finally {
+      await conn.close();
+    }
+  };
+
+  (crudMethods as any).findBySimilarityWithDistance = async (
+    fieldName: string,
+    vector: number[],
+    options?: SimilarityOptions,
+  ): Promise<SimilarityResult<T>[]> => {
+    const vecMeta = resolveVectorField(fieldName);
+    const metric = options?.metric ?? vecMeta.metric;
+    const limit = options?.limit ?? 10;
+    const maxDistance = options?.maxDistance;
+    const distOp = vectorOperators[metric];
+    const vectorLiteral = `[${vector.join(",")}]`;
+
+    // Use rawColumns for the SELECT list so we can include the distance expression
+    const entityCols = metadata.fields.map((f: FieldMapping) =>
+      `${quoteIdentifier(metadata.tableName)}.${quoteIdentifier(f.columnName)}`
+    );
+
+    const builder = new SelectBuilder(metadata.tableName)
+      .rawColumns(...entityCols);
+
+    if (maxDistance !== undefined) {
+      builder.where(new VectorDistanceCriteria(
+        vecMeta.columnName,
+        vector,
+        metric,
+        "lte",
+        maxDistance,
+      ));
+    }
+
+    applyAllFilters(builder);
+
+    // Order by distance ascending
+    builder.orderByExpression({
+      direction: "ASC" as const,
+      toSql(paramOffset: number) {
+        return {
+          sql: `(${quoteIdentifier(vecMeta.columnName)} ${distOp} $${paramOffset})`,
+          params: [vectorLiteral as SqlValue],
+        };
+      },
+    });
+
+    builder.limit(limit);
+
+    // Build the base query, then inject the distance column into the SELECT list.
+    // The distance SELECT expression needs its own parameter appended after the base query params.
+    const baseQuery = builder.build();
+    const distSelectExpr = `(${quoteIdentifier(vecMeta.columnName)} ${distOp} $${baseQuery.params.length + 1}) AS ${quoteIdentifier("__similarity_distance")}`;
+    const finalSql = baseQuery.sql.replace(
+      `FROM ${quoteIdentifier(metadata.tableName)}`,
+      `, ${distSelectExpr} FROM ${quoteIdentifier(metadata.tableName)}`,
+    );
+    const finalParams = [...baseQuery.params, vectorLiteral as SqlValue];
+
+    const conn = await dataSource.getConnection();
+    try {
+      const stmt = conn.prepareStatement(finalSql);
+      try {
+        for (let i = 0; i < finalParams.length; i++) {
+          stmt.setParameter(i + 1, finalParams[i]);
+        }
+        const rs = await stmt.executeQuery();
+        const results: SimilarityResult<T>[] = [];
+        while (await rs.next()) {
+          const row = rs.getRow();
+          const distance = Number(row["__similarity_distance"] ?? 0);
+          const entity = rowMapper.mapRow(rs);
+          results.push({ entity, distance });
+        }
+
+        // Post-load processing
+        if (results.length > 0) {
+          const entities = results.map(r => r.entity);
+          await batchLoadCollections(entities, conn);
+          for (const entity of entities) {
+            const id = getEntityId(entity);
+            await postLoadEntity(entity, id);
+          }
+        }
+
+        return results;
+      } finally {
+        await stmt.close().catch(() => {});
+      }
+    } finally {
+      await conn.close();
+    }
+  };
+
   const knownMethods = new Set<string>([
     "findById",
     "existsById",
@@ -1779,12 +1975,16 @@ export function createDerivedRepository<T, ID>(
     "softDelete",
     // Audit log method (only functional when @Audited is present)
     "getAuditLog",
+    // Vector similarity methods
+    "findBySimilarity",
+    "findBySimilarityWithDistance",
   ]);
 
   const tracedMethods = new Set<string>([
     "findById", "existsById", "findAll", "save", "saveAll", "upsertAll",
     "delete", "deleteAll", "deleteById", "refresh", "count",
     "restore", "findIncludingDeleted", "findOnlyDeleted", "softDelete",
+    "findBySimilarity", "findBySimilarityWithDistance",
   ]);
 
   (crudMethods as any).getEntityCache = () => entityCache;

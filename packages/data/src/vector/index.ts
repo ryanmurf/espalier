@@ -15,3 +15,9 @@ export type {
   VectorIndexOptions,
   VectorMetric,
 } from "./vector-index-manager.js";
+
+export type { EmbeddingProvider, EmbeddingHookOptions } from "./embedding-hook.js";
+export { createEmbeddingHook, registerEmbeddingHook } from "./embedding-hook.js";
+
+export type { NearestToResult } from "./vector-specifications.js";
+export { similarTo, nearestTo } from "./vector-specifications.js";

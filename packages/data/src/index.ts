@@ -135,7 +135,7 @@ export {
 export type { StreamOptions } from "./repository/streaming.js";
 export type { LazyInitializer } from "./repository/lazy-proxy.js";
 export { isLazyProxy, isInitialized, initializeProxy } from "./repository/lazy-proxy.js";
-export type { DerivedRepositoryOptions } from "./repository/derived-repository.js";
+export type { DerivedRepositoryOptions, SimilarityOptions, SimilarityResult } from "./repository/derived-repository.js";
 export { createDerivedRepository } from "./repository/derived-repository.js";
 export { createRepository } from "./repository/repository-factory.js";
 export type { CreateRepositoryOptions } from "./repository/repository-factory.js";

@@ -296,9 +296,9 @@ describe("bundle size adversarial tests", () => {
       return total;
     }
 
-    it("espalier-data dist total is under 2MB raw", () => {
+    it("espalier-data dist total is under 3MB raw", () => {
       const total = getTotalSize(DATA_DIST);
-      expect(total).toBeLessThan(2.5 * 1024 * 1024);
+      expect(total).toBeLessThan(3 * 1024 * 1024);
     });
 
     it("espalier-jdbc dist total is under 500KB raw (includes .map, .cjs, .d.ts)", () => {

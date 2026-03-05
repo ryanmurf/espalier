@@ -1,4 +1,4 @@
-import type { SqlValue } from "espalier-jdbc";
+import { type SqlValue, quoteIdentifier } from "espalier-jdbc";
 import type { EntityMetadata, FieldMapping } from "../mapping/entity-metadata.js";
 import type { DerivedQueryDescriptor, PropertyExpression } from "./derived-query-parser.js";
 import type { BuiltQuery } from "./query-builder.js";
@@ -40,7 +40,7 @@ function buildCriteriaForExpression(
   columnName: string,
   args: unknown[],
   argOffset: number,
-): Criteria {
+): Criteria | null {
   switch (expr.operator) {
     case "Equals":
       return new ComparisonCriteria("eq", columnName, args[argOffset] as SqlValue);
@@ -94,6 +94,9 @@ function buildCriteriaForExpression(
       return new ComparisonCriteria("eq", columnName, true as SqlValue);
     case "False":
       return new ComparisonCriteria("eq", columnName, false as SqlValue);
+    case "SimilarTo":
+      // SimilarTo is handled via ORDER BY, not WHERE — return null to signal skip
+      return null;
     default:
       throw new Error(`Unsupported derived query operator: ${expr.operator}`);
   }
@@ -119,39 +122,52 @@ export function buildDerivedQuery(
   args: unknown[],
   extraCriteria?: Criteria,
 ): BuiltQuery {
-  // Build criteria from property expressions
+  // Build criteria from property expressions, tracking SimilarTo separately
   const criteriaList: Criteria[] = [];
+  const similarToExprs: Array<{ columnName: string; vector: number[] }> = [];
   let argOffset = 0;
 
   for (const expr of descriptor.properties) {
     const columnName = resolveColumn(expr.property, metadata);
+    if (expr.operator === "SimilarTo") {
+      // SimilarTo contributes ORDER BY, not WHERE
+      similarToExprs.push({ columnName, vector: args[argOffset] as number[] });
+      argOffset += expr.paramCount;
+      continue;
+    }
     const criteria = buildCriteriaForExpression(expr, columnName, args, argOffset);
-    criteriaList.push(criteria);
+    if (criteria !== null) {
+      criteriaList.push(criteria);
+    }
     argOffset += expr.paramCount;
   }
 
-  let where = combineCriteria(criteriaList, descriptor.connector);
+  let where: Criteria | undefined;
+  if (criteriaList.length > 0) {
+    where = combineCriteria(criteriaList, descriptor.connector);
+  }
   if (extraCriteria) {
-    where = new LogicalCriteria("and", where, extraCriteria);
+    where = where ? new LogicalCriteria("and", where, extraCriteria) : extraCriteria;
   }
 
   if (descriptor.action === "delete") {
-    const builder = new DeleteBuilder(metadata.tableName).where(where);
+    const builder = new DeleteBuilder(metadata.tableName);
+    if (where) builder.where(where);
     return builder.build();
   }
 
   if (descriptor.action === "count") {
     const builder = new SelectBuilder(metadata.tableName)
-      .columns("COUNT(*)")
-      .where(where);
+      .columns("COUNT(*)");
+    if (where) builder.where(where);
     return builder.build();
   }
 
   if (descriptor.action === "exists") {
     const builder = new SelectBuilder(metadata.tableName)
       .columns("1")
-      .where(where)
       .limit(1);
+    if (where) builder.where(where);
     return builder.build();
   }
 
@@ -159,11 +175,26 @@ export function buildDerivedQuery(
   const columns = metadata.fields.map((f: FieldMapping) => f.columnName);
 
   const builder = new SelectBuilder(metadata.tableName)
-    .columns(...columns)
-    .where(where);
+    .columns(...columns);
+
+  if (where) builder.where(where);
 
   if (descriptor.distinct) {
     builder.distinct();
+  }
+
+  // Add vector similarity ORDER BY (cosine distance ASC) before explicit orderBy
+  for (const sim of similarToExprs) {
+    const vectorLiteral = `[${sim.vector.join(",")}]`;
+    builder.orderByExpression({
+      toSql(paramOffset: number) {
+        return {
+          sql: `(${quoteIdentifier(sim.columnName)} <=> $${paramOffset})`,
+          params: [vectorLiteral as SqlValue],
+        };
+      },
+      direction: "ASC" as const,
+    });
   }
 
   if (descriptor.orderBy) {
