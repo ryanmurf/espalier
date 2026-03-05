@@ -6,6 +6,7 @@ import { getEntityMetadata } from "../mapping/entity-metadata.js";
 import { getTenantIdField } from "../decorators/tenant.js";
 import { getSoftDeleteMetadata } from "../decorators/soft-delete.js";
 import { isAuditedEntity } from "../decorators/audited.js";
+import { getVectorFields } from "../decorators/vector.js";
 import { createPageable } from "../repository/paging.js";
 import { OptimisticLockException } from "../repository/optimistic-lock.js";
 import { EntityNotFoundException } from "../repository/entity-not-found.js";
@@ -114,6 +115,17 @@ export class RouteGenerator {
           path: `${base}/:id/audit`,
           operationId: `auditLog${typeName}`,
           handler: this.createAuditLogHandler(repository, metadata, entityClass),
+        });
+      }
+
+      // Vector similarity search routes
+      const vectorFields = getVectorFields(entityClass);
+      if (vectorFields.size > 0) {
+        routes.push({
+          method: "POST",
+          path: `${base}/similar`,
+          operationId: `findSimilar${typeName}`,
+          handler: this.createSimilarityHandler(repository, entityClass, vectorFields),
         });
       }
 
@@ -379,6 +391,62 @@ export class RouteGenerator {
           return { status: 200, body: entries };
         }
         return { status: 200, body: [] };
+      });
+    };
+  }
+
+  private createSimilarityHandler(
+    repository: CrudRepository<any, any>,
+    entityClass: new (...args: any[]) => any,
+    vectorFields: Map<string | symbol, any>,
+  ): (req: RestRequest) => Promise<RestResponse> {
+    const validFieldNames = new Set(
+      [...vectorFields.keys()].filter((k): k is string => typeof k === "string"),
+    );
+
+    return async (req: RestRequest) => {
+      const tenantCheck = this.checkTenantContext(req, entityClass);
+      if (tenantCheck) return tenantCheck;
+
+      if (!req.body || typeof req.body !== "object") {
+        return { status: 400, body: { error: "Request body is required" } };
+      }
+
+      const { field, vector, limit, maxDistance, metric } = req.body as Record<string, unknown>;
+
+      if (typeof field !== "string" || !validFieldNames.has(field)) {
+        return {
+          status: 400,
+          body: { error: `Invalid vector field. Valid fields: ${[...validFieldNames].join(", ")}` },
+        };
+      }
+
+      if (!Array.isArray(vector) || !vector.every((v) => typeof v === "number")) {
+        return { status: 400, body: { error: "vector must be an array of numbers" } };
+      }
+
+      const options: Record<string, unknown> = {};
+      if (limit != null) options.limit = Number(limit);
+      if (maxDistance != null) options.maxDistance = Number(maxDistance);
+      if (metric != null) options.metric = metric;
+
+      const includeDistance = String(req.query.includeDistance) === "true";
+
+      return this.withTenantContext(req, entityClass, async () => {
+        try {
+          const repo = repository as any;
+          if (includeDistance && typeof repo.findBySimilarityWithDistance === "function") {
+            const results = await repo.findBySimilarityWithDistance(field, vector, options);
+            return { status: 200, body: results };
+          }
+          if (typeof repo.findBySimilarity === "function") {
+            const results = await repo.findBySimilarity(field, vector, options);
+            return { status: 200, body: results };
+          }
+          return { status: 501, body: { error: "Similarity search not supported" } };
+        } catch (err) {
+          return handleError(err);
+        }
       });
     };
   }
