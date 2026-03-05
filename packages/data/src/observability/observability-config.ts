@@ -13,6 +13,8 @@ import {
   PoolHealthCheck,
   ConnectivityHealthCheck,
 } from "espalier-jdbc";
+import type { N1DetectionConfig } from "./n1-detector.js";
+import { N1Detector } from "./n1-detector.js";
 
 /**
  * Unified observability configuration.
@@ -44,6 +46,11 @@ export interface ObservabilityConfig {
    * For PG: pass `setQueryStatisticsCollector` from espalier-jdbc-pg.
    */
   wireQueryStatisticsCollector?: (collector: QueryStatisticsCollector) => void;
+  /**
+   * N+1 query detection configuration.
+   * When enabled, tracks repeated query patterns within scoped operations.
+   */
+  n1Detection?: N1DetectionConfig;
 }
 
 /**
@@ -56,6 +63,8 @@ export interface ObservabilityHandle {
   getQueryStatistics(): QueryStatisticsCollector | undefined;
   /** The slow query detector. */
   getSlowQueryDetector(): SlowQueryDetector;
+  /** The N+1 query detector (undefined if not enabled). */
+  getN1Detector(): N1Detector | undefined;
 }
 
 function isMonitoredPool(ds: DataSource): ds is MonitoredPooledDataSource {
@@ -89,6 +98,11 @@ export function configureObservability(
     config.wireQueryStatisticsCollector?.(statsCollector);
   }
 
+  // 3b. N+1 detection
+  const n1Detector = config.n1Detection?.enabled
+    ? new N1Detector(config.n1Detection)
+    : undefined;
+
   // 4. Health checks
   const registry = new HealthCheckRegistry();
 
@@ -113,5 +127,6 @@ export function configureObservability(
     getHealthRegistry: () => registry,
     getQueryStatistics: () => statsCollector,
     getSlowQueryDetector: () => slowQueryDetector,
+    getN1Detector: () => n1Detector,
   };
 }

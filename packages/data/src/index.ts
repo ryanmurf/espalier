@@ -152,6 +152,8 @@ export type { TenantSchemaManagerOptions } from "./tenant/index.js";
 export { TenantSchemaManager, TenantLimitExceededError } from "./tenant/index.js";
 
 export type { ObservabilityConfig, ObservabilityHandle } from "./observability/index.js";
+export type { N1DetectionConfig, N1DetectionEvent } from "./observability/index.js";
+export { N1Detector, N1DetectionError } from "./observability/index.js";
 
 export type { Plugin, PluginContext, PluginHook, PluginDependency, HookType, HookContext } from "./plugin/index.js";
 export type { MiddlewareContext, MiddlewareFn } from "./plugin/index.js";
