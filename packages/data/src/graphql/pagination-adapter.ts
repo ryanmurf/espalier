@@ -45,7 +45,7 @@ export class OffsetPaginationAdapter implements GraphQLPaginationAdapter {
   }
 
   generateSharedTypes(): string {
-    return `type OffsetPageInfo {
+    return `type PageInfo {
   hasNextPage: Boolean!
   hasPreviousPage: Boolean!
   totalElements: Int!
@@ -58,7 +58,7 @@ export class OffsetPaginationAdapter implements GraphQLPaginationAdapter {
   generateConnectionType(typeName: string): string {
     return `type ${typeName}OffsetConnection {
   content: [${typeName}!]!
-  pageInfo: OffsetPageInfo!
+  pageInfo: PageInfo!
 }`;
   }
 
