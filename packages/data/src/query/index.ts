@@ -41,6 +41,9 @@ export { QueryCompiler } from "./query-compiler.js";
 export type { QueryBatcherConfig } from "./query-batcher.js";
 export { QueryBatcher, QueryBatcherRegistry } from "./query-batcher.js";
 
+export type { BulkDialect, BulkOperationOptions, BulkQuery } from "./bulk-operation-builder.js";
+export { BulkOperationBuilder } from "./bulk-operation-builder.js";
+
 export type { Specification } from "./specification.js";
 export {
   Specifications,

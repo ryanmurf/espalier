@@ -13,6 +13,7 @@ export interface CrudRepository<T, ID> extends Repository<T, ID> {
   findById<P>(id: ID, projectionClass: new (...args: any[]) => P): Promise<P | null>;
   save(entity: T): Promise<T>;
   saveAll(entities: T[]): Promise<T[]>;
+  upsertAll(entities: T[]): Promise<T[]>;
   delete(entity: T): Promise<void>;
   deleteAll(entities: T[]): Promise<void>;
   deleteById(id: ID): Promise<void>;

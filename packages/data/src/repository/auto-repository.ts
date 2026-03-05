@@ -35,6 +35,7 @@ const CRUD_METHODS = new Set([
   "findAllStream",
   "save",
   "saveAll",
+  "upsertAll",
   "delete",
   "deleteAll",
   "deleteById",
