@@ -20,24 +20,126 @@ function sanitizeIdentifier(name: string): string {
 }
 
 function containsSemicolon(sql: string): boolean {
-  // Check for semicolons outside of single-quoted string literals
-  let inString = false;
-  for (let i = 0; i < sql.length; i++) {
+  // Check for semicolons outside of string literals, comments, and quoted identifiers
+  let i = 0;
+  while (i < sql.length) {
     const ch = sql[i];
-    if (ch === "'" && !inString) {
-      inString = true;
-    } else if (ch === "'" && inString) {
-      // Handle escaped quotes ('')
-      if (i + 1 < sql.length && sql[i + 1] === "'") {
-        i++;
-      } else {
-        inString = false;
+    const next = i + 1 < sql.length ? sql[i + 1] : "";
+
+    // Single-quoted string literal
+    if (ch === "'") {
+      i++;
+      while (i < sql.length) {
+        if (sql[i] === "'" && i + 1 < sql.length && sql[i + 1] === "'") {
+          i += 2; // escaped quote ''
+        } else if (sql[i] === "'") {
+          i++;
+          break;
+        } else {
+          i++;
+        }
       }
-    } else if (ch === ";" && !inString) {
+      continue;
+    }
+
+    // Double-quoted identifier
+    if (ch === '"') {
+      i++;
+      while (i < sql.length) {
+        if (sql[i] === '"' && i + 1 < sql.length && sql[i + 1] === '"') {
+          i += 2; // escaped quote ""
+        } else if (sql[i] === '"') {
+          i++;
+          break;
+        } else {
+          i++;
+        }
+      }
+      continue;
+    }
+
+    // Dollar-quoted string ($$...$$)
+    if (ch === "$" && next === "$") {
+      i += 2;
+      while (i < sql.length) {
+        if (sql[i] === "$" && i + 1 < sql.length && sql[i + 1] === "$") {
+          i += 2;
+          break;
+        }
+        i++;
+      }
+      continue;
+    }
+
+    // Line comment (--)
+    if (ch === "-" && next === "-") {
+      i += 2;
+      while (i < sql.length && sql[i] !== "\n") {
+        i++;
+      }
+      continue;
+    }
+
+    // Block comment (/* ... */)
+    if (ch === "/" && next === "*") {
+      i += 2;
+      while (i < sql.length) {
+        if (sql[i] === "*" && i + 1 < sql.length && sql[i + 1] === "/") {
+          i += 2;
+          break;
+        }
+        i++;
+      }
+      continue;
+    }
+
+    // Semicolon outside of any quoted/comment context
+    if (ch === ";") {
       return true;
     }
+
+    i++;
   }
   return false;
+}
+
+function isReadOnlyQuery(sql: string): boolean {
+  // Strip SQL comments for analysis
+  const stripped = sql
+    .replace(/--[^\n]*/g, " ")
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .trim();
+
+  // Must start with a known read keyword
+  if (!/^\s*(SELECT|SHOW|DESCRIBE|EXPLAIN|WITH|TABLE|VALUES)\b/i.test(stripped)) {
+    return false;
+  }
+
+  // Reject EXPLAIN ANALYZE — it actually executes the statement
+  if (/^\s*EXPLAIN\s+ANALYZE\b/i.test(stripped)) {
+    return false;
+  }
+
+  // Reject SELECT ... INTO (creates tables) — allow INTO TEMP/TEMPORARY for safety
+  if (/^\s*SELECT\b/i.test(stripped) && /\bINTO\s+(?!TEMP\b|TEMPORARY\b)\w/i.test(stripped)) {
+    return false;
+  }
+
+  // Reject CTE (WITH) followed by DML (INSERT/UPDATE/DELETE)
+  if (/^\s*WITH\b/i.test(stripped) && /\b(INSERT|UPDATE|DELETE)\b/i.test(stripped)) {
+    return false;
+  }
+
+  return true;
+}
+
+function sanitizeErrorMessage(err: unknown): string {
+  const msg = (err as Error).message ?? "Unknown error";
+  // Strip file paths and stack traces
+  return msg
+    .replace(/\/[^\s:]+/g, "[path]")
+    .replace(/at\s+.+/g, "")
+    .trim();
 }
 
 function parsePageParams(query: Record<string, string>): { offset: number; limit: number } {
@@ -64,6 +166,15 @@ function parseSortParam(
 }
 
 export function createApiRoutes(app: Hono, ctx: ApiRouteContext): void {
+  // CORS protection — reject cross-origin requests to API endpoints
+  app.use("/api/*", async (c, next) => {
+    const origin = c.req.header("origin");
+    if (origin) {
+      return c.text("Cross-origin requests are not allowed", 403);
+    }
+    await next();
+  });
+
   app.get("/api/schema", (c) => {
     return c.json(ctx.schema);
   });
@@ -134,7 +245,7 @@ export function createApiRoutes(app: Hono, ctx: ApiRouteContext): void {
         await stmt.close();
       }
     } catch (err) {
-      return c.json({ error: (err as Error).message }, 500);
+      return c.json({ error: sanitizeErrorMessage(err) }, 500);
     } finally {
       await conn.close();
     }
@@ -175,7 +286,7 @@ export function createApiRoutes(app: Hono, ctx: ApiRouteContext): void {
         await ps.close();
       }
     } catch (err) {
-      return c.json({ error: (err as Error).message }, 500);
+      return c.json({ error: sanitizeErrorMessage(err) }, 500);
     } finally {
       await conn.close();
     }
@@ -202,13 +313,11 @@ export function createApiRoutes(app: Hono, ctx: ApiRouteContext): void {
     const columnNames = table.columns.map((col) => col.columnName);
     const insertCols: string[] = [];
     const values: unknown[] = [];
-    let paramIdx = 1;
 
     for (const colName of columnNames) {
       if (colName in body) {
         insertCols.push(sanitizeIdentifier(colName));
         values.push(body[colName]);
-        paramIdx++;
       }
     }
 
@@ -233,7 +342,7 @@ export function createApiRoutes(app: Hono, ctx: ApiRouteContext): void {
         await ps.close();
       }
     } catch (err) {
-      return c.json({ error: (err as Error).message }, 500);
+      return c.json({ error: sanitizeErrorMessage(err) }, 500);
     } finally {
       await conn.close();
     }
@@ -304,7 +413,7 @@ export function createApiRoutes(app: Hono, ctx: ApiRouteContext): void {
         await ps.close();
       }
     } catch (err) {
-      return c.json({ error: (err as Error).message }, 500);
+      return c.json({ error: sanitizeErrorMessage(err) }, 500);
     } finally {
       await conn.close();
     }
@@ -346,7 +455,7 @@ export function createApiRoutes(app: Hono, ctx: ApiRouteContext): void {
         await ps.close();
       }
     } catch (err) {
-      return c.json({ error: (err as Error).message }, 500);
+      return c.json({ error: sanitizeErrorMessage(err) }, 500);
     } finally {
       await conn.close();
     }
@@ -377,7 +486,7 @@ export function createApiRoutes(app: Hono, ctx: ApiRouteContext): void {
       );
     }
 
-    const isReadQuery = /^\s*(SELECT|SHOW|DESCRIBE|EXPLAIN|WITH)\b/i.test(sql);
+    const isReadQuery = isReadOnlyQuery(sql);
 
     if (!isReadQuery && ctx.readOnly) {
       return c.json(
@@ -390,13 +499,27 @@ export function createApiRoutes(app: Hono, ctx: ApiRouteContext): void {
 
     const conn = await ctx.dataSource.getConnection();
     try {
+      // Set query timeout for all paths (30 seconds)
+      if (!ctx.readOnly) {
+        const timeoutStmt = conn.createStatement();
+        try {
+          await timeoutStmt.executeUpdate("SET statement_timeout = '30000'");
+        } finally {
+          await timeoutStmt.close();
+        }
+      }
+
       if (ctx.readOnly) {
         // Use a read-only transaction as defense-in-depth
         const tx = await conn.beginTransaction();
         try {
           const setupStmt = conn.createStatement();
-          await setupStmt.executeQuery("SET TRANSACTION READ ONLY");
-          await setupStmt.close();
+          try {
+            await setupStmt.executeUpdate("SET TRANSACTION READ ONLY");
+            await setupStmt.executeUpdate("SET LOCAL statement_timeout = '30000'");
+          } finally {
+            await setupStmt.close();
+          }
 
           const ps = conn.prepareStatement(sql);
           try {
@@ -455,7 +578,7 @@ export function createApiRoutes(app: Hono, ctx: ApiRouteContext): void {
         }
       }
     } catch (err) {
-      return c.json({ error: (err as Error).message }, 500);
+      return c.json({ error: sanitizeErrorMessage(err) }, 500);
     } finally {
       await conn.close();
     }

@@ -274,10 +274,10 @@ describe.skipIf(!canConnect)("query playground — adversarial (E2E)", () => {
       await cleanStmt.close();
       await cleanConn.close();
 
-      // BUG: if the table was dropped, this fails — documenting the vulnerability
+      // The injection should be blocked, so the table must still exist
       expect(checkRes.status).toBe(200);
       const body = await json(checkRes);
-      expect(body.rows[0].cnt).toBeGreaterThan(0);
+      expect(Number(body.rows[0].cnt)).toBeGreaterThan(0);
     });
   });
 

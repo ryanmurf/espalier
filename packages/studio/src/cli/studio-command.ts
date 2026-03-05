@@ -12,6 +12,15 @@ export interface StudioCommandOptions {
 }
 
 export async function startStudio(options: StudioCommandOptions): Promise<void> {
+  // Validate that all entities are constructor functions
+  for (const entity of options.entities) {
+    if (typeof entity !== "function") {
+      throw new Error(
+        `Invalid entity configuration: expected a constructor function, got ${typeof entity}`,
+      );
+    }
+  }
+
   const schema = extractSchema({ entities: options.entities });
   const server = createStudioServer({
     schema,
@@ -30,18 +39,20 @@ export async function startStudio(options: StudioCommandOptions): Promise<void> 
   process.stdout.write("Press Ctrl+C to stop.\n");
 
   if (options.open !== false) {
-    const { exec } = await import("node:child_process");
+    const { execFile } = await import("node:child_process");
     const cmd = process.platform === "darwin" ? "open" : process.platform === "win32" ? "start" : "xdg-open";
-    exec(`${cmd} ${url}`);
+    execFile(cmd, [url], () => {
+      // Silently ignore errors (e.g. no browser available)
+    });
   }
 
   await new Promise<void>((resolve) => {
-    process.on("SIGINT", async () => {
+    process.once("SIGINT", async () => {
       process.stdout.write("\nShutting down...\n");
       await server.stop();
       resolve();
     });
-    process.on("SIGTERM", async () => {
+    process.once("SIGTERM", async () => {
       await server.stop();
       resolve();
     });

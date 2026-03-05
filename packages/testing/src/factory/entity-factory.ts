@@ -352,6 +352,19 @@ export class EntityFactory<T> {
    * Auto-generate sensible defaults based on entity metadata field types.
    */
   private _applyAutoDefaults(entity: T): void {
+    // Collect field names that are @Version, @CreatedDate, @LastModifiedDate
+    // so the generic type-based defaults don't override them
+    const specialFields = new Set<string>();
+    if (this._metadata.versionField) {
+      specialFields.add(String(this._metadata.versionField));
+    }
+    if (this._metadata.createdDateField) {
+      specialFields.add(String(this._metadata.createdDateField));
+    }
+    if (this._metadata.lastModifiedDateField) {
+      specialFields.add(String(this._metadata.lastModifiedDateField));
+    }
+
     for (const field of this._metadata.fields) {
       const fieldName = String(field.fieldName);
 
@@ -360,6 +373,9 @@ export class EntityFactory<T> {
 
       // Skip transient fields
       if (this._transientKeys.has(fieldName)) continue;
+
+      // Skip @Version, @CreatedDate, @LastModifiedDate — handled separately below
+      if (specialFields.has(fieldName)) continue;
 
       // Skip if already set by constructor — but not if value is undefined, empty string, or 0
       // (undefined = ! field not initialized; "" = empty string default; 0 = numeric zero default)
@@ -380,7 +396,8 @@ export class EntityFactory<T> {
       (entity as Record<string, unknown>)[idFieldName] = generateUUID();
     }
 
-    // Apply defaults to @Version field (not in metadata.fields, tracked separately)
+    // Apply defaults to @Version field BEFORE generic type-based defaults
+    // so that the version field always starts at 0 (not globalCounter)
     if (this._metadata.versionField) {
       const versionFieldName = String(this._metadata.versionField);
       const versionValue = (entity as Record<string, unknown>)[versionFieldName];

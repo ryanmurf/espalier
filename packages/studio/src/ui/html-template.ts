@@ -70,7 +70,7 @@ tr:hover td { background: rgba(99,102,241,.06); }
 .error { background: rgba(239,68,68,.15); border: 1px solid var(--danger); color: var(--danger); padding: 12px; border-radius: 8px; font-size: 13px; }
 </style>
 <script type="module">
-import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs";
 mermaid.initialize({ startOnLoad: false, theme: "dark", er: { useMaxWidth: false } });
 window.mermaid = mermaid;
 </script>
@@ -122,8 +122,8 @@ function renderTableList() {
   const el = document.getElementById("tableList");
   el.innerHTML = tables.map(t =>
     '<div class="table-item' + (currentTable === t.tableName ? ' active' : '') +
-    '" onclick="selectTable(\\'' + t.tableName + '\\')">' +
-    t.tableName + '<span class="count">' + t.columnCount + ' cols</span></div>'
+    '" onclick="selectTable(\\'' + escAttr(t.tableName) + '\\')">' +
+    escHtml(t.tableName) + '<span class="count">' + t.columnCount + ' cols</span></div>'
   ).join("");
 }
 
@@ -150,6 +150,7 @@ async function loadRows() {
 }
 
 function escHtml(s) { const d = document.createElement("div"); d.textContent = String(s ?? ""); return d.innerHTML; }
+function escAttr(s) { return String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;").replace(/\`/g,"&#96;").replace(/\\\\/g,"&#92;"); }
 
 function renderDataGrid(data) {
   if (!data.rows || data.rows.length === 0) {
@@ -167,7 +168,7 @@ function renderDataGrid(data) {
   let html = '<div class="grid-wrap"><table><thead><tr>';
   for (const col of cols) {
     const icon = sortCol === col ? (sortDir === "ASC" ? " &#9650;" : " &#9660;") : "";
-    html += '<th onclick="toggleSort(\\'' + col + '\\')">' + escHtml(col) + '<span class="sort-icon">' + icon + '</span></th>';
+    html += '<th onclick="toggleSort(\\'' + escAttr(col) + '\\')">' + escHtml(col) + '<span class="sort-icon">' + icon + '</span></th>';
   }
   html += '</tr></thead><tbody>';
   for (const row of data.rows) {
@@ -176,7 +177,7 @@ function renderDataGrid(data) {
       const val = row[col];
       if (fkCols.has(col) && val != null) {
         const target = fkCols.get(col);
-        html += '<td><span class="fk-link" onclick="navigateFK(\\'' + target + '\\', \\'' + escHtml(String(val)) + '\\')">' + escHtml(val) + '</span></td>';
+        html += '<td><span class="fk-link" onclick="navigateFK(\\'' + escAttr(target) + '\\', \\'' + escAttr(String(val)) + '\\')">' + escHtml(val) + '</span></td>';
       } else {
         html += '<td>' + escHtml(val) + '</td>';
       }
@@ -372,7 +373,7 @@ function toggleSource() {
 function renderQueryView() {
   document.getElementById("content").innerHTML =
     '<div class="query-view">' +
-    '<textarea class="query-editor" id="sqlInput" placeholder="SELECT * FROM ... WHERE id = $1" oninput="detectParams()">' + (currentTable ? 'SELECT * FROM ' + currentTable + ' LIMIT 20' : '') + '</textarea>' +
+    '<textarea class="query-editor" id="sqlInput" placeholder="SELECT * FROM ... WHERE id = $1" oninput="detectParams()">' + (currentTable ? 'SELECT * FROM ' + escHtml(currentTable) + ' LIMIT 20' : '') + '</textarea>' +
     '<div id="paramFields" style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap"></div>' +
     '<div style="display:flex;gap:8px;margin-top:8px;align-items:center">' +
     '<button class="query-btn" onclick="runQuery()">Run Query</button>' +
