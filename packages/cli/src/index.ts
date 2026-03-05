@@ -14,3 +14,5 @@ export { migrateStatus, formatStatusTable } from "./migrate-status.js";
 export type { MigrateStatusOptions, MigrateStatusResult, MigrationStatusEntry } from "./migrate-status.js";
 export { createAdapter } from "./adapter-factory.js";
 export type { AdapterResources } from "./adapter-factory.js";
+export { seedRun, seedStatus, formatSeedStatusTable } from "./seed-run.js";
+export type { SeedRunOptions, SeedRunResult, SeedStatusEntry } from "./seed-run.js";

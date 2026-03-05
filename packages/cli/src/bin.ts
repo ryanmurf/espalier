@@ -6,6 +6,7 @@ import { createMigration } from "./migrate-create.js";
 import { migrateUp } from "./migrate-up.js";
 import { migrateDown } from "./migrate-down.js";
 import { migrateStatus, formatStatusTable } from "./migrate-status.js";
+import { seedRun, seedStatus, formatSeedStatusTable } from "./seed-run.js";
 
 function main(): void {
   const parsed = parseArgs(process.argv);
@@ -17,6 +18,11 @@ function main(): void {
 
   if (parsed.command === "migrate") {
     handleMigrate(parsed.subcommand, parsed.positional, parsed.flags);
+    return;
+  }
+
+  if (parsed.command === "seed") {
+    handleSeed(parsed.subcommand, parsed.flags);
     return;
   }
 
@@ -206,6 +212,87 @@ function handleMigrateStatus(flags: Record<string, string | boolean>): void {
       process.stderr.write(`Error: ${err.message}\n`);
       process.exitCode = 1;
     });
+}
+
+function handleSeed(
+  subcommand: string,
+  flags: Record<string, string | boolean>,
+): void {
+  const configDir = typeof flags.config === "string" ? flags.config : undefined;
+
+  let config;
+  try {
+    config = loadConfig(configDir);
+  } catch (err) {
+    process.stderr.write(`Error: ${(err as Error).message}\n`);
+    process.exitCode = 1;
+    return;
+  }
+
+  const seedsDir = typeof flags.dir === "string"
+    ? flags.dir
+    : "seeds";
+
+  const env = typeof flags.env === "string" ? flags.env : undefined;
+
+  if (subcommand === "run" || subcommand === "") {
+    const reset = flags.reset === true;
+    seedRun({ config, seedsDir, env, reset })
+      .then((result) => {
+        if (result.executed.length === 0 && result.alreadyRun.length > 0) {
+          process.stdout.write("All seeds already executed.\n");
+        } else if (result.executed.length === 0) {
+          process.stdout.write("No seeds to run.\n");
+        } else {
+          for (const name of result.executed) {
+            process.stdout.write(`Seeded: ${name}\n`);
+          }
+          process.stdout.write(`\n${result.executed.length} seed(s) executed.\n`);
+        }
+        if (result.skipped.length > 0) {
+          process.stdout.write(`Skipped (env): ${result.skipped.join(", ")}\n`);
+        }
+      })
+      .catch((err: Error) => {
+        process.stderr.write(`Error: ${err.message}\n`);
+        process.exitCode = 1;
+      });
+    return;
+  }
+
+  if (subcommand === "status") {
+    seedStatus({ config, seedsDir, env })
+      .then((entries) => {
+        process.stdout.write(formatSeedStatusTable(entries));
+      })
+      .catch((err: Error) => {
+        process.stderr.write(`Error: ${err.message}\n`);
+        process.exitCode = 1;
+      });
+    return;
+  }
+
+  if (subcommand === "reset") {
+    seedRun({ config, seedsDir, env, reset: true })
+      .then((result) => {
+        process.stdout.write("Seed tracking reset.\n");
+        for (const name of result.executed) {
+          process.stdout.write(`Seeded: ${name}\n`);
+        }
+        if (result.executed.length > 0) {
+          process.stdout.write(`\n${result.executed.length} seed(s) re-executed.\n`);
+        }
+      })
+      .catch((err: Error) => {
+        process.stderr.write(`Error: ${err.message}\n`);
+        process.exitCode = 1;
+      });
+    return;
+  }
+
+  process.stderr.write(`Unknown seed subcommand: "${subcommand}"\n`);
+  process.stderr.write("Available: run, status, reset\n");
+  process.exitCode = 1;
 }
 
 main();
