@@ -1292,6 +1292,8 @@ export function createDerivedRepository<T, ID>(
         if (await rs.next()) {
           const saved = rowMapper.mapRow(rs);
           copyRelationFields(saved, entity);
+          // Register the mapped object so children's back-refs don't re-enter
+          cascadeSaving.add(saved);
           // Cascade post-save: save @OneToMany, inverse @OneToOne, @ManyToMany
           await cascadePostSave(saved, conn, cascadeSaving);
           await invokeLifecycleCallbacks(saved, "PostUpdate");
@@ -1407,6 +1409,8 @@ export function createDerivedRepository<T, ID>(
         if (await rs.next()) {
           const saved = rowMapper.mapRow(rs);
           copyRelationFields(saved, entity);
+          // Register the mapped object so children's back-refs don't re-enter
+          cascadeSaving.add(saved);
           // Cascade post-save: save @OneToMany, inverse @OneToOne, @ManyToMany
           await cascadePostSave(saved, conn, cascadeSaving);
           await invokeLifecycleCallbacks(saved, "PostPersist");
