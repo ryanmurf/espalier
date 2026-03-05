@@ -149,7 +149,6 @@ export type { TenantSchemaManagerOptions } from "./tenant/index.js";
 export { TenantSchemaManager, TenantLimitExceededError } from "./tenant/index.js";
 
 export type { ObservabilityConfig, ObservabilityHandle } from "./observability/index.js";
-export { configureObservability } from "./observability/index.js";
 
 export type { Plugin, PluginContext, PluginHook, PluginDependency, HookType, HookContext } from "./plugin/index.js";
 export type { MiddlewareContext, MiddlewareFn } from "./plugin/index.js";
@@ -159,14 +158,202 @@ export { composeMiddleware } from "./plugin/index.js";
 export { createPluginDecorator } from "./plugin/index.js";
 
 export type { GraphQLSchemaOptions, GeneratedGraphQLSchema, GraphQLPluginConfig } from "./graphql/index.js";
-export { GraphQLSchemaGenerator, GraphQLPlugin } from "./graphql/index.js";
 export type { ResolverFn, ResolverMap, BatchLoadFn, ResolverGeneratorOptions, EntityRegistration } from "./graphql/index.js";
-export { ResolverGenerator, createFilterSpec } from "./graphql/index.js";
 
 export type { RestRequest, RestResponse, RestHandler, HttpMethod, RouteDefinition } from "./rest/index.js";
 export type { RouteGeneratorOptions, RestEntityRegistration, RestPluginConfig } from "./rest/index.js";
-export { RouteGenerator, mountExpressRoutes, createFastifyPlugin, RestPlugin } from "./rest/index.js";
 export type { OpenApiSpec, OpenApiOperation, OpenApiParameter, OpenApiSchema, OpenApiSchemaRef, OpenApiGeneratorOptions } from "./rest/index.js";
-export { OpenApiGenerator } from "./rest/index.js";
 export type { EntityRouteConfig } from "./rest/index.js";
-export { customizeRoutes, addHateoasLinks } from "./rest/index.js";
+
+// ---------------------------------------------------------------------------
+// Lazy-loaded subsystems: GraphQL, REST, and Observability.
+// These heavy modules are loaded on first use via dynamic import() to reduce
+// cold start time. Types are eagerly available; runtime code is deferred.
+// For direct (non-lazy) imports, use subpath exports:
+//   import { GraphQLSchemaGenerator } from 'espalier-data/graphql'
+//   import { RouteGenerator } from 'espalier-data/rest'
+//   import { configureObservability } from 'espalier-data/observability'
+// ---------------------------------------------------------------------------
+
+import type { ObservabilityConfig as _ObsConfig, ObservabilityHandle as _ObsHandle } from "./observability/index.js";
+import type { DataSource as _DS } from "espalier-jdbc";
+import type { GraphQLSchemaOptions as _GQLOpts, GeneratedGraphQLSchema as _GQLSchema } from "./graphql/index.js";
+import type { ResolverGeneratorOptions as _RGOpts, EntityRegistration as _EntReg } from "./graphql/index.js";
+import type { Specification as _Spec } from "./query/index.js";
+import type { RouteGeneratorOptions as _RTOpts, RestEntityRegistration as _RER } from "./rest/index.js";
+import type { RouteDefinition as _RD } from "./rest/index.js";
+import type { EntityRouteConfig as _ERC } from "./rest/index.js";
+
+// -- Observability (lazy) --
+export async function configureObservability(
+  dataSource: _DS,
+  config?: _ObsConfig,
+): Promise<_ObsHandle> {
+  const mod = await import("./observability/index.js");
+  return mod.configureObservability(dataSource, config);
+}
+
+// -- GraphQL (lazy) --
+let _graphqlMod: typeof import("./graphql/index.js") | undefined;
+
+async function loadGraphQL() {
+  if (!_graphqlMod) {
+    _graphqlMod = await import("./graphql/index.js");
+  }
+  return _graphqlMod;
+}
+
+/** Lazy proxy for GraphQLSchemaGenerator. Call `await loadGraphQLModule()` first or import from 'espalier-data/graphql'. */
+export const GraphQLSchemaGenerator: {
+  new (options?: _GQLOpts): { generate(entityClasses: Array<new (...args: any[]) => any>): _GQLSchema };
+} = new Proxy(class {} as any, {
+  construct: (_target, args) => {
+    if (!_graphqlMod) {
+      throw new Error(
+        "GraphQLSchemaGenerator not yet loaded. Call `await loadGraphQLModule()` first, " +
+        "or import directly from 'espalier-data/graphql'.",
+      );
+    }
+    return new _graphqlMod.GraphQLSchemaGenerator(...args);
+  },
+});
+
+/** Lazy proxy for GraphQLPlugin. Call `await loadGraphQLModule()` first or import from 'espalier-data/graphql'. */
+export const GraphQLPlugin: {
+  new (config: import("./graphql/index.js").GraphQLPluginConfig): import("./plugin/index.js").Plugin;
+} = new Proxy(class {} as any, {
+  construct: (_target, args) => {
+    if (!_graphqlMod) {
+      throw new Error(
+        "GraphQLPlugin not yet loaded. Call `await loadGraphQLModule()` first, " +
+        "or import directly from 'espalier-data/graphql'.",
+      );
+    }
+    return new _graphqlMod.GraphQLPlugin(args[0]);
+  },
+});
+
+/** Lazy proxy for ResolverGenerator. Call `await loadGraphQLModule()` first or import from 'espalier-data/graphql'. */
+export const ResolverGenerator: {
+  new (options?: _RGOpts): { generate(registrations: _EntReg[]): import("./graphql/index.js").ResolverMap };
+} = new Proxy(class {} as any, {
+  construct: (_target, args) => {
+    if (!_graphqlMod) {
+      throw new Error(
+        "ResolverGenerator not yet loaded. Call `await loadGraphQLModule()` first, " +
+        "or import directly from 'espalier-data/graphql'.",
+      );
+    }
+    return new _graphqlMod.ResolverGenerator(...args);
+  },
+});
+
+export async function createFilterSpec<T>(
+  filter: Record<string, any>,
+): Promise<_Spec<T> | undefined> {
+  const mod = await loadGraphQL();
+  return mod.createFilterSpec<T>(filter);
+}
+
+// -- REST (lazy) --
+let _restMod: typeof import("./rest/index.js") | undefined;
+
+async function loadRest() {
+  if (!_restMod) {
+    _restMod = await import("./rest/index.js");
+  }
+  return _restMod;
+}
+
+/** Lazy proxy for RouteGenerator. Call `await loadRestModule()` first or import from 'espalier-data/rest'. */
+export const RouteGenerator: {
+  new (options?: _RTOpts): { generate(registrations: _RER[]): _RD[] };
+} = new Proxy(class {} as any, {
+  construct: (_target, args) => {
+    if (!_restMod) {
+      throw new Error(
+        "RouteGenerator not yet loaded. Call `await loadRestModule()` first, " +
+        "or import directly from 'espalier-data/rest'.",
+      );
+    }
+    return new _restMod.RouteGenerator(...args);
+  },
+});
+
+/** Lazy proxy for RestPlugin. Call `await loadRestModule()` first or import from 'espalier-data/rest'. */
+export const RestPlugin: {
+  new (config: import("./rest/index.js").RestPluginConfig): import("./plugin/index.js").Plugin;
+} = new Proxy(class {} as any, {
+  construct: (_target, args) => {
+    if (!_restMod) {
+      throw new Error(
+        "RestPlugin not yet loaded. Call `await loadRestModule()` first, " +
+        "or import directly from 'espalier-data/rest'.",
+      );
+    }
+    return new _restMod.RestPlugin(args[0]);
+  },
+});
+
+/** Lazy proxy for OpenApiGenerator. Call `await loadRestModule()` first or import from 'espalier-data/rest'. */
+export const OpenApiGenerator: {
+  new (options?: import("./rest/index.js").OpenApiGeneratorOptions): { generate(routes: _RD[]): import("./rest/index.js").OpenApiSpec };
+} = new Proxy(class {} as any, {
+  construct: (_target, args) => {
+    if (!_restMod) {
+      throw new Error(
+        "OpenApiGenerator not yet loaded. Call `await loadRestModule()` first, " +
+        "or import directly from 'espalier-data/rest'.",
+      );
+    }
+    return new _restMod.OpenApiGenerator(...args);
+  },
+});
+
+export async function mountExpressRoutes(
+  router: any,
+  routes: _RD[],
+): Promise<void> {
+  const mod = await loadRest();
+  mod.mountExpressRoutes(router, routes);
+}
+
+export async function createFastifyPlugin(
+  routes: _RD[],
+): Promise<(fastify: any) => Promise<void>> {
+  const mod = await loadRest();
+  return mod.createFastifyPlugin(routes);
+}
+
+export async function customizeRoutes(
+  routes: _RD[],
+  config: Record<string, _ERC>,
+): Promise<_RD[]> {
+  const mod = await loadRest();
+  return mod.customizeRoutes(routes, config);
+}
+
+export async function addHateoasLinks(
+  response: any,
+  basePath: string,
+  page: number,
+  size: number,
+  totalPages: number,
+): Promise<any> {
+  const mod = await loadRest();
+  return mod.addHateoasLinks(response, basePath, page, size, totalPages);
+}
+
+// -- Module preloaders --
+// Call these to eagerly load a subsystem before using its classes synchronously.
+export async function loadGraphQLModule(): Promise<void> {
+  await loadGraphQL();
+}
+
+export async function loadRestModule(): Promise<void> {
+  await loadRest();
+}
+
+export async function loadObservabilityModule(): Promise<void> {
+  await import("./observability/index.js");
+}
