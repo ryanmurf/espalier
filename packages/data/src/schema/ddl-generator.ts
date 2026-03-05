@@ -6,6 +6,10 @@ import { getCreatedDateField } from "../decorators/auditing.js";
 import { getTableName } from "../decorators/table.js";
 import { getIdField } from "../decorators/id.js";
 import { getColumnMappings } from "../decorators/column.js";
+import { getSearchableFields } from "../decorators/searchable.js";
+import { getViewMetadata, getMaterializedViewMetadata } from "../decorators/view.js";
+import type { ViewOptions, MaterializedViewOptions } from "../decorators/view.js";
+import { getTreeMetadata } from "../decorators/tree.js";
 
 /**
  * Validates that a DEFAULT value expression is a safe SQL literal or known function.
@@ -284,10 +288,62 @@ export class DdlGenerator {
   ): string[] {
     const statements: string[] = [];
     for (const entityClass of entityClasses) {
-      statements.push(this.generateCreateTable(entityClass, options));
+      const viewMeta = getViewMetadata(entityClass);
+      const matViewMeta = getMaterializedViewMetadata(entityClass);
+
+      if (viewMeta) {
+        statements.push(this.generateViewDdl(entityClass, options));
+      } else if (matViewMeta) {
+        statements.push(this.generateMaterializedViewDdl(entityClass, options));
+      } else {
+        statements.push(this.generateCreateTable(entityClass, options));
+      }
+
+      // Generate closure table for @Tree entities
+      const treeMeta = getTreeMetadata(entityClass);
+      if (treeMeta && treeMeta.strategy === "closure-table") {
+        statements.push(...this.generateClosureTableDdl(entityClass, options));
+      }
     }
     const joinTableStatements = this.generateJoinTables(entityClasses, options);
     statements.push(...joinTableStatements);
+    for (const entityClass of entityClasses) {
+      statements.push(...this.generateSearchIndexes(entityClass, options));
+    }
+    return statements;
+  }
+
+  /**
+   * Generates CREATE INDEX statements for @Searchable fields using GIN tsvector indexes.
+   * Returns an array of DDL statements (one per searchable field).
+   */
+  generateSearchIndexes(
+    entityClass: new (...args: any[]) => any,
+    options?: DdlOptions,
+  ): string[] {
+    const metadata = getEntityMetadata(entityClass);
+
+    // Trigger decorator initializers to populate searchable metadata
+    try { new entityClass(); } catch { /* ignore */ }
+
+    const searchableFields = getSearchableFields(entityClass);
+    if (searchableFields.size === 0) return [];
+
+    const ifNotExists = options?.ifNotExists ? "IF NOT EXISTS " : "";
+    const qualifiedTable = qualifyTableName(metadata.tableName, options?.schema);
+    const statements: string[] = [];
+
+    for (const [, entry] of searchableFields) {
+      const columnName = entry.columnName;
+      const indexName = `idx_${metadata.tableName}_${columnName}_search`;
+      const indexType = entry.indexType.toUpperCase();
+      const language = entry.language;
+
+      statements.push(
+        `CREATE INDEX ${ifNotExists}${quoteIdentifier(indexName)} ON ${qualifiedTable} USING ${indexType} (to_tsvector('${language}', ${quoteIdentifier(columnName)}))`,
+      );
+    }
+
     return statements;
   }
 
@@ -300,5 +356,109 @@ export class DdlGenerator {
     const cascade = options?.cascade ? " CASCADE" : "";
     const qualifiedTable = qualifyTableName(metadata.tableName, options?.schema);
     return `DROP TABLE ${ifExists}${qualifiedTable}${cascade}`;
+  }
+
+  /**
+   * Generates CREATE OR REPLACE VIEW DDL for a @View entity.
+   */
+  generateViewDdl(
+    entityClass: new (...args: any[]) => any,
+    options?: DdlOptions,
+  ): string {
+    const meta = getViewMetadata(entityClass);
+    if (!meta) {
+      throw new Error("Entity is not decorated with @View.");
+    }
+    const qualifiedName = qualifyTableName(meta.name, options?.schema);
+    let ddl = `CREATE OR REPLACE VIEW ${qualifiedName} AS ${meta.definition}`;
+    if (meta.checkOption) {
+      ddl += ` WITH ${meta.checkOption} CHECK OPTION`;
+    }
+    return ddl;
+  }
+
+  /**
+   * Generates CREATE MATERIALIZED VIEW DDL for a @MaterializedView entity.
+   */
+  generateMaterializedViewDdl(
+    entityClass: new (...args: any[]) => any,
+    options?: DdlOptions,
+  ): string {
+    const meta = getMaterializedViewMetadata(entityClass);
+    if (!meta) {
+      throw new Error("Entity is not decorated with @MaterializedView.");
+    }
+    const qualifiedName = qualifyTableName(meta.name, options?.schema);
+    const withData = meta.withData !== false ? " WITH DATA" : " WITH NO DATA";
+    return `CREATE MATERIALIZED VIEW ${qualifiedName} AS ${meta.definition}${withData}`;
+  }
+
+  /**
+   * Generates REFRESH MATERIALIZED VIEW DDL.
+   */
+  refreshMaterializedView(
+    entityClass: new (...args: any[]) => any,
+    concurrent?: boolean,
+    options?: DdlOptions,
+  ): string {
+    const meta = getMaterializedViewMetadata(entityClass);
+    if (!meta) {
+      throw new Error("Entity is not decorated with @MaterializedView.");
+    }
+    const qualifiedName = qualifyTableName(meta.name, options?.schema);
+    const concurrently = concurrent ? " CONCURRENTLY" : "";
+    return `REFRESH MATERIALIZED VIEW${concurrently} ${qualifiedName}`;
+  }
+
+  /**
+   * Generates CREATE TABLE + indexes for a closure table used by @Tree entities.
+   */
+  generateClosureTableDdl(
+    entityClass: new (...args: any[]) => any,
+    options?: DdlOptions,
+  ): string[] {
+    const treeMeta = getTreeMetadata(entityClass);
+    if (!treeMeta || treeMeta.strategy !== "closure-table") {
+      throw new Error("Entity is not decorated with @Tree({ strategy: 'closure-table' }).");
+    }
+
+    const metadata = getEntityMetadata(entityClass);
+    const closureTable = `${metadata.tableName}_closure`;
+    const ifNotExists = options?.ifNotExists ? "IF NOT EXISTS " : "";
+    const qualifiedClosure = qualifyTableName(closureTable, options?.schema);
+    const qualifiedEntity = qualifyTableName(metadata.tableName, options?.schema);
+
+    // Resolve the ID column type
+    const entries = getColumnMetadataEntries(entityClass);
+    const idEntry = entries.get(metadata.idField);
+    const idType = idEntry?.type ?? "INTEGER";
+
+    const idCol = metadata.fields.find(f => f.fieldName === metadata.idField);
+    const idColumnName = idCol ? idCol.columnName : String(metadata.idField);
+
+    const statements: string[] = [];
+
+    statements.push(
+      `CREATE TABLE ${ifNotExists}${qualifiedClosure} (\n` +
+      `  "ancestor_id" ${idType} NOT NULL REFERENCES ${qualifiedEntity}(${quoteIdentifier(idColumnName)}),\n` +
+      `  "descendant_id" ${idType} NOT NULL REFERENCES ${qualifiedEntity}(${quoteIdentifier(idColumnName)}),\n` +
+      `  "depth" INTEGER NOT NULL DEFAULT 0,\n` +
+      `  PRIMARY KEY ("ancestor_id", "descendant_id")\n` +
+      `)`,
+    );
+
+    // Index on descendant for efficient ancestor lookups
+    const idxDescendant = `idx_${closureTable}_descendant`;
+    statements.push(
+      `CREATE INDEX ${ifNotExists}${quoteIdentifier(idxDescendant)} ON ${qualifiedClosure} ("descendant_id")`,
+    );
+
+    // Index on depth for depth-limited queries
+    const idxDepth = `idx_${closureTable}_depth`;
+    statements.push(
+      `CREATE INDEX ${ifNotExists}${quoteIdentifier(idxDepth)} ON ${qualifiedClosure} ("depth")`,
+    );
+
+    return statements;
   }
 }

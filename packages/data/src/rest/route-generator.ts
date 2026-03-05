@@ -7,6 +7,7 @@ import { getTenantIdField } from "../decorators/tenant.js";
 import { getSoftDeleteMetadata } from "../decorators/soft-delete.js";
 import { isAuditedEntity } from "../decorators/audited.js";
 import { getVectorFields } from "../decorators/vector.js";
+import { getSearchableFields } from "../decorators/searchable.js";
 import { createPageable } from "../repository/paging.js";
 import { OptimisticLockException } from "../repository/optimistic-lock.js";
 import { EntityNotFoundException } from "../repository/entity-not-found.js";
@@ -126,6 +127,17 @@ export class RouteGenerator {
           path: `${base}/similar`,
           operationId: `findSimilar${typeName}`,
           handler: this.createSimilarityHandler(repository, entityClass, vectorFields),
+        });
+      }
+
+      // Full-text search routes
+      const searchableFields = getSearchableFields(entityClass);
+      if (searchableFields.size > 0) {
+        routes.push({
+          method: "GET",
+          path: `${base}/search`,
+          operationId: `search${typeName}`,
+          handler: this.createSearchHandler(repository, metadata, entityClass),
         });
       }
 
@@ -493,6 +505,47 @@ export class RouteGenerator {
       return { status: 403, body: { error: "Tenant context is required" } };
     }
     return undefined;
+  }
+
+  private createSearchHandler(
+    repository: CrudRepository<any, any>,
+    metadata: EntityMetadata,
+    entityClass: new (...args: any[]) => any,
+  ): (req: RestRequest) => Promise<RestResponse> {
+    return async (req: RestRequest) => {
+      const tenantCheck = this.checkTenantContext(req, entityClass);
+      if (tenantCheck) return tenantCheck;
+
+      const q = req.query.q;
+      if (!q || typeof q !== "string" || q.trim().length === 0) {
+        return { status: 400, body: { error: "Query parameter 'q' is required" } };
+      }
+
+      const parsedLimit = req.query.limit != null ? parseInt(String(req.query.limit), 10) : 20;
+      const parsedOffset = req.query.offset != null ? parseInt(String(req.query.offset), 10) : 0;
+
+      if (!Number.isFinite(parsedLimit) || parsedLimit < 1) {
+        return { status: 400, body: { error: "limit must be a positive integer" } };
+      }
+      if (!Number.isFinite(parsedOffset) || parsedOffset < 0) {
+        return { status: 400, body: { error: "offset must be a non-negative integer" } };
+      }
+
+      const limit = Math.min(parsedLimit, 1000);
+
+      return this.withTenantContext(req, entityClass, async () => {
+        try {
+          const repo = repository as any;
+          if (typeof repo.search === "function") {
+            const results = await repo.search(q, { limit, offset: parsedOffset });
+            return { status: 200, body: results };
+          }
+          return { status: 501, body: { error: "Full-text search not supported" } };
+        } catch (err) {
+          return handleError(err);
+        }
+      });
+    };
   }
 
   /**

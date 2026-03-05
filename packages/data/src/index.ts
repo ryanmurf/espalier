@@ -191,6 +191,23 @@ export { SoftDelete, getSoftDeleteMetadata, isSoftDeleteEntity } from "./decorat
 export type { VectorOptions, VectorMetadataEntry } from "./decorators/vector.js";
 export { Vector, getVectorFields, getVectorFieldMetadata } from "./decorators/vector.js";
 
+export type { SearchableOptions, SearchableMetadataEntry } from "./decorators/searchable.js";
+export { Searchable, getSearchableFields, getSearchableFieldMetadata } from "./decorators/searchable.js";
+
+export type { SearchOptions, SearchMode, HighlightOptions } from "./search/index.js";
+export { FullTextSearchCriteria, SearchRankExpression, SearchHighlightExpression } from "./search/index.js";
+export type { FacetedSearchSpecification } from "./search/index.js";
+export { facetedSearch } from "./search/index.js";
+
+export type { ViewOptions, MaterializedViewOptions } from "./decorators/view.js";
+export { View, getViewMetadata, isViewEntity, MaterializedView, getMaterializedViewMetadata, isMaterializedViewEntity } from "./decorators/view.js";
+
+export type { TreeOptions, TreeStrategy } from "./decorators/tree.js";
+export { Tree, getTreeMetadata, isTreeEntity } from "./decorators/tree.js";
+
+export { ClosureTableManager } from "./tree/index.js";
+export { MaterializedPathManager } from "./tree/index.js";
+
 export type { VectorIndexOptions } from "./vector/vector-index-manager.js";
 export { VectorIndexManager } from "./vector/vector-index-manager.js";
 export type { EmbeddingProvider, EmbeddingHookOptions } from "./vector/embedding-hook.js";

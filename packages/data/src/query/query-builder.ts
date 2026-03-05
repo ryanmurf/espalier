@@ -438,7 +438,25 @@ export class SelectBuilder {
       return `${wf.function}(${args}) OVER ${overClause} AS ${quoteIdentifier(wf.alias)}`;
     });
 
-    const allColParts = [baseColList, ...extraCols, ...winCols];
+    // Search rank columns (parameterized)
+    const searchRankCols: string[] = [];
+    for (const sr of this._searchRankExprs) {
+      const result = sr.expr.toSql(paramIdx);
+      searchRankCols.push(`${result.sql} AS ${quoteIdentifier(sr.alias)}`);
+      params.push(...result.params);
+      paramIdx += result.params.length;
+    }
+
+    // Search highlight columns (parameterized)
+    const searchHighlightCols: string[] = [];
+    for (const sh of this._searchHighlightExprs) {
+      const result = sh.expr.toSql(paramIdx);
+      searchHighlightCols.push(`${result.sql} AS ${quoteIdentifier(sh.alias)}`);
+      params.push(...result.params);
+      paramIdx += result.params.length;
+    }
+
+    const allColParts = [baseColList, ...extraCols, ...winCols, ...searchRankCols, ...searchHighlightCols];
     const allCols = allColParts.join(", ");
     parts.push(`SELECT ${this._distinct ? "DISTINCT " : ""}${allCols}`);
     parts.push(`FROM ${quoteIdentifier(this._from)}`);

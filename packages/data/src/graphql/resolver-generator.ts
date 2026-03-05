@@ -7,6 +7,7 @@ import { getTenantIdField } from "../decorators/tenant.js";
 import { getSoftDeleteMetadata } from "../decorators/soft-delete.js";
 import { isAuditedEntity } from "../decorators/audited.js";
 import { getVectorFields } from "../decorators/vector.js";
+import { getSearchableFields } from "../decorators/searchable.js";
 import { equal, Specifications } from "../query/specification.js";
 import { createPageable } from "../repository/paging.js";
 import { TenantContext } from "../tenant/tenant-context.js";
@@ -124,6 +125,12 @@ export class ResolverGenerator {
       const vectorFields = getVectorFields(entityClass);
       if (vectorFields.size > 0) {
         query[`${camelName}SimilarTo`] = this.createSimilarToResolver(repository, metadata, entityClass);
+      }
+
+      // Full-text search query resolver
+      const searchableFields = getSearchableFields(entityClass);
+      if (searchableFields.size > 0) {
+        query[`${camelName}Search`] = this.createSearchResolver(repository, metadata, entityClass, searchableFields);
       }
 
       // Mutation resolvers
@@ -373,6 +380,35 @@ export class ResolverGenerator {
           maxDistance: args.maxDistance,
           metric: args.metric as any,
         });
+      });
+    };
+  }
+
+  private createSearchResolver(
+    repository: CrudRepository<any, any>,
+    metadata: EntityMetadata,
+    entityClass: new (...args: any[]) => any,
+    searchableFields: Map<string | symbol, any>,
+  ): ResolverFn {
+    const validFieldNames = new Set(
+      [...searchableFields.keys()].filter((k): k is string => typeof k === "string"),
+    );
+
+    return async (_parent: any, args: { query: string; limit?: number; offset?: number }, context: any) => {
+      if (typeof args.query !== "string" || args.query.trim().length === 0) {
+        throw new Error("Search query must be a non-empty string");
+      }
+
+      const limit = args.limit != null ? Math.min(Math.max(1, args.limit), 1000) : 20;
+      const offset = args.offset != null ? Math.max(0, args.offset) : 0;
+
+      return this.withTenantContext(context, metadata, entityClass, async () => {
+        const repo = repository as any;
+        if (typeof repo.search === "function") {
+          return repo.search(args.query, { limit, offset });
+        }
+        // Fallback: return empty array if search is not implemented on the repository
+        return [];
       });
     };
   }
