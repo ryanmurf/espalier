@@ -793,12 +793,15 @@ describe("N1Detector — edge cases", () => {
     const events: N1DetectionEvent[] = [];
     const detector = createDetector({ threshold: 2, callback: (e) => events.push(e) });
 
-    const longCondition = Array.from({ length: 100 }, (_, i) => `"col_${i}" = ${i}`).join(" AND ");
-    const sql = `SELECT * FROM "big_table" WHERE ${longCondition}`;
+    // Build two long SQL strings that differ only in parameter values (not column names)
+    const makeSql = (offset: number) => {
+      const conds = Array.from({ length: 100 }, (_, i) => `"col_${i}" = ${i + offset}`).join(" AND ");
+      return `SELECT * FROM "big_table" WHERE ${conds}`;
+    };
 
     await detector.withScope("test", async () => {
-      detector.record(sql);
-      detector.record(sql.replace(/\d+/g, (n) => String(Number(n) + 1)));
+      detector.record(makeSql(0));
+      detector.record(makeSql(1000));
     });
 
     expect(events).toHaveLength(1);

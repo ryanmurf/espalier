@@ -98,7 +98,6 @@ export class QueryBatcher<T> {
       }
     }
 
-    const uniqueIds = [...idMap.keys()];
     const idValues = [...new Set(chunk.map((r) => r.id))];
 
     // Find the ID column
@@ -121,6 +120,10 @@ export class QueryBatcher<T> {
     const placeholders = idValues.map((_, i) => `$${i + 1}`);
     const sql = `SELECT ${columns.join(", ")} FROM ${table} WHERE ${idCol} IN (${placeholders.join(", ")})`;
 
+    // Collect results first, then close resources, then resolve/reject callers
+    let resultMap: Map<string, T> | undefined;
+    let queryError: Error | undefined;
+
     try {
       const conn = await this.dataSource.getConnection();
       try {
@@ -131,20 +134,11 @@ export class QueryBatcher<T> {
           }
           const rs = await stmt.executeQuery();
 
-          // Map results by ID
-          const resultMap = new Map<string, T>();
+          resultMap = new Map<string, T>();
           while (await rs.next()) {
             const entity = this.rowMapper.mapRow(rs);
             const entityId = (entity as any)[this.metadata.idField as string];
             resultMap.set(String(entityId), entity);
-          }
-
-          // Resolve all pending requests
-          for (const [idKey, requests] of idMap) {
-            const result = resultMap.get(idKey) ?? null;
-            for (const req of requests) {
-              req.resolve(result);
-            }
           }
         } finally {
           await stmt.close().catch(() => {});
@@ -153,10 +147,20 @@ export class QueryBatcher<T> {
         await conn.close();
       }
     } catch (err) {
-      // Reject all pending requests on error
-      const error = err instanceof Error ? err : new Error(String(err));
+      queryError = err instanceof Error ? err : new Error(String(err));
+    }
+
+    // Resolve or reject after all resources are closed
+    if (queryError) {
       for (const req of chunk) {
-        req.reject(error);
+        req.reject(queryError);
+      }
+    } else {
+      for (const [idKey, requests] of idMap) {
+        const result = resultMap!.get(idKey) ?? null;
+        for (const req of requests) {
+          req.resolve(result);
+        }
       }
     }
   }

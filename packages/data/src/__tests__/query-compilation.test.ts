@@ -576,11 +576,14 @@ describe("QueryCompiler — equivalence with dynamic path", () => {
     expect(compiledResult.params).toEqual(dynamicResult.params);
   });
 
-  it("existsBy produces same params", () => {
+  it("existsBy produces correct params (compiled uses literal LIMIT)", () => {
     const { compiledResult, dynamicResult } = comparePaths(
       "existsByEmail", userMeta, ["test@example.com"],
     );
-    expect(compiledResult.params).toEqual(dynamicResult.params);
+    // Compiled path uses LIMIT 1 as a literal, dynamic path parameterizes it
+    // So compiled has one fewer param (no LIMIT param)
+    expect(compiledResult.params).toEqual(["test@example.com"]);
+    expect(dynamicResult.params).toEqual(["test@example.com", 1]);
   });
 
   it("complex multi-condition And produces same params", () => {

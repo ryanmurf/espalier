@@ -74,9 +74,13 @@ export function bindCompiledQuery(
     return { sql, params };
   }
 
-  // Slow path: rebuild SQL with correct placeholder counts for spread bindings
+  // Slow path: rebuild SQL with correct placeholder counts for spread bindings.
+  // The SQL template has sequential placeholders $1, $2, ... (one per binding).
+  // We track the original template placeholder index separately from the
+  // output parameter index which grows when arrays are spread.
   const segments: string[] = [];
-  let paramIdx = 1;
+  let templateParamIdx = 1; // placeholder index in the original SQL template
+  let outputParamIdx = 1;   // placeholder index in the rewritten SQL
   let lastPos = 0;
 
   for (const binding of compiled.paramBindings) {
@@ -84,33 +88,40 @@ export function bindCompiledQuery(
       const arr = args[binding.argIndex] as SqlValue[];
       const arrLen = Array.isArray(arr) ? arr.length : 0;
 
-      // Find the placeholder pattern "IN ($N)" in remaining SQL
-      const placeholderPattern = `IN ($${paramIdx})`;
+      // Find the placeholder pattern "IN ($N)" using the TEMPLATE index
+      const placeholderPattern = `IN ($${templateParamIdx})`;
       const idx = sql.indexOf(placeholderPattern, lastPos);
       if (idx !== -1) {
         segments.push(sql.slice(lastPos, idx));
         if (arrLen === 0) {
           segments.push("IN (NULL)");
         } else {
-          const placeholders = arr.map((_, i) => `$${paramIdx + i}`);
+          const placeholders = arr.map((_, i) => `$${outputParamIdx + i}`);
           segments.push(`IN (${placeholders.join(", ")})`);
           params.push(...arr);
-          paramIdx += arrLen;
+          outputParamIdx += arrLen;
         }
         lastPos = idx + placeholderPattern.length;
       }
     } else {
+      // For non-spread bindings, replace the template placeholder with output index
+      const templatePlaceholder = `$${templateParamIdx}`;
+      const idx = sql.indexOf(templatePlaceholder, lastPos);
+      if (idx !== -1) {
+        segments.push(sql.slice(lastPos, idx));
+        segments.push(`$${outputParamIdx}`);
+        lastPos = idx + templatePlaceholder.length;
+      }
       params.push(applyTransform(args[binding.argIndex], binding.transform));
-      paramIdx++;
+      outputParamIdx++;
     }
+    templateParamIdx++;
   }
 
   if (lastPos < sql.length) {
     segments.push(sql.slice(lastPos));
   }
 
-  // Renumber remaining placeholders in the suffix (LIMIT, OFFSET, etc.)
-  // These are rare for derived queries, but handle just in case
   sql = segments.join("");
 
   return { sql, params };

@@ -34,6 +34,15 @@ export function createPage<T>(
   pageable: Pageable,
   totalElements: number,
 ): Page<T> {
+  if (!Number.isFinite(pageable.size) || pageable.size <= 0) {
+    throw new Error(`Page size must be a positive number, got ${pageable.size}`);
+  }
+  if (!Number.isFinite(pageable.page) || pageable.page < 0) {
+    throw new Error(`Page number must be a non-negative number, got ${pageable.page}`);
+  }
+  if (!Number.isFinite(totalElements) || totalElements < 0) {
+    throw new Error(`Total elements must be a non-negative number, got ${totalElements}`);
+  }
   const totalPages = Math.ceil(totalElements / pageable.size);
   return {
     content,
