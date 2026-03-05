@@ -21,6 +21,7 @@ import { Table as TableDec } from "../decorators/table.js";
 import { Column as ColumnDec } from "../decorators/column.js";
 import { Id as IdDec } from "../decorators/id.js";
 import { TenantId as TenantIdDec } from "../decorators/tenant.js";
+import { TenantContext } from "../tenant/tenant-context.js";
 
 // ══════════════════════════════════════════════════
 // Test entities
@@ -241,7 +242,7 @@ describe("ResolverGenerator — mutation resolvers", () => {
     const resolvers = gen.generate([{ entityClass: Item, repository: repo }]);
     await expect(
       resolvers.Mutation.updateItem(null, { id: 999, input: { name: "X" } }, {}, {}),
-    ).rejects.toThrow(/Item with id 999 not found/);
+    ).rejects.toThrow(/Entity not found/);
   });
 
   it("delete mutation calls deleteById and returns true", async () => {
@@ -322,51 +323,75 @@ describe("ResolverGenerator — sort parsing", () => {
 // ══════════════════════════════════════════════════
 
 describe("ResolverGenerator — tenant awareness", () => {
-  it("sets __tenantId on context for @TenantId entity", async () => {
+  it("sets TenantContext for @TenantId entity", async () => {
     const repo = createMockRepo<TenantRecord, string>([]);
+    let capturedTenantId: string | undefined;
+    (repo.findById as any).mockImplementation(() => {
+      capturedTenantId = TenantContext.current();
+      return Promise.resolve(null);
+    });
     const gen = new ResolverGenerator({
       getTenantId: (ctx: any) => ctx.tenantId,
     });
     const resolvers = gen.generate([{ entityClass: TenantRecord, repository: repo }]);
     const context = { tenantId: "acme" };
     await resolvers.Query.tenantRecord(null, { id: "abc" }, context, {});
-    expect((context as any).__tenantId).toBe("acme");
-    expect((context as any).__tenantField).toBe("tenantId");
+    expect(capturedTenantId).toBe("acme");
   });
 
-  it("does NOT set __tenantId for non-tenant entity", async () => {
+  it("does NOT set TenantContext for non-tenant entity", async () => {
     const repo = createMockRepo<Item, number>([]);
+    let capturedTenantId: string | undefined = "NOT_CALLED";
+    (repo.findById as any).mockImplementation(() => {
+      capturedTenantId = TenantContext.current();
+      return Promise.resolve(null);
+    });
     const gen = new ResolverGenerator({
       getTenantId: (ctx: any) => ctx.tenantId,
     });
     const resolvers = gen.generate([{ entityClass: Item, repository: repo }]);
     const context = { tenantId: "acme" };
     await resolvers.Query.item(null, { id: 1 }, context, {});
-    expect((context as any).__tenantId).toBeUndefined();
+    expect(capturedTenantId).toBeUndefined();
   });
 
-  it("does NOT set __tenantId when tenantAware=false", async () => {
+  it("does NOT set TenantContext when tenantAware=false", async () => {
     const repo = createMockRepo<TenantRecord, string>([]);
+    let capturedTenantId: string | undefined = "NOT_CALLED";
+    (repo.findById as any).mockImplementation(() => {
+      capturedTenantId = TenantContext.current();
+      return Promise.resolve(null);
+    });
     const gen = new ResolverGenerator({ tenantAware: false });
     const resolvers = gen.generate([{ entityClass: TenantRecord, repository: repo }]);
     const context = { tenantId: "acme" };
     await resolvers.Query.tenantRecord(null, { id: "abc" }, context, {});
-    expect((context as any).__tenantId).toBeUndefined();
+    expect(capturedTenantId).toBeUndefined();
   });
 
-  it("does NOT set __tenantId when getTenantId returns undefined", async () => {
+  it("does NOT set TenantContext when getTenantId returns undefined", async () => {
     const repo = createMockRepo<TenantRecord, string>([]);
+    let capturedTenantId: string | undefined = "NOT_CALLED";
+    (repo.findById as any).mockImplementation(() => {
+      capturedTenantId = TenantContext.current();
+      return Promise.resolve(null);
+    });
     const gen = new ResolverGenerator({
       getTenantId: () => undefined,
     });
     const resolvers = gen.generate([{ entityClass: TenantRecord, repository: repo }]);
     const context = {};
     await resolvers.Query.tenantRecord(null, { id: "abc" }, context, {});
-    expect((context as any).__tenantId).toBeUndefined();
+    expect(capturedTenantId).toBeUndefined();
   });
 
   it("sets tenant context on mutations too", async () => {
     const repo = createMockRepo<TenantRecord, string>([]);
+    let capturedTenantId: string | undefined;
+    (repo.save as any).mockImplementation((entity: any) => {
+      capturedTenantId = TenantContext.current();
+      return Promise.resolve(entity);
+    });
     const gen = new ResolverGenerator({
       getTenantId: (ctx: any) => ctx.tenantId,
     });
@@ -378,16 +403,21 @@ describe("ResolverGenerator — tenant awareness", () => {
       context,
       {},
     );
-    expect((context as any).__tenantId).toBe("globex");
+    expect(capturedTenantId).toBe("globex");
   });
 
   it("default getTenantId reads from context.tenantId", async () => {
     const repo = createMockRepo<TenantRecord, string>([]);
+    let capturedTenantId: string | undefined;
+    (repo.findById as any).mockImplementation(() => {
+      capturedTenantId = TenantContext.current();
+      return Promise.resolve(null);
+    });
     const gen = new ResolverGenerator(); // default options
     const resolvers = gen.generate([{ entityClass: TenantRecord, repository: repo }]);
     const context = { tenantId: "default-tenant" };
     await resolvers.Query.tenantRecord(null, { id: "abc" }, context, {});
-    expect((context as any).__tenantId).toBe("default-tenant");
+    expect(capturedTenantId).toBe("default-tenant");
   });
 });
 
@@ -486,7 +516,7 @@ describe("createFilterSpec", () => {
 // ══════════════════════════════════════════════════
 
 describe("ResolverGenerator — error handling", () => {
-  it("update error message includes entity name and id", async () => {
+  it("update error message does not leak entity name or id", async () => {
     const repo = createMockRepo<Item, number>([]);
     const gen = new ResolverGenerator();
     const resolvers = gen.generate([{ entityClass: Item, repository: repo }]);
@@ -494,8 +524,9 @@ describe("ResolverGenerator — error handling", () => {
       await resolvers.Mutation.updateItem(null, { id: 42, input: {} }, {}, {});
       expect.unreachable("should have thrown");
     } catch (e: any) {
-      expect(e.message).toContain("Item");
-      expect(e.message).toContain("42");
+      expect(e.message).toBe("Entity not found");
+      expect(e.message).not.toContain("Item");
+      expect(e.message).not.toContain("42");
       // Should NOT contain SQL
       expect(e.message).not.toContain("SELECT");
       expect(e.message).not.toContain("UPDATE");
@@ -559,18 +590,28 @@ describe("ResolverGenerator — tenant isolation edge cases", () => {
 
   it("tenant ID of 0 is still set (falsy but valid)", async () => {
     const repo = createMockRepo<TenantRecord, string>([]);
+    let capturedTenantId: string | undefined;
+    (repo.findById as any).mockImplementation(() => {
+      capturedTenantId = TenantContext.current();
+      return Promise.resolve(null);
+    });
     const gen = new ResolverGenerator({
       getTenantId: () => 0,
     });
     const resolvers = gen.generate([{ entityClass: TenantRecord, repository: repo }]);
     const context = {};
     await resolvers.Query.tenantRecord(null, { id: "abc" }, context, {});
-    // 0 is != null, so should be set
-    expect((context as any).__tenantId).toBe(0);
+    // 0 is != null, so should be set (converted to string "0" by TenantContext.run)
+    expect(capturedTenantId).toBe("0");
   });
 
   it("tenant ID of empty string is still set (falsy but valid)", async () => {
     const repo = createMockRepo<TenantRecord, string>([]);
+    let capturedTenantId: string | undefined;
+    (repo.findById as any).mockImplementation(() => {
+      capturedTenantId = TenantContext.current();
+      return Promise.resolve(null);
+    });
     const gen = new ResolverGenerator({
       getTenantId: () => "",
     });
@@ -580,6 +621,6 @@ describe("ResolverGenerator — tenant isolation edge cases", () => {
     // BUG: empty string is falsy, but "" != null is true, so it WILL be set
     // This could be a security concern — an empty tenant ID means "no tenant"
     // but the resolver treats it as a valid tenant
-    expect((context as any).__tenantId).toBe("");
+    expect(capturedTenantId).toBe("");
   });
 });

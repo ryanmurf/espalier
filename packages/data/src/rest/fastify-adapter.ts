@@ -53,8 +53,7 @@ export function createFastifyPlugin(routes: RouteDefinition[]): (fastify: Fastif
             reply.status(result.status).send();
           }
         } catch (err) {
-          const message = err instanceof Error ? err.message : "Internal server error";
-          reply.status(500).send({ error: message });
+          reply.status(500).send({ error: "Internal Server Error" });
         }
       });
     }

@@ -543,3 +543,52 @@ describe("MSSQL_TYPE_MAP", () => {
     expect(MSSQL_TYPE_MAP).not.toHaveProperty("TIME");
   });
 });
+
+// ══════════════════════════════════════════════════
+// Security: error messages must not leak SQL (#64)
+// ══════════════════════════════════════════════════
+
+describe("MSSQL stub error redaction (#64)", () => {
+  it("Statement.executeQuery does not leak SQL in error", async () => {
+    const stmt = new MssqlStatement(null);
+    await expect(stmt.executeQuery("SELECT * FROM secret")).rejects.toThrow(
+      "MSSQL adapter stub: executeQuery not implemented",
+    );
+    try {
+      await stmt.executeQuery("SELECT * FROM secret");
+    } catch (e: any) {
+      expect(e.message).not.toContain("SELECT");
+      expect(e.message).not.toContain("secret");
+    }
+  });
+
+  it("Statement.executeUpdate does not leak SQL in error", async () => {
+    const stmt = new MssqlStatement(null);
+    try {
+      await stmt.executeUpdate("DROP TABLE users");
+    } catch (e: any) {
+      expect(e.message).not.toContain("DROP");
+      expect(e.message).not.toContain("users");
+    }
+  });
+
+  it("PreparedStatement.executeQuery does not leak SQL in error", async () => {
+    const stmt = new MssqlPreparedStatement(null, "SELECT password FROM users");
+    try {
+      await stmt.executeQuery();
+    } catch (e: any) {
+      expect(e.message).not.toContain("password");
+      expect(e.message).not.toContain("users");
+    }
+  });
+
+  it("PreparedStatement.executeUpdate does not leak SQL in error", async () => {
+    const stmt = new MssqlPreparedStatement(null, "DELETE FROM secrets WHERE id = 1");
+    try {
+      await stmt.executeUpdate();
+    } catch (e: any) {
+      expect(e.message).not.toContain("secrets");
+      expect(e.message).not.toContain("DELETE");
+    }
+  });
+});

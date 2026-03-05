@@ -114,7 +114,7 @@ export class RouteGenerator {
           method: "DELETE",
           path: `${base}/:id`,
           operationId: `delete${typeName}`,
-          handler: this.createDeleteHandler(repository),
+          handler: this.createDeleteHandler(repository, metadata, entityClass),
         });
       }
     }
@@ -248,18 +248,21 @@ export class RouteGenerator {
 
   private createDeleteHandler(
     repository: CrudRepository<any, any>,
+    metadata: EntityMetadata,
+    entityClass: new (...args: any[]) => any,
   ): (req: RestRequest) => Promise<RestResponse> {
     return async (req: RestRequest) => {
-      if (this.options.requireTenantContext && !TenantContext.current()) {
-        return { status: 403, body: { error: "Tenant context is required" } };
-      }
+      const tenantCheck = this.checkTenantContext(req, entityClass);
+      if (tenantCheck) return tenantCheck;
 
-      try {
-        await repository.deleteById(req.params.id);
-        return { status: 204 };
-      } catch (err) {
-        return handleError(err);
-      }
+      return this.withTenantContext(req, entityClass, async () => {
+        try {
+          await repository.deleteById(req.params.id);
+          return { status: 204 };
+        } catch (err) {
+          return handleError(err);
+        }
+      });
     };
   }
 

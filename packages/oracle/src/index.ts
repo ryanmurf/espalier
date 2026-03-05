@@ -128,16 +128,12 @@ export class OracleStatement implements Statement {
 
   async executeQuery(sql: string): Promise<ResultSet> {
     this.ensureOpen();
-    throw new Error(
-      `Oracle adapter stub: executeQuery not implemented. SQL: ${sql.slice(0, 50)}`,
-    );
+    throw new Error("Oracle adapter stub: executeQuery not implemented");
   }
 
   async executeUpdate(sql: string): Promise<number> {
     this.ensureOpen();
-    throw new Error(
-      `Oracle adapter stub: executeUpdate not implemented. SQL: ${sql.slice(0, 50)}`,
-    );
+    throw new Error("Oracle adapter stub: executeUpdate not implemented");
   }
 
   async close(): Promise<void> {
@@ -168,18 +164,14 @@ export class OraclePreparedStatement extends OracleStatement implements Prepared
   async executeQuery(sql: string): Promise<ResultSet>;
   async executeQuery(sql?: string): Promise<ResultSet> {
     this.ensureOpen();
-    throw new Error(
-      `Oracle adapter stub: prepared executeQuery not implemented. SQL: ${(sql ?? this.sql).slice(0, 50)}`,
-    );
+    throw new Error("Oracle adapter stub: prepared executeQuery not implemented");
   }
 
   async executeUpdate(): Promise<number>;
   async executeUpdate(sql: string): Promise<number>;
   async executeUpdate(sql?: string): Promise<number> {
     this.ensureOpen();
-    throw new Error(
-      `Oracle adapter stub: prepared executeUpdate not implemented. SQL: ${(sql ?? this.sql).slice(0, 50)}`,
-    );
+    throw new Error("Oracle adapter stub: prepared executeUpdate not implemented");
   }
 }
 

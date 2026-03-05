@@ -28,6 +28,7 @@ import { OptimisticLockException } from "../repository/optimistic-lock.js";
 import { EntityNotFoundException } from "../repository/entity-not-found.js";
 import type { CrudRepository } from "../repository/crud-repository.js";
 import type { Page, Pageable } from "../repository/paging.js";
+import { TenantContext } from "../tenant/tenant-context.js";
 
 // ══════════════════════════════════════════════════
 // Test entities
@@ -560,64 +561,93 @@ describe("RouteGenerator — delete handler", () => {
 describe("RouteGenerator — tenant awareness", () => {
   it("extracts tenant ID from x-tenant-id header", async () => {
     const repo = mockRepo<TenantDoc, string>([]);
-    const gen = new RouteGenerator();
+    let capturedTenantId: string | undefined;
+    (repo.findAll as any).mockImplementation(() => {
+      capturedTenantId = TenantContext.current();
+      return Promise.resolve([]);
+    });
+    const gen = new RouteGenerator({ pagination: false });
     const routes = gen.generate([{ entityClass: TenantDoc, repository: repo }]);
     const findAll = routes.find((r) => r.operationId === "findAllTenantDoc")!;
     const req = makeReq({ headers: { "x-tenant-id": "acme" } });
     await findAll.handler(req);
-    expect((req as any).__tenantId).toBe("acme");
-    expect((req as any).__tenantField).toBe("tenantId");
+    expect(capturedTenantId).toBe("acme");
   });
 
   it("custom tenantHeader", async () => {
     const repo = mockRepo<TenantDoc, string>([]);
-    const gen = new RouteGenerator({ tenantHeader: "x-org-id" });
+    let capturedTenantId: string | undefined;
+    (repo.findAll as any).mockImplementation(() => {
+      capturedTenantId = TenantContext.current();
+      return Promise.resolve([]);
+    });
+    const gen = new RouteGenerator({ tenantHeader: "x-org-id", pagination: false });
     const routes = gen.generate([{ entityClass: TenantDoc, repository: repo }]);
     const findAll = routes.find((r) => r.operationId === "findAllTenantDoc")!;
     const req = makeReq({ headers: { "x-org-id": "globex" } });
     await findAll.handler(req);
-    expect((req as any).__tenantId).toBe("globex");
+    expect(capturedTenantId).toBe("globex");
   });
 
-  it("no tenant header set = no __tenantId on request", async () => {
+  it("no tenant header set = no TenantContext on request", async () => {
     const repo = mockRepo<TenantDoc, string>([]);
-    const gen = new RouteGenerator();
+    let capturedTenantId: string | undefined = "NOT_CALLED";
+    (repo.findAll as any).mockImplementation(() => {
+      capturedTenantId = TenantContext.current();
+      return Promise.resolve([]);
+    });
+    const gen = new RouteGenerator({ pagination: false });
     const routes = gen.generate([{ entityClass: TenantDoc, repository: repo }]);
     const findAll = routes.find((r) => r.operationId === "findAllTenantDoc")!;
     const req = makeReq({ headers: {} });
     await findAll.handler(req);
-    expect((req as any).__tenantId).toBeUndefined();
+    expect(capturedTenantId).toBeUndefined();
   });
 
   it("non-tenant entity does not extract tenant", async () => {
     const repo = mockRepo<Widget, number>([]);
-    const gen = new RouteGenerator();
+    let capturedTenantId: string | undefined = "NOT_CALLED";
+    (repo.findAll as any).mockImplementation(() => {
+      capturedTenantId = TenantContext.current();
+      return Promise.resolve([]);
+    });
+    const gen = new RouteGenerator({ pagination: false });
     const routes = gen.generate([{ entityClass: Widget, repository: repo }]);
     const findAll = routes.find((r) => r.operationId === "findAllWidget")!;
     const req = makeReq({ headers: { "x-tenant-id": "acme" } });
     await findAll.handler(req);
-    expect((req as any).__tenantId).toBeUndefined();
+    expect(capturedTenantId).toBeUndefined();
   });
 
   it("tenantAware: false skips tenant extraction", async () => {
     const repo = mockRepo<TenantDoc, string>([]);
-    const gen = new RouteGenerator({ tenantAware: false });
+    let capturedTenantId: string | undefined = "NOT_CALLED";
+    (repo.findAll as any).mockImplementation(() => {
+      capturedTenantId = TenantContext.current();
+      return Promise.resolve([]);
+    });
+    const gen = new RouteGenerator({ tenantAware: false, pagination: false });
     const routes = gen.generate([{ entityClass: TenantDoc, repository: repo }]);
     const findAll = routes.find((r) => r.operationId === "findAllTenantDoc")!;
     const req = makeReq({ headers: { "x-tenant-id": "acme" } });
     await findAll.handler(req);
-    expect((req as any).__tenantId).toBeUndefined();
+    expect(capturedTenantId).toBeUndefined();
   });
 
   it("array header value is ignored (only string accepted)", async () => {
     const repo = mockRepo<TenantDoc, string>([]);
-    const gen = new RouteGenerator();
+    let capturedTenantId: string | undefined = "NOT_CALLED";
+    (repo.findAll as any).mockImplementation(() => {
+      capturedTenantId = TenantContext.current();
+      return Promise.resolve([]);
+    });
+    const gen = new RouteGenerator({ pagination: false });
     const routes = gen.generate([{ entityClass: TenantDoc, repository: repo }]);
     const findAll = routes.find((r) => r.operationId === "findAllTenantDoc")!;
     const req = makeReq({ headers: { "x-tenant-id": ["a", "b"] as any } });
     await findAll.handler(req);
     // Array header should not be accepted
-    expect((req as any).__tenantId).toBeUndefined();
+    expect(capturedTenantId).toBeUndefined();
   });
 });
 
@@ -702,7 +732,7 @@ describe("mountExpressRoutes", () => {
     await handler({ params: {}, query: {}, body: undefined, headers: {} }, res);
     expect(res.status).toHaveBeenCalledWith(500);
     expect(res.json).toHaveBeenCalledWith(
-      expect.objectContaining({ error: "DB crashed" }),
+      expect.objectContaining({ error: "Internal Server Error" }),
     );
   });
 });

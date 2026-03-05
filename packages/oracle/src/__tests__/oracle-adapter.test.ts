@@ -614,3 +614,49 @@ describe("Oracle adapter contract compliance", () => {
     expect(typeof ds.close).toBe("function");
   });
 });
+
+// ══════════════════════════════════════════════════
+// Security: error messages must not leak SQL (#64)
+// ══════════════════════════════════════════════════
+
+describe("Oracle stub error redaction (#64)", () => {
+  it("Statement.executeQuery does not leak SQL in error", async () => {
+    const stmt = new OracleStatement(null);
+    try {
+      await stmt.executeQuery("SELECT * FROM secret");
+    } catch (e: any) {
+      expect(e.message).not.toContain("SELECT");
+      expect(e.message).not.toContain("secret");
+    }
+  });
+
+  it("Statement.executeUpdate does not leak SQL in error", async () => {
+    const stmt = new OracleStatement(null);
+    try {
+      await stmt.executeUpdate("DROP TABLE users");
+    } catch (e: any) {
+      expect(e.message).not.toContain("DROP");
+      expect(e.message).not.toContain("users");
+    }
+  });
+
+  it("PreparedStatement.executeQuery does not leak SQL in error", async () => {
+    const stmt = new OraclePreparedStatement(null, "SELECT password FROM users");
+    try {
+      await stmt.executeQuery();
+    } catch (e: any) {
+      expect(e.message).not.toContain("password");
+      expect(e.message).not.toContain("users");
+    }
+  });
+
+  it("PreparedStatement.executeUpdate does not leak SQL in error", async () => {
+    const stmt = new OraclePreparedStatement(null, "DELETE FROM secrets WHERE id = 1");
+    try {
+      await stmt.executeUpdate();
+    } catch (e: any) {
+      expect(e.message).not.toContain("secrets");
+      expect(e.message).not.toContain("DELETE");
+    }
+  });
+});
