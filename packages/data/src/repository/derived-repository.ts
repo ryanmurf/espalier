@@ -151,13 +151,21 @@ export function createDerivedRepository<T, ID>(
   // Global query filters
   const filterRegistrations: readonly FilterRegistration[] = getFilters(entityClass);
 
+  // Frozen metadata copy to prevent filter functions from mutating shared state
+  const frozenMetadata = Object.freeze({ ...metadata, fields: Object.freeze([...metadata.fields]) });
+
   function applyGlobalFilters(builder: { and(criteria: Criteria): unknown }): void {
     if (!filterRegistrations.length) return;
     const contextOptions = FilterContext.current();
     const active = resolveActiveFilters(filterRegistrations, contextOptions);
     for (const reg of active) {
-      const criteria = reg.filter(metadata);
-      if (criteria) {
+      const criteria = reg.filter(frozenMetadata as EntityMetadata);
+      if (criteria != null) {
+        if (typeof (criteria as any).toSql !== "function") {
+          throw new Error(
+            `Filter "${reg.name}" returned an invalid value — expected Criteria with toSql(), got ${typeof criteria}`,
+          );
+        }
         builder.and(criteria);
       }
     }
@@ -197,8 +205,15 @@ export function createDerivedRepository<T, ID>(
       const contextOptions = FilterContext.current();
       const active = resolveActiveFilters(filterRegistrations, contextOptions);
       for (const reg of active) {
-        const c = reg.filter(metadata);
-        if (c) globalCriteriaList.push(c);
+        const c = reg.filter(frozenMetadata as EntityMetadata);
+        if (c != null) {
+          if (typeof (c as any).toSql !== "function") {
+            throw new Error(
+              `Filter "${reg.name}" returned an invalid value — expected Criteria with toSql(), got ${typeof c}`,
+            );
+          }
+          globalCriteriaList.push(c);
+        }
       }
     }
 

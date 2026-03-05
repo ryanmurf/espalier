@@ -60,7 +60,8 @@ export function SoftDelete(options?: SoftDeleteOptions) {
 export function getSoftDeleteMetadata(
   target: object,
 ): SoftDeleteMetadataEntry | undefined {
-  return softDeleteMetadata.get(target);
+  const entry = softDeleteMetadata.get(target);
+  return entry ? { ...entry } : undefined;
 }
 
 /**
