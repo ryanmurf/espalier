@@ -78,6 +78,8 @@ function operatorToSql(
       return { sql: `${col} = TRUE`, bindings: [], argCount: 0, paramCount: 0 };
     case "False":
       return { sql: `${col} = FALSE`, bindings: [], argCount: 0, paramCount: 0 };
+    case "SimilarTo":
+      return { sql: `${col} <=> $${paramIdx}`, bindings: [{ argIndex: -1, transform: "identity" }], argCount: 1, paramCount: 1 };
   }
 }
 

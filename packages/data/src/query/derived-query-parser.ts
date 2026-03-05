@@ -15,7 +15,8 @@ export type QueryOperator =
   | "IsNotNull"
   | "Not"
   | "True"
-  | "False";
+  | "False"
+  | "SimilarTo";
 
 export interface PropertyExpression {
   property: string;
@@ -55,6 +56,7 @@ const OPERATOR_PARAM_COUNT: Record<QueryOperator, number> = {
   Not: 1,
   True: 0,
   False: 0,
+  SimilarTo: 1,
 };
 
 // Operators sorted by length descending so longer suffixes match first
