@@ -42,10 +42,14 @@ export class MaterializedPathManager {
    */
   buildPath(nodeId: string | number, parentPath?: string): string {
     const s = this.separator;
-    if (!parentPath) {
-      return `${s}${nodeId}${s}`;
+    const id = String(nodeId);
+    if (id.includes(s)) {
+      throw new Error(`Node ID "${id}" must not contain the path separator "${s}".`);
     }
-    return `${parentPath}${nodeId}${s}`;
+    if (!parentPath) {
+      return `${s}${id}${s}`;
+    }
+    return `${parentPath}${id}${s}`;
   }
 
   /**
@@ -119,7 +123,9 @@ export class MaterializedPathManager {
     const pathCol = quoteIdentifier(this.pathColumn);
     const escapedOldPath = escapeLikeValue(oldPath);
 
-    // Update the node and all descendants: replace old path prefix with new path
+    // Update the node and all descendants: replace old path prefix with new path.
+    // For the node itself, SUBSTRING(oldPath FROM len+1) = '', so it becomes newNodePath.
+    // For descendants, the old prefix is replaced with the new one.
     const sql =
       `UPDATE ${table} SET ${pathCol} = $1 || SUBSTRING(${pathCol} FROM $2) ` +
       `WHERE ${pathCol} LIKE $3`;
@@ -128,13 +134,6 @@ export class MaterializedPathManager {
     stmt.setParameter(2, (oldPath.length + 1) as SqlValue);
     stmt.setParameter(3, `${escapedOldPath}%` as SqlValue);
     await stmt.executeUpdate();
-
-    // Update the node's own path
-    const selfSql = `UPDATE ${table} SET ${pathCol} = $1 WHERE ${quoteIdentifier(this.idColumn)} = $2`;
-    const selfStmt = connection.prepareStatement(selfSql);
-    selfStmt.setParameter(1, newNodePath as SqlValue);
-    selfStmt.setParameter(2, nodeId);
-    await selfStmt.executeUpdate();
   }
 
   /**

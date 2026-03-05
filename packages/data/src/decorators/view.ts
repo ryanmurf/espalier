@@ -27,7 +27,15 @@ const materializedViewMetadata = new WeakMap<object, MaterializedViewOptions>();
  * View entities are read-only: save(), update(), and delete() will throw.
  * Read operations (find, findAll, etc.) work normally.
  */
+const VALID_CHECK_OPTIONS = new Set(["LOCAL", "CASCADED"]);
+
 export function View(options: ViewOptions) {
+  if (!options.definition || !options.definition.trim()) {
+    throw new Error("@View definition must be a non-empty SQL SELECT statement.");
+  }
+  if (options.checkOption && !VALID_CHECK_OPTIONS.has(options.checkOption)) {
+    throw new Error(`Invalid checkOption: "${options.checkOption}". Must be "LOCAL" or "CASCADED".`);
+  }
   return function <TClass extends new (...args: any[]) => any>(
     target: TClass,
     _context: ClassDecoratorContext<TClass>,
@@ -59,6 +67,9 @@ export function isViewEntity(target: object): boolean {
  * Use refreshMaterializedView() to refresh the view data.
  */
 export function MaterializedView(options: MaterializedViewOptions) {
+  if (!options.definition || !options.definition.trim()) {
+    throw new Error("@MaterializedView definition must be a non-empty SQL SELECT statement.");
+  }
   return function <TClass extends new (...args: any[]) => any>(
     target: TClass,
     _context: ClassDecoratorContext<TClass>,
@@ -79,7 +90,7 @@ export function getMaterializedViewMetadata(
   target: object,
 ): MaterializedViewOptions | undefined {
   const entry = materializedViewMetadata.get(target);
-  return entry ? { ...entry } : undefined;
+  return entry ? { ...entry, unique: entry.unique ? [...entry.unique] : undefined } : undefined;
 }
 
 /**

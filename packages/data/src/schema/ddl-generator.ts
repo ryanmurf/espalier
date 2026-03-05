@@ -341,7 +341,13 @@ export class DdlGenerator {
       const columnName = entry.columnName;
       const indexName = `idx_${metadata.tableName}_${columnName}_search`;
       const indexType = entry.indexType.toUpperCase();
+      if (!/^[A-Z]+$/.test(indexType)) {
+        throw new Error(`Invalid index type: "${entry.indexType}". Must be "gin" or "gist".`);
+      }
       const language = entry.language;
+      if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(language)) {
+        throw new Error(`Invalid search language: "${language}". Must be a valid identifier.`);
+      }
 
       statements.push(
         `CREATE INDEX ${ifNotExists}${quoteIdentifier(indexName)} ON ${qualifiedTable} USING ${indexType} (to_tsvector('${language}', ${quoteIdentifier(columnName)}))`,

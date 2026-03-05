@@ -889,14 +889,11 @@ describe("MaterializedPathManager — Adversarial", () => {
 
       await manager.moveNode(conn, 5 as SqlValue, "/1/5/", "/3/");
 
-      // Should have 2 statements: subtree update + self update
-      expect(captured.length).toBe(2);
-      // First statement: bulk update descendants
+      // Should have 1 statement: bulk update (node + descendants in one query)
+      expect(captured.length).toBe(1);
       expect(captured[0].sql).toContain("UPDATE");
       expect(captured[0].sql).toContain("SUBSTRING");
       expect(captured[0].sql).toContain("LIKE");
-      // Second statement: update self
-      expect(captured[1].sql).toContain("UPDATE");
     });
 
     it("parameterizes all values (no string interpolation of paths)", async () => {

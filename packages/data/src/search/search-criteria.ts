@@ -3,14 +3,8 @@ import type { Criteria, CriteriaType } from "../query/criteria.js";
 
 export type SearchMode = "plain" | "phrase" | "websearch";
 
-/** Sanitize a string for embedding in a SQL single-quoted literal (escape single quotes). */
-function sanitizeSqlLiteral(value: string): string {
-  return value.replace(/'/g, "''");
-}
-
 /** Validate and sanitize a PG text search language identifier. */
 function sanitizeLanguage(lang: string): string {
-  // Language names in PG are simple identifiers — reject anything suspicious
   if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(lang)) {
     throw new Error(`Invalid search language: "${lang}". Must be a valid identifier.`);
   }
@@ -19,8 +13,16 @@ function sanitizeLanguage(lang: string): string {
 
 /** Sanitize ts_headline tag options — only allow simple HTML-like tags. */
 function sanitizeTag(tag: string): string {
-  // Only allow alphanumeric chars, <, >, /, =, ", space — reject everything else
   return tag.replace(/[^a-zA-Z0-9<>\/=" ]/g, "");
+}
+
+const VALID_WEIGHTS = new Set(["A", "B", "C", "D"]);
+
+/** Validate a tsvector weight letter at runtime. */
+function validateWeight(weight: string, col: string): void {
+  if (!VALID_WEIGHTS.has(weight)) {
+    throw new Error(`Invalid search weight "${weight}" for column "${col}". Must be A, B, C, or D.`);
+  }
 }
 
 const SEARCH_MODE_FUNCTIONS: Record<SearchMode, string> = {
@@ -28,6 +30,15 @@ const SEARCH_MODE_FUNCTIONS: Record<SearchMode, string> = {
   phrase: "phraseto_tsquery",
   websearch: "websearch_to_tsquery",
 };
+
+/** Validate search mode at runtime. */
+function validateMode(mode: string): string {
+  const fn = SEARCH_MODE_FUNCTIONS[mode as SearchMode];
+  if (!fn) {
+    throw new Error(`Invalid search mode: "${mode}". Must be "plain", "phrase", or "websearch".`);
+  }
+  return fn;
+}
 
 /**
  * A Criteria that matches rows where a tsvector column matches a tsquery.
@@ -45,14 +56,17 @@ export class FullTextSearchCriteria implements Criteria {
   ) {}
 
   toSql(paramOffset: number): { sql: string; params: SqlValue[] } {
-    const queryFn = SEARCH_MODE_FUNCTIONS[this.mode];
+    const queryFn = validateMode(this.mode);
     const lang = sanitizeLanguage(this.language);
 
-    // Build tsvector expression, optionally with weights
     const tsvectorParts = this.columns.map((col) => {
       const weight = this.weights?.[col];
       const tsvec = `to_tsvector('${lang}', ${quoteIdentifier(col)})`;
-      return weight ? `setweight(${tsvec}, '${weight}')` : tsvec;
+      if (weight) {
+        validateWeight(weight, col);
+        return `setweight(${tsvec}, '${weight}')`;
+      }
+      return tsvec;
     });
 
     const tsvectorExpr = tsvectorParts.length === 1
@@ -79,13 +93,17 @@ export class SearchRankExpression {
   ) {}
 
   toSql(paramOffset: number): { sql: string; params: SqlValue[] } {
-    const queryFn = SEARCH_MODE_FUNCTIONS[this.mode];
+    const queryFn = validateMode(this.mode);
     const lang = sanitizeLanguage(this.language);
 
     const tsvectorParts = this.columns.map((col) => {
       const weight = this.weights?.[col];
       const tsvec = `to_tsvector('${lang}', ${quoteIdentifier(col)})`;
-      return weight ? `setweight(${tsvec}, '${weight}')` : tsvec;
+      if (weight) {
+        validateWeight(weight, col);
+        return `setweight(${tsvec}, '${weight}')`;
+      }
+      return tsvec;
     });
 
     const tsvectorExpr = tsvectorParts.length === 1
@@ -112,7 +130,7 @@ export class SearchHighlightExpression {
   ) {}
 
   toSql(paramOffset: number): { sql: string; params: SqlValue[] } {
-    const queryFn = SEARCH_MODE_FUNCTIONS[this.mode];
+    const queryFn = validateMode(this.mode);
     const lang = sanitizeLanguage(this.language);
 
     let optString = "";
