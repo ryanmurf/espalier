@@ -27,7 +27,9 @@ export function Outbox(options?: OutboxDecoratorOptions) {
 export function getOutboxMetadata(
   target: object,
 ): OutboxDecoratorOptions | undefined {
-  return outboxMetadata.get(target);
+  const meta = outboxMetadata.get(target);
+  if (!meta) return undefined;
+  return { ...meta, events: meta.events ? [...meta.events] : undefined };
 }
 
 /**

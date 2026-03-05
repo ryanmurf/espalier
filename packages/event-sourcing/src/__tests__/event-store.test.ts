@@ -451,11 +451,10 @@ describe("EventStore", () => {
       expect(indexes[2]).toContain("idx_event_store_sequence");
     });
 
-    it("sanitizes index names for special characters in table name", () => {
-      const store = new EventStore({ tableName: "my-events.v2" });
-      const indexes = store.generateIndexesDdl();
-      // Special chars should be replaced with underscores
-      expect(indexes[0]).toContain("idx_my_events_v2_aggregate_id");
+    it("rejects invalid table names with special characters", () => {
+      expect(() => new EventStore({ tableName: "my-events.v2" })).toThrow(
+        /Invalid tableName/,
+      );
     });
 
     it("generates schema-qualified table in DDL", () => {

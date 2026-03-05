@@ -351,10 +351,10 @@ describe("OutboxStore", () => {
       expect(indexes[1]).toContain("idx_outbox_created_at");
     });
 
-    it("sanitizes special characters in table name for index names", () => {
-      const store = new OutboxStore({ tableName: "my-outbox.v2" });
-      const indexes = store.generateIndexesDdl();
-      expect(indexes[0]).toContain("idx_my_outbox_v2_unpublished");
+    it("rejects invalid table names with special characters", () => {
+      expect(() => new OutboxStore({ tableName: "my-outbox.v2" })).toThrow(
+        /Invalid tableName/,
+      );
     });
   });
 });
@@ -455,7 +455,7 @@ describe("OutboxPublisher", () => {
     expect(count).toBe(0);
   });
 
-  it("poll() closes connection even on publish error", async () => {
+  it("poll() calls onError and returns 0 on publish error", async () => {
     const rows = [{
       id: "e1", aggregate_type: "T", aggregate_id: "a",
       event_type: "X", payload: "{}", created_at: "2026-01-01",
@@ -468,11 +468,17 @@ describe("OutboxPublisher", () => {
     mockDs = createMockDataSource(mockConn);
     publisher = new OutboxPublisher(mockDs);
 
+    const errors: unknown[] = [];
+    publisher.onError((err) => errors.push(err));
+
     publisher.onPublish(async () => {
       throw new Error("publish failed");
     });
 
-    await expect(publisher.poll()).rejects.toThrow("publish failed");
+    const count = await publisher.poll();
+    expect(count).toBe(0);
+    expect(errors).toHaveLength(1);
+    expect((errors[0] as Error).message).toBe("publish failed");
     expect(mockConn.close).toHaveBeenCalled();
   });
 

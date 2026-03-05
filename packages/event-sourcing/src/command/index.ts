@@ -20,4 +20,4 @@ export {
   validationMiddleware,
   retryMiddleware,
 } from "./built-in-middleware.js";
-export type { Logger } from "./built-in-middleware.js";
+export type { Logger, LoggingMiddlewareOptions } from "./built-in-middleware.js";

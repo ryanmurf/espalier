@@ -6,6 +6,18 @@ const _crypto = (globalThis as Record<string, unknown>)["crypto"] as {
   randomUUID(): string;
 };
 
+const IDENT_RE = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
+
+function escapeIdent(name: string): string {
+  return `"${name.replace(/"/g, '""')}"`;
+}
+
+function validateIdentifier(name: string, label: string): void {
+  if (!IDENT_RE.test(name)) {
+    throw new Error(`Invalid ${label}: "${name}" — must match /^[a-zA-Z_][a-zA-Z0-9_]*$/`);
+  }
+}
+
 export class OutboxStore {
   private readonly tableName: string;
   private readonly schemaName?: string;
@@ -13,12 +25,16 @@ export class OutboxStore {
   constructor(options?: OutboxOptions) {
     this.tableName = options?.tableName ?? "outbox";
     this.schemaName = options?.schemaName;
+    validateIdentifier(this.tableName, "tableName");
+    if (this.schemaName !== undefined) {
+      validateIdentifier(this.schemaName, "schemaName");
+    }
   }
 
   private get qualifiedTable(): string {
     return this.schemaName
-      ? `"${this.schemaName}"."${this.tableName}"`
-      : `"${this.tableName}"`;
+      ? `${escapeIdent(this.schemaName)}.${escapeIdent(this.tableName)}`
+      : escapeIdent(this.tableName);
   }
 
   /**
@@ -108,7 +124,7 @@ export class OutboxStore {
             aggregateId: row.aggregate_id as string,
             eventType: row.event_type as string,
             payload: typeof row.payload === "string"
-              ? (JSON.parse(row.payload) as Record<string, unknown>)
+              ? (Object.assign(Object.create(null), JSON.parse(row.payload)) as Record<string, unknown>)
               : (row.payload as Record<string, unknown>),
             createdAt: row.created_at instanceof Date
               ? row.created_at
@@ -140,18 +156,24 @@ export class OutboxStore {
       return;
     }
 
-    const placeholders = entryIds.map((_, i) => `$${i + 2}`).join(", ");
-    const sql = `UPDATE ${this.qualifiedTable} SET "published_at" = $1 WHERE "id" IN (${placeholders})`;
+    const BATCH_SIZE = 1000;
+    const now = new Date().toISOString();
 
-    const stmt = connection.prepareStatement(sql);
-    try {
-      stmt.setParameter(1, new Date().toISOString());
-      for (let i = 0; i < entryIds.length; i++) {
-        stmt.setParameter(i + 2, entryIds[i]);
+    for (let offset = 0; offset < entryIds.length; offset += BATCH_SIZE) {
+      const chunk = entryIds.slice(offset, offset + BATCH_SIZE);
+      const placeholders = chunk.map((_, i) => `$${i + 2}`).join(", ");
+      const sql = `UPDATE ${this.qualifiedTable} SET "published_at" = $1 WHERE "id" IN (${placeholders})`;
+
+      const stmt = connection.prepareStatement(sql);
+      try {
+        stmt.setParameter(1, now);
+        for (let i = 0; i < chunk.length; i++) {
+          stmt.setParameter(i + 2, chunk[i]);
+        }
+        await stmt.executeUpdate();
+      } finally {
+        await stmt.close();
       }
-      await stmt.executeUpdate();
-    } finally {
-      await stmt.close();
     }
   }
 

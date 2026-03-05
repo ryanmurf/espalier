@@ -7,6 +7,7 @@ declare function setInterval(callback: (...args: unknown[]) => void, ms: number)
 declare function clearInterval(handle: unknown): void;
 
 export type OutboxPublishFn = (entries: OutboxEntry[]) => Promise<void>;
+export type OutboxErrorFn = (error: unknown) => void;
 
 /**
  * Polls the outbox table and publishes events to external systems.
@@ -19,14 +20,15 @@ export class OutboxPublisher {
   private timer: unknown = null;
   private running = false;
   private publishFn: OutboxPublishFn | null = null;
+  private errorFn: OutboxErrorFn | null = null;
 
   constructor(
     private readonly dataSource: DataSource,
     options?: OutboxOptions,
   ) {
     this.store = new OutboxStore(options);
-    this.pollIntervalMs = options?.pollIntervalMs ?? 1000;
-    this.batchSize = options?.batchSize ?? 100;
+    this.pollIntervalMs = Math.max(options?.pollIntervalMs ?? 1000, 100);
+    this.batchSize = Math.min(Math.max(options?.batchSize ?? 100, 1), 10000);
   }
 
   /**
@@ -35,6 +37,13 @@ export class OutboxPublisher {
    */
   onPublish(fn: OutboxPublishFn): void {
     this.publishFn = fn;
+  }
+
+  /**
+   * Set an error handler for poll cycle failures.
+   */
+  onError(fn: OutboxErrorFn): void {
+    this.errorFn = fn;
   }
 
   /**
@@ -79,26 +88,33 @@ export class OutboxPublisher {
   async poll(): Promise<number> {
     if (!this.publishFn) return 0;
 
-    const connection = await this.dataSource.getConnection();
     try {
-      const entries = await this.store.fetchUnpublished(
-        connection,
-        this.batchSize,
-      );
-      if (entries.length === 0) return 0;
+      const connection = await this.dataSource.getConnection();
+      try {
+        const entries = await this.store.fetchUnpublished(
+          connection,
+          this.batchSize,
+        );
+        if (entries.length === 0) return 0;
 
-      // Publish to external system
-      await this.publishFn(entries);
+        // Publish to external system
+        await this.publishFn(entries);
 
-      // Mark as published
-      await this.store.markPublished(
-        connection,
-        entries.map((e) => e.id),
-      );
+        // Mark as published
+        await this.store.markPublished(
+          connection,
+          entries.map((e) => e.id),
+        );
 
-      return entries.length;
-    } finally {
-      await connection.close();
+        return entries.length;
+      } finally {
+        await connection.close();
+      }
+    } catch (err: unknown) {
+      if (this.errorFn) {
+        this.errorFn(err);
+      }
+      return 0;
     }
   }
 

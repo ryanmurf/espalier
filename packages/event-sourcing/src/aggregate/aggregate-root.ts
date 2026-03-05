@@ -34,7 +34,9 @@ export function AggregateRoot(options?: AggregateRootOptions) {
 export function getAggregateRootMetadata(
   target: object,
 ): AggregateRootMetadata | undefined {
-  return aggregateRootMetadata.get(target);
+  const meta = aggregateRootMetadata.get(target);
+  if (!meta) return undefined;
+  return { ...meta };
 }
 
 export function isAggregateRoot(target: object): boolean {

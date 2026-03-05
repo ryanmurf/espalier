@@ -7,6 +7,18 @@ const _crypto = (globalThis as Record<string, unknown>)["crypto"] as {
   randomUUID(): string;
 };
 
+const IDENT_RE = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
+
+function escapeIdent(name: string): string {
+  return `"${name.replace(/"/g, '""')}"`;
+}
+
+function validateIdentifier(name: string, label: string): void {
+  if (!IDENT_RE.test(name)) {
+    throw new Error(`Invalid ${label}: "${name}" — must match /^[a-zA-Z_][a-zA-Z0-9_]*$/`);
+  }
+}
+
 export class EventStore {
   private readonly tableName: string;
   private readonly schemaName?: string;
@@ -14,12 +26,16 @@ export class EventStore {
   constructor(options?: EventStoreOptions) {
     this.tableName = options?.tableName ?? "event_store";
     this.schemaName = options?.schemaName;
+    validateIdentifier(this.tableName, "tableName");
+    if (this.schemaName !== undefined) {
+      validateIdentifier(this.schemaName, "schemaName");
+    }
   }
 
   private get qualifiedTable(): string {
     return this.schemaName
-      ? `"${this.schemaName}"."${this.tableName}"`
-      : `"${this.tableName}"`;
+      ? `${escapeIdent(this.schemaName)}.${escapeIdent(this.tableName)}`
+      : escapeIdent(this.tableName);
   }
 
   /**
@@ -95,7 +111,18 @@ export class EventStore {
         stmt.setParameter(i + 1, paramValues[i] as string | number | null);
       }
 
-      const rs = await stmt.executeQuery();
+      let rs;
+      try {
+        rs = await stmt.executeQuery();
+      } catch (err: unknown) {
+        // Defense-in-depth: catch unique constraint violations (PG error code 23505)
+        const pgCode = (err as { code?: string })?.code;
+        if (pgCode === "23505") {
+          const actual = await this.getCurrentVersion(connection, aggregateId);
+          throw new ConcurrencyError(aggregateId, expectedVersion, actual);
+        }
+        throw err;
+      }
       try {
         let idx = 0;
         while (await rs.next()) {
@@ -242,7 +269,7 @@ export class EventStore {
             aggregateType: row.aggregate_type as string,
             eventType: row.event_type as string,
             payload: typeof row.payload === "string"
-              ? (JSON.parse(row.payload) as Record<string, unknown>)
+              ? (Object.assign(Object.create(null), JSON.parse(row.payload)) as Record<string, unknown>)
               : (row.payload as Record<string, unknown>),
             version: row.version as number,
             sequence: row.sequence as number,
@@ -251,7 +278,7 @@ export class EventStore {
               : new Date(row.timestamp as string),
             metadata: row.metadata
               ? typeof row.metadata === "string"
-                ? (JSON.parse(row.metadata) as Record<string, unknown>)
+                ? (Object.assign(Object.create(null), JSON.parse(row.metadata)) as Record<string, unknown>)
                 : (row.metadata as Record<string, unknown>)
               : undefined,
           });
