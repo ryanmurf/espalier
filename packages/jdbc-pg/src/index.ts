@@ -18,3 +18,11 @@ export {
 } from "./trace-query.js";
 export type { ReplicaLagConfig } from "./pg-replica-health.js";
 export { ReplicaLagHealthCheck, TenantSchemaHealthCheck } from "./pg-replica-health.js";
+export { BunPgDataSource } from "./bun-pg-data-source.js";
+export type { BunPgDataSourceConfig } from "./bun-pg-data-source.js";
+export { BunPgConnection } from "./bun-pg-connection.js";
+export { BunPgStatementImpl, BunPgPreparedStatement } from "./bun-pg-statement.js";
+export type { BunSqlClient, BunSqlResult } from "./bun-pg-statement.js";
+export { BunPgResultSet } from "./bun-pg-result-set.js";
+export { createPgDataSource } from "./pg-factory.js";
+export type { PgFactoryConfig } from "./pg-factory.js";
