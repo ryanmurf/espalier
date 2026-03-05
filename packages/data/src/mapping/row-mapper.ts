@@ -19,7 +19,7 @@ export function createRowMapper<T>(
   return {
     mapRow(resultSet: ResultSet): T {
       const row = resultSet.getRow();
-      const entity = Object.create(entityClass.prototype) as T;
+      const entity = Reflect.construct(entityClass, []) as T;
 
       for (const field of metadata.fields) {
         if (field.fieldName === "__proto__" || field.fieldName === "constructor") continue;
@@ -38,7 +38,7 @@ export function createRowMapper<T>(
         const plainObj = (entity as Record<string, unknown>)[embFieldName];
         if (plainObj && typeof plainObj === "object") {
           const EmbeddableClass = targetFn();
-          const embeddable = Object.create(EmbeddableClass.prototype);
+          const embeddable = Reflect.construct(EmbeddableClass, []);
           Object.assign(embeddable, plainObj);
           (entity as Record<string, unknown>)[embFieldName] = embeddable;
         }
