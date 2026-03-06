@@ -1,12 +1,12 @@
-import { describe, it, expect, vi } from "vitest";
-import { createRepository } from "../../repository/repository-factory.js";
-import { createAutoRepository } from "../../repository/auto-repository.js";
-import { Table } from "../../decorators/table.js";
+import type { Connection, DataSource, PreparedStatement, ResultSet } from "espalier-jdbc";
+import { describe, expect, it, vi } from "vitest";
 import { Column } from "../../decorators/column.js";
 import { Id } from "../../decorators/id.js";
-import { Version } from "../../decorators/version.js";
 import { Repository } from "../../decorators/repository.js";
-import type { DataSource, Connection, PreparedStatement, ResultSet } from "espalier-jdbc";
+import { Table } from "../../decorators/table.js";
+import { Version } from "../../decorators/version.js";
+import { createAutoRepository } from "../../repository/auto-repository.js";
+import { createRepository } from "../../repository/repository-factory.js";
 import { TestResultSet } from "../test-utils/test-result-set.js";
 
 @Table("products")
@@ -169,8 +169,6 @@ describe("createAutoRepository", () => {
     const conn = createMockConnection([]);
     const ds = createMockDataSource(conn);
 
-    expect(() => createAutoRepository<Product, number>(PlainClass, ds)).toThrow(
-      "@Repository",
-    );
+    expect(() => createAutoRepository<Product, number>(PlainClass, ds)).toThrow("@Repository");
   });
 });

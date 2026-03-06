@@ -1,13 +1,13 @@
-import { describe, it, expect, vi } from "vitest";
 import type { Connection, DataSource, PreparedStatement, ResultSet, Statement, Transaction } from "espalier-jdbc";
+import { describe, expect, it, vi } from "vitest";
 import {
-  QueryLog,
-  createInstrumentedDataSource,
-  withQueryLog,
-  assertQueryCount,
   assertMaxQueries,
   assertNoQueriesMatching,
   assertQueriesMatching,
+  assertQueryCount,
+  createInstrumentedDataSource,
+  QueryLog,
+  withQueryLog,
 } from "../assertions/query-assertions.js";
 
 // ==========================================================================

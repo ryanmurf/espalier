@@ -1,7 +1,7 @@
-import mysql from "mysql2/promise";
-import type { Pool, PoolOptions } from "mysql2/promise";
-import type { Connection, PoolConfig, PoolStats, PooledDataSource, TypeConverterRegistry } from "espalier-jdbc";
+import type { Connection, PoolConfig, PooledDataSource, PoolStats, TypeConverterRegistry } from "espalier-jdbc";
 import { ConnectionError, DatabaseErrorCode, getGlobalLogger, LogLevel } from "espalier-jdbc";
+import type { Pool, PoolOptions } from "mysql2/promise";
+import mysql from "mysql2/promise";
 import { MysqlConnection } from "./mysql-connection.js";
 
 export interface MysqlDataSourceConfig {
@@ -26,11 +26,7 @@ function mapPoolConfig(config: MysqlDataSourceConfig): PoolOptions {
 }
 
 function isMysqlDataSourceConfig(config: unknown): config is MysqlDataSourceConfig {
-  return (
-    typeof config === "object" &&
-    config !== null &&
-    ("mysql" in config || "pool" in config)
-  );
+  return typeof config === "object" && config !== null && ("mysql" in config || "pool" in config);
 }
 
 export class MysqlDataSource implements PooledDataSource {
@@ -49,11 +45,7 @@ export class MysqlDataSource implements PooledDataSource {
 
   async getConnection(): Promise<Connection> {
     if (this.closed) {
-      throw new ConnectionError(
-        "DataSource is closed",
-        undefined,
-        DatabaseErrorCode.CONNECTION_CLOSED,
-      );
+      throw new ConnectionError("DataSource is closed", undefined, DatabaseErrorCode.CONNECTION_CLOSED);
     }
     const logger = getGlobalLogger().child("mysql-pool");
     const startTime = Date.now();
@@ -71,17 +63,14 @@ export class MysqlDataSource implements PooledDataSource {
       }
       return new MysqlConnection(conn, this.typeConverters);
     } catch (err) {
-      const code = (err as { code?: string }).code === "ECONNREFUSED"
-        ? DatabaseErrorCode.CONNECTION_FAILED
-        : (err as { code?: string }).code === "ETIMEDOUT"
-          ? DatabaseErrorCode.CONNECTION_TIMEOUT
-          : DatabaseErrorCode.CONNECTION_FAILED;
+      const code =
+        (err as { code?: string }).code === "ECONNREFUSED"
+          ? DatabaseErrorCode.CONNECTION_FAILED
+          : (err as { code?: string }).code === "ETIMEDOUT"
+            ? DatabaseErrorCode.CONNECTION_TIMEOUT
+            : DatabaseErrorCode.CONNECTION_FAILED;
       logger.error("connection acquire failed", { error: (err as Error).message, duration: Date.now() - startTime });
-      throw new ConnectionError(
-        `Failed to get connection: ${(err as Error).message}`,
-        err as Error,
-        code,
-      );
+      throw new ConnectionError(`Failed to get connection: ${(err as Error).message}`, err as Error, code);
     }
   }
 

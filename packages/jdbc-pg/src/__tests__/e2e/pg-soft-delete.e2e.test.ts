@@ -5,20 +5,13 @@
  * soft-delete + @Version, concurrent soft-delete/restore, cascade scenarios,
  * restore already-active entity, SQL injection attempts.
  */
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
+
+import type { CrudRepository } from "espalier-data";
+import { Column, createDerivedRepository, FilterContext, Id, SoftDelete, Table, Version } from "espalier-data";
 import type { Connection } from "espalier-jdbc";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { PgDataSource } from "../../pg-data-source.js";
 import { createTestDataSource, isPostgresAvailable } from "./setup.js";
-import {
-  Table,
-  Column,
-  Id,
-  Version,
-  SoftDelete,
-  FilterContext,
-  createDerivedRepository,
-} from "espalier-data";
-import type { CrudRepository } from "espalier-data";
 
 const canConnect = await isPostgresAvailable();
 
@@ -115,19 +108,13 @@ describe.skipIf(!canConnect)("E2E: @SoftDelete", { timeout: 15000 }, () => {
     await stmt.executeUpdate(`DELETE FROM ${TABLE_CUSTOM}`);
 
     // Seed items: 3 active
-    await stmt.executeUpdate(
-      `INSERT INTO ${TABLE_ITEMS} (name) VALUES ('Alpha'), ('Beta'), ('Gamma')`,
-    );
+    await stmt.executeUpdate(`INSERT INTO ${TABLE_ITEMS} (name) VALUES ('Alpha'), ('Beta'), ('Gamma')`);
 
     // Seed versioned: 2 active
-    await stmt.executeUpdate(
-      `INSERT INTO ${TABLE_VERSIONED} (name, version) VALUES ('V1', 0), ('V2', 0)`,
-    );
+    await stmt.executeUpdate(`INSERT INTO ${TABLE_VERSIONED} (name, version) VALUES ('V1', 0), ('V2', 0)`);
 
     // Seed custom: 2 active
-    await stmt.executeUpdate(
-      `INSERT INTO ${TABLE_CUSTOM} (label) VALUES ('Foo'), ('Bar')`,
-    );
+    await stmt.executeUpdate(`INSERT INTO ${TABLE_CUSTOM} (label) VALUES ('Foo'), ('Bar')`);
 
     await c.close();
 
@@ -156,24 +143,24 @@ describe.skipIf(!canConnect)("E2E: @SoftDelete", { timeout: 15000 }, () => {
     const items = await itemRepo.findAll();
     expect(items).toHaveLength(3);
 
-    const alpha = items.find(i => i.name === "Alpha")!;
+    const alpha = items.find((i) => i.name === "Alpha")!;
     await itemRepo.delete(alpha);
 
     // Alpha should be hidden from default queries
     const remaining = await itemRepo.findAll();
     expect(remaining).toHaveLength(2);
-    expect(remaining.find(i => i.name === "Alpha")).toBeUndefined();
+    expect(remaining.find((i) => i.name === "Alpha")).toBeUndefined();
 
     // Alpha should still exist in DB
     const all = await itemRepo.findIncludingDeleted();
     expect(all).toHaveLength(3);
-    const deletedAlpha = all.find(i => i.name === "Alpha")!;
+    const deletedAlpha = all.find((i) => i.name === "Alpha")!;
     expect(deletedAlpha.deletedAt).toBeInstanceOf(Date);
   });
 
   it("soft-deleted entity not returned by findById", async () => {
     const items = await itemRepo.findAll();
-    const beta = items.find(i => i.name === "Beta")!;
+    const beta = items.find((i) => i.name === "Beta")!;
     await itemRepo.delete(beta);
 
     const result = await itemRepo.findById(beta.id);
@@ -199,7 +186,7 @@ describe.skipIf(!canConnect)("E2E: @SoftDelete", { timeout: 15000 }, () => {
 
     const deleted = await itemRepo.findOnlyDeleted();
     expect(deleted).toHaveLength(2);
-    expect(deleted.every(d => d.deletedAt !== null)).toBe(true);
+    expect(deleted.every((d) => d.deletedAt !== null)).toBe(true);
   });
 
   it("findOnlyDeleted returns empty when no items are deleted", async () => {
@@ -225,7 +212,7 @@ describe.skipIf(!canConnect)("E2E: @SoftDelete", { timeout: 15000 }, () => {
 
   it("restore() brings a soft-deleted entity back", async () => {
     const items = await itemRepo.findAll();
-    const gamma = items.find(i => i.name === "Gamma")!;
+    const gamma = items.find((i) => i.name === "Gamma")!;
     await itemRepo.delete(gamma);
 
     // Gamma is now soft-deleted
@@ -233,7 +220,7 @@ describe.skipIf(!canConnect)("E2E: @SoftDelete", { timeout: 15000 }, () => {
 
     // Restore it — need to get the entity with deletedAt set
     const deleted = await itemRepo.findOnlyDeleted();
-    const deletedGamma = deleted.find(d => d.name === "Gamma")!;
+    const deletedGamma = deleted.find((d) => d.name === "Gamma")!;
     await itemRepo.restore(deletedGamma);
 
     // Should be back in normal queries
@@ -262,28 +249,26 @@ describe.skipIf(!canConnect)("E2E: @SoftDelete", { timeout: 15000 }, () => {
 
   it("soft delete with @Version increments version", async () => {
     const items = await versionedRepo.findAll();
-    const v1 = items.find(i => i.name === "V1")!;
+    const v1 = items.find((i) => i.name === "V1")!;
     expect(v1.version).toBe(0);
 
     await versionedRepo.delete(v1);
 
     // Version should have incremented
     const all = await versionedRepo.findIncludingDeleted();
-    const deletedV1 = all.find(i => i.name === "V1")!;
+    const deletedV1 = all.find((i) => i.name === "V1")!;
     expect(deletedV1.version).toBe(1);
     expect(deletedV1.deletedAt).toBeInstanceOf(Date);
   });
 
   it("soft delete with stale version throws OptimisticLockException", async () => {
     const items = await versionedRepo.findAll();
-    const v2 = items.find(i => i.name === "V2")!;
+    const v2 = items.find((i) => i.name === "V2")!;
 
     // Manually update version in DB to simulate concurrent modification
     const c = await ds.getConnection();
     const stmt = c.createStatement();
-    await stmt.executeUpdate(
-      `UPDATE ${TABLE_VERSIONED} SET version = 5 WHERE id = ${v2.id}`,
-    );
+    await stmt.executeUpdate(`UPDATE ${TABLE_VERSIONED} SET version = 5 WHERE id = ${v2.id}`);
     await c.close();
 
     // v2 still has version=0 in memory — should fail with OLE
@@ -298,7 +283,7 @@ describe.skipIf(!canConnect)("E2E: @SoftDelete", { timeout: 15000 }, () => {
     const items = await customRepo.findAll();
     expect(items).toHaveLength(2);
 
-    const foo = items.find(i => i.label === "Foo")!;
+    const foo = items.find((i) => i.label === "Foo")!;
     await customRepo.delete(foo);
 
     const remaining = await customRepo.findAll();
@@ -306,7 +291,7 @@ describe.skipIf(!canConnect)("E2E: @SoftDelete", { timeout: 15000 }, () => {
 
     const all = await customRepo.findIncludingDeleted();
     expect(all).toHaveLength(2);
-    const deletedFoo = all.find(i => i.label === "Foo")!;
+    const deletedFoo = all.find((i) => i.label === "Foo")!;
     expect(deletedFoo.removedAt).toBeInstanceOf(Date);
   });
 
@@ -316,13 +301,13 @@ describe.skipIf(!canConnect)("E2E: @SoftDelete", { timeout: 15000 }, () => {
 
   it("soft-deleting an already soft-deleted entity — behavior check", async () => {
     const items = await itemRepo.findAll();
-    const alpha = items.find(i => i.name === "Alpha")!;
+    const alpha = items.find((i) => i.name === "Alpha")!;
     await itemRepo.delete(alpha);
 
     // Alpha is now soft-deleted, try to delete again
     // Need to fetch the deleted entity first
     const deleted = await itemRepo.findOnlyDeleted();
-    const deletedAlpha = deleted.find(d => d.name === "Alpha")!;
+    const deletedAlpha = deleted.find((d) => d.name === "Alpha")!;
 
     // This may update deleted_at again or be a no-op
     // The key thing is it shouldn't throw
@@ -341,9 +326,7 @@ describe.skipIf(!canConnect)("E2E: @SoftDelete", { timeout: 15000 }, () => {
     const items = await itemRepo.findAll();
     await itemRepo.delete(items[0]);
 
-    const withoutFilters = await FilterContext.withoutFilters(
-      () => itemRepo.findAll(),
-    );
+    const withoutFilters = await FilterContext.withoutFilters(() => itemRepo.findAll());
     expect(withoutFilters).toHaveLength(3);
   });
 
@@ -351,10 +334,7 @@ describe.skipIf(!canConnect)("E2E: @SoftDelete", { timeout: 15000 }, () => {
     const items = await itemRepo.findAll();
     await itemRepo.delete(items[0]);
 
-    const all = await FilterContext.withFilters(
-      { disableFilters: ["softDelete"] },
-      () => itemRepo.findAll(),
-    );
+    const all = await FilterContext.withFilters({ disableFilters: ["softDelete"] }, () => itemRepo.findAll());
     expect(all).toHaveLength(3);
   });
 
@@ -372,11 +352,11 @@ describe.skipIf(!canConnect)("E2E: @SoftDelete", { timeout: 15000 }, () => {
 
     // Should NOT appear in normal findAll (filtered by softDelete)
     const visible = await itemRepo.findAll();
-    expect(visible.find(i => i.name === "PreDeleted")).toBeUndefined();
+    expect(visible.find((i) => i.name === "PreDeleted")).toBeUndefined();
 
     // Should appear in findIncludingDeleted
     const all = await itemRepo.findIncludingDeleted();
-    expect(all.find(i => i.name === "PreDeleted")).toBeDefined();
+    expect(all.find((i) => i.name === "PreDeleted")).toBeDefined();
   });
 
   // ══════════════════════════════════════════════════════
@@ -385,12 +365,12 @@ describe.skipIf(!canConnect)("E2E: @SoftDelete", { timeout: 15000 }, () => {
 
   it("concurrent soft-delete and restore do not corrupt state", async () => {
     const items = await itemRepo.findAll();
-    const beta = items.find(i => i.name === "Beta")!;
+    const beta = items.find((i) => i.name === "Beta")!;
 
     // Delete then restore rapidly
     await itemRepo.delete(beta);
     const deleted = await itemRepo.findOnlyDeleted();
-    const deletedBeta = deleted.find(d => d.name === "Beta")!;
+    const deletedBeta = deleted.find((d) => d.name === "Beta")!;
     await itemRepo.restore(deletedBeta);
 
     // Should be fully active again

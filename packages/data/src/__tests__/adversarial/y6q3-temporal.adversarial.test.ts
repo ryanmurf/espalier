@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from "vitest";
-import { Temporal, getTemporalMetadata, isTemporalEntity } from "../../decorators/temporal.js";
+import { describe, expect, it } from "vitest";
+import { getTemporalMetadata, isTemporalEntity, Temporal } from "../../decorators/temporal.js";
 import { TemporalQueryBuilder } from "../../temporal/temporal-query.js";
 
 // ─── @Temporal Decorator ─────────────────────────────────────────────────────

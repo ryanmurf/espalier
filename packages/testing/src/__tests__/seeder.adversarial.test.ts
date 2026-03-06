@@ -1,13 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { Connection, DataSource, Transaction, ResultSet, Statement, PreparedStatement } from "espalier-jdbc";
-import {
-  SeedRunner,
-  defineSeed,
-  clearSeedRegistry,
-  getRegisteredSeeds,
-  runSeeds,
-} from "../seeding/seeder.js";
-import type { SeedDefinition, SeedRunResult, SeedContext } from "../seeding/seeder.js";
+import type { Connection, DataSource, PreparedStatement, ResultSet, Statement, Transaction } from "espalier-jdbc";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { SeedContext, SeedDefinition } from "../seeding/seeder.js";
+import { clearSeedRegistry, defineSeed, getRegisteredSeeds, runSeeds, SeedRunner } from "../seeding/seeder.js";
 
 // ==========================================================================
 // Mock helpers
@@ -20,15 +14,13 @@ function createMockResultSet(rows: Record<string, unknown>[] = []): ResultSet {
       cursor++;
       return cursor < rows.length;
     }),
-    getString: vi.fn().mockImplementation((col: string) =>
-      cursor < rows.length ? (rows[cursor][col] as string | null) : null,
-    ),
+    getString: vi
+      .fn()
+      .mockImplementation((col: string) => (cursor < rows.length ? (rows[cursor][col] as string | null) : null)),
     getNumber: vi.fn().mockReturnValue(null),
     getBoolean: vi.fn().mockReturnValue(null),
     getDate: vi.fn().mockReturnValue(null),
-    getRow: vi.fn().mockImplementation(() =>
-      cursor < rows.length ? rows[cursor] : {},
-    ),
+    getRow: vi.fn().mockImplementation(() => (cursor < rows.length ? rows[cursor] : {})),
     getMetadata: vi.fn().mockReturnValue([]),
     close: vi.fn().mockResolvedValue(undefined),
     [Symbol.asyncIterator]: async function* () {
@@ -144,12 +136,16 @@ describe("SeedRunner — dependency handling", () => {
     const seeds = new Map<string, SeedDefinition>();
     seeds.set("users", {
       name: "users",
-      run: async () => { order.push("users"); },
+      run: async () => {
+        order.push("users");
+      },
     });
     seeds.set("orders", {
       name: "orders",
       dependsOn: ["users"],
-      run: async () => { order.push("orders"); },
+      run: async () => {
+        order.push("orders");
+      },
     });
 
     const { ds } = createMockDataSource();
@@ -194,22 +190,30 @@ describe("SeedRunner — dependency handling", () => {
     const seeds = new Map<string, SeedDefinition>();
     seeds.set("base", {
       name: "base",
-      run: async () => { order.push("base"); },
+      run: async () => {
+        order.push("base");
+      },
     });
     seeds.set("left", {
       name: "left",
       dependsOn: ["base"],
-      run: async () => { order.push("left"); },
+      run: async () => {
+        order.push("left");
+      },
     });
     seeds.set("right", {
       name: "right",
       dependsOn: ["base"],
-      run: async () => { order.push("right"); },
+      run: async () => {
+        order.push("right");
+      },
     });
     seeds.set("top", {
       name: "top",
       dependsOn: ["left", "right"],
-      run: async () => { order.push("top"); },
+      run: async () => {
+        order.push("top");
+      },
     });
 
     const { ds } = createMockDataSource();
@@ -239,7 +243,9 @@ describe("SeedRunner — environment filtering", () => {
     seeds.set("test-data", {
       name: "test-data",
       environments: ["test"],
-      run: async () => { ran.push("test-data"); },
+      run: async () => {
+        ran.push("test-data");
+      },
     });
 
     const { ds } = createMockDataSource();
@@ -255,7 +261,9 @@ describe("SeedRunner — environment filtering", () => {
     seeds.set("test-only", {
       name: "test-only",
       environments: ["test"],
-      run: async () => { ran.push("test-only"); },
+      run: async () => {
+        ran.push("test-only");
+      },
     });
 
     const { ds } = createMockDataSource();
@@ -270,7 +278,9 @@ describe("SeedRunner — environment filtering", () => {
     const ran: string[] = [];
     seeds.set("always", {
       name: "always",
-      run: async () => { ran.push("always"); },
+      run: async () => {
+        ran.push("always");
+      },
     });
 
     const { ds } = createMockDataSource();
@@ -285,7 +295,9 @@ describe("SeedRunner — environment filtering", () => {
     seeds.set("empty-envs", {
       name: "empty-envs",
       environments: [],
-      run: async () => { ran.push("empty-envs"); },
+      run: async () => {
+        ran.push("empty-envs");
+      },
     });
 
     const { ds } = createMockDataSource();
@@ -309,7 +321,9 @@ describe("SeedRunner — idempotency", () => {
     const ran: string[] = [];
     seeds.set("users", {
       name: "users",
-      run: async () => { ran.push("users"); },
+      run: async () => {
+        ran.push("users");
+      },
     });
 
     const { ds } = createMockDataSource(["users"]); // Already executed
@@ -457,9 +471,7 @@ describe("SeedRunner — reset", () => {
     await runner.reset();
 
     const stmt = connection.createStatement();
-    expect(stmt.executeUpdate).toHaveBeenCalledWith(
-      expect.stringContaining("DROP TABLE"),
-    );
+    expect(stmt.executeUpdate).toHaveBeenCalledWith(expect.stringContaining("DROP TABLE"));
   });
 
   it("reset() closes the connection", async () => {
@@ -552,7 +564,9 @@ describe("SeedRunner — edge cases", () => {
     let receivedEnv = "";
     seeds.set("env-test", {
       name: "env-test",
-      run: async (ctx) => { receivedEnv = ctx.env; },
+      run: async (ctx) => {
+        receivedEnv = ctx.env;
+      },
     });
 
     const { ds } = createMockDataSource();
@@ -566,7 +580,9 @@ describe("SeedRunner — edge cases", () => {
     const ran: string[] = [];
     seeds.set("seed/with-special.chars_v2", {
       name: "seed/with-special.chars_v2",
-      run: async () => { ran.push("special"); },
+      run: async () => {
+        ran.push("special");
+      },
     });
 
     const { ds } = createMockDataSource();
@@ -579,7 +595,9 @@ describe("SeedRunner — edge cases", () => {
     const seeds = new Map<string, SeedDefinition>();
     seeds.set("error", {
       name: "error",
-      run: async () => { throw new Error("boom"); },
+      run: async () => {
+        throw new Error("boom");
+      },
     });
 
     const { ds, connection } = createMockDataSource();

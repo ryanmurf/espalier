@@ -34,9 +34,7 @@ export function detectRuntime(): RuntimeInfo {
   const nav = (globalThis as any).navigator;
   if (
     typeof (globalThis as any).EdgeRuntime === "string" ||
-    (nav != null &&
-      typeof nav.userAgent === "string" &&
-      nav.userAgent.includes("Cloudflare-Workers"))
+    (nav != null && typeof nav.userAgent === "string" && nav.userAgent.includes("Cloudflare-Workers"))
   ) {
     return {
       runtime: "edge",

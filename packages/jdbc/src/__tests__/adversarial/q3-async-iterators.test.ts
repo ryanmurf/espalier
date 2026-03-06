@@ -3,14 +3,8 @@
  * Targets: early break cleanup, error mid-stream, calling next() after done,
  * generator cleanup (no finally blocks), concurrent iteration.
  */
-import { describe, it, expect, vi } from "vitest";
-import {
-  toArray,
-  mapResultSet,
-  filterResultSet,
-  reduceResultSet,
-  forEachResultSet,
-} from "../../result-set-utils.js";
+import { describe, expect, it, vi } from "vitest";
+import { filterResultSet, forEachResultSet, mapResultSet, reduceResultSet, toArray } from "../../result-set-utils.js";
 import { TestResultSet } from "../test-utils/test-result-set.js";
 
 /**
@@ -53,10 +47,7 @@ class AdversarialResultSet extends TestResultSet {
   }
 }
 
-function mockResultSet(
-  rows: Record<string, unknown>[],
-  opts?: { errorAtIndex?: number },
-): AdversarialResultSet {
+function mockResultSet(rows: Record<string, unknown>[], opts?: { errorAtIndex?: number }): AdversarialResultSet {
   return new AdversarialResultSet(rows, opts);
 }
 
@@ -168,10 +159,14 @@ describe("Async iterators adversarial: error mid-stream", () => {
     const rs = mockResultSet(rows);
 
     await expect(
-      reduceResultSet(rs, (acc, row) => {
-        if (row.v === 2) throw new Error("reduce-error");
-        return acc + (row.v as number);
-      }, 0),
+      reduceResultSet(
+        rs,
+        (acc, row) => {
+          if (row.v === 2) throw new Error("reduce-error");
+          return acc + (row.v as number);
+        },
+        0,
+      ),
     ).rejects.toThrow("reduce-error");
 
     expect(rs.closeSpy).toHaveBeenCalledOnce();

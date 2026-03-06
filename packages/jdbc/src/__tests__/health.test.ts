@@ -2,16 +2,11 @@
  * Adversarial tests for health checks: PoolHealthCheck, ConnectivityHealthCheck,
  * HealthCheckRegistry, CompositeHealthCheck (Y3 Q3).
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import {
-  HealthCheckRegistry,
-  CompositeHealthCheck,
-  PoolHealthCheck,
-  ConnectivityHealthCheck,
-} from "../health.js";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { HealthCheck, HealthCheckResult, HealthStatus } from "../health.js";
+import { CompositeHealthCheck, ConnectivityHealthCheck, HealthCheckRegistry, PoolHealthCheck } from "../health.js";
+import type { Connection, DataSource, ResultSet, Statement } from "../index.js";
 import type { MonitoredPooledDataSource, PoolStats } from "../pool.js";
-import type { DataSource, Connection, Statement, ResultSet } from "../index.js";
 
 // ══════════════════════════════════════════════════
 // Mock factories
@@ -135,7 +130,9 @@ describe("PoolHealthCheck", () => {
 
   it("getPoolStats() throwing returns DOWN with error", async () => {
     const ds = {
-      getPoolStats: () => { throw new Error("pool closed"); },
+      getPoolStats: () => {
+        throw new Error("pool closed");
+      },
     } as unknown as MonitoredPooledDataSource;
     const check = new PoolHealthCheck("pool", ds);
 
@@ -146,7 +143,9 @@ describe("PoolHealthCheck", () => {
 
   it("getPoolStats() throwing non-Error returns DOWN with stringified error", async () => {
     const ds = {
-      getPoolStats: () => { throw "pool boom"; },
+      getPoolStats: () => {
+        throw "pool boom";
+      },
     } as unknown as MonitoredPooledDataSource;
     const check = new PoolHealthCheck("pool", ds);
 
@@ -251,8 +250,9 @@ describe("ConnectivityHealthCheck", () => {
 
   it("disallowed query throws on construction", () => {
     const ds = mockDataSource();
-    expect(() => new ConnectivityHealthCheck("db", ds, { query: "DROP TABLE users" }))
-      .toThrow("Health check query must be one of");
+    expect(() => new ConnectivityHealthCheck("db", ds, { query: "DROP TABLE users" })).toThrow(
+      "Health check query must be one of",
+    );
   });
 
   it("connection and statement are closed after check", async () => {
@@ -317,7 +317,7 @@ describe("HealthCheckRegistry", () => {
 
     const results = await registry.checkAll();
     expect(results).toHaveLength(3);
-    const statuses = results.map(r => r.status);
+    const statuses = results.map((r) => r.status);
     expect(statuses).toContain("UP");
     expect(statuses).toContain("DEGRADED");
     expect(statuses).toContain("DOWN");
@@ -452,9 +452,7 @@ describe("CompositeHealthCheck", () => {
   });
 
   it("durationMs is recorded", async () => {
-    const composite = new CompositeHealthCheck("timed", [
-      staticCheck("a", "UP"),
-    ]);
+    const composite = new CompositeHealthCheck("timed", [staticCheck("a", "UP")]);
 
     const result = await composite.check();
     expect(result.durationMs).toBeGreaterThanOrEqual(0);
@@ -467,10 +465,7 @@ describe("CompositeHealthCheck", () => {
         throw new Error("child explosion");
       },
     };
-    const composite = new CompositeHealthCheck("parent", [
-      staticCheck("good", "UP"),
-      throwingCheck,
-    ]);
+    const composite = new CompositeHealthCheck("parent", [staticCheck("good", "UP"), throwingCheck]);
 
     const result = await composite.check();
     expect(result.status).toBe("DOWN");
@@ -511,7 +506,7 @@ describe("adversarial edge cases", () => {
       name: "slow",
       async check(): Promise<HealthCheckResult> {
         callCount++;
-        await new Promise(r => setTimeout(r, 10));
+        await new Promise((r) => setTimeout(r, 10));
         return { status: "UP", name: "slow", details: { call: callCount }, checkedAt: new Date(), durationMs: 0 };
       },
     };

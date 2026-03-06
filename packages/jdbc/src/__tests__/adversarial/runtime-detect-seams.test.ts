@@ -6,7 +6,7 @@
  * - Does mutation of globalThis produce wrong results?
  * - Are edge cases (null globals, mixed environments) handled?
  */
-import { describe, it, expect, afterEach, vi } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { detectRuntime } from "../../runtime-detect.js";
 
 describe("detectRuntime seam tests", () => {

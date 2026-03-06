@@ -10,8 +10,8 @@ import { quoteIdentifier } from "espalier-jdbc";
  * Every node has a self-referencing row with depth 0.
  */
 export class ClosureTableManager {
-  private readonly closureTable: string;
   private readonly entityTable: string;
+  private readonly closureTable: string;
   private readonly idColumn: string;
 
   constructor(entityTable: string, idColumn: string) {
@@ -30,11 +30,7 @@ export class ClosureTableManager {
    * If parentId is provided, copies the parent's ancestor paths + adds self-reference.
    * If no parent, only adds the self-reference (root node).
    */
-  async insertNode(
-    connection: Connection,
-    nodeId: SqlValue,
-    parentId?: SqlValue,
-  ): Promise<void> {
+  async insertNode(connection: Connection, nodeId: SqlValue, parentId?: SqlValue): Promise<void> {
     const ct = quoteIdentifier(this.closureTable);
 
     // Self-reference: every node is its own ancestor at depth 0
@@ -61,11 +57,7 @@ export class ClosureTableManager {
    * 1. Detach the subtree from old ancestors
    * 2. Attach the subtree under the new parent
    */
-  async moveNode(
-    connection: Connection,
-    nodeId: SqlValue,
-    newParentId: SqlValue,
-  ): Promise<void> {
+  async moveNode(connection: Connection, nodeId: SqlValue, newParentId: SqlValue): Promise<void> {
     const ct = quoteIdentifier(this.closureTable);
 
     // Prevent circular reference: newParentId must not be a descendant of nodeId
@@ -87,9 +79,9 @@ export class ClosureTableManager {
     // except the subtree-internal paths.
     const deleteSql =
       `DELETE FROM ${ct} WHERE "descendant_id" IN (` +
-        `SELECT "descendant_id" FROM ${ct} WHERE "ancestor_id" = $1` +
+      `SELECT "descendant_id" FROM ${ct} WHERE "ancestor_id" = $1` +
       `) AND "ancestor_id" NOT IN (` +
-        `SELECT "descendant_id" FROM ${ct} WHERE "ancestor_id" = $2` +
+      `SELECT "descendant_id" FROM ${ct} WHERE "ancestor_id" = $2` +
       `)`;
     const deleteStmt = connection.prepareStatement(deleteSql);
     deleteStmt.setParameter(1, nodeId);
@@ -111,16 +103,13 @@ export class ClosureTableManager {
   /**
    * Deletes a node and all its descendants from the closure table.
    */
-  async deleteNode(
-    connection: Connection,
-    nodeId: SqlValue,
-  ): Promise<void> {
+  async deleteNode(connection: Connection, nodeId: SqlValue): Promise<void> {
     const ct = quoteIdentifier(this.closureTable);
 
     // Delete all closure records where descendant is in the subtree
     const sql =
       `DELETE FROM ${ct} WHERE "descendant_id" IN (` +
-        `SELECT "descendant_id" FROM ${ct} WHERE "ancestor_id" = $1` +
+      `SELECT "descendant_id" FROM ${ct} WHERE "ancestor_id" = $1` +
       `)`;
     const stmt = connection.prepareStatement(sql);
     stmt.setParameter(1, nodeId);
@@ -130,11 +119,7 @@ export class ClosureTableManager {
   /**
    * Finds all descendant IDs of a node, optionally limited by depth.
    */
-  async findDescendants(
-    connection: Connection,
-    nodeId: SqlValue,
-    maxDepth?: number,
-  ): Promise<SqlValue[]> {
+  async findDescendants(connection: Connection, nodeId: SqlValue, maxDepth?: number): Promise<SqlValue[]> {
     const ct = quoteIdentifier(this.closureTable);
     let sql = `SELECT "descendant_id" FROM ${ct} WHERE "ancestor_id" = $1 AND "depth" > 0`;
     const params: SqlValue[] = [nodeId];
@@ -161,10 +146,7 @@ export class ClosureTableManager {
   /**
    * Finds all ancestor IDs of a node (excluding itself).
    */
-  async findAncestors(
-    connection: Connection,
-    nodeId: SqlValue,
-  ): Promise<SqlValue[]> {
+  async findAncestors(connection: Connection, nodeId: SqlValue): Promise<SqlValue[]> {
     const ct = quoteIdentifier(this.closureTable);
     const sql = `SELECT "ancestor_id" FROM ${ct} WHERE "descendant_id" = $1 AND "depth" > 0 ORDER BY "depth"`;
     const stmt = connection.prepareStatement(sql);
@@ -187,7 +169,7 @@ export class ClosureTableManager {
     const sql =
       `SELECT DISTINCT "ancestor_id" FROM ${ct} WHERE "depth" = 0 ` +
       `AND "ancestor_id" NOT IN (` +
-        `SELECT "descendant_id" FROM ${ct} WHERE "depth" > 0` +
+      `SELECT "descendant_id" FROM ${ct} WHERE "depth" > 0` +
       `)`;
     const stmt = connection.prepareStatement(sql);
     const rs = await stmt.executeQuery();
@@ -202,10 +184,7 @@ export class ClosureTableManager {
   /**
    * Returns the depth of a node (0 for root nodes).
    */
-  async getDepth(
-    connection: Connection,
-    nodeId: SqlValue,
-  ): Promise<number> {
+  async getDepth(connection: Connection, nodeId: SqlValue): Promise<number> {
     const ct = quoteIdentifier(this.closureTable);
     const sql = `SELECT MAX("depth") AS "max_depth" FROM ${ct} WHERE "descendant_id" = $1`;
     const stmt = connection.prepareStatement(sql);
@@ -222,10 +201,7 @@ export class ClosureTableManager {
   /**
    * Finds direct children of a node (depth = 1).
    */
-  async findChildren(
-    connection: Connection,
-    nodeId: SqlValue,
-  ): Promise<SqlValue[]> {
+  async findChildren(connection: Connection, nodeId: SqlValue): Promise<SqlValue[]> {
     const ct = quoteIdentifier(this.closureTable);
     const sql = `SELECT "descendant_id" FROM ${ct} WHERE "ancestor_id" = $1 AND "depth" = 1`;
     const stmt = connection.prepareStatement(sql);
@@ -248,7 +224,7 @@ export class ClosureTableManager {
     const sql =
       `SELECT DISTINCT "descendant_id" FROM ${ct} WHERE "depth" = 0 ` +
       `AND "descendant_id" NOT IN (` +
-        `SELECT "ancestor_id" FROM ${ct} WHERE "depth" > 0` +
+      `SELECT "ancestor_id" FROM ${ct} WHERE "depth" > 0` +
       `)`;
     const stmt = connection.prepareStatement(sql);
     const rs = await stmt.executeQuery();

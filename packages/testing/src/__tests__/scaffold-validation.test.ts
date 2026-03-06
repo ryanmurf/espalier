@@ -1,7 +1,7 @@
-import { describe, it, expect } from "vitest";
 import { existsSync, readFileSync } from "node:fs";
-import { resolve, dirname } from "node:path";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { describe, expect, it } from "vitest";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const pkgRoot = resolve(__dirname, "../..");
@@ -170,9 +170,7 @@ describe.skipIf(!distExists())("dist output — ESM bundle content", () => {
 describe.skipIf(!distExists())("dist output — CJS bundle content", () => {
   it("exports via module.exports or exports", () => {
     const cjsContent = readDist("index.cjs");
-    expect(
-      cjsContent.includes("module.exports") || cjsContent.includes("exports.")
-    ).toBe(true);
+    expect(cjsContent.includes("module.exports") || cjsContent.includes("exports.")).toBe(true);
   });
 });
 
@@ -310,7 +308,9 @@ describe("circular dependency — basic check", () => {
     const src = readFileSync(resolve(pkgRoot, "src/index.ts"), "utf8");
     const nonCommentLines = src
       .split("\n")
-      .filter((l) => l.trim() && !l.trim().startsWith("//") && !l.trim().startsWith("*") && !l.trim().startsWith("/**"));
+      .filter(
+        (l) => l.trim() && !l.trim().startsWith("//") && !l.trim().startsWith("*") && !l.trim().startsWith("/**"),
+      );
     for (const line of nonCommentLines) {
       // Lines must be export statements or continuation of multi-line exports (e.g. "  SeedRunner,")
       expect(line).toMatch(/^export |^\s+\w|^\s*}\s*from\s/);

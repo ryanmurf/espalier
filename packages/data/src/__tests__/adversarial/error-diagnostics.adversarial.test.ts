@@ -1,6 +1,5 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { diagnose, enhanceError } from "../../errors/error-diagnostics.js";
-import type { ErrorContext } from "../../errors/error-diagnostics.js";
 
 // ==========================================================================
 // diagnose — @Table decorator missing
@@ -227,7 +226,7 @@ describe("diagnose — SQL syntax error", () => {
 
 describe("diagnose — authentication failed", () => {
   it("recognizes password auth failure", () => {
-    const result = diagnose("password authentication failed for user \"app\"");
+    const result = diagnose('password authentication failed for user "app"');
     expect(result).not.toBeNull();
     expect(result!.hint).toContain("password");
   });
@@ -282,7 +281,7 @@ describe("enhanceError — wrapper", () => {
 
   it("preserves original stack trace", () => {
     const err = new Error("No @Table decorator");
-    const originalStack = err.stack;
+    const _originalStack = err.stack;
     const enhanced = enhanceError(err);
     // Stack should still reference the original location
     expect(enhanced.stack).toBeDefined();
@@ -332,7 +331,7 @@ describe("enhanceError — security", () => {
   });
 
   it("auth failure hint doesn't include password", () => {
-    const err = new Error("password authentication failed for user \"admin\" with password \"hunter2\"");
+    const err = new Error('password authentication failed for user "admin" with password "hunter2"');
     const enhanced = enhanceError(err);
     expect(enhanced.message).toContain("Hint:");
     // Hint should NOT contain the password

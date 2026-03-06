@@ -1,5 +1,4 @@
-import type { Connection } from "espalier-jdbc";
-import type { SchemaIntrospector } from "espalier-jdbc";
+import type { Connection, SchemaIntrospector } from "espalier-jdbc";
 
 export interface MigrationTestContext {
   connection: Connection;
@@ -44,13 +43,9 @@ export function createSchemaAssertion(introspector: SchemaIntrospector): SchemaA
 
     async columnExists(tableName: string, columnName: string, expectedType?: string): Promise<void> {
       const columns = await introspector.getColumns(tableName);
-      const column = columns.find(
-        (c) => c.columnName.toLowerCase() === columnName.toLowerCase(),
-      );
+      const column = columns.find((c) => c.columnName.toLowerCase() === columnName.toLowerCase());
       if (!column) {
-        throw new Error(
-          `Expected column '${columnName}' to exist on table '${tableName}', but it does not.`,
-        );
+        throw new Error(`Expected column '${columnName}' to exist on table '${tableName}', but it does not.`);
       }
       if (expectedType !== undefined) {
         const actual = column.dataType.trim().toLowerCase();
@@ -65,47 +60,31 @@ export function createSchemaAssertion(introspector: SchemaIntrospector): SchemaA
 
     async columnNotExists(tableName: string, columnName: string): Promise<void> {
       const columns = await introspector.getColumns(tableName);
-      const column = columns.find(
-        (c) => c.columnName.toLowerCase() === columnName.toLowerCase(),
-      );
+      const column = columns.find((c) => c.columnName.toLowerCase() === columnName.toLowerCase());
       if (column) {
-        throw new Error(
-          `Expected column '${columnName}' not to exist on table '${tableName}', but it does.`,
-        );
+        throw new Error(`Expected column '${columnName}' not to exist on table '${tableName}', but it does.`);
       }
     },
 
     async columnIsNullable(tableName: string, columnName: string): Promise<void> {
       const columns = await introspector.getColumns(tableName);
-      const column = columns.find(
-        (c) => c.columnName.toLowerCase() === columnName.toLowerCase(),
-      );
+      const column = columns.find((c) => c.columnName.toLowerCase() === columnName.toLowerCase());
       if (!column) {
-        throw new Error(
-          `Expected column '${columnName}' to exist on table '${tableName}', but it does not.`,
-        );
+        throw new Error(`Expected column '${columnName}' to exist on table '${tableName}', but it does not.`);
       }
       if (!column.nullable) {
-        throw new Error(
-          `Expected column '${columnName}' on table '${tableName}' to be nullable, but it is NOT NULL.`,
-        );
+        throw new Error(`Expected column '${columnName}' on table '${tableName}' to be nullable, but it is NOT NULL.`);
       }
     },
 
     async columnIsNotNullable(tableName: string, columnName: string): Promise<void> {
       const columns = await introspector.getColumns(tableName);
-      const column = columns.find(
-        (c) => c.columnName.toLowerCase() === columnName.toLowerCase(),
-      );
+      const column = columns.find((c) => c.columnName.toLowerCase() === columnName.toLowerCase());
       if (!column) {
-        throw new Error(
-          `Expected column '${columnName}' to exist on table '${tableName}', but it does not.`,
-        );
+        throw new Error(`Expected column '${columnName}' to exist on table '${tableName}', but it does not.`);
       }
       if (column.nullable) {
-        throw new Error(
-          `Expected column '${columnName}' on table '${tableName}' to be NOT NULL, but it is nullable.`,
-        );
+        throw new Error(`Expected column '${columnName}' on table '${tableName}' to be NOT NULL, but it is nullable.`);
       }
     },
 
@@ -114,8 +93,10 @@ export function createSchemaAssertion(introspector: SchemaIntrospector): SchemaA
       const normalizedExpected = columns.map((c) => c.toLowerCase()).sort();
       const normalizedActual = pkColumns.map((c) => c.toLowerCase()).sort();
 
-      if (normalizedExpected.length !== normalizedActual.length ||
-          !normalizedExpected.every((col, i) => col === normalizedActual[i])) {
+      if (
+        normalizedExpected.length !== normalizedActual.length ||
+        !normalizedExpected.every((col, i) => col === normalizedActual[i])
+      ) {
         throw new Error(
           `Expected primary key on table '${tableName}' to be [${columns.join(", ")}], but got [${pkColumns.join(", ")}].`,
         );

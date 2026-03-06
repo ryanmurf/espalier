@@ -1,9 +1,9 @@
-import { Hono } from "hono";
 import { serve } from "@hono/node-server";
-import type { SchemaModel } from "../schema/schema-model.js";
 import type { DataSource } from "espalier-jdbc";
-import { createApiRoutes } from "./api-routes.js";
+import { Hono } from "hono";
+import type { SchemaModel } from "../schema/schema-model.js";
 import { getStudioHtml } from "../ui/html-template.js";
+import { createApiRoutes } from "./api-routes.js";
 
 export interface StudioServerOptions {
   schema: SchemaModel;

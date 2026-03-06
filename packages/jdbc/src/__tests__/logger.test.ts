@@ -1,13 +1,12 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  ConsoleLogger,
+  createConsoleLogger,
+  getGlobalLogger,
   LogLevel,
   NoopLogger,
-  ConsoleLogger,
   setGlobalLogger,
-  getGlobalLogger,
-  createConsoleLogger,
 } from "../logger.js";
-import type { Logger } from "../logger.js";
 
 describe("logger", () => {
   // ──────────────────────────────────────────────
@@ -168,11 +167,11 @@ describe("logger", () => {
         logger.warn("w");
         logger.error("e");
 
-        expect((logSpy.mock.calls[0]![0] as string)).toContain("TRACE");
-        expect((logSpy.mock.calls[1]![0] as string)).toContain("DEBUG");
-        expect((logSpy.mock.calls[2]![0] as string)).toContain("INFO");
-        expect((warnSpy.mock.calls[0]![0] as string)).toContain("WARN");
-        expect((errorSpy.mock.calls[0]![0] as string)).toContain("ERROR");
+        expect(logSpy.mock.calls[0]![0] as string).toContain("TRACE");
+        expect(logSpy.mock.calls[1]![0] as string).toContain("DEBUG");
+        expect(logSpy.mock.calls[2]![0] as string).toContain("INFO");
+        expect(warnSpy.mock.calls[0]![0] as string).toContain("WARN");
+        expect(errorSpy.mock.calls[0]![0] as string).toContain("ERROR");
       });
 
       it("includes logger name", () => {

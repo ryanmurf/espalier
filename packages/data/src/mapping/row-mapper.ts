@@ -6,10 +6,7 @@ export interface RowMapper<T> {
   mapRow(resultSet: ResultSet): T;
 }
 
-export function createRowMapper<T>(
-  entityClass: new (...args: any[]) => T,
-  metadata: EntityMetadata,
-): RowMapper<T> {
+export function createRowMapper<T>(entityClass: new (...args: any[]) => T, metadata: EntityMetadata): RowMapper<T> {
   // Pre-compute embedded field prefixes for reconstruction
   const embeddedTargets = new Map<string, () => new (...args: any[]) => any>();
   for (const embedded of metadata.embeddedFields) {
@@ -25,7 +22,7 @@ export function createRowMapper<T>(
         if (field.fieldName === "__proto__" || field.fieldName === "constructor") continue;
         const value = row[field.columnName];
         const fieldStr = typeof field.fieldName === "string" ? field.fieldName : undefined;
-        if (fieldStr && fieldStr.includes(".")) {
+        if (fieldStr?.includes(".")) {
           // Embedded field: use setFieldValue for dotted path
           setFieldValue(entity as Record<string | symbol, unknown>, fieldStr, value);
         } else {

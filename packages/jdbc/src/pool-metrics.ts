@@ -1,10 +1,10 @@
 import type {
-  PoolMonitor,
-  PoolEventListener,
   AcquireEvent,
+  ErrorEvent,
+  PoolEventListener,
+  PoolMonitor,
   ReleaseEvent,
   TimeoutEvent,
-  ErrorEvent,
 } from "./pool-monitor.js";
 
 export interface PoolMetricsSnapshot {
@@ -118,13 +118,9 @@ export class DefaultPoolMetricsCollector implements PoolMetricsCollector {
       totalReleases: this.totalReleases,
       totalTimeouts: this.totalTimeouts,
       totalErrors: this.totalErrors,
-      avgAcquireTimeMs: this.totalAcquires > 0
-        ? this.totalAcquireTimeMs / this.totalAcquires
-        : 0,
+      avgAcquireTimeMs: this.totalAcquires > 0 ? this.totalAcquireTimeMs / this.totalAcquires : 0,
       maxAcquireTimeMs: this.maxAcquireTimeMs,
-      avgHeldTimeMs: this.totalReleases > 0
-        ? this.totalHeldTimeMs / this.totalReleases
-        : 0,
+      avgHeldTimeMs: this.totalReleases > 0 ? this.totalHeldTimeMs / this.totalReleases : 0,
       maxHeldTimeMs: this.maxHeldTimeMs,
       activeConnections: this.lastActiveConnections,
       idleConnections: this.lastIdleConnections,

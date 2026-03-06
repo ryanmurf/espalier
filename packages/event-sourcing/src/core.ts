@@ -1,11 +1,10 @@
+export type { ExternalEventBusAdapter } from "./adapter/index.js";
 export type {
-  DomainEvent,
-  StoredEvent,
   Command,
   CommandResult,
-  OutboxEntry,
+  DomainEvent,
   EventStoreOptions,
+  OutboxEntry,
   OutboxOptions,
+  StoredEvent,
 } from "./types.js";
-
-export type { ExternalEventBusAdapter } from "./adapter/index.js";

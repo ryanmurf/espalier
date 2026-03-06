@@ -1,6 +1,6 @@
 import type { Connection } from "./connection.js";
-import type { PooledDataSource } from "./pool.js";
 import { getGlobalLogger, LogLevel } from "./logger.js";
+import type { PooledDataSource } from "./pool.js";
 
 export interface WarmupResult {
   connectionsCreated: number;
@@ -23,19 +23,14 @@ export const DEFAULT_MAX_PING_RETRIES = 3;
  * Pre-create connections to warm up the pool.
  * Connections are acquired and immediately released.
  */
-export async function warmupPool(
-  dataSource: PooledDataSource,
-  targetConnections: number,
-): Promise<WarmupResult> {
+export async function warmupPool(dataSource: PooledDataSource, targetConnections: number): Promise<WarmupResult> {
   const logger = getGlobalLogger().child("pool-warmup");
   logger.info("pool warmup starting", { targetConnections });
 
   const startTime = Date.now();
 
   const results = await Promise.allSettled(
-    Array.from({ length: targetConnections }, () =>
-      dataSource.getConnection().then((conn) => conn.close()),
-    ),
+    Array.from({ length: targetConnections }, () => dataSource.getConnection().then((conn) => conn.close())),
   );
 
   const errors: Error[] = [];

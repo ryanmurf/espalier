@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdirSync, writeFileSync, rmSync, existsSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { discoverMigrationFiles, loadMigrations } from "../migrate-loader.js";
 
 describe("discoverMigrationFiles", () => {
@@ -28,10 +28,7 @@ describe("discoverMigrationFiles", () => {
     writeFileSync(join(tempDir, "20260102120000_add_orders.ts"), "");
 
     const files = discoverMigrationFiles(tempDir);
-    expect(files).toEqual([
-      "20260101120000_add_users.ts",
-      "20260102120000_add_orders.ts",
-    ]);
+    expect(files).toEqual(["20260101120000_add_users.ts", "20260102120000_add_orders.ts"]);
   });
 
   it("discovers .js migration files", () => {
@@ -57,18 +54,12 @@ describe("discoverMigrationFiles", () => {
     writeFileSync(join(tempDir, "20260102120000_second.ts"), "");
 
     const files = discoverMigrationFiles(tempDir);
-    expect(files).toEqual([
-      "20260101120000_first.ts",
-      "20260102120000_second.ts",
-      "20260103120000_third.ts",
-    ]);
+    expect(files).toEqual(["20260101120000_first.ts", "20260102120000_second.ts", "20260103120000_third.ts"]);
   });
 
   it("throws when directory does not exist", () => {
     const nonExistent = join(tempDir, "does-not-exist");
-    expect(() => discoverMigrationFiles(nonExistent)).toThrow(
-      "Migrations directory not found",
-    );
+    expect(() => discoverMigrationFiles(nonExistent)).toThrow("Migrations directory not found");
   });
 
   it("ignores files with too-short timestamps", () => {
@@ -154,9 +145,7 @@ describe("loadMigrations", () => {
     `;
     writeFileSync(join(tempDir, "20260101120000_no_version.js"), content);
 
-    await expect(loadMigrations(tempDir)).rejects.toThrow(
-      "does not export a valid Migration",
-    );
+    await expect(loadMigrations(tempDir)).rejects.toThrow("does not export a valid Migration");
   });
 
   it("throws for migration file missing up()", async () => {
@@ -169,9 +158,7 @@ describe("loadMigrations", () => {
     `;
     writeFileSync(join(tempDir, "20260101120000_no_up.js"), content);
 
-    await expect(loadMigrations(tempDir)).rejects.toThrow(
-      "does not export a valid Migration",
-    );
+    await expect(loadMigrations(tempDir)).rejects.toThrow("does not export a valid Migration");
   });
 
   it("throws for migration file missing down()", async () => {
@@ -184,9 +171,7 @@ describe("loadMigrations", () => {
     `;
     writeFileSync(join(tempDir, "20260101120000_no_down.js"), content);
 
-    await expect(loadMigrations(tempDir)).rejects.toThrow(
-      "does not export a valid Migration",
-    );
+    await expect(loadMigrations(tempDir)).rejects.toThrow("does not export a valid Migration");
   });
 
   it("supports named export 'migration'", async () => {

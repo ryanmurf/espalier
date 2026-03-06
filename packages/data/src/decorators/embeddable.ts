@@ -26,10 +26,7 @@ export function isEmbeddable(target: object): boolean {
 const embeddedMetadata = new WeakMap<object, Map<string | symbol, EmbeddedField>>();
 
 export function Embedded(options: EmbeddedOptions) {
-  return function <T>(
-    _target: undefined,
-    context: ClassFieldDecoratorContext<T>,
-  ): void {
+  return <T>(_target: undefined, context: ClassFieldDecoratorContext<T>): void => {
     const fieldName = context.name;
     const prefix = options.prefix ?? "";
 

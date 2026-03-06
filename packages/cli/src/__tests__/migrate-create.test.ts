@@ -1,13 +1,8 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdirSync, readFileSync, existsSync, rmSync, readdirSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import {
-  createMigration,
-  _generateVersion,
-  _generateMigrationTemplate,
-  _toSnakeCase,
-} from "../migrate-create.js";
+import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { _generateMigrationTemplate, _generateVersion, _toSnakeCase, createMigration } from "../migrate-create.js";
 
 describe("toSnakeCase", () => {
   it("converts camelCase to snake_case", () => {
@@ -120,7 +115,7 @@ describe("createMigration", () => {
   });
 
   it("uses timestamp prefix in filename", () => {
-    const result = createMigration({ name: "add orders", migrationsDir: tempDir });
+    const _result = createMigration({ name: "add orders", migrationsDir: tempDir });
     const files = readdirSync(tempDir);
 
     expect(files.length).toBe(1);

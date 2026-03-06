@@ -1,4 +1,4 @@
-import type { DataSource, PoolStats, MonitoredPooledDataSource } from "./index.js";
+import type { DataSource, MonitoredPooledDataSource, PoolStats } from "./index.js";
 
 /**
  * Health status of a component.
@@ -48,7 +48,7 @@ export class HealthCheckRegistry {
   private isRateLimited(name: string): boolean {
     if (this.minIntervalMs <= 0) return false;
     const last = this.lastCheckTime.get(name);
-    return last !== undefined && (Date.now() - last) < this.minIntervalMs;
+    return last !== undefined && Date.now() - last < this.minIntervalMs;
   }
 
   private recordCheck(name: string): void {
@@ -152,7 +152,10 @@ export class CompositeHealthCheck implements HealthCheck {
 
     let worstStatus: HealthStatus = "UP";
     for (const r of results) {
-      if (r.status === "DOWN") { worstStatus = "DOWN"; break; }
+      if (r.status === "DOWN") {
+        worstStatus = "DOWN";
+        break;
+      }
       if (r.status === "DEGRADED") worstStatus = "DEGRADED";
     }
 
@@ -195,9 +198,7 @@ export class PoolHealthCheck implements HealthCheck {
         status = "DEGRADED";
       }
 
-      const utilization = this.maxConnections > 0
-        ? Math.round((stats.total / this.maxConnections) * 100)
-        : 0;
+      const utilization = this.maxConnections > 0 ? Math.round((stats.total / this.maxConnections) * 100) : 0;
 
       return {
         status,
@@ -243,9 +244,7 @@ export class ConnectivityHealthCheck implements HealthCheck {
     this.timeoutMs = options?.timeoutMs ?? 5000;
     const q = options?.query ?? "SELECT 1";
     if (!ConnectivityHealthCheck.ALLOWED_QUERIES.has(q.trim().replace(/\s+/g, " "))) {
-      throw new Error(
-        `Health check query must be one of: ${[...ConnectivityHealthCheck.ALLOWED_QUERIES].join(", ")}`,
-      );
+      throw new Error(`Health check query must be one of: ${[...ConnectivityHealthCheck.ALLOWED_QUERIES].join(", ")}`);
     }
     this.query = q;
   }
@@ -257,7 +256,9 @@ export class ConnectivityHealthCheck implements HealthCheck {
 
     try {
       const result = await Promise.race([
-        this.executeProbe(abort, (c) => { pendingConn = c; }),
+        this.executeProbe(abort, (c) => {
+          pendingConn = c;
+        }),
         this.timeout(),
       ]);
 

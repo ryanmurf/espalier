@@ -1,10 +1,10 @@
 /**
  * Adversarial tests for SlowQueryDetector and QueryStatisticsCollector (Y3 Q3).
  */
-import { describe, it, expect, vi } from "vitest";
-import { SlowQueryDetector } from "../slow-query-detector.js";
+import { describe, expect, it, vi } from "vitest";
 import { QueryStatisticsCollector } from "../query-statistics.js";
 import type { SlowQueryEvent } from "../slow-query-detector.js";
+import { SlowQueryDetector } from "../slow-query-detector.js";
 
 // ══════════════════════════════════════════════════
 // SlowQueryDetector
@@ -73,7 +73,9 @@ describe("SlowQueryDetector", () => {
       let captured: SlowQueryEvent | undefined;
       const detector = new SlowQueryDetector({
         thresholdMs: 0,
-        callback: (e) => { captured = e; },
+        callback: (e) => {
+          captured = e;
+        },
       });
       detector.record("SELECT * FROM users", 42);
 
@@ -87,7 +89,9 @@ describe("SlowQueryDetector", () => {
       let captured: SlowQueryEvent | undefined;
       const detector = new SlowQueryDetector({
         thresholdMs: 0,
-        callback: (e) => { captured = e; },
+        callback: (e) => {
+          captured = e;
+        },
       });
       detector.record("SELECT $1, $2, $3", 10, 3);
       expect(captured!.parameterCount).toBe(3);
@@ -97,7 +101,9 @@ describe("SlowQueryDetector", () => {
       let captured: SlowQueryEvent | undefined;
       const detector = new SlowQueryDetector({
         thresholdMs: 0,
-        callback: (e) => { captured = e; },
+        callback: (e) => {
+          captured = e;
+        },
       });
       detector.record("SELECT 1", 10, 0, "conn-123");
       expect(captured!.connectionId).toBe("conn-123");
@@ -107,7 +113,9 @@ describe("SlowQueryDetector", () => {
       let captured: SlowQueryEvent | undefined;
       const detector = new SlowQueryDetector({
         thresholdMs: 0,
-        callback: (e) => { captured = e; },
+        callback: (e) => {
+          captured = e;
+        },
       });
       const longSql = "SELECT " + "x".repeat(500);
       detector.record(longSql, 10);
@@ -119,7 +127,9 @@ describe("SlowQueryDetector", () => {
       let captured: SlowQueryEvent | undefined;
       const detector = new SlowQueryDetector({
         thresholdMs: 0,
-        callback: (e) => { captured = e; },
+        callback: (e) => {
+          captured = e;
+        },
       });
       detector.record("SELECT 1", 10);
       expect(captured!.sql).toBe("SELECT ?");
@@ -176,7 +186,9 @@ describe("SlowQueryDetector", () => {
       let captured: SlowQueryEvent | undefined;
       const detector = new SlowQueryDetector({
         thresholdMs: 0,
-        callback: (e) => { captured = e; },
+        callback: (e) => {
+          captured = e;
+        },
       });
       detector.record("", 10);
       expect(captured!.sql).toBe("");
@@ -383,7 +395,7 @@ describe("QueryStatisticsCollector", () => {
       collector.record("SELECT * FROM a", 30);
 
       const stats = collector.getStatistics();
-      const aStat = stats.find(s => s.pattern.includes("a"));
+      const aStat = stats.find((s) => s.pattern.includes("a"));
       expect(aStat!.count).toBe(2);
       expect(aStat!.totalTime).toBe(40);
     });

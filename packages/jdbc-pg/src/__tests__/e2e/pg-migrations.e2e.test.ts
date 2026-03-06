@@ -1,10 +1,10 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
-import { createTestDataSource, isPostgresAvailable } from "./setup.js";
-import { PgMigrationRunner, computeChecksum } from "../../pg-migration-runner.js";
-import { PgSchemaIntrospector } from "../../pg-schema-introspector.js";
-import type { PgDataSource } from "../../pg-data-source.js";
-import type { Connection } from "espalier-jdbc";
 import type { Migration } from "espalier-data";
+import type { Connection } from "espalier-jdbc";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import type { PgDataSource } from "../../pg-data-source.js";
+import { computeChecksum, PgMigrationRunner } from "../../pg-migration-runner.js";
+import { PgSchemaIntrospector } from "../../pg-schema-introspector.js";
+import { createTestDataSource, isPostgresAvailable } from "./setup.js";
 
 const canConnect = await isPostgresAvailable();
 
@@ -379,10 +379,7 @@ describe.skipIf(!canConnect)("PgMigrationRunner E2E", () => {
           "CREATE TABLE e2e_mig_users (id SERIAL PRIMARY KEY, name TEXT NOT NULL)",
           "CREATE INDEX idx_e2e_mig_users_name ON e2e_mig_users (name)",
         ],
-        down: () => [
-          "DROP INDEX IF EXISTS idx_e2e_mig_users_name",
-          "DROP TABLE e2e_mig_users",
-        ],
+        down: () => ["DROP INDEX IF EXISTS idx_e2e_mig_users_name", "DROP TABLE e2e_mig_users"],
       };
 
       await runner.run([multiMigration]);

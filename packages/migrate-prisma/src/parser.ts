@@ -63,7 +63,7 @@ function parseAttributes(line: string): PrismaAttribute[] {
     if (afterName < line.length && line[afterName] === "(") {
       // Extract balanced parentheses content
       let depth = 0;
-      let start = afterName + 1;
+      const start = afterName + 1;
       let end = start;
       for (let j = afterName; j < line.length; j++) {
         if (line[j] === "(") depth++;
@@ -76,9 +76,7 @@ function parseAttributes(line: string): PrismaAttribute[] {
         }
       }
       const rawArgs = line.slice(start, end).trim();
-      const args = rawArgs
-        ? splitTopLevelArgs(rawArgs)
-        : [];
+      const args = rawArgs ? splitTopLevelArgs(rawArgs) : [];
       attrs.push({ name, args });
       nameRegex.lastIndex = end + 1;
     } else {
@@ -99,7 +97,7 @@ function parseField(line: string): PrismaField | null {
   if (!fieldMatch) return null;
 
   const name = fieldMatch[1];
-  let type = fieldMatch[2];
+  const type = fieldMatch[2];
   const isList = !!(fieldMatch[3] || fieldMatch[5]);
   const isOptional = fieldMatch[4] === "?";
   const attrPart = fieldMatch[6] || "";

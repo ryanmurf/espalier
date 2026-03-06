@@ -1,9 +1,9 @@
-import { describe, it, expect, vi } from "vitest";
-import type { DataSource, Connection, PreparedStatement, ResultSet } from "espalier-jdbc";
-import { Repository } from "../../decorators/repository.js";
-import { Table } from "../../decorators/table.js";
+import type { Connection, DataSource, PreparedStatement, ResultSet } from "espalier-jdbc";
+import { describe, expect, it, vi } from "vitest";
 import { Column } from "../../decorators/column.js";
 import { Id } from "../../decorators/id.js";
+import { Repository } from "../../decorators/repository.js";
+import { Table } from "../../decorators/table.js";
 import { createAutoRepository } from "../../repository/auto-repository.js";
 import { TestResultSet } from "../test-utils/test-result-set.js";
 
@@ -64,9 +64,7 @@ function createMockDataSource(conn: Connection): DataSource {
 describe("createAutoRepository", () => {
   it("throws if class has no @Repository decorator", () => {
     const ds = createMockDataSource(null as any);
-    expect(() => createAutoRepository(PlainRepository, ds)).toThrow(
-      /No @Repository decorator found/,
-    );
+    expect(() => createAutoRepository(PlainRepository, ds)).toThrow(/No @Repository decorator found/);
   });
 
   it("creates a repository with CrudRepository methods", () => {
@@ -145,9 +143,7 @@ describe("createAutoRepository", () => {
   });
 
   it("supports derived query methods via proxy", async () => {
-    const rs = new TestResultSet([
-      { id: 1, name: "Alice", email: "alice@example.com" },
-    ]);
+    const rs = new TestResultSet([{ id: 1, name: "Alice", email: "alice@example.com" }]);
     const stmt = createMockPreparedStatement(rs);
     const conn = createMockConnection(stmt);
     const ds = createMockDataSource(conn);

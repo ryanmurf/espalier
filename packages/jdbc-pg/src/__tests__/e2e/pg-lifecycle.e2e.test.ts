@@ -3,22 +3,23 @@
  * Tests @PrePersist, @PostPersist, @PreUpdate, @PostUpdate, @PreRemove, @PostRemove,
  * @PostLoad decorators with live PostgreSQL, and verifies dirty checking / minimal updates.
  */
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { createTestDataSource, isPostgresAvailable } from "./setup.js";
+
 import {
-  Table,
   Column,
-  Id,
-  PrePersist,
-  PostPersist,
-  PreUpdate,
-  PostUpdate,
-  PreRemove,
-  PostRemove,
-  PostLoad,
   createDerivedRepository,
+  Id,
+  PostLoad,
+  PostPersist,
+  PostRemove,
+  PostUpdate,
+  PrePersist,
+  PreRemove,
+  PreUpdate,
+  Table,
 } from "espalier-data";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { PgDataSource } from "../../pg-data-source.js";
+import { createTestDataSource, isPostgresAvailable } from "./setup.js";
 
 const canConnect = await isPostgresAvailable();
 
@@ -96,14 +97,14 @@ class AsyncLifecycleItem {
   @PrePersist
   async asyncPrePersist() {
     // Simulate async operation (e.g., external validation)
-    await new Promise(r => setTimeout(r, 1));
+    await new Promise((r) => setTimeout(r, 1));
     asyncLog.push(`AsyncPrePersist:${this.name}`);
     this.status = "validated";
   }
 
   @PostLoad
   async asyncPostLoad() {
-    await new Promise(r => setTimeout(r, 1));
+    await new Promise((r) => setTimeout(r, 1));
     asyncLog.push(`AsyncPostLoad:${this.name}`);
   }
 }
@@ -240,7 +241,7 @@ describe.skipIf(!canConnect)("E2E: Lifecycle Event Decorators", { timeout: 15000
     expect(results.length).toBeGreaterThanOrEqual(2);
 
     // Each entity should have had PostLoad called
-    expect(lifecycleLog.filter(e => e.startsWith("PostLoad:")).length).toBeGreaterThanOrEqual(2);
+    expect(lifecycleLog.filter((e) => e.startsWith("PostLoad:")).length).toBeGreaterThanOrEqual(2);
   });
 
   it("@PostLoad is NOT called on save result (INSERT path)", async () => {
@@ -394,8 +395,8 @@ describe.skipIf(!canConnect)("E2E: Lifecycle Event Decorators", { timeout: 15000
     await repo.deleteById(saved.id);
 
     // No PreRemove/PostRemove should appear in the log
-    expect(lifecycleLog.filter(e => e.startsWith("PreRemove:"))).toHaveLength(0);
-    expect(lifecycleLog.filter(e => e.startsWith("PostRemove:"))).toHaveLength(0);
+    expect(lifecycleLog.filter((e) => e.startsWith("PreRemove:"))).toHaveLength(0);
+    expect(lifecycleLog.filter((e) => e.startsWith("PostRemove:"))).toHaveLength(0);
 
     // Verify it was actually deleted
     (repo as any).getEntityCache().clear();

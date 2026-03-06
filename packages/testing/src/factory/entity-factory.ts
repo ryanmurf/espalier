@@ -1,7 +1,5 @@
-import { getEntityMetadata } from "espalier-data";
-import type { EntityMetadata } from "espalier-data";
-import { getColumnMetadataEntries } from "espalier-data";
-import type { ColumnMetadataEntry } from "espalier-data";
+import type { ColumnMetadataEntry, EntityMetadata } from "espalier-data";
+import { getColumnMetadataEntries, getEntityMetadata } from "espalier-data";
 
 /**
  * Generate a UUID v4 using the Web Crypto API (available in Node 19+,
@@ -9,18 +7,20 @@ import type { ColumnMetadataEntry } from "espalier-data";
  * UUID v4 construction, and as a last resort uses Math.random (test-only).
  */
 // Typed accessor for the Web Crypto API present in Node 19+, Bun, Deno, browsers
-const _crypto = (globalThis as Record<string, unknown>)['crypto'] as {
-  randomUUID?: () => string;
-  getRandomValues?: (buf: Uint8Array) => Uint8Array;
-} | undefined;
+const _crypto = (globalThis as Record<string, unknown>)["crypto"] as
+  | {
+      randomUUID?: () => string;
+      getRandomValues?: (buf: Uint8Array) => Uint8Array;
+    }
+  | undefined;
 
 function generateUUID(): string {
-  if (typeof _crypto?.randomUUID === 'function') {
+  if (typeof _crypto?.randomUUID === "function") {
     return _crypto.randomUUID();
   }
   // Fallback: crypto.getRandomValues-based UUID v4
   const bytes = new Uint8Array(16);
-  if (typeof _crypto?.getRandomValues === 'function') {
+  if (typeof _crypto?.getRandomValues === "function") {
     _crypto.getRandomValues(bytes);
   } else {
     // Last resort: Math.random (test-only environments without Web Crypto)
@@ -28,8 +28,10 @@ function generateUUID(): string {
   }
   bytes[6] = (bytes[6] & 0x0f) | 0x40;
   bytes[8] = (bytes[8] & 0x3f) | 0x80;
-  const hex = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
-  return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`;
+  const hex = Array.from(bytes)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
 /**
@@ -84,7 +86,9 @@ export type PersistFn<T> = (entity: T) => Promise<T>;
  * ```
  */
 export class EntityFactory<T> {
-  private readonly _entityClass: new (...args: unknown[]) => T;
+  private readonly _entityClass: new (
+    ...args: unknown[]
+  ) => T;
   private readonly _metadata: EntityMetadata;
   private readonly _columnEntries: Map<string | symbol, ColumnMetadataEntry>;
   private readonly _defaults: Partial<T>;
@@ -102,10 +106,7 @@ export class EntityFactory<T> {
    */
   protected _defaultPersistFn?: PersistFn<T>;
 
-  constructor(
-    entityClass: new (...args: unknown[]) => T,
-    options?: FactoryOptions<T>,
-  ) {
+  constructor(entityClass: new (...args: unknown[]) => T, options?: FactoryOptions<T>) {
     this._entityClass = entityClass;
     this._metadata = getEntityMetadata(entityClass);
     this._columnEntries = getColumnMetadataEntries(entityClass);
@@ -117,10 +118,7 @@ export class EntityFactory<T> {
   /**
    * Register a sequence for a field. Each call to build() increments the counter.
    */
-  sequence<K extends keyof T & string>(
-    fieldName: K,
-    generator: (n: number) => T[K],
-  ): this {
+  sequence<K extends keyof T & string>(fieldName: K, generator: (n: number) => T[K]): this {
     this._sequences.set(fieldName, { generator: generator as (n: number) => unknown });
     this._sequenceCounters.set(fieldName, 0);
     return this;
@@ -145,11 +143,7 @@ export class EntityFactory<T> {
   /**
    * Register an association — a related factory that builds associated entities.
    */
-  association<K extends keyof T & string, R>(
-    fieldName: K,
-    factory: EntityFactory<R>,
-    overrides?: Partial<R>,
-  ): this {
+  association<K extends keyof T & string, R>(fieldName: K, factory: EntityFactory<R>, overrides?: Partial<R>): this {
     this._associations.push({
       fieldName,
       factory: factory as EntityFactory<unknown>,
@@ -196,9 +190,7 @@ export class EntityFactory<T> {
     for (const traitName of traitNames) {
       const traitDef = this._traits.get(traitName);
       if (!traitDef) {
-        throw new Error(
-          `Unknown trait "${traitName}" for factory of ${this._entityClass.name}`,
-        );
+        throw new Error(`Unknown trait "${traitName}" for factory of ${this._entityClass.name}`);
       }
       Object.assign(entity as object, traitDef.overrides);
     }
@@ -212,9 +204,7 @@ export class EntityFactory<T> {
 
     // 5. Apply associations (sync build — associations with async hooks require buildAsync)
     for (const assoc of this._associations) {
-      (entity as Record<string, unknown>)[assoc.fieldName] = assoc.factory.build(
-        assoc.overrides,
-      );
+      (entity as Record<string, unknown>)[assoc.fieldName] = assoc.factory.build(assoc.overrides);
     }
 
     // 6. Apply explicit overrides (highest priority)
@@ -248,9 +238,7 @@ export class EntityFactory<T> {
     for (const traitName of traitNames) {
       const traitDef = this._traits.get(traitName);
       if (!traitDef) {
-        throw new Error(
-          `Unknown trait "${traitName}" for factory of ${this._entityClass.name}`,
-        );
+        throw new Error(`Unknown trait "${traitName}" for factory of ${this._entityClass.name}`);
       }
       Object.assign(entity as object, traitDef.overrides);
     }
@@ -264,9 +252,7 @@ export class EntityFactory<T> {
 
     // 5. Apply associations (using async build so nested async hooks are awaited)
     for (const assoc of this._associations) {
-      (entity as Record<string, unknown>)[assoc.fieldName] = await assoc.factory.buildAsync(
-        assoc.overrides,
-      );
+      (entity as Record<string, unknown>)[assoc.fieldName] = await assoc.factory.buildAsync(assoc.overrides);
     }
 
     // 6. Apply explicit overrides (highest priority)
@@ -300,16 +286,12 @@ export class EntityFactory<T> {
    * If no persistFn is provided and a default persist function has been set
    * (e.g. by BoundEntityFactory), the default is used. Otherwise throws.
    */
-  async create(
-    persistFn?: PersistFn<T>,
-    overrides?: Partial<T>,
-    ...traitNames: string[]
-  ): Promise<T> {
+  async create(persistFn?: PersistFn<T>, overrides?: Partial<T>, ...traitNames: string[]): Promise<T> {
     const fn = persistFn ?? this._defaultPersistFn;
     if (!fn) {
       throw new Error(
         `EntityFactory.create() requires a persist function. ` +
-        `Pass a persistFn, or use ctx.factory() inside withTestTransaction to get a pre-bound factory.`,
+          `Pass a persistFn, or use ctx.factory() inside withTestTransaction to get a pre-bound factory.`,
       );
     }
     const entity = await this.buildAsync(overrides, ...traitNames);
@@ -426,10 +408,7 @@ export class EntityFactory<T> {
   /**
    * Generate a default value based on column type or field name heuristics.
    */
-  private _generateDefault(
-    fieldName: string,
-    columnEntry?: ColumnMetadataEntry,
-  ): unknown {
+  private _generateDefault(fieldName: string, columnEntry?: ColumnMetadataEntry): unknown {
     const sqlType = columnEntry?.type?.toLowerCase();
 
     // SQL type-based inference
@@ -448,23 +427,13 @@ export class EntityFactory<T> {
       ) {
         return this._globalCounter;
       }
-      if (
-        sqlType.includes("bool")
-      ) {
+      if (sqlType.includes("bool")) {
         return false;
       }
-      if (
-        sqlType.includes("timestamp") ||
-        sqlType.includes("date") ||
-        sqlType.includes("time")
-      ) {
+      if (sqlType.includes("timestamp") || sqlType.includes("date") || sqlType.includes("time")) {
         return new Date();
       }
-      if (
-        sqlType.includes("text") ||
-        sqlType.includes("varchar") ||
-        sqlType.includes("char")
-      ) {
+      if (sqlType.includes("text") || sqlType.includes("varchar") || sqlType.includes("char")) {
         return `${fieldName}_${this._globalCounter}`;
       }
       if (sqlType.includes("json")) {
@@ -476,9 +445,7 @@ export class EntityFactory<T> {
     if (fieldName.toLowerCase().includes("id") && fieldName !== String(this._metadata.idField)) {
       return generateUUID();
     }
-    if (
-      fieldName.toLowerCase().includes("email")
-    ) {
+    if (fieldName.toLowerCase().includes("email")) {
       return `${fieldName}_${this._globalCounter}@test.com`;
     }
     if (

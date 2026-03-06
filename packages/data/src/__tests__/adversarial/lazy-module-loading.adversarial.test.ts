@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, expect, it } from "vitest";
 
 // ═══════════════════════════════════════════════════════════════
 // Adversarial tests for lazy module loading
@@ -147,10 +147,7 @@ describe("lazy module loading adversarial tests", () => {
   describe("concurrent lazy loading", () => {
     it("two concurrent loadGraphQLModule() calls both resolve", async () => {
       const mod = await import("../../index.js");
-      const [r1, r2] = await Promise.all([
-        mod.loadGraphQLModule(),
-        mod.loadGraphQLModule(),
-      ]);
+      const [r1, r2] = await Promise.all([mod.loadGraphQLModule(), mod.loadGraphQLModule()]);
       // Both should resolve
       expect(r1).toBeUndefined(); // void
       expect(r2).toBeUndefined();
@@ -161,10 +158,7 @@ describe("lazy module loading adversarial tests", () => {
 
     it("two concurrent loadRestModule() calls both resolve", async () => {
       const mod = await import("../../index.js");
-      const [r1, r2] = await Promise.all([
-        mod.loadRestModule(),
-        mod.loadRestModule(),
-      ]);
+      const [r1, r2] = await Promise.all([mod.loadRestModule(), mod.loadRestModule()]);
       expect(r1).toBeUndefined();
       expect(r2).toBeUndefined();
       const gen = new mod.RouteGenerator();
@@ -173,11 +167,7 @@ describe("lazy module loading adversarial tests", () => {
 
     it("concurrent load of different modules does not interfere", async () => {
       const mod = await import("../../index.js");
-      await Promise.all([
-        mod.loadGraphQLModule(),
-        mod.loadRestModule(),
-        mod.loadObservabilityModule(),
-      ]);
+      await Promise.all([mod.loadGraphQLModule(), mod.loadRestModule(), mod.loadObservabilityModule()]);
       // All three should work
       const gqlGen = new mod.GraphQLSchemaGenerator();
       const restGen = new mod.RouteGenerator();

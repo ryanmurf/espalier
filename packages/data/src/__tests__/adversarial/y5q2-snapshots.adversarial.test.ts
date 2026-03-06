@@ -5,13 +5,13 @@
  * diff of identical snapshots, null fields, very large entities,
  * snapshots of soft-deleted entities, structuredClone edge cases.
  */
-import { describe, it, expect, vi } from "vitest";
-import { snapshot } from "../../snapshot/entity-snapshot.js";
-import { diff, diffEntity } from "../../snapshot/entity-diff.js";
-import type { Snapshot } from "../../snapshot/entity-snapshot.js";
-import { Table } from "../../decorators/table.js";
+import { describe, expect, it } from "vitest";
 import { Column } from "../../decorators/column.js";
 import { Id } from "../../decorators/id.js";
+import { Table } from "../../decorators/table.js";
+import { diff, diffEntity } from "../../snapshot/entity-diff.js";
+import type { Snapshot } from "../../snapshot/entity-snapshot.js";
+import { snapshot } from "../../snapshot/entity-snapshot.js";
 
 // ──────────────────────────────────────────────────────
 // Test entities
@@ -170,8 +170,7 @@ describe("snapshot immutability", () => {
       (snap.fields as any).name = "hacked";
       expect(snap.fields.name).toBe("hacked");
       console.warn(
-        "FINDING: snapshot.fields is not frozen. " +
-        "Mutations to snapshot field values are not prevented.",
+        "FINDING: snapshot.fields is not frozen. " + "Mutations to snapshot field values are not prevented.",
       );
     } else {
       expect(() => {
@@ -205,11 +204,11 @@ describe("diff", () => {
     expect(result.entityId).toBe(1);
     expect(result.changes).toHaveLength(2);
 
-    const nameChange = result.changes.find(c => c.field === "name");
+    const nameChange = result.changes.find((c) => c.field === "name");
     expect(nameChange!.oldValue).toBe("Before");
     expect(nameChange!.newValue).toBe("After");
 
-    const ageChange = result.changes.find(c => c.field === "age");
+    const ageChange = result.changes.find((c) => c.field === "age");
     expect(ageChange!.oldValue).toBe(20);
     expect(ageChange!.newValue).toBe(21);
   });
@@ -274,7 +273,10 @@ describe("diff", () => {
 
   it("throws when diffing snapshots of different entity types", () => {
     const basic = new BasicEntity();
-    basic.id = 1; basic.name = "A"; basic.age = 1; basic.active = true;
+    basic.id = 1;
+    basic.name = "A";
+    basic.age = 1;
+    basic.active = true;
     const nullable = new NullableEntity();
     nullable.id = 1;
 
@@ -286,9 +288,15 @@ describe("diff", () => {
 
   it("throws when diffing snapshots of different entity IDs", () => {
     const a = new BasicEntity();
-    a.id = 1; a.name = "A"; a.age = 1; a.active = true;
+    a.id = 1;
+    a.name = "A";
+    a.age = 1;
+    a.active = true;
     const b = new BasicEntity();
-    b.id = 2; b.name = "B"; b.age = 2; b.active = true;
+    b.id = 2;
+    b.name = "B";
+    b.age = 2;
+    b.active = true;
 
     const snap1 = snapshot(a);
     const snap2 = snapshot(b);
@@ -298,7 +306,10 @@ describe("diff", () => {
 
   it("diff result is frozen", () => {
     const entity = new BasicEntity();
-    entity.id = 1; entity.name = "A"; entity.age = 1; entity.active = true;
+    entity.id = 1;
+    entity.name = "A";
+    entity.age = 1;
+    entity.active = true;
     const snap1 = snapshot(entity);
     entity.name = "B";
     const snap2 = snapshot(entity);
@@ -367,7 +378,7 @@ describe("complex type handling", () => {
 
     const result = diff(snap1, snap2);
     expect(result.changes.length).toBeGreaterThanOrEqual(1);
-    const dateChange = result.changes.find(c => c.field === "created");
+    const dateChange = result.changes.find((c) => c.field === "created");
     expect(dateChange).toBeDefined();
   });
 
@@ -383,7 +394,7 @@ describe("complex type handling", () => {
     const snap2 = snapshot(entity);
 
     const result = diff(snap1, snap2);
-    const tagsChange = result.changes.find(c => c.field === "tags");
+    const tagsChange = result.changes.find((c) => c.field === "tags");
     expect(tagsChange).toBeDefined();
     expect(tagsChange!.oldValue).toEqual(["a", "b"]);
     expect(tagsChange!.newValue).toEqual(["a", "b", "c"]);
@@ -401,7 +412,7 @@ describe("complex type handling", () => {
     const snap2 = snapshot(entity);
 
     const result = diff(snap1, snap2);
-    const dataChange = result.changes.find(c => c.field === "data");
+    const dataChange = result.changes.find((c) => c.field === "data");
     expect(dataChange).toBeDefined();
   });
 });
@@ -423,7 +434,7 @@ describe("special values", () => {
 
     // NaN === NaN should be treated as equal (no change)
     const result = diff(snap1, snap2);
-    const ageChange = result.changes.find(c => c.field === "age");
+    const ageChange = result.changes.find((c) => c.field === "age");
     expect(ageChange).toBeUndefined(); // NaN == NaN handled correctly
   });
 
@@ -481,7 +492,7 @@ describe("special values", () => {
     };
 
     const result = diff(snap1, snap2);
-    const activeChange = result.changes.find(c => c.field === "active");
+    const activeChange = result.changes.find((c) => c.field === "active");
     expect(activeChange).toBeDefined();
     expect(activeChange!.oldValue).toBe(false);
     expect(activeChange!.newValue).toBeNull();
@@ -536,7 +547,10 @@ describe("minimal entity", () => {
 describe("timestamp behavior", () => {
   it("each snapshot gets its own timestamp", () => {
     const entity = new BasicEntity();
-    entity.id = 1; entity.name = "T"; entity.age = 1; entity.active = true;
+    entity.id = 1;
+    entity.name = "T";
+    entity.age = 1;
+    entity.active = true;
 
     const snap1 = snapshot(entity);
     // Small delay to ensure different timestamp
@@ -548,7 +562,10 @@ describe("timestamp behavior", () => {
 
   it("diff includes both timestamps in result", () => {
     const entity = new BasicEntity();
-    entity.id = 1; entity.name = "A"; entity.age = 1; entity.active = true;
+    entity.id = 1;
+    entity.name = "A";
+    entity.age = 1;
+    entity.active = true;
     const snap1 = snapshot(entity);
     entity.name = "B";
     const snap2 = snapshot(entity);

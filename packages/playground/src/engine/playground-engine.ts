@@ -83,15 +83,16 @@ export class PlaygroundEngine {
 
         if (trimmed.startsWith("SELECT") || trimmed.startsWith("PRAGMA") || trimmed.startsWith("EXPLAIN")) {
           const result = db.exec(sql);
-          output = result.length > 0
-            ? result[0].values.map((row: any[]) => {
-                const obj: Record<string, any> = {};
-                result[0].columns.forEach((col: string, i: number) => {
-                  obj[col] = row[i];
-                });
-                return obj;
-              })
-            : [];
+          output =
+            result.length > 0
+              ? result[0].values.map((row: any[]) => {
+                  const obj: Record<string, any> = {};
+                  result[0].columns.forEach((col: string, i: number) => {
+                    obj[col] = row[i];
+                  });
+                  return obj;
+                })
+              : [];
         } else {
           db.run(sql);
           const changes = db.getRowsModified();
@@ -156,7 +157,7 @@ export class PlaygroundEngine {
   async getSchema(): Promise<string> {
     const db = await this.ensureDb();
     const result = db.exec(
-      "SELECT sql FROM sqlite_master WHERE type IN ('table', 'index', 'view') AND sql IS NOT NULL ORDER BY type, name"
+      "SELECT sql FROM sqlite_master WHERE type IN ('table', 'index', 'view') AND sql IS NOT NULL ORDER BY type, name",
     );
     if (result.length === 0) return "";
     return result[0].values.map((row: any[]) => `${row[0]};`).join("\n\n");

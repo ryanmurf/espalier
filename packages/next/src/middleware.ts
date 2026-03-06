@@ -36,9 +36,7 @@ export function getRequestConnection(): Connection | undefined {
  * });
  * ```
  */
-export async function withConnection<R>(
-  callback: (connection: Connection) => Promise<R>,
-): Promise<R> {
+export async function withConnection<R>(callback: (connection: Connection) => Promise<R>): Promise<R> {
   const ds = await getDataSource();
   const conn = await ds.getConnection();
 

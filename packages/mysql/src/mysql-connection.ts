@@ -1,17 +1,24 @@
-import type { PoolConnection as MysqlPoolConnection } from "mysql2/promise";
-import type { Connection, TypeAwareConnection, PreparedStatement, NamedPreparedStatement, BatchStatement, Statement, TypeConverterRegistry } from "espalier-jdbc";
+import type {
+  BatchStatement,
+  NamedPreparedStatement,
+  PreparedStatement,
+  Statement,
+  TypeAwareConnection,
+  TypeConverterRegistry,
+} from "espalier-jdbc";
 import {
-  type Transaction,
-  type IsolationLevel,
   ConnectionError,
-  TransactionError,
   DatabaseErrorCode,
   getGlobalLogger,
+  type IsolationLevel,
   LogLevel,
+  type Transaction,
+  TransactionError,
 } from "espalier-jdbc";
-import { MysqlStatement, MysqlPreparedStatement } from "./mysql-statement.js";
-import { MysqlNamedPreparedStatement } from "./mysql-named-statement.js";
+import type { PoolConnection as MysqlPoolConnection } from "mysql2/promise";
 import { MysqlBatchStatement } from "./mysql-batch-statement.js";
+import { MysqlNamedPreparedStatement } from "./mysql-named-statement.js";
+import { MysqlPreparedStatement, MysqlStatement } from "./mysql-statement.js";
 
 export class MysqlConnection implements TypeAwareConnection {
   private closed = false;
@@ -50,9 +57,7 @@ export class MysqlConnection implements TypeAwareConnection {
     const txLogger = getGlobalLogger().child("mysql-transaction");
     try {
       if (isolation) {
-        await this.connection.query(
-          `SET TRANSACTION ISOLATION LEVEL ${isolation}`,
-        );
+        await this.connection.query(`SET TRANSACTION ISOLATION LEVEL ${isolation}`);
       }
       await this.connection.beginTransaction();
     } catch (err) {
@@ -155,11 +160,7 @@ export class MysqlConnection implements TypeAwareConnection {
 
   private ensureOpen(): void {
     if (this.closed) {
-      throw new ConnectionError(
-        "Connection is closed",
-        undefined,
-        DatabaseErrorCode.CONNECTION_CLOSED,
-      );
+      throw new ConnectionError("Connection is closed", undefined, DatabaseErrorCode.CONNECTION_CLOSED);
     }
   }
 }

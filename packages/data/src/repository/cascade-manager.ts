@@ -1,13 +1,12 @@
 import type { Connection, SqlValue } from "espalier-jdbc";
 import type { EntityMetadata } from "../mapping/entity-metadata.js";
 import { getEntityMetadata } from "../mapping/entity-metadata.js";
-import { createRowMapper } from "../mapping/row-mapper.js";
-import { InsertBuilder, UpdateBuilder, DeleteBuilder } from "../query/query-builder.js";
-import { ComparisonCriteria, LogicalCriteria } from "../query/criteria.js";
 import { getFieldValue } from "../mapping/field-access.js";
-import { getColumnTypeMappings } from "../decorators/column.js";
+import { createRowMapper } from "../mapping/row-mapper.js";
+import { ComparisonCriteria, LogicalCriteria } from "../query/criteria.js";
+import { DeleteBuilder, InsertBuilder, UpdateBuilder } from "../query/query-builder.js";
+import { NoTenantException, TenantContext } from "../tenant/tenant-context.js";
 import { getTenantColumn } from "../tenant/tenant-filter.js";
-import { TenantContext, NoTenantException } from "../tenant/tenant-context.js";
 import { isLazyProxy } from "./lazy-proxy.js";
 
 /**
@@ -117,7 +116,7 @@ export class CascadeManager<T> {
 
       if (relation.mappedBy) {
         const owningRel = targetMeta.oneToOneRelations.find(
-          r => r.isOwning && String(r.fieldName) === relation.mappedBy,
+          (r) => r.isOwning && String(r.fieldName) === relation.mappedBy,
         );
         if (owningRel) {
           (relatedEntity as Record<string | symbol, unknown>)[owningRel.fieldName] = entity;
@@ -144,9 +143,7 @@ export class CascadeManager<T> {
       const targetIdField = targetMeta.idField;
       if (!targetIdField) continue;
 
-      const owningRel = targetMeta.manyToOneRelations.find(
-        (r) => String(r.fieldName) === relation.mappedBy,
-      );
+      const owningRel = targetMeta.manyToOneRelations.find((r) => String(r.fieldName) === relation.mappedBy);
 
       for (const child of children) {
         if (child == null || isLazyProxy(child)) continue;
@@ -237,13 +234,27 @@ export class CascadeManager<T> {
 
       if (!this.isUnassignedRelatedId(relIdValue, relatedClass, relMeta)) {
         return await this.cascadeUpdateRelated(
-          relatedEntity, relMeta, relRowMapper, relIdField, relIdValue, relIdCol,
-          relVersionField, relVersionCol, conn, saving,
+          relatedEntity,
+          relMeta,
+          relRowMapper,
+          relIdField,
+          relIdValue,
+          relIdCol,
+          relVersionField,
+          relVersionCol,
+          conn,
+          saving,
         );
       } else {
         return await this.cascadeInsertRelated(
-          relatedEntity, relMeta, relRowMapper, relIdField, relIdCol,
-          relVersionField, conn, saving,
+          relatedEntity,
+          relMeta,
+          relRowMapper,
+          relIdField,
+          relIdCol,
+          relVersionField,
+          conn,
+          saving,
         );
       }
     } finally {
@@ -252,10 +263,16 @@ export class CascadeManager<T> {
   }
 
   private async cascadeUpdateRelated(
-    relatedEntity: unknown, relMeta: EntityMetadata, relRowMapper: { mapRow(rs: any): any },
-    relIdField: string | symbol, relIdValue: unknown, relIdCol: string,
-    relVersionField: string | symbol | undefined, relVersionCol: string | undefined,
-    conn: Connection, saving: Set<unknown>,
+    relatedEntity: unknown,
+    relMeta: EntityMetadata,
+    relRowMapper: { mapRow(rs: any): any },
+    relIdField: string | symbol,
+    relIdValue: unknown,
+    relIdCol: string,
+    relVersionField: string | symbol | undefined,
+    relVersionCol: string | undefined,
+    conn: Connection,
+    saving: Set<unknown>,
   ): Promise<unknown> {
     const updateBuilder = new UpdateBuilder(relMeta.tableName);
     if (relVersionField && relVersionCol) {
@@ -333,10 +350,14 @@ export class CascadeManager<T> {
   }
 
   private async cascadeInsertRelated(
-    relatedEntity: unknown, relMeta: EntityMetadata, relRowMapper: { mapRow(rs: any): any },
-    relIdField: string | symbol, relIdCol: string,
+    relatedEntity: unknown,
+    relMeta: EntityMetadata,
+    relRowMapper: { mapRow(rs: any): any },
+    relIdField: string | symbol,
+    relIdCol: string,
     relVersionField: string | symbol | undefined,
-    conn: Connection, saving: Set<unknown>,
+    conn: Connection,
+    saving: Set<unknown>,
   ): Promise<unknown> {
     const relTenantIdField = relMeta.tenantIdField;
     const relTenantColInsert = getTenantColumn(relMeta);
@@ -393,8 +414,9 @@ export class CascadeManager<T> {
       const rs = await stmt.executeQuery();
       if (await rs.next()) {
         const saved = relRowMapper.mapRow(rs);
-        (relatedEntity as Record<string | symbol, unknown>)[relIdField] =
-          (saved as Record<string | symbol, unknown>)[relIdField];
+        (relatedEntity as Record<string | symbol, unknown>)[relIdField] = (saved as Record<string | symbol, unknown>)[
+          relIdField
+        ];
         result = saved;
       }
     } finally {
@@ -461,9 +483,7 @@ export class CascadeManager<T> {
       const targetIdField = targetMeta.idField;
       if (!targetIdField) continue;
       if (rel.mappedBy) {
-        const owningRel = targetMeta.oneToOneRelations.find(
-          r => r.isOwning && String(r.fieldName) === rel.mappedBy,
-        );
+        const owningRel = targetMeta.oneToOneRelations.find((r) => r.isOwning && String(r.fieldName) === rel.mappedBy);
         if (owningRel) {
           (related as Record<string | symbol, unknown>)[owningRel.fieldName] = entity;
         }
@@ -483,9 +503,7 @@ export class CascadeManager<T> {
       const targetMeta = getEntityMetadata(targetClass);
       const targetIdField = targetMeta.idField;
       if (!targetIdField) continue;
-      const owningRel = targetMeta.manyToOneRelations.find(
-        (r) => String(r.fieldName) === rel.mappedBy,
-      );
+      const owningRel = targetMeta.manyToOneRelations.find((r) => String(r.fieldName) === rel.mappedBy);
       for (const child of children) {
         if (child == null || isLazyProxy(child)) continue;
         if (owningRel) {
@@ -555,8 +573,7 @@ export class CascadeManager<T> {
       const relIdFieldMapping = relMeta.fields.find((f) => f.fieldName === relIdField);
       const relIdCol = relIdFieldMapping ? relIdFieldMapping.columnName : String(relIdField);
 
-      const builder = new DeleteBuilder(relMeta.tableName)
-        .where(new ComparisonCriteria("eq", relIdCol, relIdValue));
+      const builder = new DeleteBuilder(relMeta.tableName).where(new ComparisonCriteria("eq", relIdCol, relIdValue));
       const relTenantCol = getTenantColumn(relMeta);
       if (relTenantCol) {
         const tid = TenantContext.current();
@@ -599,8 +616,7 @@ export class CascadeManager<T> {
       if (!relation.cascade.has("remove")) continue;
       const jt = relation.joinTable;
 
-      const deleteJt = new DeleteBuilder(jt.name)
-        .where(new ComparisonCriteria("eq", jt.joinColumn, parentId));
+      const deleteJt = new DeleteBuilder(jt.name).where(new ComparisonCriteria("eq", jt.joinColumn, parentId));
       const jtQuery = deleteJt.build();
       const jtStmt = conn.prepareStatement(jtQuery.sql);
       try {

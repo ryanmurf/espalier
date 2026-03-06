@@ -1,8 +1,7 @@
-import type { EspalierConfig } from "./config.js";
-import { SchemaDiffEngine } from "espalier-data";
-import { DdlGenerator } from "espalier-data";
-import type { SchemaIntrospector } from "espalier-jdbc";
 import type { SchemaDiff } from "espalier-data";
+import { DdlGenerator, SchemaDiffEngine } from "espalier-data";
+import type { SchemaIntrospector } from "espalier-jdbc";
+import type { EspalierConfig } from "./config.js";
 
 export interface SchemaDiffOptions {
   config: EspalierConfig;
@@ -25,9 +24,7 @@ export async function schemaDiff(options: SchemaDiffOptions): Promise<SchemaDiff
   const diff = await engine.diff(options.entityClasses, options.introspector, options.schema);
   const { up, down } = engine.generateMigration(diff);
 
-  const hasChanges = diff.addedTables.length > 0 ||
-    diff.removedTables.length > 0 ||
-    diff.modifiedTables.length > 0;
+  const hasChanges = diff.addedTables.length > 0 || diff.removedTables.length > 0 || diff.modifiedTables.length > 0;
 
   return { diff, up, down, hasChanges };
 }

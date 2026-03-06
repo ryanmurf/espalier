@@ -1,7 +1,7 @@
-import { describe, it, expect } from "vitest";
+import { execFileSync, execSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { execSync, execFileSync } from "node:child_process";
+import { describe, expect, it } from "vitest";
 
 // ═══════════════════════════════════════════════════════════════
 // Adversarial tests for cold start benchmark suite
@@ -28,12 +28,7 @@ describe("cold start benchmark adversarial tests", () => {
       expect(fs.existsSync(path.join(BENCH_DIR, "bench-espalier.mjs"))).toBe(true);
     });
 
-    const expectedBenchmarks = [
-      "bench-espalier.mjs",
-      "bench-prisma.mjs",
-      "bench-drizzle.mjs",
-      "bench-typeorm.mjs",
-    ];
+    const expectedBenchmarks = ["bench-espalier.mjs", "bench-prisma.mjs", "bench-drizzle.mjs", "bench-typeorm.mjs"];
 
     for (const script of expectedBenchmarks) {
       it(`${script} exists`, () => {
@@ -53,12 +48,7 @@ describe("cold start benchmark adversarial tests", () => {
   // ──────────────────────────────────────────────
 
   describe("timing precision — hrtime, not Date.now()", () => {
-    const benchFiles = [
-      "bench-espalier.mjs",
-      "bench-prisma.mjs",
-      "bench-drizzle.mjs",
-      "bench-typeorm.mjs",
-    ];
+    const benchFiles = ["bench-espalier.mjs", "bench-prisma.mjs", "bench-drizzle.mjs", "bench-typeorm.mjs"];
 
     for (const script of benchFiles) {
       it(`${script} uses process.hrtime.bigint() not Date.now()`, () => {
@@ -162,11 +152,7 @@ describe("cold start benchmark adversarial tests", () => {
   // ──────────────────────────────────────────────
 
   describe("graceful handling of missing ORMs", () => {
-    const thirdPartyBenches = [
-      "bench-prisma.mjs",
-      "bench-drizzle.mjs",
-      "bench-typeorm.mjs",
-    ];
+    const thirdPartyBenches = ["bench-prisma.mjs", "bench-drizzle.mjs", "bench-typeorm.mjs"];
 
     for (const script of thirdPartyBenches) {
       it(`${script} handles missing dependency via try/catch`, () => {

@@ -1,9 +1,9 @@
-import { describe, it, expect } from "vitest";
-import { getEntityMetadata } from "../../mapping/entity-metadata.js";
-import { Table } from "../../decorators/table.js";
+import { describe, expect, it } from "vitest";
+import { CreatedDate, LastModifiedDate } from "../../decorators/auditing.js";
 import { Column } from "../../decorators/column.js";
 import { Id } from "../../decorators/id.js";
-import { CreatedDate, LastModifiedDate } from "../../decorators/auditing.js";
+import { Table } from "../../decorators/table.js";
+import { getEntityMetadata } from "../../mapping/entity-metadata.js";
 
 describe("getEntityMetadata", () => {
   it("returns complete metadata for a fully-decorated class", () => {
@@ -26,9 +26,7 @@ describe("getEntityMetadata", () => {
     expect(meta.lastModifiedDateField).toBe("updatedAt");
     expect(meta.fields.length).toBe(5);
 
-    const fieldMap = new Map(
-      meta.fields.map((f) => [f.fieldName, f.columnName]),
-    );
+    const fieldMap = new Map(meta.fields.map((f) => [f.fieldName, f.columnName]));
     expect(fieldMap.get("id")).toBe("id");
     expect(fieldMap.get("name")).toBe("user_name");
     expect(fieldMap.get("email")).toBe("email_address");
@@ -42,9 +40,7 @@ describe("getEntityMetadata", () => {
     }
     new NoTable();
 
-    expect(() => getEntityMetadata(NoTable)).toThrow(
-      /No @Table decorator found/,
-    );
+    expect(() => getEntityMetadata(NoTable)).toThrow(/No @Table decorator found/);
   });
 
   it("throws when @Id is missing", () => {

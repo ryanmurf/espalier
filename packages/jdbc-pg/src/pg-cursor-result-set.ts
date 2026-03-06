@@ -1,5 +1,5 @@
-import Cursor from "pg-cursor";
-import type { StreamingResultSet, ColumnMetadata } from "espalier-jdbc";
+import type { ColumnMetadata, StreamingResultSet } from "espalier-jdbc";
+import type Cursor from "pg-cursor";
 
 export class PgCursorResultSet implements StreamingResultSet {
   private cursorSize = 100;

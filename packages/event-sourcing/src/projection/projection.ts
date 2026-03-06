@@ -1,5 +1,4 @@
 import type { Connection } from "espalier-jdbc";
-import type { StoredEvent } from "../types.js";
 import type { EventStore } from "../store/event-store.js";
 
 export interface ProjectionHandler<TEvent = unknown> {
@@ -15,18 +14,13 @@ export interface ProjectionOptions {
 const projectionMetadata = new WeakMap<object, ProjectionOptions>();
 
 export function Projection(options: ProjectionOptions) {
-  return function <T extends new (...args: any[]) => any>(
-    target: T,
-    _context: ClassDecoratorContext,
-  ): T {
+  return <T extends new (...args: any[]) => any>(target: T, _context: ClassDecoratorContext): T => {
     projectionMetadata.set(target, { ...options });
     return target;
   };
 }
 
-export function getProjectionMetadata(
-  target: object,
-): ProjectionOptions | undefined {
+export function getProjectionMetadata(target: object): ProjectionOptions | undefined {
   const meta = projectionMetadata.get(target);
   if (!meta) return undefined;
   return { ...meta, eventTypes: [...meta.eventTypes] };
@@ -73,14 +67,11 @@ export class ProjectionRunner {
 
     // Process in batches to avoid loading all events into memory
     while (true) {
-      const events = await this.eventStore.loadAllEvents(
-        this.connection,
-        {
-          eventTypes: [...handlerMap.keys()],
-          fromSequence: lastSequence,
-          limit: batchSize,
-        },
-      );
+      const events = await this.eventStore.loadAllEvents(this.connection, {
+        eventTypes: [...handlerMap.keys()],
+        fromSequence: lastSequence,
+        limit: batchSize,
+      });
 
       if (events.length === 0) break;
 

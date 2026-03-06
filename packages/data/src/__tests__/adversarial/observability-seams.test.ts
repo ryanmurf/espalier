@@ -4,22 +4,18 @@
  * Tests that observability hooks (health checks, tracing, slow query detection)
  * work correctly with both existing and new adapter types.
  */
-import { describe, it, expect, vi } from "vitest";
+
+import type { Connection, DataSource, HealthCheck, HealthCheckResult } from "espalier-jdbc";
 import {
-  HealthCheckRegistry,
   ConnectivityHealthCheck,
-  SlowQueryDetector,
-  QueryStatisticsCollector,
-  NoopTracerProvider,
-  setGlobalTracerProvider,
   getGlobalTracerProvider,
+  HealthCheckRegistry,
+  NoopTracerProvider,
+  QueryStatisticsCollector,
+  SlowQueryDetector,
+  setGlobalTracerProvider,
 } from "espalier-jdbc";
-import type {
-  DataSource,
-  Connection,
-  HealthCheck,
-  HealthCheckResult,
-} from "espalier-jdbc";
+import { describe, expect, it } from "vitest";
 
 function createMockConnection(): Connection {
   return {
@@ -27,24 +23,46 @@ function createMockConnection(): Connection {
       return {
         async executeQuery(_sql: string) {
           return {
-            async next() { return true; },
-            getString() { return "1"; },
-            getNumber() { return 1; },
-            getBoolean() { return true; },
-            getDate() { return null; },
-            getRow() { return { "1": 1 }; },
-            getMetadata() { return []; },
+            async next() {
+              return true;
+            },
+            getString() {
+              return "1";
+            },
+            getNumber() {
+              return 1;
+            },
+            getBoolean() {
+              return true;
+            },
+            getDate() {
+              return null;
+            },
+            getRow() {
+              return { "1": 1 };
+            },
+            getMetadata() {
+              return [];
+            },
             async close() {},
             [Symbol.asyncIterator]() {
-              return { async next() { return { value: undefined, done: true }; } };
+              return {
+                async next() {
+                  return { value: undefined, done: true };
+                },
+              };
             },
           };
         },
-        async executeUpdate() { return 0; },
+        async executeUpdate() {
+          return 0;
+        },
         async close() {},
       };
     },
-    prepareStatement() { throw new Error("not implemented"); },
+    prepareStatement() {
+      throw new Error("not implemented");
+    },
     async beginTransaction() {
       return {
         async commit() {},
@@ -54,7 +72,9 @@ function createMockConnection(): Connection {
       };
     },
     async close() {},
-    isClosed() { return false; },
+    isClosed() {
+      return false;
+    },
   } as Connection;
 }
 
@@ -131,7 +151,13 @@ describe("observability seam tests", () => {
       registry.register({
         name: "down-check",
         async check() {
-          return { status: "DOWN", name: "down-check", details: { error: "db unreachable" }, checkedAt: new Date(), durationMs: 0 };
+          return {
+            status: "DOWN",
+            name: "down-check",
+            details: { error: "db unreachable" },
+            checkedAt: new Date(),
+            durationMs: 0,
+          };
         },
       });
 
@@ -191,7 +217,9 @@ describe("observability seam tests", () => {
       let firedEvent: any;
       const detector = new SlowQueryDetector({
         thresholdMs: 10,
-        callback: (event) => { firedEvent = event; },
+        callback: (event) => {
+          firedEvent = event;
+        },
       });
 
       detector.record("SELECT * FROM users", 50, 0);
@@ -203,7 +231,9 @@ describe("observability seam tests", () => {
       let fired = false;
       const detector = new SlowQueryDetector({
         thresholdMs: 100,
-        callback: () => { fired = true; },
+        callback: () => {
+          fired = true;
+        },
       });
 
       detector.record("SELECT 1", 5, 0);

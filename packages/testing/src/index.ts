@@ -5,36 +5,32 @@
  * and query assertions.
  */
 
-// Entity factory
-export { EntityFactory, createFactory } from "./factory/entity-factory.js";
-export type { FactoryOptions, PersistFn } from "./factory/entity-factory.js";
-
-// Seeding framework
-export {
-  SeedRunner,
-  defineSeed,
-  getRegisteredSeeds,
-  clearSeedRegistry,
-  runSeeds,
-} from "./seeding/seeder.js";
-export type { SeedContext, SeedDefinition, SeedRecord, SeedRunResult } from "./seeding/seeder.js";
-
-// Test isolation
-export { withTestTransaction, withNestedTransaction, BoundEntityFactory } from "./isolation/test-transaction.js";
-export type { TestTransactionContext, TestTransactionOptions } from "./isolation/test-transaction.js";
-
+export type { AssertionResult, CapturedQuery } from "./assertions/query-assertions.js";
 // Query log capture and assertions
 export {
-  QueryLog,
-  createInstrumentedDataSource,
-  withQueryLog,
-  assertQueryCount,
   assertMaxQueries,
   assertNoQueriesMatching,
   assertQueriesMatching,
+  assertQueryCount,
+  createInstrumentedDataSource,
+  QueryLog,
+  withQueryLog,
 } from "./assertions/query-assertions.js";
-export type { CapturedQuery, AssertionResult } from "./assertions/query-assertions.js";
-
-// Migration testing
-export { testMigration, createSchemaAssertion } from "./migration/migration-tester.js";
+export type { FactoryOptions, PersistFn } from "./factory/entity-factory.js";
+// Entity factory
+export { createFactory, EntityFactory } from "./factory/entity-factory.js";
+export type { TestTransactionContext, TestTransactionOptions } from "./isolation/test-transaction.js";
+// Test isolation
+export { BoundEntityFactory, withNestedTransaction, withTestTransaction } from "./isolation/test-transaction.js";
 export type { MigrationTestContext, SchemaAssertion } from "./migration/migration-tester.js";
+// Migration testing
+export { createSchemaAssertion, testMigration } from "./migration/migration-tester.js";
+export type { SeedContext, SeedDefinition, SeedRecord, SeedRunResult } from "./seeding/seeder.js";
+// Seeding framework
+export {
+  clearSeedRegistry,
+  defineSeed,
+  getRegisteredSeeds,
+  runSeeds,
+  SeedRunner,
+} from "./seeding/seeder.js";

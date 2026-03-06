@@ -8,17 +8,14 @@
  *  - Verify vector-literal transform produces '[0.1,0.2,...]' format
  *  - Probe edge cases: empty vectors, non-array values, multiple SimilarTo
  */
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import type { EntityMetadata, FieldMapping } from "../../mapping/entity-metadata.js";
-import type {
-  DerivedQueryDescriptor,
-  PropertyExpression,
-} from "../../query/derived-query-parser.js";
-import { QueryCompiler } from "../../query/query-compiler.js";
+import type { CompiledQuery } from "../../query/compiled-query.js";
 import { bindCompiledQuery } from "../../query/compiled-query.js";
-import type { CompiledQuery, ParamBinding } from "../../query/compiled-query.js";
-import { buildDerivedQuery } from "../../query/derived-query-executor.js";
 import { ComparisonCriteria } from "../../query/criteria.js";
+import { buildDerivedQuery } from "../../query/derived-query-executor.js";
+import type { DerivedQueryDescriptor, PropertyExpression } from "../../query/derived-query-parser.js";
+import { QueryCompiler } from "../../query/query-compiler.js";
 
 // =====================================================================
 // Test fixtures
@@ -36,8 +33,20 @@ function makeMetadata(overrides?: Partial<EntityMetadata>): EntityMetadata {
 
   // Provide vector field metadata so SimilarTo can look up the correct metric
   const vectorFields = new Map<string | symbol, any>([
-    ["embedding", { fieldName: "embedding", columnName: "embedding", dimensions: 3, metric: "cosine", indexType: "hnsw" }],
-    ["secondEmbedding", { fieldName: "secondEmbedding", columnName: "second_embedding", dimensions: 3, metric: "cosine", indexType: "hnsw" }],
+    [
+      "embedding",
+      { fieldName: "embedding", columnName: "embedding", dimensions: 3, metric: "cosine", indexType: "hnsw" },
+    ],
+    [
+      "secondEmbedding",
+      {
+        fieldName: "secondEmbedding",
+        columnName: "second_embedding",
+        dimensions: 3,
+        metric: "cosine",
+        indexType: "hnsw",
+      },
+    ],
   ]);
 
   return {
@@ -78,7 +87,7 @@ function isNullProp(property: string): PropertyExpression {
   return { property, operator: "IsNull", paramCount: 0 };
 }
 
-function inProp(property: string): PropertyExpression {
+function _inProp(property: string): PropertyExpression {
   return { property, operator: "In", paramCount: 1 };
 }
 
@@ -169,11 +178,7 @@ describe("QueryCompiler: SimilarTo", () => {
 
   it("compiles SimilarTo sandwiched between two Equals — param indices correct", () => {
     const descriptor = makeDescriptor({
-      properties: [
-        eqProp("title"),
-        simProp("embedding"),
-        eqProp("category"),
-      ],
+      properties: [eqProp("title"), simProp("embedding"), eqProp("category")],
     });
 
     const compiled = compiler.compile(descriptor, metadata);
@@ -287,10 +292,7 @@ describe("QueryCompiler: SimilarTo", () => {
 
   it("SimilarTo combined with Between — param offsets correct", () => {
     const descriptor = makeDescriptor({
-      properties: [
-        simProp("embedding"),
-        betweenProp("title"),
-      ],
+      properties: [simProp("embedding"), betweenProp("title")],
     });
 
     const compiled = compiler.compile(descriptor, metadata);
@@ -304,11 +306,7 @@ describe("QueryCompiler: SimilarTo", () => {
 
   it("SimilarTo combined with IsNull — no extra param consumed for IsNull", () => {
     const descriptor = makeDescriptor({
-      properties: [
-        eqProp("title"),
-        isNullProp("category"),
-        simProp("embedding"),
-      ],
+      properties: [eqProp("title"), isNullProp("category"), simProp("embedding")],
     });
 
     const compiled = compiler.compile(descriptor, metadata);
@@ -482,8 +480,7 @@ describe("bindCompiledQuery: vector-literal transform", () => {
       metadata: { action: "find", expectedArgCount: 1, distinct: false },
     };
 
-    expect(() => bindCompiledQuery(compiled, [[NaN, Infinity, -Infinity]]))
-      .toThrow(/finite number/);
+    expect(() => bindCompiledQuery(compiled, [[NaN, Infinity, -Infinity]])).toThrow(/finite number/);
   });
 });
 
@@ -544,12 +541,7 @@ describe("buildDerivedQuery: SimilarTo", () => {
     });
 
     const extraCriteria = new ComparisonCriteria("eq", "category", "tech");
-    const result = buildDerivedQuery(
-      descriptor,
-      metadata,
-      ["my-title", [0.1, 0.2]],
-      extraCriteria,
-    );
+    const result = buildDerivedQuery(descriptor, metadata, ["my-title", [0.1, 0.2]], extraCriteria);
 
     expect(result.sql).toContain("WHERE");
     expect(result.sql).toContain("ORDER BY");
@@ -563,14 +555,10 @@ describe("buildDerivedQuery: SimilarTo", () => {
       properties: [simProp("embedding"), simProp("secondEmbedding")],
     });
 
-    const result = buildDerivedQuery(
-      descriptor,
-      metadata,
-      [
-        [0.1, 0.2],
-        [0.3, 0.4],
-      ],
-    );
+    const result = buildDerivedQuery(descriptor, metadata, [
+      [0.1, 0.2],
+      [0.3, 0.4],
+    ]);
 
     expect(result.sql).not.toContain("WHERE");
     expect(result.sql).toContain("ORDER BY");
@@ -598,18 +586,10 @@ describe("buildDerivedQuery: SimilarTo", () => {
     // Complex: Equals + Between + SimilarTo
     // Equals consumes 1 arg, Between consumes 2 args, SimilarTo consumes 1 arg
     const descriptor = makeDescriptor({
-      properties: [
-        eqProp("title"),
-        betweenProp("category"),
-        simProp("embedding"),
-      ],
+      properties: [eqProp("title"), betweenProp("category"), simProp("embedding")],
     });
 
-    const result = buildDerivedQuery(
-      descriptor,
-      metadata,
-      ["hello", "A", "Z", [0.5, 0.6]],
-    );
+    const result = buildDerivedQuery(descriptor, metadata, ["hello", "A", "Z", [0.5, 0.6]]);
 
     expect(result.sql).toContain("WHERE");
     expect(result.sql).toContain("ORDER BY");
@@ -626,9 +606,7 @@ describe("buildDerivedQuery: SimilarTo", () => {
       properties: [simProp("nonExistentField")],
     });
 
-    expect(() =>
-      buildDerivedQuery(descriptor, metadata, [[0.1, 0.2]]),
-    ).toThrow(/Unknown property/);
+    expect(() => buildDerivedQuery(descriptor, metadata, [[0.1, 0.2]])).toThrow(/Unknown property/);
   });
 });
 

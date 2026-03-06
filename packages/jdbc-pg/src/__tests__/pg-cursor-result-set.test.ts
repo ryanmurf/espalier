@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { PgCursorResultSet } from "../pg-cursor-result-set.js";
 
 function createMockCursor(rows: Record<string, unknown>[][]) {
@@ -17,11 +17,7 @@ function createMockCursor(rows: Record<string, unknown>[][]) {
 describe("PgCursorResultSet", () => {
   describe("next()", () => {
     it("fetches rows in batches", async () => {
-      const cursor = createMockCursor([
-        [{ id: 1 }, { id: 2 }],
-        [{ id: 3 }],
-        [],
-      ]);
+      const cursor = createMockCursor([[{ id: 1 }, { id: 2 }], [{ id: 3 }], []]);
 
       const rs = new PgCursorResultSet(cursor as any);
       rs.setCursorSize(2);
@@ -159,10 +155,7 @@ describe("PgCursorResultSet", () => {
 
   describe("AsyncIterable", () => {
     it("iterates over all rows", async () => {
-      const cursor = createMockCursor([
-        [{ id: 1 }, { id: 2 }],
-        [{ id: 3 }],
-      ]);
+      const cursor = createMockCursor([[{ id: 1 }, { id: 2 }], [{ id: 3 }]]);
 
       const rs = new PgCursorResultSet(cursor as any);
       rs.setCursorSize(2);
@@ -200,9 +193,7 @@ describe("PgCursorResultSet", () => {
 
   describe("setCursorSize()", () => {
     it("changes the batch size for reads", async () => {
-      const cursor = createMockCursor([
-        [{ id: 1 }],
-      ]);
+      const cursor = createMockCursor([[{ id: 1 }]]);
 
       const rs = new PgCursorResultSet(cursor as any);
       rs.setCursorSize(50);

@@ -15,19 +15,15 @@
  * - Empty body writes
  * - Concurrent request safety (connection release)
  */
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
-import { Hono } from "hono";
+
+import { Column, Id, Table, Version } from "espalier-data";
 import { PgDataSource } from "espalier-jdbc-pg";
-import {
-  Table,
-  Column,
-  Id,
-  Version,
-} from "espalier-data";
+import { Hono } from "hono";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { extractSchema } from "../schema/index.js";
-import { createApiRoutes } from "../server/api-routes.js";
-import type { ApiRouteContext } from "../server/api-routes.js";
 import type { SchemaModel } from "../schema/schema-model.js";
+import type { ApiRouteContext } from "../server/api-routes.js";
+import { createApiRoutes } from "../server/api-routes.js";
 
 // =============================================================================
 // Postgres connectivity check
@@ -43,7 +39,11 @@ async function isPostgresAvailable(): Promise<boolean> {
     await ds.close();
     return true;
   } catch {
-    try { await ds.close(); } catch { /* ignore */ }
+    try {
+      await ds.close();
+    } catch {
+      /* ignore */
+    }
     return false;
   }
 }
@@ -294,10 +294,7 @@ describe.skipIf(!canConnect)("data browser HTTP API — adversarial (E2E)", () =
     });
 
     it("SQL injection via sort column is blocked", async () => {
-      const res = await req(
-        app,
-        `/api/tables/${TEST_TABLE}/rows?sort=name;DROP%20TABLE%20${TEST_TABLE}`,
-      );
+      const res = await req(app, `/api/tables/${TEST_TABLE}/rows?sort=name;DROP%20TABLE%20${TEST_TABLE}`);
       expect(res.status).toBe(200);
       // Sort should be ignored due to sanitize + column validation
       const body = await json(res);
@@ -305,10 +302,7 @@ describe.skipIf(!canConnect)("data browser HTTP API — adversarial (E2E)", () =
     });
 
     it("SQL injection via sort direction is harmless", async () => {
-      const res = await req(
-        app,
-        `/api/tables/${TEST_TABLE}/rows?sort=score,DESC;DROP%20TABLE%20${TEST_TABLE}`,
-      );
+      const res = await req(app, `/api/tables/${TEST_TABLE}/rows?sort=score,DESC;DROP%20TABLE%20${TEST_TABLE}`);
       expect(res.status).toBe(200);
     });
   });
@@ -340,10 +334,7 @@ describe.skipIf(!canConnect)("data browser HTTP API — adversarial (E2E)", () =
 
   describe("GET /api/tables/:table/rows/:id", () => {
     it("returns 404 for non-existent UUID", async () => {
-      const res = await req(
-        app,
-        `/api/tables/${TEST_TABLE}/rows/00000000-0000-0000-0000-000000000000`,
-      );
+      const res = await req(app, `/api/tables/${TEST_TABLE}/rows/00000000-0000-0000-0000-000000000000`);
       expect(res.status).toBe(404);
     });
 
@@ -389,24 +380,18 @@ describe.skipIf(!canConnect)("data browser HTTP API — adversarial (E2E)", () =
     });
 
     it("PUT blocked with 403", async () => {
-      const res = await req(
-        app,
-        `/api/tables/${TEST_TABLE}/rows/00000000-0000-0000-0000-000000000000`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: "Hacked" }),
-        },
-      );
+      const res = await req(app, `/api/tables/${TEST_TABLE}/rows/00000000-0000-0000-0000-000000000000`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: "Hacked" }),
+      });
       expect(res.status).toBe(403);
     });
 
     it("DELETE blocked with 403", async () => {
-      const res = await req(
-        app,
-        `/api/tables/${TEST_TABLE}/rows/00000000-0000-0000-0000-000000000000`,
-        { method: "DELETE" },
-      );
+      const res = await req(app, `/api/tables/${TEST_TABLE}/rows/00000000-0000-0000-0000-000000000000`, {
+        method: "DELETE",
+      });
       expect(res.status).toBe(403);
     });
   });
@@ -439,37 +424,29 @@ describe.skipIf(!canConnect)("data browser HTTP API — adversarial (E2E)", () =
     });
 
     it("PUT updates the inserted row", async () => {
-      const res = await req(
-        writeApp,
-        `/api/tables/${TEST_TABLE}/rows/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: "Updated", score: 99 }),
-        },
-      );
+      const res = await req(writeApp, `/api/tables/${TEST_TABLE}/rows/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: "Updated", score: 99 }),
+      });
       expect(res.status).toBe(200);
       const body = await json(res);
       expect(body.affected).toBe(1);
     });
 
     it("DELETE removes the inserted row", async () => {
-      const res = await req(
-        writeApp,
-        `/api/tables/${TEST_TABLE}/rows/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee`,
-        { method: "DELETE" },
-      );
+      const res = await req(writeApp, `/api/tables/${TEST_TABLE}/rows/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee`, {
+        method: "DELETE",
+      });
       expect(res.status).toBe(200);
       const body = await json(res);
       expect(body.affected).toBe(1);
     });
 
     it("DELETE on non-existent row returns 404", async () => {
-      const res = await req(
-        writeApp,
-        `/api/tables/${TEST_TABLE}/rows/00000000-0000-0000-0000-000000000000`,
-        { method: "DELETE" },
-      );
+      const res = await req(writeApp, `/api/tables/${TEST_TABLE}/rows/00000000-0000-0000-0000-000000000000`, {
+        method: "DELETE",
+      });
       expect(res.status).toBe(404);
     });
 
@@ -495,15 +472,11 @@ describe.skipIf(!canConnect)("data browser HTTP API — adversarial (E2E)", () =
     });
 
     it("PUT with empty columns returns 400", async () => {
-      const res = await req(
-        writeApp,
-        `/api/tables/${TEST_TABLE}/rows/00000000-0000-0000-0000-000000000000`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ bogus: "value" }),
-        },
-      );
+      const res = await req(writeApp, `/api/tables/${TEST_TABLE}/rows/00000000-0000-0000-0000-000000000000`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bogus: "value" }),
+      });
       expect(res.status).toBe(400);
     });
 
@@ -534,9 +507,7 @@ describe.skipIf(!canConnect)("data browser HTTP API — adversarial (E2E)", () =
 
   describe("concurrent requests", () => {
     it("handles 10 concurrent row listing requests", async () => {
-      const requests = Array.from({ length: 10 }, () =>
-        req(app, `/api/tables/${TEST_TABLE}/rows?size=5`),
-      );
+      const requests = Array.from({ length: 10 }, () => req(app, `/api/tables/${TEST_TABLE}/rows?size=5`));
       const responses = await Promise.all(requests);
       for (const res of responses) {
         expect(res.status).toBe(200);

@@ -1,13 +1,13 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { Logger } from "../../logger.js";
 import {
+  ConsoleLogger,
+  createConsoleLogger,
+  getGlobalLogger,
   LogLevel,
   NoopLogger,
-  ConsoleLogger,
   setGlobalLogger,
-  getGlobalLogger,
-  createConsoleLogger,
 } from "../../logger.js";
-import type { Logger } from "../../logger.js";
 
 describe("adversarial: logger", () => {
   // ──────────────────────────────────────────────

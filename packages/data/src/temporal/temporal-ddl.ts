@@ -1,8 +1,8 @@
 import { quoteIdentifier, validateIdentifier } from "espalier-jdbc";
-import { getEntityMetadata } from "../mapping/entity-metadata.js";
 import { getColumnMetadataEntries } from "../decorators/column.js";
 import { getTableName } from "../decorators/table.js";
 import { getTemporalMetadata } from "../decorators/temporal.js";
+import { getEntityMetadata } from "../mapping/entity-metadata.js";
 
 function qualifyTableName(tableName: string, schema?: string): string {
   if (!schema) return quoteIdentifier(tableName);
@@ -39,7 +39,9 @@ export function generateTemporalDdl(
   let instance: Record<string, unknown> = {};
   try {
     instance = new entityClass() as Record<string, unknown>;
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 
   const ifNotExists = options?.ifNotExists ? "IF NOT EXISTS " : "";
   const qualifiedHistory = qualifyTableName(historyTable, options?.schema);
@@ -73,9 +75,7 @@ export function generateTemporalDdl(
   const statements: string[] = [];
 
   // 1. CREATE TABLE for history
-  statements.push(
-    `CREATE TABLE ${ifNotExists}${qualifiedHistory} (\n${columns.join(",\n")}\n)`,
-  );
+  statements.push(`CREATE TABLE ${ifNotExists}${qualifiedHistory} (\n${columns.join(",\n")}\n)`);
 
   // 2. CREATE INDEX on temporal columns
   const idxValidFrom = `idx_${historyTable}_${validFrom}`;
@@ -103,9 +103,9 @@ export function generateTemporalDdl(
 
   // 3. Trigger function (PostgreSQL)
   // Resolve entity column names for the INSERT
-  const entityColumns = metadata.fields.map(f => f.columnName);
-  const quotedEntityCols = entityColumns.map(c => quoteIdentifier(c)).join(", ");
-  const oldEntityCols = entityColumns.map(c => `OLD.${quoteIdentifier(c)}`).join(", ");
+  const entityColumns = metadata.fields.map((f) => f.columnName);
+  const quotedEntityCols = entityColumns.map((c) => quoteIdentifier(c)).join(", ");
+  const oldEntityCols = entityColumns.map((c) => `OLD.${quoteIdentifier(c)}`).join(", ");
 
   const funcName = `${historyTable}_trigger_fn`;
   const qualifiedFunc = options?.schema
@@ -123,20 +123,20 @@ export function generateTemporalDdl(
 
   statements.push(
     `CREATE OR REPLACE FUNCTION ${qualifiedFunc}() RETURNS TRIGGER AS $$\n` +
-    `BEGIN\n` +
-    `  INSERT INTO ${qualifiedHistory} (${insertCols})\n` +
-    `  VALUES (${insertVals});\n` +
-    `  RETURN NEW;\n` +
-    `END;\n` +
-    `$$ LANGUAGE plpgsql`,
+      `BEGIN\n` +
+      `  INSERT INTO ${qualifiedHistory} (${insertCols})\n` +
+      `  VALUES (${insertVals});\n` +
+      `  RETURN NEW;\n` +
+      `END;\n` +
+      `$$ LANGUAGE plpgsql`,
   );
 
   // 4. CREATE TRIGGER
   const triggerName = `${historyTable}_trigger`;
   statements.push(
     `CREATE TRIGGER ${quoteIdentifier(triggerName)}\n` +
-    `AFTER UPDATE OR DELETE ON ${qualifiedEntity}\n` +
-    `FOR EACH ROW EXECUTE FUNCTION ${qualifiedFunc}()`,
+      `AFTER UPDATE OR DELETE ON ${qualifiedEntity}\n` +
+      `FOR EACH ROW EXECUTE FUNCTION ${qualifiedFunc}()`,
   );
 
   return statements;

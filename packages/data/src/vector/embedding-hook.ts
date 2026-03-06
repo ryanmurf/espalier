@@ -64,13 +64,7 @@ function buildSourceText(entity: Record<string, unknown>, sourceFields: string[]
  * ```
  */
 export function createEmbeddingHook(options: EmbeddingHookOptions): (this: Record<string, unknown>) => Promise<void> {
-  const {
-    vectorField,
-    sourceFields,
-    provider,
-    separator = " ",
-    onlyOnChange = true,
-  } = options;
+  const { vectorField, sourceFields, provider, separator = " ", onlyOnChange = true } = options;
 
   if (sourceFields.length === 0) {
     throw new Error("EmbeddingHookOptions.sourceFields must contain at least one field");

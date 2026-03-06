@@ -1,4 +1,4 @@
-import type { ResultSet, ColumnMetadata } from "espalier-jdbc";
+import type { ColumnMetadata, ResultSet } from "espalier-jdbc";
 import type { LibSqlResultSet } from "./libsql-types.js";
 
 export class LibSqlJdbcResultSet implements ResultSet {
@@ -36,7 +36,7 @@ export class LibSqlJdbcResultSet implements ResultSet {
   getBoolean(column: string | number): boolean | null {
     const value = this._getValue(column);
     if (value == null) return null;
-    if (typeof value === 'string') return value !== 'false' && value !== '0' && value !== '';
+    if (typeof value === "string") return value !== "false" && value !== "0" && value !== "";
     return Boolean(value);
   }
 

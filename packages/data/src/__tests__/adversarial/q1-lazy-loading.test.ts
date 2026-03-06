@@ -4,16 +4,9 @@
  * isLazyProxy/isInitialized/initializeProxy utilities, edge cases.
  * Repository E2E tests are in packages/jdbc-pg/src/__tests__/e2e/pg-lazy-loading.e2e.test.ts
  */
-import { describe, it, expect, vi } from "vitest";
-import {
-  isLazyProxy,
-  isInitialized,
-  initializeProxy,
-} from "../../index.js";
-import {
-  createLazySingleProxy,
-  createLazyCollectionProxy,
-} from "../../repository/lazy-proxy.js";
+import { describe, expect, it, vi } from "vitest";
+import { initializeProxy, isInitialized, isLazyProxy } from "../../index.js";
+import { createLazyCollectionProxy, createLazySingleProxy } from "../../repository/lazy-proxy.js";
 
 // ══════════════════════════════════════════════════
 // Section 1: createLazySingleProxy
@@ -95,15 +88,12 @@ describe("Lazy proxy adversarial: single-valued proxy", () => {
     const proxy = createLazySingleProxy(async () => {
       callCount++;
       // Small delay to simulate async DB query
-      await new Promise(r => setTimeout(r, 10));
+      await new Promise((r) => setTimeout(r, 10));
       return { id: 42 };
     });
 
     // Start two concurrent awaits
-    const [r1, r2] = await Promise.all([
-      (async () => await proxy)(),
-      (async () => await proxy)(),
-    ]);
+    const [r1, r2] = await Promise.all([(async () => await proxy)(), (async () => await proxy)()]);
     expect(r1).toEqual({ id: 42 });
     expect(r2).toEqual({ id: 42 });
     expect(callCount).toBe(1);
@@ -185,9 +175,9 @@ describe("Lazy proxy adversarial: collection proxy", () => {
       { id: 2, name: "b" },
     ]);
     await proxy;
-    expect(proxy.map(x => x.name)).toEqual(["a", "b"]);
-    expect(proxy.filter(x => x.id > 1)).toEqual([{ id: 2, name: "b" }]);
-    expect(proxy.find(x => x.name === "a")).toEqual({ id: 1, name: "a" });
+    expect(proxy.map((x) => x.name)).toEqual(["a", "b"]);
+    expect(proxy.filter((x) => x.id > 1)).toEqual([{ id: 2, name: "b" }]);
+    expect(proxy.find((x) => x.name === "a")).toEqual({ id: 1, name: "a" });
   });
 
   it("empty collection resolves to empty array", async () => {
@@ -209,14 +199,11 @@ describe("Lazy proxy adversarial: collection proxy", () => {
     let callCount = 0;
     const proxy = createLazyCollectionProxy(async () => {
       callCount++;
-      await new Promise(r => setTimeout(r, 10));
+      await new Promise((r) => setTimeout(r, 10));
       return [10, 20, 30];
     });
 
-    const [r1, r2] = await Promise.all([
-      (async () => await proxy)(),
-      (async () => await proxy)(),
-    ]);
+    const [r1, r2] = await Promise.all([(async () => await proxy)(), (async () => await proxy)()]);
     expect(r1).toEqual([10, 20, 30]);
     expect(r2).toEqual([10, 20, 30]);
     expect(callCount).toBe(1);
@@ -298,23 +285,25 @@ describe("Lazy proxy adversarial: utility functions", () => {
 // ══════════════════════════════════════════════════
 
 import {
-  Table,
   Column,
-  Id,
-  ManyToOne,
-  OneToMany,
-  OneToOne,
-  ManyToMany,
+  getManyToManyRelations,
   getManyToOneRelations,
   getOneToManyRelations,
   getOneToOneRelations,
-  getManyToManyRelations,
+  Id,
+  ManyToMany,
+  ManyToOne,
+  OneToMany,
+  OneToOne,
+  Table,
 } from "../../index.js";
 
 describe("Lazy proxy adversarial: decorator metadata", () => {
   it("@ManyToOne with lazy: true stores lazy flag in metadata", () => {
     @Table("lz_m2o_target")
-    class LzTarget { @Id @Column() id: number = 0; }
+    class LzTarget {
+      @Id @Column() id: number = 0;
+    }
 
     @Table("lz_m2o")
     class LzEntity {
@@ -322,7 +311,8 @@ describe("Lazy proxy adversarial: decorator metadata", () => {
       @ManyToOne({ target: () => LzTarget, lazy: true })
       ref!: LzTarget;
     }
-    new LzTarget(); new LzEntity();
+    new LzTarget();
+    new LzEntity();
 
     const rels = getManyToOneRelations(LzEntity);
     expect(rels[0].lazy).toBe(true);
@@ -330,7 +320,9 @@ describe("Lazy proxy adversarial: decorator metadata", () => {
 
   it("@ManyToOne without lazy defaults to false", () => {
     @Table("lz_m2o_d_target")
-    class LzDTarget { @Id @Column() id: number = 0; }
+    class LzDTarget {
+      @Id @Column() id: number = 0;
+    }
 
     @Table("lz_m2o_d")
     class LzDEntity {
@@ -338,7 +330,8 @@ describe("Lazy proxy adversarial: decorator metadata", () => {
       @ManyToOne({ target: () => LzDTarget })
       ref!: LzDTarget;
     }
-    new LzDTarget(); new LzDEntity();
+    new LzDTarget();
+    new LzDEntity();
 
     const rels = getManyToOneRelations(LzDEntity);
     expect(rels[0].lazy).toBe(false);
@@ -346,7 +339,9 @@ describe("Lazy proxy adversarial: decorator metadata", () => {
 
   it("@OneToOne with lazy: true stores lazy flag", () => {
     @Table("lz_o2o_target")
-    class LzO2OTarget { @Id @Column() id: number = 0; }
+    class LzO2OTarget {
+      @Id @Column() id: number = 0;
+    }
 
     @Table("lz_o2o")
     class LzO2OEntity {
@@ -354,7 +349,8 @@ describe("Lazy proxy adversarial: decorator metadata", () => {
       @OneToOne({ target: () => LzO2OTarget, lazy: true })
       ref!: LzO2OTarget;
     }
-    new LzO2OTarget(); new LzO2OEntity();
+    new LzO2OTarget();
+    new LzO2OEntity();
 
     const rels = getOneToOneRelations(LzO2OEntity);
     expect(rels[0].lazy).toBe(true);
@@ -373,7 +369,8 @@ describe("Lazy proxy adversarial: decorator metadata", () => {
       @OneToMany({ target: () => LzChild, mappedBy: "parent", lazy: true })
       children!: LzChild[];
     }
-    new LzChild(); new LzParent();
+    new LzChild();
+    new LzParent();
 
     const rels = getOneToManyRelations(LzParent);
     expect(rels[0].lazy).toBe(true);
@@ -381,7 +378,9 @@ describe("Lazy proxy adversarial: decorator metadata", () => {
 
   it("@ManyToMany with lazy: true stores lazy flag", () => {
     @Table("lz_m2m_tag")
-    class LzTag { @Id @Column() id: number = 0; }
+    class LzTag {
+      @Id @Column() id: number = 0;
+    }
 
     @Table("lz_m2m_post")
     class LzPost {
@@ -393,7 +392,8 @@ describe("Lazy proxy adversarial: decorator metadata", () => {
       })
       tags!: LzTag[];
     }
-    new LzTag(); new LzPost();
+    new LzTag();
+    new LzPost();
 
     const rels = getManyToManyRelations(LzPost);
     expect(rels[0].lazy).toBe(true);
@@ -401,10 +401,14 @@ describe("Lazy proxy adversarial: decorator metadata", () => {
 
   it("mixed lazy and eager on same entity", () => {
     @Table("lz_mix_dept")
-    class LzMDept { @Id @Column() id: number = 0; }
+    class LzMDept {
+      @Id @Column() id: number = 0;
+    }
 
     @Table("lz_mix_tag")
-    class LzMTag { @Id @Column() id: number = 0; }
+    class LzMTag {
+      @Id @Column() id: number = 0;
+    }
 
     @Table("lz_mix_child")
     class LzMChild {
@@ -426,7 +430,10 @@ describe("Lazy proxy adversarial: decorator metadata", () => {
       })
       tags!: LzMTag[]; // lazy
     }
-    new LzMDept(); new LzMTag(); new LzMChild(); new LzMParent();
+    new LzMDept();
+    new LzMTag();
+    new LzMChild();
+    new LzMParent();
 
     const m2o = getManyToOneRelations(LzMParent);
     expect(m2o[0].lazy).toBe(false);

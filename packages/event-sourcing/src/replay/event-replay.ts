@@ -1,6 +1,6 @@
 import type { Connection } from "espalier-jdbc";
-import type { StoredEvent } from "../types.js";
 import type { EventStore } from "../store/event-store.js";
+import type { StoredEvent } from "../types.js";
 
 export interface ReplayOptions {
   aggregateTypes?: string[];

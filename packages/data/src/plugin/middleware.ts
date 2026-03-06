@@ -5,7 +5,9 @@ export interface MiddlewareContext {
   /** Operation being performed (e.g., "save", "findById", "delete"). */
   operation: string;
   /** Entity class involved. */
-  entityClass: new (...args: any[]) => any;
+  entityClass: new (
+    ...args: any[]
+  ) => any;
   /** Arguments passed to the repository method. */
   args: unknown[];
   /** Arbitrary metadata for cross-middleware communication. */
@@ -16,10 +18,7 @@ export interface MiddlewareContext {
  * A middleware function that can intercept repository operations.
  * Call next() to continue the chain, or return directly to short-circuit.
  */
-export type MiddlewareFn = (
-  context: MiddlewareContext,
-  next: () => Promise<unknown>,
-) => Promise<unknown>;
+export type MiddlewareFn = (context: MiddlewareContext, next: () => Promise<unknown>) => Promise<unknown>;
 
 /**
  * Composes an array of middleware functions into a single function.

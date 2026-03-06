@@ -1,7 +1,7 @@
-import { describe, it, expect } from "vitest";
-import { BulkOperationBuilder } from "../../query/bulk-operation-builder.js";
-import type { BulkDialect, BulkQuery } from "../../query/bulk-operation-builder.js";
 import type { SqlValue } from "espalier-jdbc";
+import { describe, expect, it } from "vitest";
+import type { BulkDialect } from "../../query/bulk-operation-builder.js";
+import { BulkOperationBuilder } from "../../query/bulk-operation-builder.js";
 
 // ==========================================================================
 // Helpers
@@ -12,9 +12,7 @@ function makeBuilder(opts?: { dialect?: BulkDialect; chunkSize?: number; returni
 }
 
 function makeRows(count: number, colCount: number): SqlValue[][] {
-  return Array.from({ length: count }, (_, i) =>
-    Array.from({ length: colCount }, (_, j) => `val-${i}-${j}`),
-  );
+  return Array.from({ length: count }, (_, i) => Array.from({ length: colCount }, (_, j) => `val-${i}-${j}`));
 }
 
 // ==========================================================================
@@ -83,14 +81,28 @@ describe("BulkOperationBuilder.buildBulkInsert — adversarial", () => {
 
   it("parameter indices are sequential across rows", () => {
     const b = makeBuilder();
-    const queries = b.buildBulkInsert("t", ["a", "b"], [["x1", "x2"], ["y1", "y2"]]);
+    const queries = b.buildBulkInsert(
+      "t",
+      ["a", "b"],
+      [
+        ["x1", "x2"],
+        ["y1", "y2"],
+      ],
+    );
     expect(queries[0].sql).toContain("($1, $2), ($3, $4)");
     expect(queries[0].params).toEqual(["x1", "x2", "y1", "y2"]);
   });
 
   it("null values — preserved as null params", () => {
     const b = makeBuilder();
-    const queries = b.buildBulkInsert("t", ["a", "b"], [[null, "val"], ["val", null]]);
+    const queries = b.buildBulkInsert(
+      "t",
+      ["a", "b"],
+      [
+        [null, "val"],
+        ["val", null],
+      ],
+    );
     expect(queries[0].params).toEqual([null, "val", "val", null]);
   });
 
@@ -172,11 +184,15 @@ describe("BulkOperationBuilder — chunking", () => {
 
   it("parameter indices reset per chunk", () => {
     const b = makeBuilder({ chunkSize: 2 });
-    const queries = b.buildBulkInsert("t", ["a", "b"], [
-      ["a1", "b1"],
-      ["a2", "b2"],
-      ["a3", "b3"],
-    ]);
+    const queries = b.buildBulkInsert(
+      "t",
+      ["a", "b"],
+      [
+        ["a1", "b1"],
+        ["a2", "b2"],
+        ["a3", "b3"],
+      ],
+    );
     expect(queries.length).toBe(2);
     // First chunk: $1..$4
     expect(queries[0].sql).toContain("$1");
@@ -217,7 +233,8 @@ describe("BulkOperationBuilder.buildBulkUpsert — adversarial", () => {
   it("postgres upsert with update columns — ON CONFLICT DO UPDATE SET", () => {
     const b = makeBuilder({ dialect: "postgres" });
     const queries = b.buildBulkUpsert(
-      "t", ["id", "name", "email"],
+      "t",
+      ["id", "name", "email"],
       [[1, "Alice", "a@b.com"]],
       ["id"],
       ["name", "email"],
@@ -229,42 +246,32 @@ describe("BulkOperationBuilder.buildBulkUpsert — adversarial", () => {
 
   it("postgres upsert with no update columns — DO NOTHING", () => {
     const b = makeBuilder({ dialect: "postgres" });
-    const queries = b.buildBulkUpsert(
-      "t", ["id", "name"], [[1, "Alice"]], ["id"], [],
-    );
+    const queries = b.buildBulkUpsert("t", ["id", "name"], [[1, "Alice"]], ["id"], []);
     expect(queries[0].sql).toContain('ON CONFLICT ("id") DO NOTHING');
   });
 
   it("postgres upsert with composite conflict columns", () => {
     const b = makeBuilder({ dialect: "postgres" });
-    const queries = b.buildBulkUpsert(
-      "t", ["a", "b", "c"], [["x", "y", "z"]], ["a", "b"], ["c"],
-    );
+    const queries = b.buildBulkUpsert("t", ["a", "b", "c"], [["x", "y", "z"]], ["a", "b"], ["c"]);
     expect(queries[0].sql).toContain('ON CONFLICT ("a", "b") DO UPDATE SET');
   });
 
   it("mysql upsert with update columns — ON DUPLICATE KEY UPDATE", () => {
     const b = makeBuilder({ dialect: "mysql" });
-    const queries = b.buildBulkUpsert(
-      "t", ["id", "name"], [[1, "Alice"]], ["id"], ["name"],
-    );
+    const queries = b.buildBulkUpsert("t", ["id", "name"], [[1, "Alice"]], ["id"], ["name"]);
     expect(queries[0].sql).toContain("ON DUPLICATE KEY UPDATE");
     expect(queries[0].sql).toContain('"name" = VALUES("name")');
   });
 
   it("mysql upsert with no update columns — self-assign to conflict col (no-op)", () => {
     const b = makeBuilder({ dialect: "mysql" });
-    const queries = b.buildBulkUpsert(
-      "t", ["id", "name"], [[1, "Alice"]], ["id"], [],
-    );
+    const queries = b.buildBulkUpsert("t", ["id", "name"], [[1, "Alice"]], ["id"], []);
     expect(queries[0].sql).toContain('ON DUPLICATE KEY UPDATE "id" = "id"');
   });
 
   it("sqlite upsert — same syntax as postgres (ON CONFLICT)", () => {
     const b = makeBuilder({ dialect: "sqlite" });
-    const queries = b.buildBulkUpsert(
-      "t", ["id", "name"], [[1, "Alice"]], ["id"], ["name"],
-    );
+    const queries = b.buildBulkUpsert("t", ["id", "name"], [[1, "Alice"]], ["id"], ["name"]);
     expect(queries[0].sql).toContain("ON CONFLICT");
     expect(queries[0].sql).toContain("EXCLUDED");
   });
@@ -272,7 +279,15 @@ describe("BulkOperationBuilder.buildBulkUpsert — adversarial", () => {
   it("upsert with chunking — each chunk gets ON CONFLICT clause", () => {
     const b = makeBuilder({ dialect: "postgres", chunkSize: 2 });
     const queries = b.buildBulkUpsert(
-      "t", ["id", "val"], [[1, "a"], [2, "b"], [3, "c"]], ["id"], ["val"],
+      "t",
+      ["id", "val"],
+      [
+        [1, "a"],
+        [2, "b"],
+        [3, "c"],
+      ],
+      ["id"],
+      ["val"],
     );
     expect(queries.length).toBe(2);
     for (const q of queries) {
@@ -282,9 +297,7 @@ describe("BulkOperationBuilder.buildBulkUpsert — adversarial", () => {
 
   it("upsert with RETURNING — postgres only", () => {
     const b = makeBuilder({ dialect: "postgres", returning: ["id", "val"] });
-    const queries = b.buildBulkUpsert(
-      "t", ["id", "val"], [[1, "a"]], ["id"], ["val"],
-    );
+    const queries = b.buildBulkUpsert("t", ["id", "val"], [[1, "a"]], ["id"], ["val"]);
     expect(queries[0].sql).toContain('RETURNING "id", "val"');
   });
 });
@@ -312,11 +325,16 @@ describe("BulkOperationBuilder.buildBulkUpdate — adversarial", () => {
 
   it("multiple rows — multiple WHEN clauses", () => {
     const b = makeBuilder();
-    const queries = b.buildBulkUpdate("t", "id", ["name"], [
-      [1, "Alice"],
-      [2, "Bob"],
-      [3, "Charlie"],
-    ]);
+    const queries = b.buildBulkUpdate(
+      "t",
+      "id",
+      ["name"],
+      [
+        [1, "Alice"],
+        [2, "Bob"],
+        [3, "Charlie"],
+      ],
+    );
     const sql = queries[0].sql;
     // 3 WHEN clauses
     const whenCount = (sql.match(/WHEN/g) || []).length;
@@ -327,10 +345,15 @@ describe("BulkOperationBuilder.buildBulkUpdate — adversarial", () => {
 
   it("multiple update columns — multiple CASE expressions", () => {
     const b = makeBuilder();
-    const queries = b.buildBulkUpdate("t", "id", ["name", "email"], [
-      [1, "Alice", "a@b.com"],
-      [2, "Bob", "b@b.com"],
-    ]);
+    const queries = b.buildBulkUpdate(
+      "t",
+      "id",
+      ["name", "email"],
+      [
+        [1, "Alice", "a@b.com"],
+        [2, "Bob", "b@b.com"],
+      ],
+    );
     const sql = queries[0].sql;
     const caseCount = (sql.match(/CASE/g) || []).length;
     expect(caseCount).toBe(2); // one per update column
@@ -366,18 +389,23 @@ describe("BulkOperationBuilder.buildBulkUpdate — adversarial", () => {
 
   it("SQL injection in id value — parameterized", () => {
     const b = makeBuilder();
-    const queries = b.buildBulkUpdate("t", "id", ["name"], [
-      ["1; DROP TABLE t; --" as any, "Alice"],
-    ]);
+    const queries = b.buildBulkUpdate("t", "id", ["name"], [["1; DROP TABLE t; --" as any, "Alice"]]);
     expect(queries[0].sql).not.toContain("DROP TABLE");
     expect(queries[0].params).toContain("1; DROP TABLE t; --");
   });
 
   it("chunking applies to updates too", () => {
     const b = makeBuilder({ chunkSize: 2 });
-    const queries = b.buildBulkUpdate("t", "id", ["name"], [
-      [1, "a"], [2, "b"], [3, "c"],
-    ]);
+    const queries = b.buildBulkUpdate(
+      "t",
+      "id",
+      ["name"],
+      [
+        [1, "a"],
+        [2, "b"],
+        [3, "c"],
+      ],
+    );
     expect(queries.length).toBe(2);
   });
 
@@ -486,10 +514,9 @@ describe("BulkOperationBuilder — mismatched columns and row values", () => {
 
   it("rows with inconsistent lengths — throws validation error for mismatched row", () => {
     const b = makeBuilder();
-    expect(() => b.buildBulkInsert("t", ["a", "b"], [
-      ["x", "y"],
-      ["z"],
-    ])).toThrow("Row 1 has 1 values but 2 columns were specified");
+    expect(() => b.buildBulkInsert("t", ["a", "b"], [["x", "y"], ["z"]])).toThrow(
+      "Row 1 has 1 values but 2 columns were specified",
+    );
   });
 });
 
@@ -513,7 +540,7 @@ describe("BulkOperationBuilder — special values", () => {
 
   it("empty string values — preserved", () => {
     const b = makeBuilder();
-    const queries = b.buildBulkInsert("t", ["a"], [[""]] );
+    const queries = b.buildBulkInsert("t", ["a"], [[""]]);
     expect(queries[0].params[0]).toBe("");
   });
 

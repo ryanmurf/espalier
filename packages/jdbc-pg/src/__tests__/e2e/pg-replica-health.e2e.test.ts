@@ -3,12 +3,13 @@
  *
  * Unit tests use mocked connections; E2E tests run against live Postgres.
  */
-import { describe, it, expect, vi, beforeAll, afterAll } from "vitest";
-import { ReplicaLagHealthCheck, TenantSchemaHealthCheck } from "../../pg-replica-health.js";
-import type { ReplicaLagConfig } from "../../pg-replica-health.js";
-import { createTestDataSource, isPostgresAvailable } from "./setup.js";
+
+import type { Connection, DataSource, ResultSet, Statement } from "espalier-jdbc";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type { PgDataSource } from "../../pg-data-source.js";
-import type { DataSource, Connection, Statement, ResultSet } from "espalier-jdbc";
+import type { ReplicaLagConfig } from "../../pg-replica-health.js";
+import { ReplicaLagHealthCheck, TenantSchemaHealthCheck } from "../../pg-replica-health.js";
+import { createTestDataSource, isPostgresAvailable } from "./setup.js";
 
 // ══════════════════════════════════════════════════
 // Mock helpers
@@ -17,7 +18,10 @@ import type { DataSource, Connection, Statement, ResultSet } from "espalier-jdbc
 function mockResultSet(rows: Record<string, unknown>[]): ResultSet {
   let idx = -1;
   return {
-    next: vi.fn(async () => { idx++; return idx < rows.length; }),
+    next: vi.fn(async () => {
+      idx++;
+      return idx < rows.length;
+    }),
     getRow: vi.fn(() => rows[idx] ?? {}),
     close: vi.fn().mockResolvedValue(undefined),
     [Symbol.asyncIterator]: vi.fn(),
@@ -62,10 +66,10 @@ describe("ReplicaLagHealthCheck (unit)", () => {
         const recoveryRs = mockResultSet([{ is_replica: isReplica }]);
         const lagRs = mockResultSet(lagSeconds !== null ? [{ lag_seconds: lagSeconds }] : []);
         return mockStatement({
-          "pg_is_in_recovery": recoveryRs,
-          "pg_last_xact_replay_timestamp": lagRs,
+          pg_is_in_recovery: recoveryRs,
+          pg_last_xact_replay_timestamp: lagRs,
         });
-      })
+      }),
     );
   }
 
@@ -189,10 +193,10 @@ describe("ReplicaLagHealthCheck (unit)", () => {
         const recoveryRs = mockResultSet([{ is_replica: true }]);
         const lagRs = mockResultSet([{ lag_seconds: "15.5" }]); // string, not number
         return mockStatement({
-          "pg_is_in_recovery": recoveryRs,
-          "pg_last_xact_replay_timestamp": lagRs,
+          pg_is_in_recovery: recoveryRs,
+          pg_last_xact_replay_timestamp: lagRs,
         });
-      })
+      }),
     );
     const check = new ReplicaLagHealthCheck("replica", ds);
 
@@ -220,9 +224,9 @@ describe("TenantSchemaHealthCheck (unit)", () => {
   function makeSchemaDs(existingSchemas: string[]): DataSource {
     return mockDataSource(() =>
       mockConnection(() => {
-        const rs = mockResultSet(existingSchemas.map(s => ({ schema_name: s })));
+        const rs = mockResultSet(existingSchemas.map((s) => ({ schema_name: s })));
         return mockStatement({ "information_schema.schemata": rs });
-      })
+      }),
     );
   }
 
@@ -265,10 +269,7 @@ describe("TenantSchemaHealthCheck (unit)", () => {
 
   it("schema resolver is applied", async () => {
     const ds = makeSchemaDs(["schema_alpha", "schema_beta"]);
-    const check = new TenantSchemaHealthCheck(
-      "tenants", ds, ["alpha", "beta"],
-      (id) => `schema_${id}`,
-    );
+    const check = new TenantSchemaHealthCheck("tenants", ds, ["alpha", "beta"], (id) => `schema_${id}`);
 
     const result = await check.check();
     expect(result.status).toBe("UP");
@@ -278,7 +279,9 @@ describe("TenantSchemaHealthCheck (unit)", () => {
   it("schema resolver mismatch causes DEGRADED", async () => {
     const ds = makeSchemaDs(["alpha", "beta"]);
     const check = new TenantSchemaHealthCheck(
-      "tenants", ds, ["alpha", "beta"],
+      "tenants",
+      ds,
+      ["alpha", "beta"],
       (id) => `tenant_${id}`, // resolves to tenant_alpha, tenant_beta — not in DB
     );
 
@@ -389,10 +392,7 @@ describe.skipIf(!canConnect)("E2E: Replica Lag & Tenant Schema Health Checks", {
     });
 
     it("missing schema returns DEGRADED", async () => {
-      const check = new TenantSchemaHealthCheck(
-        "schema-check", ds,
-        [testSchema, "nonexistent_schema_xyz_abc_123"],
-      );
+      const check = new TenantSchemaHealthCheck("schema-check", ds, [testSchema, "nonexistent_schema_xyz_abc_123"]);
 
       const result = await check.check();
       expect(result.status).toBe("DEGRADED");
@@ -400,10 +400,7 @@ describe.skipIf(!canConnect)("E2E: Replica Lag & Tenant Schema Health Checks", {
     });
 
     it("all missing schemas returns DOWN", async () => {
-      const check = new TenantSchemaHealthCheck(
-        "schema-check", ds,
-        ["nonexistent_1", "nonexistent_2"],
-      );
+      const check = new TenantSchemaHealthCheck("schema-check", ds, ["nonexistent_1", "nonexistent_2"]);
 
       const result = await check.check();
       expect(result.status).toBe("DOWN");
@@ -411,7 +408,8 @@ describe.skipIf(!canConnect)("E2E: Replica Lag & Tenant Schema Health Checks", {
 
     it("schema resolver with prefix works against live DB", async () => {
       const check = new TenantSchemaHealthCheck(
-        "schema-check", ds,
+        "schema-check",
+        ds,
         ["test_schema"], // resolved to health_check_test_schema
         (id) => `health_check_${id}`,
       );

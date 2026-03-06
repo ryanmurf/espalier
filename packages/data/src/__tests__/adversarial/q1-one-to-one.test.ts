@@ -3,16 +3,16 @@
  * Covers: decorator metadata edge cases and DDL generation.
  * Repository E2E tests are in packages/jdbc-pg/src/__tests__/e2e/pg-one-to-one.e2e.test.ts
  */
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-  Table,
   Column,
-  Id,
-  OneToOne,
-  ManyToOne,
-  getOneToOneRelations,
-  getEntityMetadata,
   DdlGenerator,
+  getEntityMetadata,
+  getOneToOneRelations,
+  Id,
+  ManyToOne,
+  OneToOne,
+  Table,
 } from "../../index.js";
 
 const generator = new DdlGenerator();
@@ -116,10 +116,10 @@ describe("@OneToOne adversarial: metadata edge cases", () => {
 
     const relations = getOneToOneRelations(MultiTarget);
     expect(relations).toHaveLength(2);
-    const joinColumns = relations.map(r => r.joinColumn);
+    const joinColumns = relations.map((r) => r.joinColumn);
     expect(joinColumns).toContain("primary_ref_id");
     expect(joinColumns).toContain("secondary_ref_id");
-    expect(relations.every(r => r.isOwning)).toBe(true);
+    expect(relations.every((r) => r.isOwning)).toBe(true);
   });
 
   it("@OneToOne combined with @ManyToOne on same class", () => {

@@ -1,65 +1,60 @@
 // Core types
-export type {
-  DomainEvent,
-  StoredEvent,
-  Command,
-  CommandResult,
-  OutboxEntry,
-  EventStoreOptions,
-  OutboxOptions,
-} from "./types.js";
-
-// Event store
-export { EventStore } from "./store/index.js";
-export { ConcurrencyError } from "./store/index.js";
-
-// Aggregate root
-export { AggregateRoot, getAggregateRootMetadata, isAggregateRoot } from "./aggregate/index.js";
-export type { AggregateRootOptions, AggregateRootMetadata } from "./aggregate/index.js";
-export { AggregateBase } from "./aggregate/index.js";
-export { EventHandler, getEventHandlers } from "./aggregate/index.js";
-
-// Command bus
-export {
-  CommandBus,
-  getGlobalCommandBus,
-  resetGlobalCommandBus,
-  CommandHandler,
-  getCommandHandlerMetadata,
-  isCommandHandler,
-  loggingMiddleware,
-  validationMiddleware,
-  retryMiddleware,
-} from "./command/index.js";
-export type {
-  CommandHandlerFn,
-  CommandMiddlewareFn,
-  CommandHandlerOptions,
-} from "./command/index.js";
-
-// Outbox
-export { OutboxStore } from "./outbox/index.js";
-export { OutboxPublisher } from "./outbox/index.js";
-export type { OutboxPublishFn } from "./outbox/index.js";
-export { Outbox, getOutboxMetadata, isOutboxEntity } from "./outbox/index.js";
-export type { OutboxDecoratorOptions } from "./outbox/index.js";
 
 // Adapter
 export type { ExternalEventBusAdapter } from "./adapter/index.js";
 export { InMemoryEventBusAdapter } from "./adapter/index.js";
+export type { AggregateRootMetadata, AggregateRootOptions } from "./aggregate/index.js";
+// Aggregate root
+export {
+  AggregateBase,
+  AggregateRoot,
+  EventHandler,
+  getAggregateRootMetadata,
+  getEventHandlers,
+  isAggregateRoot,
+} from "./aggregate/index.js";
+export type {
+  CommandHandlerFn,
+  CommandHandlerOptions,
+  CommandMiddlewareFn,
+} from "./command/index.js";
 
+// Command bus
+export {
+  CommandBus,
+  CommandHandler,
+  getCommandHandlerMetadata,
+  getGlobalCommandBus,
+  isCommandHandler,
+  loggingMiddleware,
+  resetGlobalCommandBus,
+  retryMiddleware,
+  validationMiddleware,
+} from "./command/index.js";
+export type { OutboxDecoratorOptions, OutboxPublishFn } from "./outbox/index.js";
+// Outbox
+export { getOutboxMetadata, isOutboxEntity, Outbox, OutboxPublisher, OutboxStore } from "./outbox/index.js";
 // Plugin
 export type { EventSourcingPluginConfig } from "./plugin/index.js";
 export { EventSourcingPlugin } from "./plugin/index.js";
-
-// Projection
-export { Projection, getProjectionMetadata, ProjectionRunner } from "./projection/index.js";
 export type { ProjectionHandler, ProjectionOptions } from "./projection/index.js";
+// Projection
+export { getProjectionMetadata, Projection, ProjectionRunner } from "./projection/index.js";
+export type { ReplayOptions } from "./replay/index.js";
+// Replay
+export { EventReplayer } from "./replay/index.js";
+export type { AggregateSnapshot } from "./snapshot/index.js";
 
 // Snapshot
 export { SnapshotStore } from "./snapshot/index.js";
-export type { AggregateSnapshot } from "./snapshot/index.js";
-
-// Replay
-export { EventReplayer } from "./replay/index.js";
-export type { ReplayOptions } from "./replay/index.js";
+// Event store
+export { ConcurrencyError, EventStore } from "./store/index.js";
+export type {
+  Command,
+  CommandResult,
+  DomainEvent,
+  EventStoreOptions,
+  OutboxEntry,
+  OutboxOptions,
+  StoredEvent,
+} from "./types.js";

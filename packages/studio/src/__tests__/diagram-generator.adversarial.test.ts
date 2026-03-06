@@ -15,23 +15,23 @@
  * - Duplicate relation deduplication
  * - Title with special characters
  */
-import { describe, it, expect } from "vitest";
+
 import {
-  Table,
   Column,
+  CreatedDate,
   Id,
-  Version,
+  LastModifiedDate,
+  ManyToMany,
   ManyToOne,
   OneToMany,
-  OneToOne,
-  ManyToMany,
+  Table,
   TenantId,
-  CreatedDate,
-  LastModifiedDate,
+  Version,
 } from "espalier-data";
-import { extractSchema } from "../schema/index.js";
+import { describe, expect, it } from "vitest";
 import { generateDiagram } from "../diagram/index.js";
-import type { SchemaModel, DiagramFormat } from "../index.js";
+import type { DiagramFormat, SchemaModel } from "../index.js";
+import { extractSchema } from "../schema/index.js";
 
 // =============================================================================
 // Test entities
@@ -188,11 +188,7 @@ new Article();
 
 const ALL_FORMATS: DiagramFormat[] = ["mermaid", "d2", "plantuml"];
 
-function extractAndGenerate(
-  entities: (new (...args: any[]) => any)[],
-  format: DiagramFormat,
-  title?: string,
-): string {
+function extractAndGenerate(entities: (new (...args: any[]) => any)[], format: DiagramFormat, title?: string): string {
   const schema = extractSchema({ entities });
   return generateDiagram(schema, { format, title });
 }
@@ -281,9 +277,7 @@ describe("diagram generator — adversarial", () => {
       const output = extractAndGenerate([GraphNode], "mermaid");
       // Should have graph_nodes referencing itself
       const lines = output.split("\n");
-      const relLines = lines.filter(
-        (l) => l.includes("graph_nodes") && l.includes(":"),
-      );
+      const relLines = lines.filter((l) => l.includes("graph_nodes") && l.includes(":"));
       expect(relLines.length).toBeGreaterThan(0);
     });
   });
@@ -315,9 +309,7 @@ describe("diagram generator — adversarial", () => {
       const output = extractAndGenerate([Tag, Article], "mermaid");
       const lines = output.split("\n");
       const relLines = lines.filter(
-        (l) =>
-          (l.includes("tags") && l.includes("articles")) ||
-          (l.includes("articles") && l.includes("tags")),
+        (l) => (l.includes("tags") && l.includes("articles")) || (l.includes("articles") && l.includes("tags")),
       );
       // M:N bidirectional: owning side + inverse side
       // The generator's dedup uses sorted table names + fieldName as key
@@ -409,18 +401,8 @@ describe("diagram generator — adversarial", () => {
     });
 
     it("relation lines use valid Mermaid ER connectors", () => {
-      const output = extractAndGenerate(
-        [Depth1, Depth2, Depth3, Depth4, Depth5, Depth6],
-        "mermaid",
-      );
-      const validConnectors = [
-        "}o--||",
-        "}|--||",
-        "||--o{",
-        "}o--o{",
-        "|o--||",
-        "||--||",
-      ];
+      const output = extractAndGenerate([Depth1, Depth2, Depth3, Depth4, Depth5, Depth6], "mermaid");
+      const validConnectors = ["}o--||", "}|--||", "||--o{", "}o--o{", "|o--||", "||--||"];
       const lines = output.split("\n");
       const relLines = lines.filter((l) => l.includes('" :') || l.includes(': "'));
       for (const line of relLines) {
@@ -447,9 +429,7 @@ describe("diagram generator — adversarial", () => {
       const lines = output.split("\n");
       const entityStart = lines.findIndex((l) => l.includes("widgets"));
       const separator = lines.findIndex((l, i) => i > entityStart && l.trim() === "--");
-      const pkLine = lines.findIndex(
-        (l, i) => i > entityStart && l.includes("<<PK>>"),
-      );
+      const pkLine = lines.findIndex((l, i) => i > entityStart && l.includes("<<PK>>"));
       if (separator !== -1 && pkLine !== -1) {
         expect(pkLine).toBeLessThan(separator);
       }
@@ -463,10 +443,7 @@ describe("diagram generator — adversarial", () => {
     });
 
     it("relation lines use arrow syntax", () => {
-      const output = extractAndGenerate(
-        [Depth1, Depth2],
-        "d2",
-      );
+      const output = extractAndGenerate([Depth1, Depth2], "d2");
       expect(output).toMatch(/->/);
     });
   });
@@ -475,11 +452,20 @@ describe("diagram generator — adversarial", () => {
     it("generates all three formats for 12+ entities without error", () => {
       const allEntities = [
         Widget,
-        Depth1, Depth2, Depth3, Depth4, Depth5, Depth6,
+        Depth1,
+        Depth2,
+        Depth3,
+        Depth4,
+        Depth5,
+        Depth6,
         GraphNode,
-        DiamondA, DiamondB, DiamondC, DiamondD,
+        DiamondA,
+        DiamondB,
+        DiamondC,
+        DiamondD,
         FullEntity,
-        Tag, Article,
+        Tag,
+        Article,
       ];
 
       for (const format of ALL_FORMATS) {

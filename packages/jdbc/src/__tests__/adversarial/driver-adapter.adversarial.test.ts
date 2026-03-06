@@ -2,17 +2,16 @@
  * Adversarial tests for DriverAdapter interface, DriverCapabilities, and runtime detection.
  * Y4 Q2 — Task T1-Test
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { detectRuntime } from "../../runtime-detect.js";
-import { IsolationLevel } from "../../transaction.js";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   DriverAdapter,
   DriverCapabilities,
   DriverExecResult,
   DriverQueryResult,
   DriverRow,
-  RuntimeInfo,
 } from "../../driver-adapter.js";
+import { detectRuntime } from "../../runtime-detect.js";
+import { IsolationLevel } from "../../transaction.js";
 import type { SqlValue } from "../../types.js";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -22,12 +21,13 @@ function createMockAdapter(overrides: Partial<DriverAdapter> = {}): DriverAdapte
     name: "mock",
     connect: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
     disconnect: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
-    execute: vi.fn<(sql: string, params?: SqlValue[]) => Promise<DriverExecResult>>()
+    execute: vi
+      .fn<(sql: string, params?: SqlValue[]) => Promise<DriverExecResult>>()
       .mockResolvedValue({ affectedRows: 0 }),
-    query: vi.fn<(sql: string, params?: SqlValue[]) => Promise<DriverQueryResult>>()
+    query: vi
+      .fn<(sql: string, params?: SqlValue[]) => Promise<DriverQueryResult>>()
       .mockResolvedValue({ rows: [], columns: [] }),
-    beginTransaction: vi.fn<(isolation?: IsolationLevel) => Promise<void>>()
-      .mockResolvedValue(undefined),
+    beginTransaction: vi.fn<(isolation?: IsolationLevel) => Promise<void>>().mockResolvedValue(undefined),
     commit: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
     rollback: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
     getCapabilities: vi.fn<() => DriverCapabilities>().mockReturnValue({
@@ -343,9 +343,7 @@ describe("DriverAdapter error propagation", () => {
     const adapter = createMockAdapter({
       query: vi.fn().mockRejectedValue(new Error("relation does not exist")),
     });
-    await expect(adapter.query("SELECT * FROM nonexistent")).rejects.toThrow(
-      "relation does not exist",
-    );
+    await expect(adapter.query("SELECT * FROM nonexistent")).rejects.toThrow("relation does not exist");
   });
 
   it("beginTransaction() throws propagated error", async () => {
@@ -436,9 +434,7 @@ describe("adapter with null/undefined/empty returns", () => {
   });
 
   it("query returning rows with undefined column values", async () => {
-    const rows: DriverRow[] = [
-      { id: 1, name: undefined },
-    ];
+    const rows: DriverRow[] = [{ id: 1, name: undefined }];
     const adapter = createMockAdapter({
       query: vi.fn().mockResolvedValue({ rows, columns: ["id", "name"] }),
     });
@@ -514,21 +510,15 @@ describe("adapter with null/undefined/empty returns", () => {
 
 describe("type safety — SqlValue and Uint8Array", () => {
   it("SqlValue accepts string, number, boolean, Date, Uint8Array, null", () => {
-    const values: SqlValue[] = [
-      "hello",
-      42,
-      true,
-      new Date(),
-      new Uint8Array([0xff, 0x00]),
-      null,
-    ];
+    const values: SqlValue[] = ["hello", 42, true, new Date(), new Uint8Array([0xff, 0x00]), null];
     // All should be valid SqlValue types
     expect(values).toHaveLength(6);
   });
 
   it("Uint8Array flows through adapter params without conversion to Buffer", async () => {
     const binaryData = new Uint8Array([0xde, 0xad, 0xbe, 0xef]);
-    const executeFn = vi.fn<(sql: string, params?: SqlValue[]) => Promise<DriverExecResult>>()
+    const executeFn = vi
+      .fn<(sql: string, params?: SqlValue[]) => Promise<DriverExecResult>>()
       .mockResolvedValue({ affectedRows: 1 });
     const adapter = createMockAdapter({ execute: executeFn });
 
@@ -570,7 +560,8 @@ describe("type safety — SqlValue and Uint8Array", () => {
 
   it("Date values are preserved through adapter", async () => {
     const now = new Date();
-    const queryFn = vi.fn<(sql: string, params?: SqlValue[]) => Promise<DriverQueryResult>>()
+    const queryFn = vi
+      .fn<(sql: string, params?: SqlValue[]) => Promise<DriverQueryResult>>()
       .mockResolvedValue({ rows: [{ created: now }] });
     const adapter = createMockAdapter({ query: queryFn });
 
@@ -579,7 +570,8 @@ describe("type safety — SqlValue and Uint8Array", () => {
   });
 
   it("boolean values are preserved (not coerced to 0/1)", async () => {
-    const queryFn = vi.fn<(sql: string, params?: SqlValue[]) => Promise<DriverQueryResult>>()
+    const queryFn = vi
+      .fn<(sql: string, params?: SqlValue[]) => Promise<DriverQueryResult>>()
       .mockResolvedValue({ rows: [{ active: true }] });
     const adapter = createMockAdapter({ query: queryFn });
 
@@ -603,9 +595,7 @@ describe("concurrent adapter calls", () => {
       }),
     });
 
-    const promises = Array.from({ length: 10 }, (_, i) =>
-      adapter.execute(`INSERT INTO t VALUES (${i})`),
-    );
+    const promises = Array.from({ length: 10 }, (_, i) => adapter.execute(`INSERT INTO t VALUES (${i})`));
     const results = await Promise.all(promises);
 
     expect(results).toHaveLength(10);
@@ -635,15 +625,15 @@ describe("concurrent adapter calls", () => {
   });
 
   it("concurrent connect and disconnect calls", async () => {
-    let connected = false;
+    let _connected = false;
     const adapter = createMockAdapter({
       connect: vi.fn(async () => {
         await new Promise((r) => setTimeout(r, 5));
-        connected = true;
+        _connected = true;
       }),
       disconnect: vi.fn(async () => {
         await new Promise((r) => setTimeout(r, 5));
-        connected = false;
+        _connected = false;
       }),
     });
 
@@ -693,9 +683,7 @@ describe("concurrent adapter calls", () => {
       }),
     });
 
-    const promises = Array.from({ length: 100 }, (_, i) =>
-      adapter.query("SELECT ?", [i]),
-    );
+    const promises = Array.from({ length: 100 }, (_, i) => adapter.query("SELECT ?", [i]));
     const results = await Promise.all(promises);
 
     expect(results).toHaveLength(100);
@@ -780,20 +768,19 @@ describe("DriverAdapter interface contract", () => {
   });
 
   it("execute with params passes them through", async () => {
-    const executeFn = vi.fn<(sql: string, params?: SqlValue[]) => Promise<DriverExecResult>>()
+    const executeFn = vi
+      .fn<(sql: string, params?: SqlValue[]) => Promise<DriverExecResult>>()
       .mockResolvedValue({ affectedRows: 1 });
     const adapter = createMockAdapter({ execute: executeFn });
 
     await adapter.execute("INSERT INTO t (a, b) VALUES (?, ?)", ["hello", 42]);
 
-    expect(executeFn).toHaveBeenCalledWith(
-      "INSERT INTO t (a, b) VALUES (?, ?)",
-      ["hello", 42],
-    );
+    expect(executeFn).toHaveBeenCalledWith("INSERT INTO t (a, b) VALUES (?, ?)", ["hello", 42]);
   });
 
   it("query with params passes them through", async () => {
-    const queryFn = vi.fn<(sql: string, params?: SqlValue[]) => Promise<DriverQueryResult>>()
+    const queryFn = vi
+      .fn<(sql: string, params?: SqlValue[]) => Promise<DriverQueryResult>>()
       .mockResolvedValue({ rows: [] });
     const adapter = createMockAdapter({ query: queryFn });
 

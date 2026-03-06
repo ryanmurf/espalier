@@ -10,10 +10,7 @@ export interface DeprecatedOptions {
 const deprecatedMetadata = new WeakMap<object, Map<string | symbol, DeprecatedOptions>>();
 
 export function Deprecated(options?: DeprecatedOptions) {
-  return function <T>(
-    _target: undefined,
-    context: ClassFieldDecoratorContext<T>,
-  ): void {
+  return <T>(_target: undefined, context: ClassFieldDecoratorContext<T>): void => {
     const opts = options ?? {};
 
     context.addInitializer(function (this: T) {

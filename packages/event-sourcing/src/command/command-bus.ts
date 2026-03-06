@@ -1,12 +1,8 @@
 import type { Command, CommandResult } from "../types.js";
 
-export type CommandHandlerFn<C extends Command = Command, R = unknown> =
-  (command: C) => Promise<CommandResult<R>>;
+export type CommandHandlerFn<C extends Command = Command, R = unknown> = (command: C) => Promise<CommandResult<R>>;
 
-export type CommandMiddlewareFn = (
-  command: Command,
-  next: () => Promise<CommandResult>,
-) => Promise<CommandResult>;
+export type CommandMiddlewareFn = (command: Command, next: () => Promise<CommandResult>) => Promise<CommandResult>;
 
 export class CommandBus {
   private readonly handlers = new Map<string, CommandHandlerFn>();
@@ -16,10 +12,7 @@ export class CommandBus {
    * Register a handler for a specific command type.
    * Only one handler per command type is allowed.
    */
-  register<C extends Command>(
-    commandType: string,
-    handler: CommandHandlerFn<C>,
-  ): void {
+  register<C extends Command>(commandType: string, handler: CommandHandlerFn<C>): void {
     if (this.handlers.has(commandType)) {
       throw new Error(`Handler already registered for command type: ${commandType}`);
     }

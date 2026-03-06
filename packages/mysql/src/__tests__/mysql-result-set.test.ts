@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
 import type { FieldPacket } from "mysql2/promise";
+import { describe, expect, it } from "vitest";
 import { MysqlResultSet } from "../mysql-result-set.js";
 
 function createResultSet(
@@ -12,10 +12,7 @@ function createResultSet(
 describe("MysqlResultSet", () => {
   describe("next()", () => {
     it("advances cursor and returns true while rows remain", async () => {
-      const rs = createResultSet(
-        [{ id: 1 }, { id: 2 }],
-        [{ name: "id" }],
-      );
+      const rs = createResultSet([{ id: 1 }, { id: 2 }], [{ name: "id" }]);
 
       expect(await rs.next()).toBe(true);
       expect(await rs.next()).toBe(true);
@@ -30,37 +27,25 @@ describe("MysqlResultSet", () => {
 
   describe("getString()", () => {
     it("returns string value by column name", async () => {
-      const rs = createResultSet(
-        [{ name: "Alice" }],
-        [{ name: "name" }],
-      );
+      const rs = createResultSet([{ name: "Alice" }], [{ name: "name" }]);
       await rs.next();
       expect(rs.getString("name")).toBe("Alice");
     });
 
     it("returns string value by column index", async () => {
-      const rs = createResultSet(
-        [{ name: "Alice" }],
-        [{ name: "name" }],
-      );
+      const rs = createResultSet([{ name: "Alice" }], [{ name: "name" }]);
       await rs.next();
       expect(rs.getString(0)).toBe("Alice");
     });
 
     it("returns null for null value", async () => {
-      const rs = createResultSet(
-        [{ name: null }],
-        [{ name: "name" }],
-      );
+      const rs = createResultSet([{ name: null }], [{ name: "name" }]);
       await rs.next();
       expect(rs.getString("name")).toBeNull();
     });
 
     it("converts non-string values to string", async () => {
-      const rs = createResultSet(
-        [{ id: 42 }],
-        [{ name: "id" }],
-      );
+      const rs = createResultSet([{ id: 42 }], [{ name: "id" }]);
       await rs.next();
       expect(rs.getString("id")).toBe("42");
     });
@@ -68,28 +53,19 @@ describe("MysqlResultSet", () => {
 
   describe("getNumber()", () => {
     it("returns number value", async () => {
-      const rs = createResultSet(
-        [{ count: 42 }],
-        [{ name: "count" }],
-      );
+      const rs = createResultSet([{ count: 42 }], [{ name: "count" }]);
       await rs.next();
       expect(rs.getNumber("count")).toBe(42);
     });
 
     it("returns null for null value", async () => {
-      const rs = createResultSet(
-        [{ count: null }],
-        [{ name: "count" }],
-      );
+      const rs = createResultSet([{ count: null }], [{ name: "count" }]);
       await rs.next();
       expect(rs.getNumber("count")).toBeNull();
     });
 
     it("converts string numeric value to number", async () => {
-      const rs = createResultSet(
-        [{ count: "42" }],
-        [{ name: "count" }],
-      );
+      const rs = createResultSet([{ count: "42" }], [{ name: "count" }]);
       await rs.next();
       expect(rs.getNumber("count")).toBe(42);
     });
@@ -97,46 +73,31 @@ describe("MysqlResultSet", () => {
 
   describe("getBoolean()", () => {
     it("returns true for truthy boolean", async () => {
-      const rs = createResultSet(
-        [{ active: true }],
-        [{ name: "active" }],
-      );
+      const rs = createResultSet([{ active: true }], [{ name: "active" }]);
       await rs.next();
       expect(rs.getBoolean("active")).toBe(true);
     });
 
     it("returns false for falsy boolean", async () => {
-      const rs = createResultSet(
-        [{ active: false }],
-        [{ name: "active" }],
-      );
+      const rs = createResultSet([{ active: false }], [{ name: "active" }]);
       await rs.next();
       expect(rs.getBoolean("active")).toBe(false);
     });
 
     it("returns null for null value", async () => {
-      const rs = createResultSet(
-        [{ active: null }],
-        [{ name: "active" }],
-      );
+      const rs = createResultSet([{ active: null }], [{ name: "active" }]);
       await rs.next();
       expect(rs.getBoolean("active")).toBeNull();
     });
 
     it("converts number 0 to false (MySQL TINYINT pattern)", async () => {
-      const rs = createResultSet(
-        [{ active: 0 }],
-        [{ name: "active" }],
-      );
+      const rs = createResultSet([{ active: 0 }], [{ name: "active" }]);
       await rs.next();
       expect(rs.getBoolean("active")).toBe(false);
     });
 
     it("converts number 1 to true (MySQL TINYINT pattern)", async () => {
-      const rs = createResultSet(
-        [{ active: 1 }],
-        [{ name: "active" }],
-      );
+      const rs = createResultSet([{ active: 1 }], [{ name: "active" }]);
       await rs.next();
       expect(rs.getBoolean("active")).toBe(true);
     });
@@ -145,19 +106,13 @@ describe("MysqlResultSet", () => {
   describe("getDate()", () => {
     it("returns Date object directly", async () => {
       const date = new Date("2024-01-15");
-      const rs = createResultSet(
-        [{ created: date }],
-        [{ name: "created" }],
-      );
+      const rs = createResultSet([{ created: date }], [{ name: "created" }]);
       await rs.next();
       expect(rs.getDate("created")).toBe(date);
     });
 
     it("parses date string", async () => {
-      const rs = createResultSet(
-        [{ created: "2024-01-15" }],
-        [{ name: "created" }],
-      );
+      const rs = createResultSet([{ created: "2024-01-15" }], [{ name: "created" }]);
       await rs.next();
       const result = rs.getDate("created");
       expect(result).toBeInstanceOf(Date);
@@ -165,10 +120,7 @@ describe("MysqlResultSet", () => {
     });
 
     it("returns null for null value", async () => {
-      const rs = createResultSet(
-        [{ created: null }],
-        [{ name: "created" }],
-      );
+      const rs = createResultSet([{ created: null }], [{ name: "created" }]);
       await rs.next();
       expect(rs.getDate("created")).toBeNull();
     });
@@ -176,10 +128,7 @@ describe("MysqlResultSet", () => {
 
   describe("getRow()", () => {
     it("returns current row object", async () => {
-      const rs = createResultSet(
-        [{ id: 1, name: "Alice" }],
-        [{ name: "id" }, { name: "name" }],
-      );
+      const rs = createResultSet([{ id: 1, name: "Alice" }], [{ name: "id" }, { name: "name" }]);
       await rs.next();
       expect(rs.getRow()).toEqual({ id: 1, name: "Alice" });
     });
@@ -210,10 +159,7 @@ describe("MysqlResultSet", () => {
 
   describe("[Symbol.asyncIterator]", () => {
     it("iterates over all rows", async () => {
-      const rs = createResultSet(
-        [{ id: 1 }, { id: 2 }, { id: 3 }],
-        [{ name: "id" }],
-      );
+      const rs = createResultSet([{ id: 1 }, { id: 2 }, { id: 3 }], [{ name: "id" }]);
 
       const rows: Record<string, unknown>[] = [];
       for await (const row of rs) {

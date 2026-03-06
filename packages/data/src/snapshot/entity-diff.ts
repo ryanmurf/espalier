@@ -51,7 +51,7 @@ function deepEqual(a: unknown, b: unknown, seen = new Set<object>()): boolean {
   const keysB = Object.keys(objB as Record<string, unknown>);
   if (keysA.length !== keysB.length) return false;
   for (const key of keysA) {
-    if (!Object.prototype.hasOwnProperty.call(objB, key)) return false;
+    if (!Object.hasOwn(objB, key)) return false;
     if (!deepEqual((objA as any)[key], (objB as any)[key], seen)) return false;
   }
   return true;
@@ -82,10 +82,7 @@ export function diff(snapshot1: Snapshot, snapshot2: Snapshot): DiffResult {
   const changes: FieldDiff[] = [];
 
   // Collect all field names from both snapshots
-  const allFields = new Set<string>([
-    ...Object.keys(snapshot1.fields),
-    ...Object.keys(snapshot2.fields),
-  ]);
+  const allFields = new Set<string>([...Object.keys(snapshot1.fields), ...Object.keys(snapshot2.fields)]);
 
   for (const field of allFields) {
     const oldValue = snapshot1.fields[field];

@@ -4,7 +4,7 @@
  * Verifies that error messages, toString(), toJSON(), and toSafeString()
  * do NOT leak tenant IDs or schema names to external callers.
  */
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { SchemaSetupError } from "../../index.js";
 
 describe("SchemaSetupError — information leak prevention (#44)", () => {
@@ -192,11 +192,7 @@ describe("SchemaSetupError — information leak prevention (#44)", () => {
     });
 
     it("special characters in schema/tenant don't appear in message", () => {
-      const err = new SchemaSetupError(
-        "schema'; DROP TABLE --",
-        "tenant<script>alert(1)</script>",
-        new Error(),
-      );
+      const err = new SchemaSetupError("schema'; DROP TABLE --", "tenant<script>alert(1)</script>", new Error());
       expect(err.message).not.toContain("DROP");
       expect(err.message).not.toContain("script");
       expect(err.message).not.toContain("alert");

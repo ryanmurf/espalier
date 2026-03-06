@@ -34,16 +34,12 @@ export class RoutingDataSource implements DataSource {
     const route = this.routeResolver() ?? this.defaultRoute;
 
     if (route === undefined) {
-      throw new RoutingError(
-        "No route resolved and no default route configured",
-      );
+      throw new RoutingError("No route resolved and no default route configured");
     }
 
     const ds = this.dataSources.get(route);
     if (!ds) {
-      throw new RoutingError(
-        "No DataSource found for the resolved route",
-      );
+      throw new RoutingError("No DataSource found for the resolved route");
     }
 
     return ds.getConnection();
@@ -51,22 +47,16 @@ export class RoutingDataSource implements DataSource {
 
   async close(): Promise<void> {
     const errors: Error[] = [];
-    for (const [key, ds] of this.dataSources) {
+    for (const [_key, ds] of this.dataSources) {
       try {
         await ds.close();
       } catch (err) {
-        errors.push(
-          err instanceof Error
-            ? err
-            : new Error("Failed to close a routed DataSource"),
-        );
+        errors.push(err instanceof Error ? err : new Error("Failed to close a routed DataSource"));
       }
     }
     if (errors.length > 0) {
       const msg = errors.map((e) => e.message).join("; ");
-      throw new RoutingError(
-        `Failed to close ${errors.length} DataSource(s): ${msg}`,
-      );
+      throw new RoutingError(`Failed to close ${errors.length} DataSource(s): ${msg}`);
     }
   }
 

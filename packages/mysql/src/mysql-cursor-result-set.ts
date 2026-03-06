@@ -1,5 +1,5 @@
 import type { Readable } from "node:stream";
-import type { StreamingResultSet, ColumnMetadata } from "espalier-jdbc";
+import type { ColumnMetadata, StreamingResultSet } from "espalier-jdbc";
 
 export class MysqlCursorResultSet implements StreamingResultSet {
   private cursorSize = 100;

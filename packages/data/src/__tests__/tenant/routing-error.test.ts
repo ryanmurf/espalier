@@ -4,14 +4,15 @@
  * Verifies that error messages do NOT leak route keys or internal
  * topology information to external callers.
  */
-import { describe, it, expect } from "vitest";
-import { RoutingError, RoutingDataSource } from "../../index.js";
+
 import type { Connection, DataSource } from "espalier-jdbc";
+import { describe, expect, it } from "vitest";
+import { RoutingDataSource, RoutingError } from "../../index.js";
 
 /** Minimal mock DataSource for testing error paths. */
 function mockDs(): DataSource {
   return {
-    getConnection: async () => ({} as Connection),
+    getConnection: async () => ({}) as Connection,
     close: async () => {},
   };
 }
@@ -163,8 +164,10 @@ describe("RoutingError — information leak prevention (#46)", () => {
   describe("close() error handling", () => {
     it("close() error does not leak DataSource keys", async () => {
       const failingDs: DataSource = {
-        getConnection: async () => ({} as Connection),
-        close: async () => { throw new Error("connection refused"); },
+        getConnection: async () => ({}) as Connection,
+        close: async () => {
+          throw new Error("connection refused");
+        },
       };
 
       const ds = new RoutingDataSource({

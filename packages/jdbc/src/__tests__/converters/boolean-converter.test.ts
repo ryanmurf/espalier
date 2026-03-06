@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { BooleanConverter } from "../../converters/boolean-converter.js";
 
 describe("BooleanConverter", () => {
@@ -44,21 +44,15 @@ describe("BooleanConverter", () => {
 
   describe("round-trip", () => {
     it("preserves true through round-trip", () => {
-      expect(converter.fromDatabaseValue(converter.toDatabaseValue(true))).toBe(
-        true,
-      );
+      expect(converter.fromDatabaseValue(converter.toDatabaseValue(true))).toBe(true);
     });
 
     it("preserves false through round-trip", () => {
-      expect(
-        converter.fromDatabaseValue(converter.toDatabaseValue(false)),
-      ).toBe(false);
+      expect(converter.fromDatabaseValue(converter.toDatabaseValue(false))).toBe(false);
     });
 
     it("preserves null through round-trip", () => {
-      expect(
-        converter.fromDatabaseValue(converter.toDatabaseValue(null)),
-      ).toBeNull();
+      expect(converter.fromDatabaseValue(converter.toDatabaseValue(null))).toBeNull();
     });
   });
 });

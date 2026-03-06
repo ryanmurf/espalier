@@ -1,17 +1,11 @@
-import type {
-  TracerProvider,
-  SlowQueryEvent,
-  HealthCheck,
-  DataSource,
-  MonitoredPooledDataSource,
-} from "espalier-jdbc";
+import type { DataSource, HealthCheck, MonitoredPooledDataSource, SlowQueryEvent, TracerProvider } from "espalier-jdbc";
 import {
-  setGlobalTracerProvider,
-  SlowQueryDetector,
-  QueryStatisticsCollector,
+  ConnectivityHealthCheck,
   HealthCheckRegistry,
   PoolHealthCheck,
-  ConnectivityHealthCheck,
+  QueryStatisticsCollector,
+  SlowQueryDetector,
+  setGlobalTracerProvider,
 } from "espalier-jdbc";
 import type { N1DetectionConfig } from "./n1-detector.js";
 import { N1Detector } from "./n1-detector.js";
@@ -75,10 +69,7 @@ function isMonitoredPool(ds: DataSource): ds is MonitoredPooledDataSource {
  * Configures observability for a DataSource with a single function call.
  * Sets up tracing, slow query detection, statistics collection, and health checks.
  */
-export function configureObservability(
-  dataSource: DataSource,
-  config: ObservabilityConfig = {},
-): ObservabilityHandle {
+export function configureObservability(dataSource: DataSource, config: ObservabilityConfig = {}): ObservabilityHandle {
   // 1. Tracing
   if (config.tracerProvider) {
     setGlobalTracerProvider(config.tracerProvider);
@@ -99,17 +90,17 @@ export function configureObservability(
   }
 
   // 3b. N+1 detection
-  const n1Detector = config.n1Detection?.enabled
-    ? new N1Detector(config.n1Detection)
-    : undefined;
+  const n1Detector = config.n1Detection?.enabled ? new N1Detector(config.n1Detection) : undefined;
 
   // 4. Health checks
   const registry = new HealthCheckRegistry();
 
   // Default: connectivity check
-  registry.register(new ConnectivityHealthCheck("connectivity", dataSource, {
-    timeoutMs: config.connectivityTimeoutMs ?? 5000,
-  }));
+  registry.register(
+    new ConnectivityHealthCheck("connectivity", dataSource, {
+      timeoutMs: config.connectivityTimeoutMs ?? 5000,
+    }),
+  );
 
   // Default: pool health check (if monitored pool)
   if (isMonitoredPool(dataSource)) {

@@ -1,14 +1,7 @@
-import { describe, it, expect, vi } from "vitest";
-import type {
-  Connection,
-  PreparedStatement,
-  ResultSet,
-  Statement,
-  DataSource,
-  Transaction,
-} from "espalier-jdbc";
 import type { Migration } from "espalier-data";
-import { MysqlMigrationRunner, computeChecksum } from "../mysql-migration-runner.js";
+import type { Connection, DataSource, PreparedStatement, ResultSet, Statement, Transaction } from "espalier-jdbc";
+import { describe, expect, it, vi } from "vitest";
+import { computeChecksum, MysqlMigrationRunner } from "../mysql-migration-runner.js";
 
 // --- Mock factories ---
 
@@ -75,9 +68,7 @@ function createMockStatement(): Statement & {
   };
 }
 
-function createMockPreparedStatement(
-  rs?: ResultSet,
-): PreparedStatement & {
+function createMockPreparedStatement(rs?: ResultSet): PreparedStatement & {
   setParameter: ReturnType<typeof vi.fn>;
   executeQuery: ReturnType<typeof vi.fn>;
   executeUpdate: ReturnType<typeof vi.fn>;
@@ -138,9 +129,7 @@ function createMockConnection(opts?: {
   } as unknown as MockConnection;
 }
 
-function createMockDataSource(
-  connectionFactory: () => Connection,
-): DataSource {
+function createMockDataSource(connectionFactory: () => Connection): DataSource {
   return {
     getConnection: vi.fn(async () => connectionFactory()),
     close: vi.fn(async () => {}),
@@ -173,15 +162,9 @@ describe("MysqlMigrationRunner", () => {
 
       await runner.initialize();
 
-      expect(stmt.executeUpdate).toHaveBeenCalledWith(
-        expect.stringContaining("CREATE TABLE IF NOT EXISTS"),
-      );
-      expect(stmt.executeUpdate).toHaveBeenCalledWith(
-        expect.stringContaining("version VARCHAR(255) PRIMARY KEY"),
-      );
-      expect(stmt.executeUpdate).toHaveBeenCalledWith(
-        expect.stringContaining("checksum VARCHAR(64) NOT NULL"),
-      );
+      expect(stmt.executeUpdate).toHaveBeenCalledWith(expect.stringContaining("CREATE TABLE IF NOT EXISTS"));
+      expect(stmt.executeUpdate).toHaveBeenCalledWith(expect.stringContaining("version VARCHAR(255) PRIMARY KEY"));
+      expect(stmt.executeUpdate).toHaveBeenCalledWith(expect.stringContaining("checksum VARCHAR(64) NOT NULL"));
       expect(conn.close).toHaveBeenCalled();
     });
 
@@ -195,9 +178,7 @@ describe("MysqlMigrationRunner", () => {
 
       await runner.initialize();
 
-      expect(stmt.executeUpdate).toHaveBeenCalledWith(
-        expect.stringContaining("custom_migrations"),
-      );
+      expect(stmt.executeUpdate).toHaveBeenCalledWith(expect.stringContaining("custom_migrations"));
     });
   });
 
@@ -254,9 +235,7 @@ describe("MysqlMigrationRunner", () => {
 
       await runner.getAppliedMigrations();
 
-      expect(conn.prepareStatement).toHaveBeenCalledWith(
-        expect.stringContaining("ORDER BY version"),
-      );
+      expect(conn.prepareStatement).toHaveBeenCalledWith(expect.stringContaining("ORDER BY version"));
     });
   });
 
@@ -294,9 +273,7 @@ describe("MysqlMigrationRunner", () => {
 
       await runner.getCurrentVersion();
 
-      expect(conn.prepareStatement).toHaveBeenCalledWith(
-        expect.stringContaining("ORDER BY version DESC LIMIT 1"),
-      );
+      expect(conn.prepareStatement).toHaveBeenCalledWith(expect.stringContaining("ORDER BY version DESC LIMIT 1"));
     });
   });
 
@@ -327,33 +304,19 @@ describe("MysqlMigrationRunner", () => {
       });
 
       const runner = new MysqlMigrationRunner(ds);
-      const m1 = createMigration(
-        "001",
-        "Create users",
-        "CREATE TABLE users (id INT)",
-      );
-      const m2 = createMigration(
-        "002",
-        "Add email",
-        "ALTER TABLE users ADD COLUMN email TEXT",
-      );
+      const m1 = createMigration("001", "Create users", "CREATE TABLE users (id INT)");
+      const m2 = createMigration("002", "Add email", "ALTER TABLE users ADD COLUMN email TEXT");
 
       await runner.run([m2, m1]); // pass out of order to test sorting
 
       // Both migrations should be applied
-      expect(stmt.executeUpdate).toHaveBeenCalledWith(
-        "CREATE TABLE users (id INT)",
-      );
-      expect(stmt.executeUpdate).toHaveBeenCalledWith(
-        "ALTER TABLE users ADD COLUMN email TEXT",
-      );
+      expect(stmt.executeUpdate).toHaveBeenCalledWith("CREATE TABLE users (id INT)");
+      expect(stmt.executeUpdate).toHaveBeenCalledWith("ALTER TABLE users ADD COLUMN email TEXT");
       expect(tx.commit).toHaveBeenCalledTimes(2);
     });
 
     it("skips already-applied migrations", async () => {
-      const checksum = await computeChecksum(
-        createMigration("001", "Create users", "CREATE TABLE users (id INT)"),
-      );
+      const checksum = await computeChecksum(createMigration("001", "Create users", "CREATE TABLE users (id INT)"));
       const appliedRs = createMockResultSet([
         {
           version: "001",
@@ -383,32 +346,18 @@ describe("MysqlMigrationRunner", () => {
       });
 
       const runner = new MysqlMigrationRunner(ds);
-      const m1 = createMigration(
-        "001",
-        "Create users",
-        "CREATE TABLE users (id INT)",
-      );
-      const m2 = createMigration(
-        "002",
-        "Add email",
-        "ALTER TABLE users ADD COLUMN email TEXT",
-      );
+      const m1 = createMigration("001", "Create users", "CREATE TABLE users (id INT)");
+      const m2 = createMigration("002", "Add email", "ALTER TABLE users ADD COLUMN email TEXT");
 
       await runner.run([m1, m2]);
 
       // Only m2 should be applied
       expect(stmt.executeUpdate).toHaveBeenCalledTimes(1);
-      expect(stmt.executeUpdate).toHaveBeenCalledWith(
-        "ALTER TABLE users ADD COLUMN email TEXT",
-      );
+      expect(stmt.executeUpdate).toHaveBeenCalledWith("ALTER TABLE users ADD COLUMN email TEXT");
     });
 
     it("does nothing when all migrations already applied", async () => {
-      const m1 = createMigration(
-        "001",
-        "Create users",
-        "CREATE TABLE users (id INT)",
-      );
+      const m1 = createMigration("001", "Create users", "CREATE TABLE users (id INT)");
       const checksum = await computeChecksum(m1);
       const appliedRs = createMockResultSet([
         {
@@ -449,11 +398,7 @@ describe("MysqlMigrationRunner", () => {
       const ds = createMockDataSource(() => getAppliedConn);
       const runner = new MysqlMigrationRunner(ds);
 
-      const m1 = createMigration(
-        "001",
-        "Create users",
-        "CREATE TABLE users (id INT, name TEXT)",
-      );
+      const m1 = createMigration("001", "Create users", "CREATE TABLE users (id INT, name TEXT)");
 
       await expect(runner.run([m1])).rejects.toThrow("checksum mismatch");
     });
@@ -490,15 +435,9 @@ describe("MysqlMigrationRunner", () => {
       await runner.run([m1]);
 
       expect(stmt.executeUpdate).toHaveBeenCalledTimes(3);
-      expect(stmt.executeUpdate).toHaveBeenCalledWith(
-        "CREATE TABLE a (id INT)",
-      );
-      expect(stmt.executeUpdate).toHaveBeenCalledWith(
-        "CREATE TABLE b (id INT)",
-      );
-      expect(stmt.executeUpdate).toHaveBeenCalledWith(
-        "CREATE INDEX idx_a ON a(id)",
-      );
+      expect(stmt.executeUpdate).toHaveBeenCalledWith("CREATE TABLE a (id INT)");
+      expect(stmt.executeUpdate).toHaveBeenCalledWith("CREATE TABLE b (id INT)");
+      expect(stmt.executeUpdate).toHaveBeenCalledWith("CREATE INDEX idx_a ON a(id)");
     });
 
     it("records migration version, description, and checksum after applying", async () => {
@@ -524,21 +463,14 @@ describe("MysqlMigrationRunner", () => {
       });
 
       const runner = new MysqlMigrationRunner(ds);
-      const m1 = createMigration(
-        "001",
-        "Create users",
-        "CREATE TABLE users (id INT)",
-      );
+      const m1 = createMigration("001", "Create users", "CREATE TABLE users (id INT)");
       const expectedChecksum = await computeChecksum(m1);
 
       await runner.run([m1]);
 
       expect(insertPs.setParameter).toHaveBeenCalledWith(1, "001");
       expect(insertPs.setParameter).toHaveBeenCalledWith(2, "Create users");
-      expect(insertPs.setParameter).toHaveBeenCalledWith(
-        3,
-        expectedChecksum,
-      );
+      expect(insertPs.setParameter).toHaveBeenCalledWith(3, expectedChecksum);
     });
 
     it("rolls back tracking INSERT on failure (MySQL DDL is non-transactional)", async () => {
@@ -565,11 +497,7 @@ describe("MysqlMigrationRunner", () => {
       });
 
       const runner = new MysqlMigrationRunner(ds);
-      const m1 = createMigration(
-        "001",
-        "Bad migration",
-        "CREATE TABLE t (id INT)",
-      );
+      const m1 = createMigration("001", "Bad migration", "CREATE TABLE t (id INT)");
 
       await expect(runner.run([m1])).rejects.toThrow("insert failed");
       expect(tx.rollback).toHaveBeenCalled();
@@ -578,12 +506,7 @@ describe("MysqlMigrationRunner", () => {
 
   describe("rollback()", () => {
     it("rolls back the last migration by default", async () => {
-      const m1 = createMigration(
-        "001",
-        "Create users",
-        "CREATE TABLE users (id INT)",
-        "DROP TABLE users",
-      );
+      const m1 = createMigration("001", "Create users", "CREATE TABLE users (id INT)", "DROP TABLE users");
       const m2 = createMigration(
         "002",
         "Add email",
@@ -631,21 +554,14 @@ describe("MysqlMigrationRunner", () => {
       await runner.rollback([m1, m2]);
 
       // Should execute m2's down SQL
-      expect(stmt.executeUpdate).toHaveBeenCalledWith(
-        "ALTER TABLE users DROP COLUMN email",
-      );
+      expect(stmt.executeUpdate).toHaveBeenCalledWith("ALTER TABLE users DROP COLUMN email");
       // Should delete m2's version from tracking table
       expect(deletePs.setParameter).toHaveBeenCalledWith(1, "002");
       expect(tx.commit).toHaveBeenCalledTimes(1);
     });
 
     it("rolls back multiple steps", async () => {
-      const m1 = createMigration(
-        "001",
-        "Create users",
-        "CREATE TABLE users (id INT)",
-        "DROP TABLE users",
-      );
+      const m1 = createMigration("001", "Create users", "CREATE TABLE users (id INT)", "DROP TABLE users");
       const m2 = createMigration(
         "002",
         "Add email",
@@ -704,9 +620,7 @@ describe("MysqlMigrationRunner", () => {
       const ds = createMockDataSource(() => conn);
 
       const runner = new MysqlMigrationRunner(ds);
-      await runner.rollback([
-        createMigration("001", "test", "SELECT 1", "SELECT 1"),
-      ]);
+      await runner.rollback([createMigration("001", "test", "SELECT 1", "SELECT 1")]);
 
       // Only one getConnection call for getAppliedMigrations
       expect(ds.getConnection).toHaveBeenCalledTimes(1);
@@ -736,20 +650,13 @@ describe("MysqlMigrationRunner", () => {
 
       const runner = new MysqlMigrationRunner(ds);
       // Pass empty migrations array - no definition for version "001"
-      await expect(runner.rollback([], 1)).rejects.toThrow(
-        "no matching migration definition found",
-      );
+      await expect(runner.rollback([], 1)).rejects.toThrow("no matching migration definition found");
     });
   });
 
   describe("rollbackTo()", () => {
     it("rolls back to a specific version", async () => {
-      const m1 = createMigration(
-        "001",
-        "Create users",
-        "CREATE TABLE users (id INT)",
-        "DROP TABLE users",
-      );
+      const m1 = createMigration("001", "Create users", "CREATE TABLE users (id INT)", "DROP TABLE users");
       const m2 = createMigration(
         "002",
         "Add email",
@@ -815,12 +722,7 @@ describe("MysqlMigrationRunner", () => {
     });
 
     it("does nothing when already at target version", async () => {
-      const m1 = createMigration(
-        "001",
-        "Create users",
-        "CREATE TABLE users (id INT)",
-        "DROP TABLE users",
-      );
+      const m1 = createMigration("001", "Create users", "CREATE TABLE users (id INT)", "DROP TABLE users");
       const cs1 = await computeChecksum(m1);
 
       const appliedRs = createMockResultSet([
@@ -845,21 +747,9 @@ describe("MysqlMigrationRunner", () => {
 
   describe("pending()", () => {
     it("returns pending migrations sorted by version", async () => {
-      const m1 = createMigration(
-        "001",
-        "Create users",
-        "CREATE TABLE users (id INT)",
-      );
-      const m2 = createMigration(
-        "002",
-        "Add email",
-        "ALTER TABLE users ADD email TEXT",
-      );
-      const m3 = createMigration(
-        "003",
-        "Add age",
-        "ALTER TABLE users ADD age INT",
-      );
+      const m1 = createMigration("001", "Create users", "CREATE TABLE users (id INT)");
+      const m2 = createMigration("002", "Add email", "ALTER TABLE users ADD email TEXT");
+      const m3 = createMigration("003", "Add age", "ALTER TABLE users ADD age INT");
 
       const checksum = await computeChecksum(m1);
       const appliedRs = createMockResultSet([
@@ -924,11 +814,7 @@ describe("MysqlMigrationRunner", () => {
 
   describe("computeChecksum()", () => {
     it("computes SHA-256 hash of up() SQL", async () => {
-      const m = createMigration(
-        "001",
-        "test",
-        "CREATE TABLE users (id INT)",
-      );
+      const m = createMigration("001", "test", "CREATE TABLE users (id INT)");
       const checksum = await computeChecksum(m);
 
       expect(checksum).toMatch(/^[a-f0-9]{64}$/);
@@ -956,15 +842,8 @@ describe("MysqlMigrationRunner", () => {
     });
 
     it("joins array SQL with newline for checksum", async () => {
-      const mArray = createMigration("001", "test", [
-        "CREATE TABLE a (id INT)",
-        "CREATE TABLE b (id INT)",
-      ]);
-      const mString = createMigration(
-        "001",
-        "test",
-        "CREATE TABLE a (id INT)\nCREATE TABLE b (id INT)",
-      );
+      const mArray = createMigration("001", "test", ["CREATE TABLE a (id INT)", "CREATE TABLE b (id INT)"]);
+      const mString = createMigration("001", "test", "CREATE TABLE a (id INT)\nCREATE TABLE b (id INT)");
 
       expect(await computeChecksum(mArray)).toBe(await computeChecksum(mString));
     });

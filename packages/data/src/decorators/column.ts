@@ -36,15 +36,45 @@ const columnMetadata = new WeakMap<object, Map<string | symbol, ColumnMetadataEn
  * The string argument sets the COLUMN NAME, not the column type.
  */
 const SQL_TYPE_KEYWORDS = new Set([
-  "varchar", "char", "text", "nvarchar", "nchar", "clob",
-  "int", "integer", "bigint", "smallint", "tinyint", "mediumint",
-  "float", "double", "real", "decimal", "numeric",
-  "boolean", "bool", "bit",
-  "date", "time", "datetime", "timestamp", "timestamptz", "interval",
-  "blob", "bytea", "binary", "varbinary",
-  "json", "jsonb", "xml", "uuid",
-  "serial", "bigserial", "smallserial",
-  "array", "enum",
+  "varchar",
+  "char",
+  "text",
+  "nvarchar",
+  "nchar",
+  "clob",
+  "int",
+  "integer",
+  "bigint",
+  "smallint",
+  "tinyint",
+  "mediumint",
+  "float",
+  "double",
+  "real",
+  "decimal",
+  "numeric",
+  "boolean",
+  "bool",
+  "bit",
+  "date",
+  "time",
+  "datetime",
+  "timestamp",
+  "timestamptz",
+  "interval",
+  "blob",
+  "bytea",
+  "binary",
+  "varbinary",
+  "json",
+  "jsonb",
+  "xml",
+  "uuid",
+  "serial",
+  "bigserial",
+  "smallserial",
+  "array",
+  "enum",
 ]);
 
 function looksLikeSqlType(value: string): boolean {
@@ -58,14 +88,11 @@ function looksLikeSqlType(value: string): boolean {
 }
 
 export function Column(options?: ColumnOptions | string) {
-  return function <T>(
-    _target: undefined,
-    context: ClassFieldDecoratorContext<T>,
-  ): void {
+  return <T>(_target: undefined, context: ClassFieldDecoratorContext<T>): void => {
     if (typeof options === "string" && looksLikeSqlType(options)) {
       throw new Error(
         `@Column("${options}") sets the column NAME, not the type. ` +
-        `Use @Column({ type: "${options}" }) to set the SQL type instead.`,
+          `Use @Column({ type: "${options}" }) to set the SQL type instead.`,
       );
     }
     const opts = typeof options === "string" ? { name: options } : (options ?? {});
@@ -91,9 +118,7 @@ export function Column(options?: ColumnOptions | string) {
 }
 
 /** Returns field -> column name mappings (backward compatible). */
-export function getColumnMappings(
-  target: object,
-): Map<string | symbol, string> {
+export function getColumnMappings(target: object): Map<string | symbol, string> {
   const entries = columnMetadata.get(target);
   if (!entries) return new Map();
   const result = new Map<string | symbol, string>();
@@ -104,9 +129,7 @@ export function getColumnMappings(
 }
 
 /** Returns field -> explicit SQL type mappings (backward compatible). */
-export function getColumnTypeMappings(
-  target: object,
-): Map<string | symbol, string> {
+export function getColumnTypeMappings(target: object): Map<string | symbol, string> {
   const entries = columnMetadata.get(target);
   if (!entries) return new Map();
   const result = new Map<string | symbol, string>();
@@ -119,8 +142,6 @@ export function getColumnTypeMappings(
 }
 
 /** Returns full column metadata entries for constraint support. */
-export function getColumnMetadataEntries(
-  target: object,
-): Map<string | symbol, ColumnMetadataEntry> {
+export function getColumnMetadataEntries(target: object): Map<string | symbol, ColumnMetadataEntry> {
   return columnMetadata.get(target) ?? new Map();
 }

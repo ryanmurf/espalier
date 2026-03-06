@@ -1,22 +1,22 @@
-import type { DataSource, SqlValue } from "espalier-jdbc";
-import type { EntityMetadata } from "../mapping/entity-metadata.js";
-import type { RowMapper } from "../mapping/row-mapper.js";
-import type { DerivedQueryDescriptor } from "../query/derived-query-parser.js";
-import { parseDerivedQueryMethod } from "../query/derived-query-parser.js";
-import { buildDerivedQuery } from "../query/derived-query-executor.js";
-import type { ProjectionMapper } from "../mapping/projection-mapper.js";
-import { createProjectionMapper } from "../mapping/projection-mapper.js";
-import { getProjectionMetadata } from "../decorators/projection.js";
+import type { DataSource } from "espalier-jdbc";
 import type { EntityCache } from "../cache/entity-cache.js";
 import type { QueryCache } from "../cache/query-cache.js";
-import type { EntityChangeTracker } from "../mapping/change-tracker.js";
 import type { LifecycleEvent } from "../decorators/lifecycle.js";
-import type { EventBus } from "../events/event-bus.js";
+import { getProjectionMetadata } from "../decorators/projection.js";
 import type { EntityLoadedEvent } from "../events/entity-events.js";
 import { ENTITY_EVENTS } from "../events/entity-events.js";
-import type { Criteria } from "../query/criteria.js";
+import type { EventBus } from "../events/event-bus.js";
+import type { EntityChangeTracker } from "../mapping/change-tracker.js";
+import type { EntityMetadata } from "../mapping/entity-metadata.js";
+import type { ProjectionMapper } from "../mapping/projection-mapper.js";
+import { createProjectionMapper } from "../mapping/projection-mapper.js";
+import type { RowMapper } from "../mapping/row-mapper.js";
 import type { CompiledQuery } from "../query/compiled-query.js";
 import { bindCompiledQuery } from "../query/compiled-query.js";
+import type { Criteria } from "../query/criteria.js";
+import { buildDerivedQuery } from "../query/derived-query-executor.js";
+import type { DerivedQueryDescriptor } from "../query/derived-query-parser.js";
+import { parseDerivedQueryMethod } from "../query/derived-query-parser.js";
 import { QueryCompiler } from "../query/query-compiler.js";
 
 function isProjectionClass(arg: unknown): arg is new (...args: any[]) => any {
@@ -40,7 +40,9 @@ export interface DerivedQueryHandlerDeps<T> {
 }
 
 export class DerivedQueryHandler<T> {
-  private readonly entityClass: new (...args: any[]) => T;
+  private readonly entityClass: new (
+    ...args: any[]
+  ) => T;
   private readonly metadata: EntityMetadata;
   private readonly dataSource: DataSource;
   private readonly rowMapper: RowMapper<T>;
@@ -127,8 +129,8 @@ export class DerivedQueryHandler<T> {
           let stmt: import("espalier-jdbc").PreparedStatement | null = null;
           let rs: Awaited<ReturnType<import("espalier-jdbc").PreparedStatement["executeQuery"]>> | null = null;
           let done = false;
-          const self = this;
-          const dataSource = (self as any).__dataSource;
+
+          const dataSource = (this as any).__dataSource;
 
           async function init() {
             conn = await dataSource.getConnection();
@@ -141,9 +143,18 @@ export class DerivedQueryHandler<T> {
 
           async function cleanup() {
             done = true;
-            if (rs) { await rs.close().catch(() => {}); rs = null; }
-            if (stmt) { await stmt.close().catch(() => {}); stmt = null; }
-            if (conn) { await conn.close().catch(() => {}); conn = null; }
+            if (rs) {
+              await rs.close().catch(() => {});
+              rs = null;
+            }
+            if (stmt) {
+              await stmt.close().catch(() => {});
+              stmt = null;
+            }
+            if (conn) {
+              await conn.close().catch(() => {});
+              conn = null;
+            }
           }
 
           return {
@@ -200,9 +211,18 @@ export class DerivedQueryHandler<T> {
 
           async function cleanup() {
             done = true;
-            if (rs) { await rs.close().catch(() => {}); rs = null; }
-            if (stmt) { await stmt.close().catch(() => {}); stmt = null; }
-            if (conn) { await conn.close().catch(() => {}); conn = null; }
+            if (rs) {
+              await rs.close().catch(() => {});
+              rs = null;
+            }
+            if (stmt) {
+              await stmt.close().catch(() => {});
+              stmt = null;
+            }
+            if (conn) {
+              await conn.close().catch(() => {});
+              conn = null;
+            }
           }
 
           return {
@@ -241,28 +261,27 @@ export class DerivedQueryHandler<T> {
   }
 
   createDerivedMethod(prop: string): (...args: unknown[]) => Promise<any> {
-    const handler = this;
     // Pre-compile the query for this method
-    const compiled = handler.getCompiledQuery(prop);
+    const compiled = this.getCompiledQuery(prop);
     return async (...args: unknown[]) => {
-      const descriptor = handler.getCachedDescriptor(prop);
+      const descriptor = this.getCachedDescriptor(prop);
 
       let projMapper: ProjectionMapper<any> | undefined;
       let queryArgs = args;
 
       if (args.length > 0 && isProjectionClass(args[args.length - 1])) {
-        projMapper = handler.getCachedProjectionMapper(args[args.length - 1] as new (...a: any[]) => any);
+        projMapper = this.getCachedProjectionMapper(args[args.length - 1] as new (...a: any[]) => any);
         queryArgs = args.slice(0, -1);
       }
 
       // Use compiled query fast path when no tenant criteria is active
-      const tenantCriteria = handler.getTenantCriteria();
+      const tenantCriteria = this.getTenantCriteria();
       const query = tenantCriteria
-        ? buildDerivedQuery(descriptor, handler.metadata, queryArgs, tenantCriteria)
+        ? buildDerivedQuery(descriptor, this.metadata, queryArgs, tenantCriteria)
         : bindCompiledQuery(compiled, queryArgs);
 
       if (descriptor.action === "delete") {
-        const conn = await handler.dataSource.getConnection();
+        const conn = await this.dataSource.getConnection();
         try {
           const stmt = conn.prepareStatement(query.sql);
           try {
@@ -270,8 +289,8 @@ export class DerivedQueryHandler<T> {
               stmt.setParameter(i + 1, query.params[i]);
             }
             await stmt.executeUpdate();
-            handler.entityCache.evictAll(handler.entityClass);
-            handler.queryCache.invalidate(handler.entityClass);
+            this.entityCache.evictAll(this.entityClass);
+            this.queryCache.invalidate(this.entityClass);
             return;
           } finally {
             await stmt.close().catch(() => {});
@@ -282,18 +301,18 @@ export class DerivedQueryHandler<T> {
       }
 
       const cacheKey = { sql: query.sql, params: query.params as unknown[] };
-      const cachedResult = handler.queryCache.get(cacheKey);
+      const cachedResult = this.queryCache.get(cacheKey);
       if (cachedResult !== undefined) {
         if (descriptor.action === "count") return cachedResult[0];
         if (descriptor.action === "exists") return cachedResult[0];
         for (const entity of cachedResult as T[]) {
-          handler.entityCache.put(handler.entityClass, handler.tenantCacheKey(handler.getEntityId(entity)), entity);
+          this.entityCache.put(this.entityClass, this.tenantCacheKey(this.getEntityId(entity)), entity);
         }
         if (descriptor.limit === 1) return (cachedResult as any[])[0] ?? null;
         return cachedResult;
       }
 
-      const conn = await handler.dataSource.getConnection();
+      const conn = await this.dataSource.getConnection();
       try {
         const stmt = conn.prepareStatement(query.sql);
         try {
@@ -307,17 +326,17 @@ export class DerivedQueryHandler<T> {
               const row = rs.getRow();
               const val = Object.values(row)[0];
               const result = typeof val === "number" ? val : Number(val);
-              handler.queryCache.put(cacheKey, [result], handler.entityClass);
+              this.queryCache.put(cacheKey, [result], this.entityClass);
               return result;
             }
-            handler.queryCache.put(cacheKey, [0], handler.entityClass);
+            this.queryCache.put(cacheKey, [0], this.entityClass);
             return 0;
           }
 
           if (descriptor.action === "exists") {
             const rs = await stmt.executeQuery();
             const result = await rs.next();
-            handler.queryCache.put(cacheKey, [result], handler.entityClass);
+            this.queryCache.put(cacheKey, [result], this.entityClass);
             return result;
           }
 
@@ -327,22 +346,22 @@ export class DerivedQueryHandler<T> {
             if (projMapper) {
               results.push(projMapper.mapRow(rs.getRow()));
             } else {
-              const mapped = handler.rowMapper.mapRow(rs);
-              await handler.invokeLifecycleCallbacks(mapped, "PostLoad");
-              handler.changeTracker.snapshot(mapped);
-              await handler.emitEntityEvent(ENTITY_EVENTS.LOADED, `${ENTITY_EVENTS.LOADED}:${handler.entityName}`, {
+              const mapped = this.rowMapper.mapRow(rs);
+              await this.invokeLifecycleCallbacks(mapped, "PostLoad");
+              this.changeTracker.snapshot(mapped);
+              await this.emitEntityEvent(ENTITY_EVENTS.LOADED, `${ENTITY_EVENTS.LOADED}:${this.entityName}`, {
                 type: "loaded",
-                entityClass: handler.entityClass,
-                entityName: handler.entityName,
+                entityClass: this.entityClass,
+                entityName: this.entityName,
                 entity: mapped,
-                id: handler.getEntityId(mapped),
+                id: this.getEntityId(mapped),
                 timestamp: new Date(),
               } satisfies EntityLoadedEvent<T>);
               results.push(mapped);
             }
           }
 
-          handler.queryCache.put(cacheKey, results, handler.entityClass);
+          this.queryCache.put(cacheKey, results, this.entityClass);
 
           if (descriptor.limit === 1) return results[0] ?? null;
           return results;

@@ -1,4 +1,4 @@
-import type { ResultSet, ColumnMetadata } from "espalier-jdbc";
+import type { ColumnMetadata, ResultSet } from "espalier-jdbc";
 
 /**
  * Column definition from Bun's SQLite API.

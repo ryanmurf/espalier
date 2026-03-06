@@ -1,16 +1,16 @@
 /**
  * Unit tests for entity lifecycle event decorators.
  */
-import { describe, it, expect, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-  PrePersist,
-  PostPersist,
-  PreUpdate,
-  PostUpdate,
-  PreRemove,
-  PostRemove,
-  PostLoad,
   getLifecycleCallbacks,
+  PostLoad,
+  PostPersist,
+  PostRemove,
+  PostUpdate,
+  PrePersist,
+  PreRemove,
+  PreUpdate,
 } from "../../decorators/lifecycle.js";
 
 // ──────────────────────────────────────────────────

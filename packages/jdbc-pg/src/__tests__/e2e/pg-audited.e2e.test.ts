@@ -6,24 +6,24 @@
  * concurrent audit writes, audit trail tampering detection, getFieldHistory,
  * getAuditLogForEntity, large JSONB payloads, SQL injection in audit queries.
  */
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
-import type { PgDataSource } from "../../pg-data-source.js";
-import { createTestDataSource, isPostgresAvailable } from "./setup.js";
+
+import type { AuditEntry, CrudRepository } from "espalier-data";
 import {
-  Table,
-  Column,
-  Id,
-  Version,
-  Audited,
-  SoftDelete,
   AuditContext,
-  AuditLogWriter,
+  Audited,
+  Column,
+  createDerivedRepository,
   getAuditLog,
   getAuditLogForEntity,
   getFieldHistory,
-  createDerivedRepository,
+  Id,
+  SoftDelete,
+  Table,
+  Version,
 } from "espalier-data";
-import type { CrudRepository, AuditEntry } from "espalier-data";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import type { PgDataSource } from "../../pg-data-source.js";
+import { createTestDataSource, isPostgresAvailable } from "./setup.js";
 
 const canConnect = await isPostgresAvailable();
 
@@ -185,9 +185,7 @@ describe.skipIf(!canConnect)("E2E: @Audited + audit log", { timeout: 20000 }, ()
     item.email = "alice@example.com";
     item.age = 30;
 
-    const saved = await AuditContext.withUser({ id: "admin" }, () =>
-      itemRepo.save(item),
-    );
+    const saved = await AuditContext.withUser({ id: "admin" }, () => itemRepo.save(item));
 
     const c = await ds.getConnection();
     const log = await getAuditLog(AuditItem, saved.id, c);
@@ -201,7 +199,7 @@ describe.skipIf(!canConnect)("E2E: @Audited + audit log", { timeout: 20000 }, ()
     expect(log[0].changes.length).toBeGreaterThan(0);
 
     // All non-id fields should be in the changes
-    const fieldNames = log[0].changes.map(c => c.field);
+    const fieldNames = log[0].changes.map((c) => c.field);
     expect(fieldNames).toContain("name");
     expect(fieldNames).toContain("email");
     expect(fieldNames).toContain("age");
@@ -233,7 +231,7 @@ describe.skipIf(!canConnect)("E2E: @Audited + audit log", { timeout: 20000 }, ()
     expect(updateEntry.operation).toBe("UPDATE");
     expect(updateEntry.userId).toBe("editor");
 
-    const nameChange = updateEntry.changes.find(c => c.field === "name");
+    const nameChange = updateEntry.changes.find((c) => c.field === "name");
     expect(nameChange).toBeDefined();
     expect(nameChange!.oldValue).toBe("Bob");
     expect(nameChange!.newValue).toBe("Robert");
@@ -258,7 +256,7 @@ describe.skipIf(!canConnect)("E2E: @Audited + audit log", { timeout: 20000 }, ()
 
     // INSERT + DELETE
     expect(log).toHaveLength(2);
-    const deleteEntry = log.find(e => e.operation === "DELETE");
+    const deleteEntry = log.find((e) => e.operation === "DELETE");
     expect(deleteEntry).toBeDefined();
     expect(deleteEntry!.userId).toBe("deleter");
   });
@@ -306,7 +304,7 @@ describe.skipIf(!canConnect)("E2E: @Audited + audit log", { timeout: 20000 }, ()
     expect(updateEntry.operation).toBe("UPDATE");
 
     // Only 'name' should appear in changes, not 'secret'
-    const fields = updateEntry.changes.map(c => c.field);
+    const fields = updateEntry.changes.map((c) => c.field);
     expect(fields).toContain("name");
     expect(fields).not.toContain("secret");
   });
@@ -354,7 +352,7 @@ describe.skipIf(!canConnect)("E2E: @Audited + audit log", { timeout: 20000 }, ()
     // 3 entries with 'name' change
     expect(history.length).toBeGreaterThanOrEqual(3);
 
-    const transitions = history.map(h => `${h.oldValue}->${h.newValue}`);
+    const transitions = history.map((h) => `${h.oldValue}->${h.newValue}`);
     // INSERT creates null->V1
     expect(transitions).toContain("null->V1");
     // First update V1->V2
@@ -363,7 +361,7 @@ describe.skipIf(!canConnect)("E2E: @Audited + audit log", { timeout: 20000 }, ()
     expect(transitions).toContain("V2->V3");
 
     // Verify userId is captured
-    const v2ToV3 = history.find(h => h.oldValue === "V2" && h.newValue === "V3");
+    const v2ToV3 = history.find((h) => h.oldValue === "V2" && h.newValue === "V3");
     expect(v2ToV3).toBeDefined();
     expect(v2ToV3!.userId).toBe("u2");
   });
@@ -406,13 +404,9 @@ describe.skipIf(!canConnect)("E2E: @Audited + audit log", { timeout: 20000 }, ()
   it("soft-delete generates a DELETE audit entry (not physical delete)", async () => {
     const item = new AuditSoft();
     item.name = "SoftAudited";
-    const saved = await AuditContext.withUser({ id: "soft-user" }, () =>
-      softRepo.save(item),
-    );
+    const saved = await AuditContext.withUser({ id: "soft-user" }, () => softRepo.save(item));
 
-    await AuditContext.withUser({ id: "soft-deleter" }, () =>
-      softRepo.delete(saved),
-    );
+    await AuditContext.withUser({ id: "soft-deleter" }, () => softRepo.delete(saved));
 
     const c = await ds.getConnection();
     const log = await getAuditLog(AuditSoft, saved.id, c);
@@ -421,7 +415,7 @@ describe.skipIf(!canConnect)("E2E: @Audited + audit log", { timeout: 20000 }, ()
     // INSERT + soft-delete (recorded as DELETE operation)
     expect(log.length).toBeGreaterThanOrEqual(2);
     // The soft-delete operation should be recorded with DELETE operation type
-    const softDeleteEntry = log.find(e => e.operation === "DELETE");
+    const softDeleteEntry = log.find((e) => e.operation === "DELETE");
     expect(softDeleteEntry).toBeDefined();
     expect(softDeleteEntry!.userId).toBe("soft-deleter");
   });
@@ -436,9 +430,7 @@ describe.skipIf(!canConnect)("E2E: @Audited + audit log", { timeout: 20000 }, ()
         const item = new AuditItem();
         item.name = `Concurrent-${i}`;
         item.email = `c${i}@test.com`;
-        return AuditContext.withUser({ id: `user-${i}` }, () =>
-          itemRepo.save(item),
-        );
+        return AuditContext.withUser({ id: `user-${i}` }, () => itemRepo.save(item));
       }),
     );
 
@@ -466,9 +458,7 @@ describe.skipIf(!canConnect)("E2E: @Audited + audit log", { timeout: 20000 }, ()
     // Tamper: directly update the audit log
     const c = await ds.getConnection();
     const stmt = c.createStatement();
-    await stmt.executeUpdate(
-      `UPDATE ${AUDIT_TABLE} SET user_id = 'hacker' WHERE entity_id = '${saved.id}'`,
-    );
+    await stmt.executeUpdate(`UPDATE ${AUDIT_TABLE} SET user_id = 'hacker' WHERE entity_id = '${saved.id}'`);
 
     const log = await getAuditLog(AuditItem, saved.id, c);
     await c.close();
@@ -492,9 +482,7 @@ describe.skipIf(!canConnect)("E2E: @Audited + audit log", { timeout: 20000 }, ()
 
     // Delete the audit entry directly
     const stmt = c.createStatement();
-    await stmt.executeUpdate(
-      `DELETE FROM ${AUDIT_TABLE} WHERE entity_id = '${saved.id}'`,
-    );
+    await stmt.executeUpdate(`DELETE FROM ${AUDIT_TABLE} WHERE entity_id = '${saved.id}'`);
 
     log = await getAuditLog(AuditItem, saved.id, c);
     await c.close();
@@ -518,7 +506,7 @@ describe.skipIf(!canConnect)("E2E: @Audited + audit log", { timeout: 20000 }, ()
     await c.close();
 
     expect(log).toHaveLength(1);
-    const nameChange = log[0].changes.find(c => c.field === "name");
+    const nameChange = log[0].changes.find((c) => c.field === "name");
     expect(nameChange).toBeDefined();
     expect((nameChange!.newValue as string).length).toBe(5000);
   });
@@ -549,9 +537,7 @@ describe.skipIf(!canConnect)("E2E: @Audited + audit log", { timeout: 20000 }, ()
     item.email = "life@test.com";
     item.age = 1;
 
-    const saved = await AuditContext.withUser({ id: "creator" }, () =>
-      itemRepo.save(item),
-    );
+    const saved = await AuditContext.withUser({ id: "creator" }, () => itemRepo.save(item));
 
     saved.name = "Lifecycle-v2";
     const saved2 = await AuditContext.withUser({ id: "updater1" }, () => itemRepo.save(saved));
@@ -569,13 +555,13 @@ describe.skipIf(!canConnect)("E2E: @Audited + audit log", { timeout: 20000 }, ()
 
     // Verify all 4 operations are present with correct users
     // (don't depend on exact ordering due to same-millisecond timestamps)
-    const ops = log.map(e => ({ op: e.operation, user: e.userId }));
+    const ops = log.map((e) => ({ op: e.operation, user: e.userId }));
     expect(ops).toContainEqual({ op: "INSERT", user: "creator" });
     expect(ops).toContainEqual({ op: "DELETE", user: "deleter" });
     // Two UPDATE entries
-    const updates = ops.filter(o => o.op === "UPDATE");
+    const updates = ops.filter((o) => o.op === "UPDATE");
     expect(updates).toHaveLength(2);
-    expect(updates.map(u => u.user).sort()).toEqual(["updater1", "updater2"]);
+    expect(updates.map((u) => u.user).sort()).toEqual(["updater1", "updater2"]);
   });
 
   // ══════════════════════════════════════════════════════

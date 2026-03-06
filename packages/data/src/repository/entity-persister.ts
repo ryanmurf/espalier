@@ -1,23 +1,23 @@
-import type { Connection, SqlValue, Logger } from "espalier-jdbc";
-import { LogLevel, getGlobalLogger } from "espalier-jdbc";
-import type { EntityMetadata, FieldMapping } from "../mapping/entity-metadata.js";
-import type { RowMapper } from "../mapping/row-mapper.js";
-import { SelectBuilder, InsertBuilder, UpdateBuilder, DeleteBuilder } from "../query/query-builder.js";
-import { ComparisonCriteria, LogicalCriteria } from "../query/criteria.js";
-import { OptimisticLockException } from "./optimistic-lock.js";
-import { EntityNotFoundException } from "./entity-not-found.js";
+import type { Connection, Logger, SqlValue } from "espalier-jdbc";
+import { getGlobalLogger, LogLevel } from "espalier-jdbc";
+import type { AuditFieldChange, AuditLogWriter } from "../audit/audit-log.js";
 import type { EntityCache } from "../cache/entity-cache.js";
 import type { QueryCache } from "../cache/query-cache.js";
-import type { EntityChangeTracker } from "../mapping/change-tracker.js";
-import type { LifecycleEvent } from "../decorators/lifecycle.js";
-import type { EventBus } from "../events/event-bus.js";
-import type { EntityPersistedEvent, EntityUpdatedEvent, EntityRemovedEvent } from "../events/entity-events.js";
-import { ENTITY_EVENTS } from "../events/entity-events.js";
-import type { OneToOneRelation } from "../decorators/relations.js";
-import { getFieldValue } from "../mapping/field-access.js";
-import type { CascadeManager } from "./cascade-manager.js";
-import type { AuditLogWriter, AuditFieldChange } from "../audit/audit-log.js";
 import { getAuditedMetadata, isAuditedEntity } from "../decorators/audited.js";
+import type { LifecycleEvent } from "../decorators/lifecycle.js";
+import type { OneToOneRelation } from "../decorators/relations.js";
+import type { EntityPersistedEvent, EntityRemovedEvent, EntityUpdatedEvent } from "../events/entity-events.js";
+import { ENTITY_EVENTS } from "../events/entity-events.js";
+import type { EventBus } from "../events/event-bus.js";
+import type { EntityChangeTracker } from "../mapping/change-tracker.js";
+import type { EntityMetadata } from "../mapping/entity-metadata.js";
+import { getFieldValue } from "../mapping/field-access.js";
+import type { RowMapper } from "../mapping/row-mapper.js";
+import { ComparisonCriteria, LogicalCriteria } from "../query/criteria.js";
+import { DeleteBuilder, InsertBuilder, SelectBuilder, UpdateBuilder } from "../query/query-builder.js";
+import type { CascadeManager } from "./cascade-manager.js";
+import { EntityNotFoundException } from "./entity-not-found.js";
+import { OptimisticLockException } from "./optimistic-lock.js";
 
 export interface EntityPersisterDeps<T> {
   entityClass: new (...args: any[]) => T;
@@ -48,7 +48,9 @@ export interface EntityPersisterDeps<T> {
 }
 
 export class EntityPersister<T> {
-  private readonly entityClass: new (...args: any[]) => T;
+  private readonly entityClass: new (
+    ...args: any[]
+  ) => T;
   private readonly metadata: EntityMetadata;
   private readonly rowMapper: RowMapper<T>;
   private readonly entityCache: EntityCache;
@@ -66,7 +68,10 @@ export class EntityPersister<T> {
   private readonly tenantCacheKey: (id: unknown) => unknown;
   private readonly copyRelationFields: (target: T, source: T) => void;
   private readonly getOneToOneFkValue: (entity: T, relation: OneToOneRelation) => SqlValue | undefined;
-  private readonly getManyToOneFkValue: (entity: T, relation: import("../decorators/relations.js").ManyToOneRelation) => SqlValue;
+  private readonly getManyToOneFkValue: (
+    entity: T,
+    relation: import("../decorators/relations.js").ManyToOneRelation,
+  ) => SqlValue;
   private readonly softDeleteColumn: string | undefined;
   private readonly softDeleteField: string | undefined;
   private readonly auditLogWriter: AuditLogWriter | undefined;
@@ -155,9 +160,14 @@ export class EntityPersister<T> {
   }
 
   private async performUpdate(
-    entity: T, conn: Connection, cascadeSaving: Set<unknown>,
-    idField: string | symbol, idValue: SqlValue, idCol: string,
-    versionCol: string | undefined, versionField: string | symbol | undefined,
+    entity: T,
+    conn: Connection,
+    cascadeSaving: Set<unknown>,
+    idField: string | symbol,
+    idValue: SqlValue,
+    idCol: string,
+    versionCol: string | undefined,
+    versionField: string | symbol | undefined,
   ): Promise<T> {
     if (this.metadata.lastModifiedDateField) {
       (entity as Record<string | symbol, unknown>)[this.metadata.lastModifiedDateField] = new Date();
@@ -170,10 +180,10 @@ export class EntityPersister<T> {
 
     if (hasSnapshot && dirtyFields.length === 0) {
       const hasCascadeRelations =
-        this.metadata.oneToManyRelations.some(r => r.cascade.has("persist") || r.cascade.has("merge")) ||
-        this.metadata.manyToManyRelations.some(r => r.cascade.has("persist") || r.cascade.has("merge")) ||
-        this.metadata.oneToOneRelations.some(r => r.cascade.has("persist") || r.cascade.has("merge")) ||
-        this.metadata.manyToOneRelations.some(r => r.cascade.has("persist") || r.cascade.has("merge"));
+        this.metadata.oneToManyRelations.some((r) => r.cascade.has("persist") || r.cascade.has("merge")) ||
+        this.metadata.manyToManyRelations.some((r) => r.cascade.has("persist") || r.cascade.has("merge")) ||
+        this.metadata.oneToOneRelations.some((r) => r.cascade.has("persist") || r.cascade.has("merge")) ||
+        this.metadata.manyToOneRelations.some((r) => r.cascade.has("persist") || r.cascade.has("merge"));
       if (hasCascadeRelations) {
         await this.cascadeManager.cascadePostSave(entity, conn, cascadeSaving);
       }
@@ -337,12 +347,7 @@ export class EntityPersister<T> {
         } finally {
           await checkStmt.close().catch(() => {});
         }
-        throw new OptimisticLockException(
-          this.entityClass.name,
-          idValue,
-          currentVersion,
-          actualVersion,
-        );
+        throw new OptimisticLockException(this.entityClass.name, idValue, currentVersion, actualVersion);
       }
 
       this.entityCache.evict(this.entityClass, this.tenantCacheKey(idValue));
@@ -355,9 +360,13 @@ export class EntityPersister<T> {
   }
 
   private async performInsert(
-    entity: T, conn: Connection, cascadeSaving: Set<unknown>,
-    idField: string | symbol, idCol: string,
-    versionCol: string | undefined, versionField: string | symbol | undefined,
+    entity: T,
+    conn: Connection,
+    cascadeSaving: Set<unknown>,
+    idField: string | symbol,
+    idCol: string,
+    versionCol: string | undefined,
+    versionField: string | symbol | undefined,
   ): Promise<T> {
     if (this.tenantIdField && this.tenantColumn) {
       const tid = this.requireTenantForWrite();
@@ -459,8 +468,7 @@ export class EntityPersister<T> {
     await this.cascadeManager.cascadePreDelete(entity, conn, new Set<unknown>());
 
     const now = new Date();
-    const updateBuilder = new UpdateBuilder(this.metadata.tableName)
-      .set(this.softDeleteColumn!, now as SqlValue);
+    const updateBuilder = new UpdateBuilder(this.metadata.tableName).set(this.softDeleteColumn!, now as SqlValue);
 
     if (versionField && versionCol) {
       const currentVersion = (entity as Record<string | symbol, unknown>)[versionField] as number;
@@ -506,11 +514,13 @@ export class EntityPersister<T> {
         id: idValue,
         timestamp: now,
       } satisfies EntityRemovedEvent<T>);
-      await this.writeAuditEntry(conn, idValue, "DELETE", [{
-        field: this.softDeleteField!,
-        oldValue: null,
-        newValue: now,
-      }]);
+      await this.writeAuditEntry(conn, idValue, "DELETE", [
+        {
+          field: this.softDeleteField!,
+          oldValue: null,
+          newValue: now,
+        },
+      ]);
       this.changeTracker.snapshot(entity);
       this.entityCache.evict(this.entityClass, this.tenantCacheKey(idValue));
       this.queryCache.invalidate(this.entityClass);
@@ -610,12 +620,7 @@ export class EntityPersister<T> {
         } finally {
           await checkStmt.close().catch(() => {});
         }
-        throw new OptimisticLockException(
-          this.entityClass.name,
-          idValue,
-          currentVersion,
-          actualVersion,
-        );
+        throw new OptimisticLockException(this.entityClass.name, idValue, currentVersion, actualVersion);
       }
       await this.invokeLifecycleCallbacks(entity, "PostRemove");
       await this.cascadeManager.cascadePostDelete(entity, conn, cascadeDeleting);
@@ -650,18 +655,12 @@ export class EntityPersister<T> {
     // Filter changes to audited fields only if a specific field list is configured
     let filteredChanges = changes;
     if (this.auditedFields) {
-      filteredChanges = changes.filter(c => this.auditedFields!.includes(c.field));
+      filteredChanges = changes.filter((c) => this.auditedFields!.includes(c.field));
       if (filteredChanges.length === 0 && operation === "UPDATE") return;
     }
 
     try {
-      await this.auditLogWriter.writeEntry(
-        conn,
-        this.entityName,
-        String(entityId),
-        operation,
-        filteredChanges,
-      );
+      await this.auditLogWriter.writeEntry(conn, this.entityName, String(entityId), operation, filteredChanges);
     } catch (err) {
       // Log but don't fail the operation — audit is non-blocking
       this.repoLogger.warn("Failed to write audit log entry", {
@@ -694,7 +693,7 @@ export class EntityPersister<T> {
    * Converts FieldChange[] from the change tracker to AuditFieldChange[].
    */
   private toAuditFieldChanges(dirtyFields: import("../mapping/change-tracker.js").FieldChange[]): AuditFieldChange[] {
-    return dirtyFields.map(c => ({
+    return dirtyFields.map((c) => ({
       field: String(c.field),
       oldValue: c.oldValue,
       newValue: c.newValue,

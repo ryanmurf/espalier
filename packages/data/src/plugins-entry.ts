@@ -1,10 +1,29 @@
 // Subpath export: espalier-data/plugins
-export type { Plugin, PluginContext, PluginHook, PluginDependency, HookType, HookContext } from "./plugin/index.js";
-export type { MiddlewareContext, MiddlewareFn } from "./plugin/index.js";
-export { PluginManager } from "./plugin/index.js";
-export { PluginDecorator, getPluginMetadata, getDiscoveredPlugins, clearDiscoveredPlugins } from "./plugin/index.js";
-export { composeMiddleware } from "./plugin/index.js";
-export { createPluginDecorator } from "./plugin/index.js";
-export { EventBus, getGlobalEventBus } from "./events/index.js";
-export type { EntityEvent, EntityPersistedEvent, EntityUpdatedEvent, EntityRemovedEvent, EntityLoadedEvent } from "./events/index.js";
-export { ENTITY_EVENTS } from "./events/index.js";
+
+export type {
+  EntityEvent,
+  EntityLoadedEvent,
+  EntityPersistedEvent,
+  EntityRemovedEvent,
+  EntityUpdatedEvent,
+} from "./events/index.js";
+export { ENTITY_EVENTS, EventBus, getGlobalEventBus } from "./events/index.js";
+export type {
+  HookContext,
+  HookType,
+  MiddlewareContext,
+  MiddlewareFn,
+  Plugin,
+  PluginContext,
+  PluginDependency,
+  PluginHook,
+} from "./plugin/index.js";
+export {
+  clearDiscoveredPlugins,
+  composeMiddleware,
+  createPluginDecorator,
+  getDiscoveredPlugins,
+  getPluginMetadata,
+  PluginDecorator,
+  PluginManager,
+} from "./plugin/index.js";

@@ -1,15 +1,15 @@
-import type { TypeAwareConnection, PreparedStatement, Statement, TypeConverterRegistry } from "espalier-jdbc";
+import type { PreparedStatement, Statement, TypeAwareConnection, TypeConverterRegistry } from "espalier-jdbc";
 import {
-  type Transaction,
-  IsolationLevel,
   ConnectionError,
-  TransactionError,
   DatabaseErrorCode,
   getGlobalLogger,
+  IsolationLevel,
   LogLevel,
+  type Transaction,
+  TransactionError,
 } from "espalier-jdbc";
 import type { BunSqlClient } from "./bun-pg-statement.js";
-import { BunPgStatementImpl, BunPgPreparedStatement } from "./bun-pg-statement.js";
+import { BunPgPreparedStatement, BunPgStatementImpl } from "./bun-pg-statement.js";
 
 const VALID_ISOLATION_LEVELS: ReadonlySet<string> = new Set(Object.values(IsolationLevel));
 
@@ -153,11 +153,7 @@ export class BunPgConnection implements TypeAwareConnection {
 
   private ensureOpen(): void {
     if (this.closed) {
-      throw new ConnectionError(
-        "Connection is closed",
-        undefined,
-        DatabaseErrorCode.CONNECTION_CLOSED,
-      );
+      throw new ConnectionError("Connection is closed", undefined, DatabaseErrorCode.CONNECTION_CLOSED);
     }
   }
 }

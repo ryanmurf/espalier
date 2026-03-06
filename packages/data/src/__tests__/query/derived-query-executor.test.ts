@@ -1,7 +1,7 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
+import type { EntityMetadata } from "../../mapping/entity-metadata.js";
 import { buildDerivedQuery } from "../../query/derived-query-executor.js";
 import { parseDerivedQueryMethod } from "../../query/derived-query-parser.js";
-import type { EntityMetadata } from "../../mapping/entity-metadata.js";
 
 // Minimal entity metadata for testing
 const metadata: EntityMetadata = {
@@ -215,9 +215,7 @@ describe("buildDerivedQuery", () => {
 
   describe("error cases", () => {
     it("throws when property does not exist in entity metadata", () => {
-      expect(() =>
-        buildQuery("findByUnknownField", ["value"]),
-      ).toThrow(/Unknown property "unknownField"/);
+      expect(() => buildQuery("findByUnknownField", ["value"])).toThrow(/Unknown property "unknownField"/);
     });
   });
 

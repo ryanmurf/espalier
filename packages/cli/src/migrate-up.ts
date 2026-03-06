@@ -1,5 +1,5 @@
-import type { EspalierConfig } from "./config.js";
 import { createAdapter } from "./adapter-factory.js";
+import type { EspalierConfig } from "./config.js";
 import { loadMigrations } from "./migrate-loader.js";
 
 export interface MigrateUpOptions {
@@ -28,24 +28,18 @@ export async function migrateUp(options: MigrateUpOptions): Promise<MigrateUpRes
     const versionSet = new Set<string>();
     for (const m of migrations) {
       if (versionSet.has(m.version)) {
-        throw new Error(
-          `Duplicate migration version "${m.version}" found. Each migration must have a unique version.`,
-        );
+        throw new Error(`Duplicate migration version "${m.version}" found. Each migration must have a unique version.`);
       }
       versionSet.add(m.version);
     }
 
     if (toVersion !== undefined) {
       if (toVersion === "") {
-        throw new Error(
-          `Target version must not be empty. Provide a valid migration version.`,
-        );
+        throw new Error(`Target version must not be empty. Provide a valid migration version.`);
       }
       const targetExists = migrations.some((m) => m.version === toVersion);
       if (!targetExists) {
-        throw new Error(
-          `Target version "${toVersion}" not found in migrations directory.`,
-        );
+        throw new Error(`Target version "${toVersion}" not found in migrations directory.`);
       }
       migrations = migrations.filter((m) => m.version <= toVersion);
     }

@@ -18,10 +18,7 @@ export interface AggregateRootMetadata {
 const aggregateRootMetadata = new WeakMap<object, AggregateRootMetadata>();
 
 export function AggregateRoot(options?: AggregateRootOptions) {
-  return function <T extends new (...args: any[]) => any>(
-    target: T,
-    _context: ClassDecoratorContext,
-  ): T {
+  return <T extends new (...args: any[]) => any>(target: T, _context: ClassDecoratorContext): T => {
     const type = options?.type ?? target.name;
     aggregateRootMetadata.set(target, {
       type,
@@ -31,9 +28,7 @@ export function AggregateRoot(options?: AggregateRootOptions) {
   };
 }
 
-export function getAggregateRootMetadata(
-  target: object,
-): AggregateRootMetadata | undefined {
+export function getAggregateRootMetadata(target: object): AggregateRootMetadata | undefined {
   const meta = aggregateRootMetadata.get(target);
   if (!meta) return undefined;
   return { ...meta };

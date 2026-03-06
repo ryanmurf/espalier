@@ -1,4 +1,4 @@
-import { type SqlValue, quoteIdentifier } from "espalier-jdbc";
+import { quoteIdentifier, type SqlValue } from "espalier-jdbc";
 import { toVectorLiteral } from "../vector/vector-utils.js";
 
 export type CriteriaType =

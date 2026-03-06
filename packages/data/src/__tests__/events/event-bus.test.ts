@@ -2,8 +2,9 @@
  * Unit tests for EventBus: on/once/off, emit, error handling,
  * removeAllListeners, listenerCount, and the global singleton.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { EventBus, getGlobalEventBus, ENTITY_EVENTS } from "espalier-data";
+
+import { ENTITY_EVENTS, EventBus, getGlobalEventBus } from "espalier-data";
+import { beforeEach, describe, expect, it } from "vitest";
 
 describe("EventBus", () => {
   let bus: EventBus;
@@ -28,9 +29,15 @@ describe("EventBus", () => {
 
   it("multiple handlers on same event all fire", async () => {
     const log: number[] = [];
-    bus.on("evt", () => { log.push(1); });
-    bus.on("evt", () => { log.push(2); });
-    bus.on("evt", () => { log.push(3); });
+    bus.on("evt", () => {
+      log.push(1);
+    });
+    bus.on("evt", () => {
+      log.push(2);
+    });
+    bus.on("evt", () => {
+      log.push(3);
+    });
 
     await bus.emit("evt", null);
     expect(log).toEqual([1, 2, 3]);
@@ -38,9 +45,15 @@ describe("EventBus", () => {
 
   it("handlers fire in registration order", async () => {
     const order: string[] = [];
-    bus.on("evt", () => { order.push("first"); });
-    bus.on("evt", () => { order.push("second"); });
-    bus.on("evt", () => { order.push("third"); });
+    bus.on("evt", () => {
+      order.push("first");
+    });
+    bus.on("evt", () => {
+      order.push("second");
+    });
+    bus.on("evt", () => {
+      order.push("third");
+    });
 
     await bus.emit("evt", null);
     expect(order).toEqual(["first", "second", "third"]);
@@ -54,8 +67,12 @@ describe("EventBus", () => {
   it("different events are independent", async () => {
     const aLog: number[] = [];
     const bLog: number[] = [];
-    bus.on("a", (n: number) => { aLog.push(n); });
-    bus.on("b", (n: number) => { bLog.push(n); });
+    bus.on("a", (n: number) => {
+      aLog.push(n);
+    });
+    bus.on("b", (n: number) => {
+      bLog.push(n);
+    });
 
     await bus.emit("a", 1);
     await bus.emit("b", 2);
@@ -70,7 +87,9 @@ describe("EventBus", () => {
 
   it("once() handler fires only on the first emit", async () => {
     const calls: number[] = [];
-    bus.once("evt", (n: number) => { calls.push(n); });
+    bus.once("evt", (n: number) => {
+      calls.push(n);
+    });
 
     await bus.emit("evt", 1);
     await bus.emit("evt", 2);
@@ -81,8 +100,12 @@ describe("EventBus", () => {
 
   it("once() handler is removed after firing even when mixed with on()", async () => {
     const log: string[] = [];
-    bus.on("evt", () => { log.push("persistent"); });
-    bus.once("evt", () => { log.push("once"); });
+    bus.on("evt", () => {
+      log.push("persistent");
+    });
+    bus.once("evt", () => {
+      log.push("once");
+    });
 
     await bus.emit("evt", null);
     expect(log).toEqual(["persistent", "once"]);
@@ -94,8 +117,12 @@ describe("EventBus", () => {
 
   it("multiple once() handlers each fire exactly once", async () => {
     const log: string[] = [];
-    bus.once("evt", () => { log.push("A"); });
-    bus.once("evt", () => { log.push("B"); });
+    bus.once("evt", () => {
+      log.push("A");
+    });
+    bus.once("evt", () => {
+      log.push("B");
+    });
 
     await bus.emit("evt", null);
     expect(log).toEqual(["A", "B"]);
@@ -111,9 +138,13 @@ describe("EventBus", () => {
 
   it("off() removes a specific handler", async () => {
     const log: string[] = [];
-    const handler = () => { log.push("removed"); };
+    const handler = () => {
+      log.push("removed");
+    };
     bus.on("evt", handler);
-    bus.on("evt", () => { log.push("kept"); });
+    bus.on("evt", () => {
+      log.push("kept");
+    });
 
     bus.off("evt", handler);
     await bus.emit("evt", null);
@@ -130,7 +161,9 @@ describe("EventBus", () => {
 
   it("off() removes only the first matching handler (if duplicated)", async () => {
     const log: number[] = [];
-    const handler = () => { log.push(1); };
+    const handler = () => {
+      log.push(1);
+    };
     bus.on("evt", handler);
     bus.on("evt", handler); // same reference added twice
 
@@ -249,8 +282,12 @@ describe("EventBus", () => {
 
   it("removeAllListeners(event) removes only that event", async () => {
     const log: string[] = [];
-    bus.on("a", () => { log.push("a"); });
-    bus.on("b", () => { log.push("b"); });
+    bus.on("a", () => {
+      log.push("a");
+    });
+    bus.on("b", () => {
+      log.push("b");
+    });
 
     bus.removeAllListeners("a");
     await bus.emit("a", null);
@@ -335,7 +372,9 @@ describe("EventBus", () => {
     const log: string[] = [];
     bus.on("evt", () => {
       log.push("original");
-      bus.on("evt", () => { log.push("late-add"); });
+      bus.on("evt", () => {
+        log.push("late-add");
+      });
     });
 
     await bus.emit("evt", null);
@@ -349,7 +388,9 @@ describe("EventBus", () => {
 
   it("off() during emit does not skip remaining handlers", async () => {
     const log: string[] = [];
-    const handler2 = () => { log.push("handler2"); };
+    const handler2 = () => {
+      log.push("handler2");
+    };
     bus.on("evt", () => {
       log.push("handler1");
       bus.off("evt", handler2);
@@ -364,7 +405,9 @@ describe("EventBus", () => {
 
   it("emit with same event name but different payload types works", async () => {
     const payloads: unknown[] = [];
-    bus.on("evt", (p) => { payloads.push(p); });
+    bus.on("evt", (p) => {
+      payloads.push(p);
+    });
 
     await bus.emit("evt", "string");
     await bus.emit("evt", 42);
@@ -377,8 +420,12 @@ describe("EventBus", () => {
 
   it("event names are case-sensitive", async () => {
     const log: string[] = [];
-    bus.on("Event", () => { log.push("upper"); });
-    bus.on("event", () => { log.push("lower"); });
+    bus.on("Event", () => {
+      log.push("upper");
+    });
+    bus.on("event", () => {
+      log.push("lower");
+    });
 
     await bus.emit("Event", null);
     expect(log).toEqual(["upper"]);
@@ -386,15 +433,21 @@ describe("EventBus", () => {
 
   it("empty string is a valid event name", async () => {
     const log: string[] = [];
-    bus.on("", () => { log.push("empty"); });
+    bus.on("", () => {
+      log.push("empty");
+    });
     await bus.emit("", null);
     expect(log).toEqual(["empty"]);
   });
 
   it("colon-namespaced events like entity:persisted:MyEntity work", async () => {
     const log: string[] = [];
-    bus.on("entity:persisted", () => { log.push("generic"); });
-    bus.on("entity:persisted:MyEntity", () => { log.push("specific"); });
+    bus.on("entity:persisted", () => {
+      log.push("generic");
+    });
+    bus.on("entity:persisted:MyEntity", () => {
+      log.push("specific");
+    });
 
     await bus.emit("entity:persisted", null);
     await bus.emit("entity:persisted:MyEntity", null);

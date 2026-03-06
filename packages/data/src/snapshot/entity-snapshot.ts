@@ -5,7 +5,7 @@ import { getTableName } from "../decorators/table.js";
 /**
  * An immutable point-in-time copy of an entity's column-mapped fields.
  */
-export interface Snapshot<T = unknown> {
+export interface Snapshot<_T = unknown> {
   readonly entityType: string;
   readonly entityId: unknown;
   readonly fields: Readonly<Record<string, unknown>>;

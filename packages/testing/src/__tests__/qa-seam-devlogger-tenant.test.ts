@@ -7,20 +7,13 @@
  * 3. Seeder dependency ordering and circular dependency detection
  * 4. Seeder environment filtering
  */
-import { describe, it, expect, vi, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
-import { PgDataSource } from "espalier-jdbc-pg";
-import { Table, Column, Id } from "espalier-data";
-import { DevQueryLogger, createDevLogger } from "espalier-data/observability";
+
+import { Column, Id, Table, TenantAwareDataSource, TenantContext } from "espalier-data";
+import { createDevLogger, DevQueryLogger } from "espalier-data/observability";
 import { LogLevel } from "espalier-jdbc";
-import { TenantAwareDataSource, TenantContext } from "espalier-data";
-import {
-  SeedRunner,
-  defineSeed,
-  clearSeedRegistry,
-  getRegisteredSeeds,
-  createFactory,
-  withTestTransaction,
-} from "../index.js";
+import { PgDataSource } from "espalier-jdbc-pg";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { clearSeedRegistry, defineSeed, getRegisteredSeeds, SeedRunner } from "../index.js";
 
 // =============================================================================
 // Connectivity check
@@ -52,7 +45,8 @@ try {
 
 @Table("qa_seam_products")
 class SeamProduct {
-  @Id @Column({ type: "UUID" })
+  @Id
+  @Column({ type: "UUID" })
   id!: string;
 
   @Column({ type: "VARCHAR(255)" })
@@ -232,209 +226,205 @@ describe("Seam 5: DevQueryLogger + multi-tenant DataSource — unit level", () =
 // Seam 8: SeedRunner + existing database state
 // =============================================================================
 
-describe.skipIf(!canConnect)(
-  "Seam 8: SeedRunner + existing migration state",
-  { timeout: 30000 },
-  () => {
-    let ds: PgDataSource;
+describe.skipIf(!canConnect)("Seam 8: SeedRunner + existing migration state", { timeout: 30000 }, () => {
+  let ds: PgDataSource;
 
-    beforeAll(async () => {
-      ds = new PgDataSource(PG_CONFIG);
-      // Ensure a fresh state
-      const conn = await ds.getConnection();
-      const stmt = conn.createStatement();
-      await stmt.executeUpdate("DROP TABLE IF EXISTS _espalier_seeds CASCADE");
+  beforeAll(async () => {
+    ds = new PgDataSource(PG_CONFIG);
+    // Ensure a fresh state
+    const conn = await ds.getConnection();
+    const stmt = conn.createStatement();
+    await stmt.executeUpdate("DROP TABLE IF EXISTS _espalier_seeds CASCADE");
+    await conn.close();
+  });
+
+  afterAll(async () => {
+    const conn = await ds.getConnection();
+    const stmt = conn.createStatement();
+    await stmt.executeUpdate("DROP TABLE IF EXISTS _espalier_seeds CASCADE");
+    await conn.close();
+    await ds.close();
+  });
+
+  beforeEach(() => {
+    clearSeedRegistry();
+  });
+
+  it("SeedRunner.ensureTable creates tracking table idempotently", async () => {
+    const runner = new SeedRunner(ds, "test");
+    const conn = await ds.getConnection();
+    try {
+      await runner.ensureTable(conn); // first call
+      await runner.ensureTable(conn); // second call — must not throw
+    } finally {
       await conn.close();
+    }
+  });
+
+  it("seeds run on first call and are marked as already-run on second call", async () => {
+    const runner = new SeedRunner(ds, "test");
+
+    defineSeed("qa-seed-first-run", {
+      run: async (_ctx) => {
+        // no-op seed
+      },
     });
 
-    afterAll(async () => {
-      const conn = await ds.getConnection();
-      const stmt = conn.createStatement();
-      await stmt.executeUpdate("DROP TABLE IF EXISTS _espalier_seeds CASCADE");
+    const first = await runner.run(getRegisteredSeeds());
+    expect(first.executed).toContain("qa-seed-first-run");
+    expect(first.alreadyRun).not.toContain("qa-seed-first-run");
+
+    const second = await runner.run(getRegisteredSeeds());
+    expect(second.alreadyRun).toContain("qa-seed-first-run");
+    expect(second.executed).not.toContain("qa-seed-first-run");
+  });
+
+  it("seeds respect environment filter — dev-only seeds skipped in production", async () => {
+    const runner = new SeedRunner(ds, "production");
+
+    defineSeed("qa-seed-dev-only", {
+      environments: ["development"],
+      run: async () => {},
+    });
+    defineSeed("qa-seed-all-envs", {
+      // no environments = runs everywhere
+      run: async () => {},
+    });
+
+    const result = await runner.run(getRegisteredSeeds());
+    expect(result.skipped).toContain("qa-seed-dev-only");
+    expect(result.executed).toContain("qa-seed-all-envs");
+  });
+
+  it("SeedRunner.reset drops the tracking table completely", async () => {
+    const runner = new SeedRunner(ds, "test");
+
+    defineSeed("qa-seed-to-reset", { run: async () => {} });
+    await runner.run(getRegisteredSeeds()); // run once
+
+    await runner.reset(); // drop the tracking table
+
+    // Clear registry and re-register
+    clearSeedRegistry();
+    defineSeed("qa-seed-fresh-after-reset", { run: async () => {} });
+
+    // Should execute again since tracking was dropped
+    const afterReset = await runner.run(getRegisteredSeeds());
+    expect(afterReset.executed).toContain("qa-seed-fresh-after-reset");
+
+    // Cleanup
+    await runner.reset();
+  });
+
+  it("seeds run in dependency order", async () => {
+    const order: string[] = [];
+    const runner = new SeedRunner(ds, "test");
+
+    defineSeed("qa-seed-b-depends-on-a", {
+      dependsOn: ["qa-seed-a-base"],
+      run: async () => {
+        order.push("B");
+      },
+    });
+    defineSeed("qa-seed-a-base", {
+      run: async () => {
+        order.push("A");
+      },
+    });
+
+    await runner.run(getRegisteredSeeds());
+
+    const aIdx = order.indexOf("A");
+    const bIdx = order.indexOf("B");
+    expect(aIdx).toBeGreaterThanOrEqual(0);
+    expect(bIdx).toBeGreaterThanOrEqual(0);
+    expect(aIdx).toBeLessThan(bIdx); // A must run before B
+
+    await runner.reset();
+  });
+
+  it("SeedRunner detects circular dependencies and throws", async () => {
+    const runner = new SeedRunner(ds, "test");
+
+    defineSeed("qa-seed-circular-x", {
+      dependsOn: ["qa-seed-circular-y"],
+      run: async () => {},
+    });
+    defineSeed("qa-seed-circular-y", {
+      dependsOn: ["qa-seed-circular-x"],
+      run: async () => {},
+    });
+
+    const conn = await ds.getConnection();
+    try {
+      await runner.ensureTable(conn);
+    } finally {
       await conn.close();
-      await ds.close();
+    }
+
+    await expect(runner.run(getRegisteredSeeds())).rejects.toThrow(/circular/i);
+
+    await runner.reset();
+  });
+
+  it("seed with unknown dependency throws descriptive error", async () => {
+    const runner = new SeedRunner(ds, "test");
+
+    defineSeed("qa-seed-orphan", {
+      dependsOn: ["this-seed-does-not-exist"],
+      run: async () => {},
     });
 
-    beforeEach(() => {
-      clearSeedRegistry();
+    const conn = await ds.getConnection();
+    try {
+      await runner.ensureTable(conn);
+    } finally {
+      await conn.close();
+    }
+
+    await expect(runner.run(getRegisteredSeeds())).rejects.toThrow(/Unknown seed dependency/i);
+
+    await runner.reset();
+  });
+
+  it("seed can use factory to build entities without persisting", async () => {
+    // SEAM CHECK: seed context provides factory() — does it work?
+    let factoryUsed = false;
+    const runner = new SeedRunner(ds, "test");
+
+    defineSeed("qa-seed-with-factory", {
+      run: async (ctx) => {
+        const factory = ctx.factory(SeamProduct);
+        const product = factory.build({ name: "SeededProduct" });
+        expect(product.id).toBeTruthy();
+        expect(product.name).toBe("SeededProduct");
+        factoryUsed = true;
+      },
     });
 
-    it("SeedRunner.ensureTable creates tracking table idempotently", async () => {
-      const runner = new SeedRunner(ds, "test");
-      const conn = await ds.getConnection();
-      try {
-        await runner.ensureTable(conn); // first call
-        await runner.ensureTable(conn); // second call — must not throw
-      } finally {
-        await conn.close();
-      }
-    });
+    await runner.run(getRegisteredSeeds());
+    expect(factoryUsed).toBe(true);
 
-    it("seeds run on first call and are marked as already-run on second call", async () => {
-      const runner = new SeedRunner(ds, "test");
+    await runner.reset();
+  });
 
-      defineSeed("qa-seed-first-run", {
-        run: async (_ctx) => {
-          // no-op seed
-        },
-      });
+  it("SeedRunner.status() correctly reports pending vs executed seeds", async () => {
+    const runner = new SeedRunner(ds, "test");
 
-      const first = await runner.run(getRegisteredSeeds());
-      expect(first.executed).toContain("qa-seed-first-run");
-      expect(first.alreadyRun).not.toContain("qa-seed-first-run");
+    defineSeed("qa-seed-status-a", { run: async () => {} });
+    defineSeed("qa-seed-status-b", { run: async () => {} });
 
-      const second = await runner.run(getRegisteredSeeds());
-      expect(second.alreadyRun).toContain("qa-seed-first-run");
-      expect(second.executed).not.toContain("qa-seed-first-run");
-    });
+    // Only run A
+    const singleSeed = new Map(Array.from(getRegisteredSeeds().entries()).filter(([k]) => k === "qa-seed-status-a"));
+    await runner.run(singleSeed);
 
-    it("seeds respect environment filter — dev-only seeds skipped in production", async () => {
-      const runner = new SeedRunner(ds, "production");
+    const status = await runner.status(getRegisteredSeeds());
+    const aStatus = status.find((s) => s.name === "qa-seed-status-a");
+    const bStatus = status.find((s) => s.name === "qa-seed-status-b");
 
-      defineSeed("qa-seed-dev-only", {
-        environments: ["development"],
-        run: async () => {},
-      });
-      defineSeed("qa-seed-all-envs", {
-        // no environments = runs everywhere
-        run: async () => {},
-      });
+    expect(aStatus?.status).toBe("executed");
+    expect(bStatus?.status).toBe("pending");
 
-      const result = await runner.run(getRegisteredSeeds());
-      expect(result.skipped).toContain("qa-seed-dev-only");
-      expect(result.executed).toContain("qa-seed-all-envs");
-    });
-
-    it("SeedRunner.reset drops the tracking table completely", async () => {
-      const runner = new SeedRunner(ds, "test");
-
-      defineSeed("qa-seed-to-reset", { run: async () => {} });
-      await runner.run(getRegisteredSeeds()); // run once
-
-      await runner.reset(); // drop the tracking table
-
-      // Clear registry and re-register
-      clearSeedRegistry();
-      defineSeed("qa-seed-fresh-after-reset", { run: async () => {} });
-
-      // Should execute again since tracking was dropped
-      const afterReset = await runner.run(getRegisteredSeeds());
-      expect(afterReset.executed).toContain("qa-seed-fresh-after-reset");
-
-      // Cleanup
-      await runner.reset();
-    });
-
-    it("seeds run in dependency order", async () => {
-      const order: string[] = [];
-      const runner = new SeedRunner(ds, "test");
-
-      defineSeed("qa-seed-b-depends-on-a", {
-        dependsOn: ["qa-seed-a-base"],
-        run: async () => { order.push("B"); },
-      });
-      defineSeed("qa-seed-a-base", {
-        run: async () => { order.push("A"); },
-      });
-
-      await runner.run(getRegisteredSeeds());
-
-      const aIdx = order.indexOf("A");
-      const bIdx = order.indexOf("B");
-      expect(aIdx).toBeGreaterThanOrEqual(0);
-      expect(bIdx).toBeGreaterThanOrEqual(0);
-      expect(aIdx).toBeLessThan(bIdx); // A must run before B
-
-      await runner.reset();
-    });
-
-    it("SeedRunner detects circular dependencies and throws", async () => {
-      const runner = new SeedRunner(ds, "test");
-
-      defineSeed("qa-seed-circular-x", {
-        dependsOn: ["qa-seed-circular-y"],
-        run: async () => {},
-      });
-      defineSeed("qa-seed-circular-y", {
-        dependsOn: ["qa-seed-circular-x"],
-        run: async () => {},
-      });
-
-      const conn = await ds.getConnection();
-      try {
-        await runner.ensureTable(conn);
-      } finally {
-        await conn.close();
-      }
-
-      await expect(runner.run(getRegisteredSeeds())).rejects.toThrow(/circular/i);
-
-      await runner.reset();
-    });
-
-    it("seed with unknown dependency throws descriptive error", async () => {
-      const runner = new SeedRunner(ds, "test");
-
-      defineSeed("qa-seed-orphan", {
-        dependsOn: ["this-seed-does-not-exist"],
-        run: async () => {},
-      });
-
-      const conn = await ds.getConnection();
-      try {
-        await runner.ensureTable(conn);
-      } finally {
-        await conn.close();
-      }
-
-      await expect(runner.run(getRegisteredSeeds())).rejects.toThrow(
-        /Unknown seed dependency/i,
-      );
-
-      await runner.reset();
-    });
-
-    it("seed can use factory to build entities without persisting", async () => {
-      // SEAM CHECK: seed context provides factory() — does it work?
-      let factoryUsed = false;
-      const runner = new SeedRunner(ds, "test");
-
-      defineSeed("qa-seed-with-factory", {
-        run: async (ctx) => {
-          const factory = ctx.factory(SeamProduct);
-          const product = factory.build({ name: "SeededProduct" });
-          expect(product.id).toBeTruthy();
-          expect(product.name).toBe("SeededProduct");
-          factoryUsed = true;
-        },
-      });
-
-      await runner.run(getRegisteredSeeds());
-      expect(factoryUsed).toBe(true);
-
-      await runner.reset();
-    });
-
-    it("SeedRunner.status() correctly reports pending vs executed seeds", async () => {
-      const runner = new SeedRunner(ds, "test");
-
-      defineSeed("qa-seed-status-a", { run: async () => {} });
-      defineSeed("qa-seed-status-b", { run: async () => {} });
-
-      // Only run A
-      const singleSeed = new Map(
-        Array.from(getRegisteredSeeds().entries()).filter(([k]) => k === "qa-seed-status-a"),
-      );
-      await runner.run(singleSeed);
-
-      const status = await runner.status(getRegisteredSeeds());
-      const aStatus = status.find((s) => s.name === "qa-seed-status-a");
-      const bStatus = status.find((s) => s.name === "qa-seed-status-b");
-
-      expect(aStatus?.status).toBe("executed");
-      expect(bStatus?.status).toBe("pending");
-
-      await runner.reset();
-    });
-  },
-);
+    await runner.reset();
+  });
+});

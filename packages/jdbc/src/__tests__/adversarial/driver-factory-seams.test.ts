@@ -8,16 +8,16 @@
  * - hasDataSourceFactory correctness
  * - Interaction with detectRuntime
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import {
-  createDataSource,
-  registerDataSourceFactory,
-  hasDataSourceFactory,
-  clearDataSourceFactories,
-} from "../../driver-factory.js";
-import type { DataSourceConfig, DataSourceFactory, Dialect } from "../../driver-factory.js";
-import type { DataSource } from "../../data-source.js";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { Connection } from "../../connection.js";
+import type { DataSource } from "../../data-source.js";
+import type { DataSourceConfig, DataSourceFactory, Dialect } from "../../driver-factory.js";
+import {
+  clearDataSourceFactories,
+  createDataSource,
+  hasDataSourceFactory,
+  registerDataSourceFactory,
+} from "../../driver-factory.js";
 
 // Minimal mock DataSource for testing
 function createMockDataSource(name: string): DataSource {
@@ -41,9 +41,7 @@ describe("driver factory seam tests", () => {
   // -- Registration & Lookup --
 
   it("throws when no factory registered for dialect", () => {
-    expect(() => createDataSource("postgres", {})).toThrow(
-      /No DataSource factory registered/,
-    );
+    expect(() => createDataSource("postgres", {})).toThrow(/No DataSource factory registered/);
   });
 
   it("error message includes dialect and runtime in suggestion", () => {
@@ -56,8 +54,7 @@ describe("driver factory seam tests", () => {
   });
 
   it("dialect-level factory works for all runtimes", () => {
-    const factory: DataSourceFactory = (config, runtime) =>
-      createMockDataSource(`pg-${runtime.runtime}`);
+    const factory: DataSourceFactory = (config, runtime) => createMockDataSource(`pg-${runtime.runtime}`);
     registerDataSourceFactory("postgres", factory);
 
     const ds = createDataSource("postgres", {});
@@ -102,13 +99,9 @@ describe("driver factory seam tests", () => {
   });
 
   it("different dialects are isolated", () => {
-    registerDataSourceFactory("postgres", () =>
-      createMockDataSource("pg"),
-    );
+    registerDataSourceFactory("postgres", () => createMockDataSource("pg"));
 
-    expect(() => createDataSource("sqlite", {})).toThrow(
-      /No DataSource factory registered/,
-    );
+    expect(() => createDataSource("sqlite", {})).toThrow(/No DataSource factory registered/);
   });
 
   // -- hasDataSourceFactory --
@@ -136,9 +129,7 @@ describe("driver factory seam tests", () => {
   });
 
   it("hasDataSourceFactory is false for unregistered runtime with no dialect fallback", () => {
-    registerDataSourceFactory("postgres", "bun", () =>
-      createMockDataSource("bun-pg"),
-    );
+    registerDataSourceFactory("postgres", "bun", () => createMockDataSource("bun-pg"));
     // Only bun-specific registered, no dialect-level
     expect(hasDataSourceFactory("postgres", "bun")).toBe(true);
     // Node has no specific or dialect-level
@@ -225,9 +216,7 @@ describe("driver factory seam tests", () => {
       throw new Error("Connection pool exhausted");
     });
 
-    expect(() => createDataSource("postgres", {})).toThrow(
-      "Connection pool exhausted",
-    );
+    expect(() => createDataSource("postgres", {})).toThrow("Connection pool exhausted");
   });
 
   it("factory that returns null does not crash in createDataSource", () => {

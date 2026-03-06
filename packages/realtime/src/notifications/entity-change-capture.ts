@@ -1,5 +1,5 @@
 import { getTableName } from "espalier-data";
-import { validateIdentifier, quoteIdentifier } from "espalier-jdbc";
+import { quoteIdentifier, validateIdentifier } from "espalier-jdbc";
 
 /**
  * Generates PostgreSQL trigger functions and triggers that emit NOTIFY events

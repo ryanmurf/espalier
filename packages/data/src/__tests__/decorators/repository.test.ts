@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeEach } from "vitest";
-import { Repository, getRepositoryMetadata, getRegisteredRepositories } from "../../decorators/repository.js";
-import { Table } from "../../decorators/table.js";
+import { describe, expect, it } from "vitest";
 import { Column } from "../../decorators/column.js";
 import { Id } from "../../decorators/id.js";
+import { getRegisteredRepositories, getRepositoryMetadata, Repository } from "../../decorators/repository.js";
+import { Table } from "../../decorators/table.js";
 
 @Table("users")
 class User {
@@ -60,7 +60,9 @@ describe("@Repository decorator", () => {
   it("returns the class unchanged", () => {
     @Repository({ entity: User })
     class TestRepo {
-      greet() { return "hello"; }
+      greet() {
+        return "hello";
+      }
     }
 
     const repo = new TestRepo();

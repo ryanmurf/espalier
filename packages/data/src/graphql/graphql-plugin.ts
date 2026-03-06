@@ -1,6 +1,6 @@
 import type { Plugin, PluginContext } from "../plugin/plugin.js";
+import type { GeneratedGraphQLSchema, GraphQLSchemaOptions } from "./schema-generator.js";
 import { GraphQLSchemaGenerator } from "./schema-generator.js";
-import type { GraphQLSchemaOptions, GeneratedGraphQLSchema } from "./schema-generator.js";
 
 /**
  * Configuration for the GraphQL plugin.

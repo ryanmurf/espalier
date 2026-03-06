@@ -1,5 +1,5 @@
-import type { EspalierConfig } from "./config.js";
 import { createAdapter } from "./adapter-factory.js";
+import type { EspalierConfig } from "./config.js";
 import { loadMigrations } from "./migrate-loader.js";
 
 export interface MigrateDownOptions {
@@ -34,9 +34,7 @@ export async function migrateDown(options: MigrateDownOptions): Promise<MigrateD
     if (toVersion !== undefined) {
       const targetExists = migrations.some((m) => m.version === toVersion);
       if (!targetExists && toVersion !== "0") {
-        throw new Error(
-          `Target version "${toVersion}" not found in migrations directory.`,
-        );
+        throw new Error(`Target version "${toVersion}" not found in migrations directory.`);
       }
 
       const effectiveVersion = toVersion === "0" ? "" : toVersion;
@@ -59,9 +57,7 @@ export async function migrateDown(options: MigrateDownOptions): Promise<MigrateD
     // Validate steps
     const effectiveSteps = steps ?? 1;
     if (!Number.isFinite(effectiveSteps) || !Number.isInteger(effectiveSteps) || effectiveSteps < 0) {
-      throw new Error(
-        `Invalid steps value: ${steps}. Steps must be a non-negative integer.`,
-      );
+      throw new Error(`Invalid steps value: ${steps}. Steps must be a non-negative integer.`);
     }
     if (effectiveSteps === 0) {
       const currentVersion = await runner.getCurrentVersion();

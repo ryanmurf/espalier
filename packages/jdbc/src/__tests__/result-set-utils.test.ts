@@ -1,14 +1,8 @@
 /**
  * Unit tests for ResultSet utility functions.
  */
-import { describe, it, expect, vi } from "vitest";
-import {
-  toArray,
-  mapResultSet,
-  filterResultSet,
-  reduceResultSet,
-  forEachResultSet,
-} from "../result-set-utils.js";
+import { describe, expect, it, vi } from "vitest";
+import { filterResultSet, forEachResultSet, mapResultSet, reduceResultSet, toArray } from "../result-set-utils.js";
 import { TestResultSet } from "./test-utils/test-result-set.js";
 
 // ──────────────────────────────────────────────────
@@ -56,7 +50,7 @@ describe("mapResultSet", () => {
       { id: 2, name: "Bob" },
     ]);
     const names: string[] = [];
-    for await (const name of mapResultSet(rs, row => row.name as string)) {
+    for await (const name of mapResultSet(rs, (row) => row.name as string)) {
       names.push(name);
     }
     expect(names).toEqual(["Alice", "Bob"]);
@@ -68,7 +62,7 @@ describe("mapResultSet", () => {
       { id: 2, price: 20 },
     ]);
     const doubled: number[] = [];
-    for await (const val of mapResultSet(rs, row => (row.price as number) * 2)) {
+    for await (const val of mapResultSet(rs, (row) => (row.price as number) * 2)) {
       doubled.push(val);
     }
     expect(doubled).toEqual([20, 40]);
@@ -77,7 +71,7 @@ describe("mapResultSet", () => {
   it("maps empty ResultSet yields nothing", async () => {
     const rs = new TestResultSet([]);
     const results: unknown[] = [];
-    for await (const val of mapResultSet(rs, row => row)) {
+    for await (const val of mapResultSet(rs, (row) => row)) {
       results.push(val);
     }
     expect(results).toEqual([]);
@@ -86,7 +80,7 @@ describe("mapResultSet", () => {
   it("works with for-await-of", async () => {
     const rs = new TestResultSet([{ x: 1 }, { x: 2 }, { x: 3 }]);
     const items: number[] = [];
-    for await (const item of mapResultSet(rs, r => r.x as number)) {
+    for await (const item of mapResultSet(rs, (r) => r.x as number)) {
       items.push(item);
     }
     expect(items).toEqual([1, 2, 3]);
@@ -105,7 +99,7 @@ describe("filterResultSet", () => {
       { id: 3, active: true },
     ]);
     const results: Record<string, unknown>[] = [];
-    for await (const row of filterResultSet(rs, r => r.active === true)) {
+    for await (const row of filterResultSet(rs, (r) => r.active === true)) {
       results.push(row);
     }
     expect(results).toHaveLength(2);
@@ -119,7 +113,7 @@ describe("filterResultSet", () => {
       { id: 2, status: "active" },
     ]);
     const results: Record<string, unknown>[] = [];
-    for await (const row of filterResultSet(rs, r => r.status === "deleted")) {
+    for await (const row of filterResultSet(rs, (r) => r.status === "deleted")) {
       results.push(row);
     }
     expect(results).toEqual([]);
@@ -131,7 +125,7 @@ describe("filterResultSet", () => {
       { id: 2, valid: true },
     ]);
     const results: Record<string, unknown>[] = [];
-    for await (const row of filterResultSet(rs, r => r.valid === true)) {
+    for await (const row of filterResultSet(rs, (r) => r.valid === true)) {
       results.push(row);
     }
     expect(results).toHaveLength(2);
@@ -144,11 +138,7 @@ describe("filterResultSet", () => {
 
 describe("reduceResultSet", () => {
   it("sums a numeric field", async () => {
-    const rs = new TestResultSet([
-      { price: 10 },
-      { price: 20 },
-      { price: 30 },
-    ]);
+    const rs = new TestResultSet([{ price: 10 }, { price: 20 }, { price: 30 }]);
     const total = await reduceResultSet(rs, (acc, row) => acc + (row.price as number), 0);
     expect(total).toBe(60);
   });
@@ -179,13 +169,9 @@ describe("reduceResultSet", () => {
 
 describe("forEachResultSet", () => {
   it("callback called for each row", async () => {
-    const rs = new TestResultSet([
-      { id: 1 },
-      { id: 2 },
-      { id: 3 },
-    ]);
+    const rs = new TestResultSet([{ id: 1 }, { id: 2 }, { id: 3 }]);
     const seen: number[] = [];
-    await forEachResultSet(rs, row => {
+    await forEachResultSet(rs, (row) => {
       seen.push(row.id as number);
     });
     expect(seen).toEqual([1, 2, 3]);
@@ -194,8 +180,8 @@ describe("forEachResultSet", () => {
   it("async callback is awaited", async () => {
     const rs = new TestResultSet([{ id: 1 }, { id: 2 }]);
     const order: string[] = [];
-    await forEachResultSet(rs, async row => {
-      await new Promise(r => setTimeout(r, 1));
+    await forEachResultSet(rs, async (row) => {
+      await new Promise((r) => setTimeout(r, 1));
       order.push(`done:${row.id}`);
     });
     // Both should be done in order (sequential, not parallel)
@@ -206,7 +192,9 @@ describe("forEachResultSet", () => {
     const rows = Array.from({ length: 50 }, (_, i) => ({ i }));
     const rs = new TestResultSet(rows);
     let count = 0;
-    await forEachResultSet(rs, () => { count++; });
+    await forEachResultSet(rs, () => {
+      count++;
+    });
     expect(count).toBe(50);
   });
 

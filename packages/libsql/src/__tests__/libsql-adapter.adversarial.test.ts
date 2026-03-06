@@ -1,9 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { LibSqlConnection } from "../libsql-connection.js";
-import { LibSqlDataSource, createLibSqlDataSource } from "../libsql-data-source.js";
-import { LibSqlStatementImpl, LibSqlPreparedStatementImpl } from "../libsql-statement.js";
+import { createLibSqlDataSource, LibSqlDataSource } from "../libsql-data-source.js";
 import { LibSqlJdbcResultSet } from "../libsql-result-set.js";
-import type { LibSqlClient, LibSqlTransaction, LibSqlResultSet } from "../libsql-types.js";
+import { LibSqlPreparedStatementImpl, LibSqlStatementImpl } from "../libsql-statement.js";
+import type { LibSqlClient, LibSqlResultSet, LibSqlTransaction } from "../libsql-types.js";
 
 // ==========================================================================
 // Mock helpers
@@ -44,7 +44,13 @@ function createMockTransaction(): LibSqlTransaction {
 describe("LibSqlJdbcResultSet", () => {
   it("iterates rows via next()/getRow()", async () => {
     const rs = new LibSqlJdbcResultSet(
-      mockResultSet(["id", "name"], [[1, "Alice"], [2, "Bob"]]),
+      mockResultSet(
+        ["id", "name"],
+        [
+          [1, "Alice"],
+          [2, "Bob"],
+        ],
+      ),
     );
     expect(await rs.next()).toBe(true);
     expect(rs.getRow()).toEqual({ id: 1, name: "Alice" });
@@ -54,9 +60,7 @@ describe("LibSqlJdbcResultSet", () => {
   });
 
   it("iterates via async iterator", async () => {
-    const rs = new LibSqlJdbcResultSet(
-      mockResultSet(["id"], [[1], [2], [3]]),
-    );
+    const rs = new LibSqlJdbcResultSet(mockResultSet(["id"], [[1], [2], [3]]));
     const rows: Record<string, unknown>[] = [];
     for await (const row of rs) {
       rows.push(row);
@@ -105,9 +109,7 @@ describe("LibSqlJdbcResultSet", () => {
   });
 
   it("getDate returns Date or null", async () => {
-    const rs = new LibSqlJdbcResultSet(
-      mockResultSet(["created"], [["2024-01-01T00:00:00Z"], [null]]),
-    );
+    const rs = new LibSqlJdbcResultSet(mockResultSet(["created"], [["2024-01-01T00:00:00Z"], [null]]));
     await rs.next();
     const date = rs.getDate("created");
     expect(date).toBeInstanceOf(Date);
@@ -144,9 +146,7 @@ describe("LibSqlJdbcResultSet", () => {
   });
 
   it("NULL values in various column types", async () => {
-    const rs = new LibSqlJdbcResultSet(
-      mockResultSet(["s", "n", "b", "d"], [[null, null, null, null]]),
-    );
+    const rs = new LibSqlJdbcResultSet(mockResultSet(["s", "n", "b", "d"], [[null, null, null, null]]));
     await rs.next();
     expect(rs.getString("s")).toBeNull();
     expect(rs.getNumber("n")).toBeNull();
@@ -309,9 +309,7 @@ describe("LibSqlConnection — transactions", () => {
 describe("LibSqlStatementImpl — query execution", () => {
   it("executeQuery calls client.execute with SQL", async () => {
     const client = createMockClient();
-    (client.execute as ReturnType<typeof vi.fn>).mockResolvedValue(
-      mockResultSet(["one"], [[1]]),
-    );
+    (client.execute as ReturnType<typeof vi.fn>).mockResolvedValue(mockResultSet(["one"], [[1]]));
     const stmt = new LibSqlStatementImpl(client);
     const rs = await stmt.executeQuery("SELECT 1 AS one");
     expect(client.execute).toHaveBeenCalledWith({ sql: "SELECT 1 AS one", args: [] });
@@ -542,7 +540,7 @@ describe("LibSqlJdbcResultSet — large data", () => {
     const rows = Array.from({ length: 10000 }, (_, i) => [i, `name_${i}`]);
     const rs = new LibSqlJdbcResultSet(mockResultSet(["id", "name"], rows));
     let count = 0;
-    for await (const row of rs) {
+    for await (const _row of rs) {
       count++;
     }
     expect(count).toBe(10000);

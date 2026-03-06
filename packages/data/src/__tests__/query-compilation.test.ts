@@ -1,14 +1,14 @@
-import { describe, it, expect, beforeAll } from "vitest";
-import { Table } from "../decorators/table.js";
+import { beforeAll, describe, expect, it } from "vitest";
 import { Column } from "../decorators/column.js";
 import { Id } from "../decorators/id.js";
+import { Table } from "../decorators/table.js";
+import type { EntityMetadata } from "../mapping/entity-metadata.js";
 import { getEntityMetadata } from "../mapping/entity-metadata.js";
-import { parseDerivedQueryMethod } from "../query/derived-query-parser.js";
-import { QueryCompiler } from "../query/query-compiler.js";
+import type { CompiledQuery } from "../query/compiled-query.js";
 import { bindCompiledQuery } from "../query/compiled-query.js";
 import { buildDerivedQuery } from "../query/derived-query-executor.js";
-import type { CompiledQuery } from "../query/compiled-query.js";
-import type { EntityMetadata } from "../mapping/entity-metadata.js";
+import { parseDerivedQueryMethod } from "../query/derived-query-parser.js";
+import { QueryCompiler } from "../query/query-compiler.js";
 
 // ---------------------------------------------------------------------------
 // Test entities
@@ -105,21 +105,18 @@ describe("QueryCompiler — parameter count variations", () => {
   });
 
   it("compiles a method with many params (And chain)", () => {
-    const result = compileAndBind(
-      "findByFirstNameAndLastNameAndAgeAndEmail",
-      userMeta,
-      ["John", "Doe", 30, "john@example.com"],
-    );
+    const result = compileAndBind("findByFirstNameAndLastNameAndAgeAndEmail", userMeta, [
+      "John",
+      "Doe",
+      30,
+      "john@example.com",
+    ]);
     expect(result.params).toEqual(["John", "Doe", 30, "john@example.com"]);
     expect(result.sql).toContain("AND");
   });
 
   it("compiles a method combining zero-arg and multi-arg operators", () => {
-    const result = compileAndBind(
-      "findByActiveTrueAndAgeBetween",
-      userMeta,
-      [18, 65],
-    );
+    const result = compileAndBind("findByActiveTrueAndAgeBetween", userMeta, [18, 65]);
     expect(result.sql).toContain("TRUE");
     expect(result.sql).toContain("BETWEEN");
     expect(result.params).toEqual([18, 65]);
@@ -325,11 +322,7 @@ describe("QueryCompiler — complex conditions", () => {
   });
 
   it("Between + And + OrderBy", () => {
-    const result = compileAndBind(
-      "findByAgeBetweenAndActiveTrueOrderByScoreDesc",
-      userMeta,
-      [18, 65],
-    );
+    const result = compileAndBind("findByAgeBetweenAndActiveTrueOrderByScoreDesc", userMeta, [18, 65]);
     expect(result.sql).toContain("BETWEEN");
     expect(result.sql).toContain("TRUE");
     expect(result.sql).toContain("ORDER BY");
@@ -368,9 +361,7 @@ describe("QueryCompiler — concurrency safety", () => {
     const compiled = compiler.compile(desc, userMeta);
 
     const promises = Array.from({ length: 100 }, (_, i) =>
-      Promise.resolve().then(() =>
-        bindCompiledQuery(compiled, [`name_${i}`, i]),
-      ),
+      Promise.resolve().then(() => bindCompiledQuery(compiled, [`name_${i}`, i])),
     );
 
     const results = await Promise.all(promises);
@@ -420,7 +411,7 @@ describe("QueryCompiler — cache mutation safety", () => {
     const desc = parseDerivedQueryMethod("findByFirstNameAndAge");
     const compiled = compiler.compile(desc, userMeta);
 
-    const result1 = bindCompiledQuery(compiled, ["John", 30]);
+    const _result1 = bindCompiledQuery(compiled, ["John", 30]);
 
     // Mutate the bindings
     compiled.paramBindings.push({ argIndex: 99, transform: "identity" });
@@ -554,32 +545,24 @@ describe("QueryCompiler — parameter edge cases", () => {
 // ===========================================================================
 describe("QueryCompiler — equivalence with dynamic path", () => {
   it("simple findBy produces equivalent SQL", () => {
-    const { compiledResult, dynamicResult } = comparePaths(
-      "findByAge", userMeta, [25],
-    );
+    const { compiledResult, dynamicResult } = comparePaths("findByAge", userMeta, [25]);
     expect(compiledResult.params).toEqual(dynamicResult.params);
     // SQL may differ in quoting style but should be semantically equivalent
     // At minimum, both should have same param values
   });
 
   it("countBy produces same params", () => {
-    const { compiledResult, dynamicResult } = comparePaths(
-      "countByAge", userMeta, [25],
-    );
+    const { compiledResult, dynamicResult } = comparePaths("countByAge", userMeta, [25]);
     expect(compiledResult.params).toEqual(dynamicResult.params);
   });
 
   it("deleteBy produces same params", () => {
-    const { compiledResult, dynamicResult } = comparePaths(
-      "deleteByEmail", userMeta, ["test@example.com"],
-    );
+    const { compiledResult, dynamicResult } = comparePaths("deleteByEmail", userMeta, ["test@example.com"]);
     expect(compiledResult.params).toEqual(dynamicResult.params);
   });
 
   it("existsBy produces correct params (compiled uses literal LIMIT)", () => {
-    const { compiledResult, dynamicResult } = comparePaths(
-      "existsByEmail", userMeta, ["test@example.com"],
-    );
+    const { compiledResult, dynamicResult } = comparePaths("existsByEmail", userMeta, ["test@example.com"]);
     // Compiled path uses LIMIT 1 as a literal, dynamic path parameterizes it
     // So compiled has one fewer param (no LIMIT param)
     expect(compiledResult.params).toEqual(["test@example.com"]);
@@ -587,46 +570,32 @@ describe("QueryCompiler — equivalence with dynamic path", () => {
   });
 
   it("complex multi-condition And produces same params", () => {
-    const { compiledResult, dynamicResult } = comparePaths(
-      "findByFirstNameAndAgeGreaterThan",
-      userMeta,
-      ["John", 18],
-    );
+    const { compiledResult, dynamicResult } = comparePaths("findByFirstNameAndAgeGreaterThan", userMeta, ["John", 18]);
     expect(compiledResult.params).toEqual(dynamicResult.params);
   });
 
   it("Between produces same params", () => {
-    const { compiledResult, dynamicResult } = comparePaths(
-      "findByAgeBetween", userMeta, [18, 65],
-    );
+    const { compiledResult, dynamicResult } = comparePaths("findByAgeBetween", userMeta, [18, 65]);
     expect(compiledResult.params).toEqual(dynamicResult.params);
   });
 
   it("StartingWith produces same wildcard param", () => {
-    const { compiledResult, dynamicResult } = comparePaths(
-      "findByFirstNameStartingWith", userMeta, ["Jo"],
-    );
+    const { compiledResult, dynamicResult } = comparePaths("findByFirstNameStartingWith", userMeta, ["Jo"]);
     expect(compiledResult.params).toEqual(dynamicResult.params);
   });
 
   it("EndingWith produces same wildcard param", () => {
-    const { compiledResult, dynamicResult } = comparePaths(
-      "findByFirstNameEndingWith", userMeta, ["hn"],
-    );
+    const { compiledResult, dynamicResult } = comparePaths("findByFirstNameEndingWith", userMeta, ["hn"]);
     expect(compiledResult.params).toEqual(dynamicResult.params);
   });
 
   it("Containing produces same wildcard param", () => {
-    const { compiledResult, dynamicResult } = comparePaths(
-      "findByFirstNameContaining", userMeta, ["oh"],
-    );
+    const { compiledResult, dynamicResult } = comparePaths("findByFirstNameContaining", userMeta, ["oh"]);
     expect(compiledResult.params).toEqual(dynamicResult.params);
   });
 
   it("True/False operators produce zero params in both paths", () => {
-    const { compiledResult: cr1, dynamicResult: dr1 } = comparePaths(
-      "findByActiveTrue", userMeta, [],
-    );
+    const { compiledResult: cr1, dynamicResult: dr1 } = comparePaths("findByActiveTrue", userMeta, []);
     // Dynamic path embeds true as a param; compiled path embeds TRUE literal
     // They may differ in SQL but both should produce correct results
     // At minimum, compiled should have 0 params
@@ -634,9 +603,7 @@ describe("QueryCompiler — equivalence with dynamic path", () => {
   });
 
   it("In-list produces same params when array has elements", () => {
-    const { compiledResult, dynamicResult } = comparePaths(
-      "findByAgeIn", userMeta, [[10, 20, 30]],
-    );
+    const { compiledResult, dynamicResult } = comparePaths("findByAgeIn", userMeta, [[10, 20, 30]]);
     // Dynamic path uses QueryBuilder which may enumerate differently
     // but the actual values should be the same set
     expect(new Set(compiledResult.params)).toEqual(new Set(dynamicResult.params));
@@ -811,7 +778,10 @@ describe("QueryCompiler — In-list SQL rewriting edge cases", () => {
 
   it("multiple In lists: both are expanded correctly", () => {
     // This would be: findByAgeInAndScoreIn → two spread params
-    const result = compileAndBind("findByAgeInAndScoreIn", userMeta, [[1, 2], [100, 200]]);
+    const result = compileAndBind("findByAgeInAndScoreIn", userMeta, [
+      [1, 2],
+      [100, 200],
+    ]);
     expect(result.params).toEqual([1, 2, 100, 200]);
   });
 });
@@ -904,11 +874,14 @@ describe("DerivedQueryHandler — compilation cache integration", () => {
 describe("QueryCompiler — extreme method names", () => {
   it("handles a method with many And conditions", () => {
     // findByFirstNameAndLastNameAndEmailAndAgeAndActiveAndScore
-    const result = compileAndBind(
-      "findByFirstNameAndLastNameAndEmailAndAgeAndActiveAndScore",
-      userMeta,
-      ["A", "B", "C", 1, true, 99],
-    );
+    const result = compileAndBind("findByFirstNameAndLastNameAndEmailAndAgeAndActiveAndScore", userMeta, [
+      "A",
+      "B",
+      "C",
+      1,
+      true,
+      99,
+    ]);
     expect(result.params).toHaveLength(6);
   });
 

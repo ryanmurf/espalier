@@ -203,7 +203,7 @@ export class KeysetPaginationAdapter implements GraphQLPaginationAdapter {
   }
 
   generateQueryArgs(): string {
-    return "size: Int = 20, sortColumn: String!, sortDirection: String = \"ASC\", afterValue: String, afterId: String";
+    return 'size: Int = 20, sortColumn: String!, sortDirection: String = "ASC", afterValue: String, afterId: String';
   }
 
   mapResolverArgs(args: Record<string, unknown>): {
@@ -246,8 +246,18 @@ export class KeysetPaginationAdapter implements GraphQLPaginationAdapter {
       content: page.content,
       size: page.size,
       hasNext: page.hasNext,
-      lastValue: page.lastValue != null ? (typeof page.lastValue === "object" ? JSON.stringify(page.lastValue) : String(page.lastValue)) : null,
-      lastId: page.lastId != null ? (typeof page.lastId === "object" ? JSON.stringify(page.lastId) : String(page.lastId)) : null,
+      lastValue:
+        page.lastValue != null
+          ? typeof page.lastValue === "object"
+            ? JSON.stringify(page.lastValue)
+            : String(page.lastValue)
+          : null,
+      lastId:
+        page.lastId != null
+          ? typeof page.lastId === "object"
+            ? JSON.stringify(page.lastId)
+            : String(page.lastId)
+          : null,
     };
   }
 }

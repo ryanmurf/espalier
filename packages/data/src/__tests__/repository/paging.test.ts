@@ -1,11 +1,9 @@
-import { describe, it, expect } from "vitest";
-import { createPageable, createPage } from "../../repository/paging.js";
+import { describe, expect, it } from "vitest";
+import { createPage, createPageable } from "../../repository/paging.js";
 
 describe("createPageable", () => {
   it("returns page, size, and sort", () => {
-    const pageable = createPageable(0, 10, [
-      { property: "name", direction: "ASC" },
-    ]);
+    const pageable = createPageable(0, 10, [{ property: "name", direction: "ASC" }]);
     expect(pageable.page).toBe(0);
     expect(pageable.size).toBe(10);
     expect(pageable.sort).toEqual([{ property: "name", direction: "ASC" }]);

@@ -4,14 +4,10 @@
  * Uses mock DataSources to test routing logic, error handling,
  * dynamic add/remove, and edge cases.
  */
-import { describe, it, expect, vi } from "vitest";
-import {
-  RoutingDataSource,
-  TenantRoutingDataSource,
-  RoutingError,
-  TenantContext,
-} from "../../index.js";
-import type { DataSource, Connection } from "espalier-jdbc";
+
+import type { Connection, DataSource } from "espalier-jdbc";
+import { describe, expect, it, vi } from "vitest";
+import { RoutingDataSource, RoutingError, TenantContext, TenantRoutingDataSource } from "../../index.js";
 
 // ══════════════════════════════════════════════════
 // Mock DataSource factory
@@ -21,7 +17,7 @@ function mockDataSource(label: string): DataSource & { label: string; closed: bo
   const ds = {
     label,
     closed: false,
-    getConnection: vi.fn(async () => ({ label } as unknown as Connection)),
+    getConnection: vi.fn(async () => ({ label }) as unknown as Connection),
     close: vi.fn(async () => {
       ds.closed = true;
     }),

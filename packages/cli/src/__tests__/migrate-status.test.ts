@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { Migration, MigrationRecord, MigrationRunner } from "espalier-data";
 import type { DataSource } from "espalier-jdbc";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../adapter-factory.js", () => ({
   createAdapter: vi.fn(),
@@ -10,10 +10,10 @@ vi.mock("../migrate-loader.js", () => ({
   loadMigrations: vi.fn(),
 }));
 
-import { migrateStatus, formatStatusTable } from "../migrate-status.js";
-import type { MigrateStatusResult } from "../migrate-status.js";
 import { createAdapter } from "../adapter-factory.js";
 import { loadMigrations } from "../migrate-loader.js";
+import type { MigrateStatusResult } from "../migrate-status.js";
+import { formatStatusTable, migrateStatus } from "../migrate-status.js";
 
 function makeMigration(version: string, description: string): Migration {
   return {
@@ -176,9 +176,7 @@ describe("migrateStatus", () => {
     vi.mocked(createAdapter).mockResolvedValue({ dataSource: ds, runner });
     vi.mocked(loadMigrations).mockRejectedValue(new Error("dir not found"));
 
-    await expect(
-      migrateStatus({ config: baseConfig, migrationsDir: "/tmp/missing" }),
-    ).rejects.toThrow("dir not found");
+    await expect(migrateStatus({ config: baseConfig, migrationsDir: "/tmp/missing" })).rejects.toThrow("dir not found");
 
     expect(ds.close).toHaveBeenCalled();
   });
@@ -187,8 +185,13 @@ describe("migrateStatus", () => {
     const runner = createMockRunner([]);
     const ds = createMockDataSource();
     const callOrder: string[] = [];
-    vi.mocked(runner.initialize).mockImplementation(async () => { callOrder.push("initialize"); });
-    vi.mocked(runner.getAppliedMigrations).mockImplementation(async () => { callOrder.push("getApplied"); return []; });
+    vi.mocked(runner.initialize).mockImplementation(async () => {
+      callOrder.push("initialize");
+    });
+    vi.mocked(runner.getAppliedMigrations).mockImplementation(async () => {
+      callOrder.push("getApplied");
+      return [];
+    });
     vi.mocked(createAdapter).mockResolvedValue({ dataSource: ds, runner });
     vi.mocked(loadMigrations).mockResolvedValue([]);
 
@@ -215,7 +218,12 @@ describe("formatStatusTable", () => {
   it("formats a table with applied and pending entries", () => {
     const result: MigrateStatusResult = {
       entries: [
-        { version: "20260101120000", description: "first", status: "applied", appliedAt: new Date("2026-01-15T12:00:00Z") },
+        {
+          version: "20260101120000",
+          description: "first",
+          status: "applied",
+          appliedAt: new Date("2026-01-15T12:00:00Z"),
+        },
         { version: "20260102120000", description: "second", status: "pending", appliedAt: null },
       ],
       appliedCount: 1,
@@ -238,7 +246,12 @@ describe("formatStatusTable", () => {
   it("shows orphaned record warnings", () => {
     const result: MigrateStatusResult = {
       entries: [
-        { version: "20260101120000", description: "first", status: "applied", appliedAt: new Date("2026-01-15T12:00:00Z") },
+        {
+          version: "20260101120000",
+          description: "first",
+          status: "applied",
+          appliedAt: new Date("2026-01-15T12:00:00Z"),
+        },
       ],
       appliedCount: 1,
       pendingCount: 0,
@@ -257,9 +270,7 @@ describe("formatStatusTable", () => {
 
   it("shows dash for pending migration date", () => {
     const result: MigrateStatusResult = {
-      entries: [
-        { version: "20260101120000", description: "first", status: "pending", appliedAt: null },
-      ],
+      entries: [{ version: "20260101120000", description: "first", status: "pending", appliedAt: null }],
       appliedCount: 0,
       pendingCount: 1,
       orphanedRecords: [],
@@ -274,7 +285,12 @@ describe("formatStatusTable", () => {
   it("formats applied date as ISO without T", () => {
     const result: MigrateStatusResult = {
       entries: [
-        { version: "20260101120000", description: "first", status: "applied", appliedAt: new Date("2026-01-15T14:30:45Z") },
+        {
+          version: "20260101120000",
+          description: "first",
+          status: "applied",
+          appliedAt: new Date("2026-01-15T14:30:45Z"),
+        },
       ],
       appliedCount: 1,
       pendingCount: 0,
@@ -288,9 +304,7 @@ describe("formatStatusTable", () => {
 
   it("includes header row with column names", () => {
     const result: MigrateStatusResult = {
-      entries: [
-        { version: "20260101120000", description: "first", status: "applied", appliedAt: new Date() },
-      ],
+      entries: [{ version: "20260101120000", description: "first", status: "applied", appliedAt: new Date() }],
       appliedCount: 1,
       pendingCount: 0,
       orphanedRecords: [],

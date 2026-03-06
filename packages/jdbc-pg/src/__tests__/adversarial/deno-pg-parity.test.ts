@@ -14,20 +14,15 @@
  * - DenoPgConnection.close() calls client.release() if available
  * - DenoPgQueryResult has rowCount (not count) and optional columns
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import {
-  ConnectionError,
-  TransactionError,
-  QueryError,
-  DatabaseErrorCode,
-  IsolationLevel,
-} from "espalier-jdbc";
-import type { DenoPgClient } from "../../deno-pg-statement.js";
-import type { DenoPgQueryResult } from "../../deno-pg-result-set.js";
-import { DenoPgResultSet } from "../../deno-pg-result-set.js";
-import { DenoPgStatementImpl, DenoPgPreparedStatement } from "../../deno-pg-statement.js";
+
+import { ConnectionError, DatabaseErrorCode, IsolationLevel, QueryError, TransactionError } from "espalier-jdbc";
+import { describe, expect, it, vi } from "vitest";
 import { DenoPgConnection } from "../../deno-pg-connection.js";
 import { DenoPgDataSource } from "../../deno-pg-data-source.js";
+import type { DenoPgQueryResult } from "../../deno-pg-result-set.js";
+import { DenoPgResultSet } from "../../deno-pg-result-set.js";
+import type { DenoPgClient } from "../../deno-pg-statement.js";
+import { DenoPgPreparedStatement, DenoPgStatementImpl } from "../../deno-pg-statement.js";
 
 // -- Mock helpers ------------------------------------------------------------
 
@@ -41,7 +36,8 @@ function createMockResult(
 
 function createMockClient(overrides: Partial<DenoPgClient> = {}): DenoPgClient {
   return {
-    queryObject: vi.fn<(sql: string, args?: unknown[]) => Promise<DenoPgQueryResult>>()
+    queryObject: vi
+      .fn<(sql: string, args?: unknown[]) => Promise<DenoPgQueryResult>>()
       .mockResolvedValue(createMockResult([], 0)),
     release: vi.fn(),
     ...overrides,
@@ -57,7 +53,11 @@ describe("DenoPgResultSet", () => {
   });
 
   it("iterates through all rows", async () => {
-    const rows = [{ id: 1, name: "a" }, { id: 2, name: "b" }, { id: 3, name: "c" }];
+    const rows = [
+      { id: 1, name: "a" },
+      { id: 2, name: "b" },
+      { id: 3, name: "c" },
+    ];
     const rs = new DenoPgResultSet(createMockResult(rows));
     const collected: Record<string, unknown>[] = [];
     while (await rs.next()) {
@@ -115,14 +115,17 @@ describe("DenoPgResultSet", () => {
   });
 
   it("getBoolean() coerces values", async () => {
-    const rs = new DenoPgResultSet(createMockResult([
-      { a: true }, { a: false }, { a: 0 }, { a: 1 }, { a: "" },
-    ]));
-    await rs.next(); expect(rs.getBoolean("a")).toBe(true);
-    await rs.next(); expect(rs.getBoolean("a")).toBe(false);
-    await rs.next(); expect(rs.getBoolean("a")).toBe(false);
-    await rs.next(); expect(rs.getBoolean("a")).toBe(true);
-    await rs.next(); expect(rs.getBoolean("a")).toBe(false);
+    const rs = new DenoPgResultSet(createMockResult([{ a: true }, { a: false }, { a: 0 }, { a: 1 }, { a: "" }]));
+    await rs.next();
+    expect(rs.getBoolean("a")).toBe(true);
+    await rs.next();
+    expect(rs.getBoolean("a")).toBe(false);
+    await rs.next();
+    expect(rs.getBoolean("a")).toBe(false);
+    await rs.next();
+    expect(rs.getBoolean("a")).toBe(true);
+    await rs.next();
+    expect(rs.getBoolean("a")).toBe(false);
   });
 
   it("getDate() returns null for null", async () => {
@@ -170,7 +173,7 @@ describe("DenoPgResultSet", () => {
     const rs = new DenoPgResultSet(createMockResult([{ id: 1, name: "a", active: true }]));
     const meta = rs.getMetadata();
     expect(meta).toHaveLength(3);
-    expect(meta.map(m => m.name)).toEqual(["id", "name", "active"]);
+    expect(meta.map((m) => m.name)).toEqual(["id", "name", "active"]);
     expect(meta[0].dataType).toBe("unknown");
     expect(meta[0].nullable).toBe(true);
     expect(meta[0].primaryKey).toBe(false);
@@ -180,7 +183,7 @@ describe("DenoPgResultSet", () => {
     const rs = new DenoPgResultSet(createMockResult([], undefined, ["id", "name"]));
     const meta = rs.getMetadata();
     expect(meta).toHaveLength(2);
-    expect(meta.map(m => m.name)).toEqual(["id", "name"]);
+    expect(meta.map((m) => m.name)).toEqual(["id", "name"]);
   });
 
   it("getMetadata() on empty result with no columns returns empty array", () => {
@@ -190,13 +193,9 @@ describe("DenoPgResultSet", () => {
 
   it("columns array takes precedence over row keys", () => {
     // If both columns and rows are present, columns should be used
-    const rs = new DenoPgResultSet(createMockResult(
-      [{ a: 1, b: 2 }],
-      undefined,
-      ["x", "y"],
-    ));
+    const rs = new DenoPgResultSet(createMockResult([{ a: 1, b: 2 }], undefined, ["x", "y"]));
     const meta = rs.getMetadata();
-    expect(meta.map(m => m.name)).toEqual(["x", "y"]);
+    expect(meta.map((m) => m.name)).toEqual(["x", "y"]);
   });
 
   it("close() is a no-op and does not throw", async () => {
@@ -261,10 +260,12 @@ describe("DenoPgResultSet", () => {
 
   it("rows with different key sets still iterate", async () => {
     // Simulating inconsistent row shapes from the driver
-    const rs = new DenoPgResultSet(createMockResult([
-      { id: 1, name: "a" },
-      { id: 2 }, // missing name
-    ]));
+    const rs = new DenoPgResultSet(
+      createMockResult([
+        { id: 1, name: "a" },
+        { id: 2 }, // missing name
+      ]),
+    );
     await rs.next();
     expect(rs.getString("name")).toBe("a");
     await rs.next();
@@ -399,16 +400,13 @@ describe("DenoPgPreparedStatement", () => {
     const ps = new DenoPgPreparedStatement(client, "INSERT INTO t (d) VALUES ($1)");
     ps.setParameter(1, date);
     await ps.executeUpdate();
-    expect(queryFn).toHaveBeenCalledWith(
-      "INSERT INTO t (d) VALUES ($1)",
-      ["2024-01-15T10:30:00.000Z"],
-    );
+    expect(queryFn).toHaveBeenCalledWith("INSERT INTO t (d) VALUES ($1)", ["2024-01-15T10:30:00.000Z"]);
   });
 
   it("Uint8Array parameters are passed through", async () => {
     const queryFn = vi.fn().mockResolvedValue(createMockResult([], 1));
     const client = createMockClient({ queryObject: queryFn });
-    const data = new Uint8Array([0xDE, 0xAD, 0xBE, 0xEF]);
+    const data = new Uint8Array([0xde, 0xad, 0xbe, 0xef]);
     const ps = new DenoPgPreparedStatement(client, "INSERT INTO t (data) VALUES ($1)");
     ps.setParameter(1, data);
     await ps.executeUpdate();
@@ -422,10 +420,7 @@ describe("DenoPgPreparedStatement", () => {
     const ps = new DenoPgPreparedStatement(client, "INSERT INTO t (a, b, c) VALUES ($1, $2, $3)");
     ps.setParameter(3, "only-third");
     await ps.executeUpdate();
-    expect(queryFn).toHaveBeenCalledWith(
-      "INSERT INTO t (a, b, c) VALUES ($1, $2, $3)",
-      [null, null, "only-third"],
-    );
+    expect(queryFn).toHaveBeenCalledWith("INSERT INTO t (a, b, c) VALUES ($1, $2, $3)", [null, null, "only-third"]);
   });
 
   it("no parameters means empty array", async () => {
@@ -507,10 +502,7 @@ describe("DenoPgPreparedStatement", () => {
     ps.setParameter(2, 10);
     ps.setParameter(1, "overwritten");
     await ps.executeUpdate();
-    expect(queryFn).toHaveBeenCalledWith(
-      "UPDATE t SET x = $1 WHERE id = $2",
-      ["overwritten", 10],
-    );
+    expect(queryFn).toHaveBeenCalledWith("UPDATE t SET x = $1 WHERE id = $2", ["overwritten", 10]);
   });
 });
 
@@ -632,9 +624,11 @@ describe("DenoPgConnection", () => {
   });
 
   it("beginTransaction wraps errors in TransactionError", async () => {
-    const conn = new DenoPgConnection(createMockClient({
-      queryObject: vi.fn().mockRejectedValue(new Error("connection lost")),
-    }));
+    const conn = new DenoPgConnection(
+      createMockClient({
+        queryObject: vi.fn().mockRejectedValue(new Error("connection lost")),
+      }),
+    );
     try {
       await conn.beginTransaction();
       expect.unreachable("should throw");
@@ -717,20 +711,14 @@ describe("DenoPgConnection", () => {
   });
 
   it("setSavepoint rejects SQL injection attempts", async () => {
-    const conn = new DenoPgConnection(createMockClient({
-      queryObject: vi.fn().mockResolvedValue(createMockResult([])),
-    }));
+    const conn = new DenoPgConnection(
+      createMockClient({
+        queryObject: vi.fn().mockResolvedValue(createMockResult([])),
+      }),
+    );
     const tx = await conn.beginTransaction();
 
-    const malicious = [
-      "'; DROP TABLE users; --",
-      "sp 1",
-      "1sp",
-      "",
-      "sp;DROP",
-      "sp\nDROP",
-      "sp-1",
-    ];
+    const malicious = ["'; DROP TABLE users; --", "sp 1", "1sp", "", "sp;DROP", "sp\nDROP", "sp-1"];
 
     for (const name of malicious) {
       try {
@@ -744,9 +732,11 @@ describe("DenoPgConnection", () => {
   });
 
   it("rollbackTo rejects invalid names", async () => {
-    const conn = new DenoPgConnection(createMockClient({
-      queryObject: vi.fn().mockResolvedValue(createMockResult([])),
-    }));
+    const conn = new DenoPgConnection(
+      createMockClient({
+        queryObject: vi.fn().mockResolvedValue(createMockResult([])),
+      }),
+    );
     const tx = await conn.beginTransaction();
 
     try {
@@ -832,15 +822,18 @@ describe("DenoPgDataSource", () => {
   });
 
   it("constructor accepts all config options without throwing", () => {
-    expect(() => new DenoPgDataSource({
-      url: "postgres://user:pass@host:5432/db",
-      hostname: "host",
-      port: 5432,
-      database: "db",
-      username: "user",
-      password: "pass",
-      max: 10,
-    })).not.toThrow();
+    expect(
+      () =>
+        new DenoPgDataSource({
+          url: "postgres://user:pass@host:5432/db",
+          hostname: "host",
+          port: 5432,
+          database: "db",
+          username: "user",
+          password: "pass",
+          max: 10,
+        }),
+    ).not.toThrow();
   });
 
   it("constructor accepts empty config", () => {
@@ -875,7 +868,7 @@ describe("error mapping", () => {
 
   it("syntax error is wrapped in QueryError with SQL", async () => {
     const client = createMockClient({
-      queryObject: vi.fn().mockRejectedValue(new Error("syntax error at or near \"SELECTT\"")),
+      queryObject: vi.fn().mockRejectedValue(new Error('syntax error at or near "SELECTT"')),
     });
     const stmt = new DenoPgStatementImpl(client);
     try {
@@ -953,8 +946,7 @@ describe("concurrent operations", () => {
 
   it("50 concurrent prepared statement executions", async () => {
     const client = createMockClient({
-      queryObject: vi.fn(async (_sql: string, args?: unknown[]) =>
-        createMockResult([{ n: args?.[0] ?? 0 }])),
+      queryObject: vi.fn(async (_sql: string, args?: unknown[]) => createMockResult([{ n: args?.[0] ?? 0 }])),
     });
     const promises = Array.from({ length: 50 }, (_, i) => {
       const ps = new DenoPgPreparedStatement(client, "SELECT $1 AS n");
@@ -986,8 +978,8 @@ describe("concurrent operations", () => {
       ),
     );
     const results = await Promise.all(promises);
-    const successes = results.filter(r => r.success);
-    const failures = results.filter(r => !r.success);
+    const successes = results.filter((r) => r.success);
+    const failures = results.filter((r) => !r.success);
     expect(successes.length).toBeGreaterThan(0);
     expect(failures.length).toBeGreaterThan(0);
     for (const f of failures) {
@@ -1130,7 +1122,16 @@ describe("Deno-specific edge cases", () => {
   it("DenoPgDataSource config builds connection string correctly", () => {
     // We can test the private buildConnectionString indirectly
     // by verifying no error on construction with various config shapes
-    expect(() => new DenoPgDataSource({ hostname: "db.example.com", port: 5433, database: "mydb", username: "admin", password: "secret" })).not.toThrow();
+    expect(
+      () =>
+        new DenoPgDataSource({
+          hostname: "db.example.com",
+          port: 5433,
+          database: "mydb",
+          username: "admin",
+          password: "secret",
+        }),
+    ).not.toThrow();
     expect(() => new DenoPgDataSource({ hostname: "db.example.com", username: "admin" })).not.toThrow();
     expect(() => new DenoPgDataSource({ hostname: "db.example.com" })).not.toThrow();
   });

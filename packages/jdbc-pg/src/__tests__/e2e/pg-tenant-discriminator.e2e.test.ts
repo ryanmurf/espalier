@@ -12,20 +12,21 @@
  * - Concurrent multi-tenant operations
  * - DDL index generation for tenant column
  */
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { createTestDataSource, isPostgresAvailable } from "./setup.js";
-import {
-  Table,
-  Column,
-  Id,
-  TenantId,
-  TenantContext,
-  NoTenantException,
-  createDerivedRepository,
-} from "espalier-data";
+
 import type { CrudRepository } from "espalier-data";
-import { DdlGenerator } from "espalier-data";
+import {
+  Column,
+  createDerivedRepository,
+  DdlGenerator,
+  Id,
+  NoTenantException,
+  Table,
+  TenantContext,
+  TenantId,
+} from "espalier-data";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { PgDataSource } from "../../pg-data-source.js";
+import { createTestDataSource, isPostgresAvailable } from "./setup.js";
 
 const canConnect = await isPostgresAvailable();
 
@@ -63,9 +64,7 @@ describe.skipIf(!canConnect)("@TenantId discriminator — E2E", () => {
           price NUMERIC NOT NULL
         )
       `);
-      await stmt.executeUpdate(
-        "CREATE INDEX idx_disc_products_tenant ON disc_products (tenant_id)",
-      );
+      await stmt.executeUpdate("CREATE INDEX idx_disc_products_tenant ON disc_products (tenant_id)");
     } finally {
       await stmt.close();
       await conn.close();
@@ -321,9 +320,7 @@ describe.skipIf(!canConnect)("@TenantId discriminator — E2E", () => {
         const conn = await ds.getConnection();
         const stmt = conn.createStatement();
         try {
-          const rs = await stmt.executeQuery(
-            "SELECT DISTINCT tenant_id FROM disc_products ORDER BY tenant_id",
-          );
+          const rs = await stmt.executeQuery("SELECT DISTINCT tenant_id FROM disc_products ORDER BY tenant_id");
           const tenants: string[] = [];
           while (await rs.next()) {
             tenants.push(rs.getString("tenant_id")!);

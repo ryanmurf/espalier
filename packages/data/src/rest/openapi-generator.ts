@@ -1,9 +1,9 @@
-import type { EntityMetadata } from "../mapping/entity-metadata.js";
-import { getEntityMetadata } from "../mapping/entity-metadata.js";
+import { getCreatedDateField, getLastModifiedDateField } from "../decorators/auditing.js";
 import { getColumnTypeMappings } from "../decorators/column.js";
 import { getIdField } from "../decorators/id.js";
-import { getCreatedDateField, getLastModifiedDateField } from "../decorators/auditing.js";
 import { getVersionField } from "../decorators/version.js";
+import type { EntityMetadata } from "../mapping/entity-metadata.js";
+import { getEntityMetadata } from "../mapping/entity-metadata.js";
 import type { RouteDefinition } from "./handler.js";
 
 /**
@@ -68,10 +68,7 @@ export class OpenApiGenerator {
   /**
    * Generate OpenAPI spec from entity classes and generated routes.
    */
-  generate(
-    entityClasses: Array<new (...args: any[]) => any>,
-    routes: RouteDefinition[],
-  ): OpenApiSpec {
+  generate(entityClasses: Array<new (...args: any[]) => any>, routes: RouteDefinition[]): OpenApiSpec {
     const schemas: Record<string, OpenApiSchema> = {};
     const paths: Record<string, Record<string, OpenApiOperation>> = {};
 
@@ -126,10 +123,7 @@ export class OpenApiGenerator {
     };
   }
 
-  private generateSchema(
-    entityClass: new (...args: any[]) => any,
-    metadata: EntityMetadata,
-  ): OpenApiSchema {
+  private generateSchema(entityClass: new (...args: any[]) => any, metadata: EntityMetadata): OpenApiSchema {
     const properties: Record<string, OpenApiSchemaRef> = {};
     const required: string[] = [];
     const typeMappings = getColumnTypeMappings(entityClass);
@@ -151,10 +145,7 @@ export class OpenApiGenerator {
     };
   }
 
-  private generateInputSchema(
-    entityClass: new (...args: any[]) => any,
-    metadata: EntityMetadata,
-  ): OpenApiSchema {
+  private generateInputSchema(entityClass: new (...args: any[]) => any, metadata: EntityMetadata): OpenApiSchema {
     const properties: Record<string, OpenApiSchemaRef> = {};
     const typeMappings = getColumnTypeMappings(entityClass);
     const idField = getIdField(entityClass);
@@ -163,9 +154,7 @@ export class OpenApiGenerator {
     const versionField = getVersionField(entityClass);
 
     const exclude = new Set<string | symbol>(
-      [idField, createdDateField, lastModifiedDateField, versionField].filter(
-        (v): v is string | symbol => v != null,
-      ),
+      [idField, createdDateField, lastModifiedDateField, versionField].filter((v): v is string | symbol => v != null),
     );
 
     for (const mapping of metadata.fields) {
@@ -178,10 +167,7 @@ export class OpenApiGenerator {
     return { type: "object", properties };
   }
 
-  private generateUpdateInputSchema(
-    entityClass: new (...args: any[]) => any,
-    metadata: EntityMetadata,
-  ): OpenApiSchema {
+  private generateUpdateInputSchema(entityClass: new (...args: any[]) => any, metadata: EntityMetadata): OpenApiSchema {
     const properties: Record<string, OpenApiSchemaRef> = {};
     const typeMappings = getColumnTypeMappings(entityClass);
     const idField = getIdField(entityClass);
@@ -190,9 +176,7 @@ export class OpenApiGenerator {
     const versionField = getVersionField(entityClass);
 
     const exclude = new Set<string | symbol>(
-      [idField, createdDateField, lastModifiedDateField, versionField].filter(
-        (v): v is string | symbol => v != null,
-      ),
+      [idField, createdDateField, lastModifiedDateField, versionField].filter((v): v is string | symbol => v != null),
     );
 
     for (const mapping of metadata.fields) {
@@ -334,7 +318,13 @@ function toOpenApiType(sqlType: string | undefined, fieldName: string): { type: 
   if (normalized.includes("INT") || normalized === "SERIAL" || normalized === "BIGSERIAL") {
     return { type: "integer" };
   }
-  if (normalized.includes("FLOAT") || normalized.includes("DOUBLE") || normalized.includes("DECIMAL") || normalized.includes("NUMERIC") || normalized.includes("REAL")) {
+  if (
+    normalized.includes("FLOAT") ||
+    normalized.includes("DOUBLE") ||
+    normalized.includes("DECIMAL") ||
+    normalized.includes("NUMERIC") ||
+    normalized.includes("REAL")
+  ) {
     return { type: "number" };
   }
   if (normalized.includes("BOOL") || normalized === "BIT") {

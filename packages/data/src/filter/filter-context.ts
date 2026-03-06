@@ -1,5 +1,5 @@
-import type { FilterOptions } from "./filter-registry.js";
 import { AsyncLocalStorage } from "node:async_hooks";
+import type { FilterOptions } from "./filter-registry.js";
 
 const storage = new AsyncLocalStorage<FilterOptions>();
 

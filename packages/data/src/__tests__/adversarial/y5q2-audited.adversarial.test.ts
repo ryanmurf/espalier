@@ -5,21 +5,12 @@
  * idempotency, SQL injection vectors, large payloads, concurrent writes,
  * interaction with @SoftDelete, and plain-class detection.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import {
-  Audited,
-  getAuditedMetadata,
-  isAuditedEntity,
-} from "../../decorators/audited.js";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AuditContext } from "../../audit/audit-context.js";
-import {
-  AuditLogWriter,
-} from "../../audit/audit-log.js";
-import type {
-  AuditFieldChange,
-  AuditEntry,
-} from "../../audit/audit-log.js";
+import type { AuditFieldChange } from "../../audit/audit-log.js";
+import { AuditLogWriter } from "../../audit/audit-log.js";
 import { getAuditLog } from "../../audit/audit-query.js";
+import { Audited, getAuditedMetadata, isAuditedEntity } from "../../decorators/audited.js";
 
 // ═══════════════════════════════════════════════════════
 // Helpers: mock Connection / PreparedStatement / ResultSet
@@ -384,15 +375,15 @@ describe("AuditLogWriter", () => {
     // them complete and set `tableEnsured = true`.
     // In practice CREATE TABLE IF NOT EXISTS is idempotent, so it's not a
     // functional bug, but it's unnecessary duplicate DDL execution.
-    const ddlCalls = conn.prepareStatement.mock.calls.filter(
-      (call: any[]) => (call[0] as string).includes("CREATE TABLE"),
+    const ddlCalls = conn.prepareStatement.mock.calls.filter((call: any[]) =>
+      (call[0] as string).includes("CREATE TABLE"),
     );
     // With mock, all 3 may have called ensureTable before any resolved
     // This test documents the race condition
     if (ddlCalls.length > 1) {
       console.warn(
         `FINDING: ensureTable race — DDL executed ${ddlCalls.length} times ` +
-        "instead of 1 (functionally safe due to IF NOT EXISTS, but wasteful).",
+          "instead of 1 (functionally safe due to IF NOT EXISTS, but wasteful).",
       );
     }
     // At minimum, at least 1 DDL call was made
@@ -416,8 +407,8 @@ describe("AuditLogWriter", () => {
     expect(stmt._params.get(1)).toBe(maliciousType);
     expect(stmt._params.get(2)).toBe(maliciousId);
     // The SQL template itself should not contain the malicious strings
-    const sqlArg = conn.prepareStatement.mock.calls.find(
-      (call: any[]) => (call[0] as string).includes("INSERT INTO espalier_audit_log"),
+    const sqlArg = conn.prepareStatement.mock.calls.find((call: any[]) =>
+      (call[0] as string).includes("INSERT INTO espalier_audit_log"),
     );
     expect(sqlArg).toBeDefined();
     expect(sqlArg![0]).not.toContain(maliciousType);

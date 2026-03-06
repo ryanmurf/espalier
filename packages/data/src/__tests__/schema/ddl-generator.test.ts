@@ -1,9 +1,9 @@
-import { describe, it, expect } from "vitest";
-import { DdlGenerator } from "../../schema/ddl-generator.js";
-import { Table } from "../../decorators/table.js";
+import { describe, expect, it } from "vitest";
+import { CreatedDate, LastModifiedDate } from "../../decorators/auditing.js";
 import { Column } from "../../decorators/column.js";
 import { Id } from "../../decorators/id.js";
-import { CreatedDate, LastModifiedDate } from "../../decorators/auditing.js";
+import { Table } from "../../decorators/table.js";
+import { DdlGenerator } from "../../schema/ddl-generator.js";
 
 const generator = new DdlGenerator();
 

@@ -4,11 +4,12 @@
  * Tests PgQueryPlanAnalyzer against live Postgres with simple queries,
  * JOINs, ANALYZE timing data, BUFFERS, and error cases.
  */
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { createTestDataSource, isPostgresAvailable } from "./setup.js";
-import { PgQueryPlanAnalyzer } from "../../pg-query-plan.js";
-import type { PgDataSource } from "../../pg-data-source.js";
+
 import type { Connection } from "espalier-jdbc";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import type { PgDataSource } from "../../pg-data-source.js";
+import { PgQueryPlanAnalyzer } from "../../pg-query-plan.js";
+import { createTestDataSource, isPostgresAvailable } from "./setup.js";
 
 const canConnect = await isPostgresAvailable();
 
@@ -112,12 +113,7 @@ describe.skipIf(!canConnect)("E2E: EXPLAIN / EXPLAIN ANALYZE", { timeout: 30000 
 
   describe("EXPLAIN ANALYZE", () => {
     it("returns actual timing data", async () => {
-      const plan = await analyzer.explain(
-        conn,
-        `SELECT * FROM ${TABLE_A}`,
-        undefined,
-        { analyze: true },
-      );
+      const plan = await analyzer.explain(conn, `SELECT * FROM ${TABLE_A}`, undefined, { analyze: true });
 
       expect(plan.planningTime).toBeDefined();
       expect(plan.planningTime).toBeGreaterThanOrEqual(0);
@@ -126,12 +122,7 @@ describe.skipIf(!canConnect)("E2E: EXPLAIN / EXPLAIN ANALYZE", { timeout: 30000 
     });
 
     it("returns actual row count", async () => {
-      const plan = await analyzer.explain(
-        conn,
-        `SELECT * FROM ${TABLE_A}`,
-        undefined,
-        { analyze: true },
-      );
+      const plan = await analyzer.explain(conn, `SELECT * FROM ${TABLE_A}`, undefined, { analyze: true });
 
       expect(plan.rootNode.actualRows).toBeDefined();
       expect(plan.rootNode.actualRows).toBeGreaterThan(0);
@@ -139,12 +130,9 @@ describe.skipIf(!canConnect)("E2E: EXPLAIN / EXPLAIN ANALYZE", { timeout: 30000 
     });
 
     it("actual rows and estimated rows may differ for WHERE clause", async () => {
-      const plan = await analyzer.explain(
-        conn,
-        `SELECT * FROM ${TABLE_A} WHERE value > 50`,
-        undefined,
-        { analyze: true },
-      );
+      const plan = await analyzer.explain(conn, `SELECT * FROM ${TABLE_A} WHERE value > 50`, undefined, {
+        analyze: true,
+      });
 
       expect(plan.rootNode.actualRows).toBeDefined();
       expect(plan.rootNode.estimatedRows).toBeGreaterThan(0);
@@ -165,7 +153,8 @@ describe.skipIf(!canConnect)("E2E: EXPLAIN / EXPLAIN ANALYZE", { timeout: 30000 
 
       expect(plan.rootNode).toBeDefined();
       // A join plan should have child nodes
-      const hasChildren = plan.rootNode.children.length > 0 ||
+      const hasChildren =
+        plan.rootNode.children.length > 0 ||
         plan.rootNode.nodeType.includes("Join") ||
         plan.rootNode.nodeType.includes("Loop");
       expect(hasChildren).toBe(true);
@@ -178,10 +167,10 @@ describe.skipIf(!canConnect)("E2E: EXPLAIN / EXPLAIN ANALYZE", { timeout: 30000 
       );
 
       // Find any node with a joinType
-      function findJoinNode(node: typeof plan.rootNode): typeof plan.rootNode | undefined {
+      function _findJoinNode(node: typeof plan.rootNode): typeof plan.rootNode | undefined {
         if (node.joinType) return node;
         for (const child of node.children) {
-          const found = findJoinNode(child);
+          const found = _findJoinNode(child);
           if (found) return found;
         }
         return undefined;
@@ -199,16 +188,13 @@ describe.skipIf(!canConnect)("E2E: EXPLAIN / EXPLAIN ANALYZE", { timeout: 30000 
 
   describe("BUFFERS option", () => {
     it("ANALYZE with BUFFERS includes buffer stats", async () => {
-      const plan = await analyzer.explain(
-        conn,
-        `SELECT * FROM ${TABLE_A}`,
-        undefined,
-        { analyze: true, buffers: true },
-      );
+      const plan = await analyzer.explain(conn, `SELECT * FROM ${TABLE_A}`, undefined, {
+        analyze: true,
+        buffers: true,
+      });
 
       // Buffer stats should be present on at least the root node
-      const hasBufferStats = plan.rootNode.sharedHit !== undefined ||
-        plan.rootNode.sharedRead !== undefined;
+      const hasBufferStats = plan.rootNode.sharedHit !== undefined || plan.rootNode.sharedRead !== undefined;
       expect(hasBufferStats).toBe(true);
     });
   });
@@ -220,10 +206,7 @@ describe.skipIf(!canConnect)("E2E: EXPLAIN / EXPLAIN ANALYZE", { timeout: 30000 
   describe("index scans", () => {
     it("query with indexed column may use Index Scan", async () => {
       // Force PG to use the index by querying a specific value
-      const plan = await analyzer.explain(
-        conn,
-        `SELECT * FROM ${TABLE_A} WHERE value = 42`,
-      );
+      const plan = await analyzer.explain(conn, `SELECT * FROM ${TABLE_A} WHERE value = 42`);
 
       // PG might choose Seq Scan for small tables or Index Scan
       // Either way, the plan should be valid
@@ -242,23 +225,14 @@ describe.skipIf(!canConnect)("E2E: EXPLAIN / EXPLAIN ANALYZE", { timeout: 30000 
 
   describe("parameterized queries", () => {
     it("EXPLAIN with parameters works", async () => {
-      const plan = await analyzer.explain(
-        conn,
-        `SELECT * FROM ${TABLE_A} WHERE value = $1`,
-        [42],
-      );
+      const plan = await analyzer.explain(conn, `SELECT * FROM ${TABLE_A} WHERE value = $1`, [42]);
 
       expect(plan).toBeDefined();
       expect(plan.rootNode.nodeType).toBeTruthy();
     });
 
     it("EXPLAIN ANALYZE with parameters executes and returns timing", async () => {
-      const plan = await analyzer.explain(
-        conn,
-        `SELECT * FROM ${TABLE_A} WHERE value = $1`,
-        [42],
-        { analyze: true },
-      );
+      const plan = await analyzer.explain(conn, `SELECT * FROM ${TABLE_A} WHERE value = $1`, [42], { analyze: true });
 
       expect(plan.planningTime).toBeDefined();
       expect(plan.executionTime).toBeDefined();
@@ -271,28 +245,19 @@ describe.skipIf(!canConnect)("E2E: EXPLAIN / EXPLAIN ANALYZE", { timeout: 30000 
 
   describe("DML statements", () => {
     it("EXPLAIN on INSERT works", async () => {
-      const plan = await analyzer.explain(
-        conn,
-        `INSERT INTO ${TABLE_A} (name, value) VALUES ('explain_insert', 999)`,
-      );
+      const plan = await analyzer.explain(conn, `INSERT INTO ${TABLE_A} (name, value) VALUES ('explain_insert', 999)`);
 
       expect(plan.rootNode.nodeType).toBeTruthy();
     });
 
     it("EXPLAIN on UPDATE works", async () => {
-      const plan = await analyzer.explain(
-        conn,
-        `UPDATE ${TABLE_A} SET value = 0 WHERE name = 'nonexistent'`,
-      );
+      const plan = await analyzer.explain(conn, `UPDATE ${TABLE_A} SET value = 0 WHERE name = 'nonexistent'`);
 
       expect(plan.rootNode.nodeType).toBeTruthy();
     });
 
     it("EXPLAIN on DELETE works", async () => {
-      const plan = await analyzer.explain(
-        conn,
-        `DELETE FROM ${TABLE_A} WHERE name = 'nonexistent'`,
-      );
+      const plan = await analyzer.explain(conn, `DELETE FROM ${TABLE_A} WHERE name = 'nonexistent'`);
 
       expect(plan.rootNode.nodeType).toBeTruthy();
     });
@@ -300,12 +265,9 @@ describe.skipIf(!canConnect)("E2E: EXPLAIN / EXPLAIN ANALYZE", { timeout: 30000 
     it("EXPLAIN ANALYZE on INSERT is blocked by security guard", async () => {
       // Security fix: EXPLAIN ANALYZE is only allowed on SELECT/WITH to prevent side effects
       await expect(
-        analyzer.explain(
-          conn,
-          `INSERT INTO ${TABLE_A} (name, value) VALUES ('analyze_insert', 888)`,
-          undefined,
-          { analyze: true },
-        ),
+        analyzer.explain(conn, `INSERT INTO ${TABLE_A} (name, value) VALUES ('analyze_insert', 888)`, undefined, {
+          analyze: true,
+        }),
       ).rejects.toThrow(/EXPLAIN ANALYZE is only allowed on SELECT\/WITH/);
     });
   });
@@ -316,15 +278,11 @@ describe.skipIf(!canConnect)("E2E: EXPLAIN / EXPLAIN ANALYZE", { timeout: 30000 
 
   describe("error handling", () => {
     it("invalid SQL throws an error", async () => {
-      await expect(
-        analyzer.explain(conn, "INVALID SQL GARBAGE"),
-      ).rejects.toThrow();
+      await expect(analyzer.explain(conn, "INVALID SQL GARBAGE")).rejects.toThrow();
     });
 
     it("EXPLAIN on non-existent table throws", async () => {
-      await expect(
-        analyzer.explain(conn, "SELECT * FROM nonexistent_table_xyz_abc"),
-      ).rejects.toThrow();
+      await expect(analyzer.explain(conn, "SELECT * FROM nonexistent_table_xyz_abc")).rejects.toThrow();
     });
   });
 
@@ -334,12 +292,9 @@ describe.skipIf(!canConnect)("E2E: EXPLAIN / EXPLAIN ANALYZE", { timeout: 30000 
 
   describe("adversarial edge cases", () => {
     it("empty result set plan still parses", async () => {
-      const plan = await analyzer.explain(
-        conn,
-        `SELECT * FROM ${TABLE_A} WHERE value = -999`,
-        undefined,
-        { analyze: true },
-      );
+      const plan = await analyzer.explain(conn, `SELECT * FROM ${TABLE_A} WHERE value = -999`, undefined, {
+        analyze: true,
+      });
 
       expect(plan.rootNode).toBeDefined();
       expect(plan.rootNode.actualRows).toBe(0);
@@ -369,26 +324,18 @@ describe.skipIf(!canConnect)("E2E: EXPLAIN / EXPLAIN ANALYZE", { timeout: 30000 
     it("EXPLAIN with SQL injection attempt in query", async () => {
       // The EXPLAIN wraps the SQL, but the SQL itself is passed through.
       // This should fail because the SQL is invalid, not because of injection.
-      await expect(
-        analyzer.explain(conn, "SELECT 1; DROP TABLE explain_test_a; --"),
-      ).rejects.toThrow();
+      await expect(analyzer.explain(conn, "SELECT 1; DROP TABLE explain_test_a; --")).rejects.toThrow();
     });
 
     it("plan for aggregate query", async () => {
-      const plan = await analyzer.explain(
-        conn,
-        `SELECT COUNT(*), AVG(value) FROM ${TABLE_A}`,
-      );
+      const plan = await analyzer.explain(conn, `SELECT COUNT(*), AVG(value) FROM ${TABLE_A}`);
 
       expect(plan.rootNode.nodeType).toBeTruthy();
       // Aggregate plans typically have an "Aggregate" node type
     });
 
     it("plan for ORDER BY includes sort info", async () => {
-      const plan = await analyzer.explain(
-        conn,
-        `SELECT * FROM ${TABLE_A} ORDER BY value DESC`,
-      );
+      const plan = await analyzer.explain(conn, `SELECT * FROM ${TABLE_A} ORDER BY value DESC`);
 
       // Find a Sort node
       function findSort(node: typeof plan.rootNode): typeof plan.rootNode | undefined {

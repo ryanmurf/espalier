@@ -1,11 +1,10 @@
-import { describe, it, expect } from "vitest";
-import { createProjectionMapper } from "../../mapping/projection-mapper.js";
-import { Projection } from "../../decorators/projection.js";
+import { describe, expect, it } from "vitest";
 import { Column } from "../../decorators/column.js";
-import { Table } from "../../decorators/table.js";
 import { Id } from "../../decorators/id.js";
+import { Projection } from "../../decorators/projection.js";
+import { Table } from "../../decorators/table.js";
 import { getEntityMetadata } from "../../mapping/entity-metadata.js";
-import type { EntityMetadata } from "../../mapping/entity-metadata.js";
+import { createProjectionMapper } from "../../mapping/projection-mapper.js";
 
 @Table("users")
 class User {
@@ -82,8 +81,6 @@ describe("ProjectionMapper", () => {
   it("throws when projection class has no @Column fields", () => {
     class EmptyProjection {}
 
-    expect(() =>
-      createProjectionMapper(EmptyProjection as any, userMetadata),
-    ).toThrow(/no @Column decorated fields/);
+    expect(() => createProjectionMapper(EmptyProjection as any, userMetadata)).toThrow(/no @Column decorated fields/);
   });
 });

@@ -1,7 +1,7 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { SseEndpointGenerator } from "../sse/sse-endpoint-generator.js";
-import type { ChangeEvent } from "../streams/types.js";
 import type { SseRequest, SseResponse } from "../sse/types.js";
+import type { ChangeEvent } from "../streams/types.js";
 
 interface TestEntity {
   id: number;
@@ -14,7 +14,13 @@ async function* createSource(events: ChangeEvent<TestEntity>[]): AsyncIterable<C
   }
 }
 
-function createMockResponse(): SseResponse & { written: string[]; ended: boolean; statusCode: number; headersSet: Record<string, string>; listeners: Map<string, Array<() => void>> } {
+function createMockResponse(): SseResponse & {
+  written: string[];
+  ended: boolean;
+  statusCode: number;
+  headersSet: Record<string, string>;
+  listeners: Map<string, Array<() => void>>;
+} {
   const mock = {
     written: [] as string[],
     ended: false,

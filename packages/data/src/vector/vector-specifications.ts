@@ -89,9 +89,8 @@ export function nearestTo(
     },
   };
 
-  const criteria = threshold !== undefined
-    ? new VectorDistanceCriteria(column, vector, metric, "lte", threshold)
-    : undefined;
+  const criteria =
+    threshold !== undefined ? new VectorDistanceCriteria(column, vector, metric, "lte", threshold) : undefined;
 
   return { criteria, orderBy, limit };
 }

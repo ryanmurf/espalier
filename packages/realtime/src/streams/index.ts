@@ -1,3 +1,3 @@
-export type { ChangeEvent, WatchOptions, OperationType } from "./types.js";
-export { ChangeStream } from "./change-stream.js";
 export type { ParsedPayload } from "./change-stream.js";
+export { ChangeStream } from "./change-stream.js";
+export type { ChangeEvent, OperationType, WatchOptions } from "./types.js";

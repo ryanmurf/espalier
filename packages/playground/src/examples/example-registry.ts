@@ -1,5 +1,5 @@
-import type { PlaygroundExample } from "./types.js";
 import { builtInExamples } from "./built-in-examples.js";
+import type { PlaygroundExample } from "./types.js";
 
 export class ExampleRegistry {
   private readonly examples: Map<string, PlaygroundExample> = new Map();

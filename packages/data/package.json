@@ -2,6 +2,17 @@
   "name": "espalier-data",
   "version": "2.0.0",
   "description": "Spring Data Relational-like repository and entity mapping layer for TypeScript",
+  "license": "Apache-2.0",
+  "author": "Ryan Murphy",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ryanmurf/espalier.git",
+    "directory": "packages/data"
+  },
+  "bugs": {
+    "url": "https://github.com/ryanmurf/espalier/issues"
+  },
+  "homepage": "https://github.com/ryanmurf/espalier#readme",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",

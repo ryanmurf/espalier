@@ -1,8 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { Connection } from "espalier-jdbc";
-import type { DomainEvent } from "../types.js";
-import { EventStore } from "../store/event-store.js";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ConcurrencyError } from "../store/concurrency-error.js";
+import { EventStore } from "../store/event-store.js";
+import type { DomainEvent } from "../types.js";
 
 // ── Mock helpers ──────────────────────────────────────────────────────
 
@@ -73,10 +73,7 @@ beforeEach(() => {
 // ── Tests ─────────────────────────────────────────────────────────────
 
 describe("EventStore", () => {
-  const makeEvent = (
-    eventType: string,
-    payload: Record<string, unknown> = {},
-  ): DomainEvent => ({
+  const makeEvent = (eventType: string, payload: Record<string, unknown> = {}): DomainEvent => ({
     eventType,
     aggregateId: "agg-1",
     aggregateType: "Order",
@@ -126,10 +123,7 @@ describe("EventStore", () => {
 
       const conn = createMockConnection([versionStmt, insertStmt]);
 
-      const events = [
-        makeEvent("OrderCreated", { orderId: "123" }),
-        makeEvent("ItemAdded", { itemId: "456" }),
-      ];
+      const events = [makeEvent("OrderCreated", { orderId: "123" }), makeEvent("ItemAdded", { itemId: "456" })];
 
       const stored = await store.append(conn, "agg-1", "Order", events, 0);
 
@@ -151,9 +145,7 @@ describe("EventStore", () => {
       const insertStmt = createMockPreparedStatement(insertRs);
       const conn = createMockConnection([versionStmt, insertStmt]);
 
-      const stored = await store.append(
-        conn, "agg-1", "Order", [makeEvent("Created")], 0,
-      );
+      const stored = await store.append(conn, "agg-1", "Order", [makeEvent("Created")], 0);
 
       // UUID format: 8-4-4-4-12 hex chars
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -174,9 +166,7 @@ describe("EventStore", () => {
 
       // Parameter 5 (1-indexed) is the payload
       const calls = insertStmt.setParameter.mock.calls;
-      const payloadParam = calls.find(
-        (c: unknown[]) => c[1] === JSON.stringify(payload),
-      );
+      const payloadParam = calls.find((c: unknown[]) => c[1] === JSON.stringify(payload));
       expect(payloadParam).toBeTruthy();
     });
 
@@ -188,9 +178,7 @@ describe("EventStore", () => {
       const versionStmt = createMockPreparedStatement(versionRs);
       const conn = createMockConnection([versionStmt]);
 
-      await expect(
-        store.append(conn, "agg-1", "Order", [makeEvent("Created")], 1),
-      ).rejects.toThrow(ConcurrencyError);
+      await expect(store.append(conn, "agg-1", "Order", [makeEvent("Created")], 1)).rejects.toThrow(ConcurrencyError);
     });
 
     it("ConcurrencyError contains correct aggregate info", async () => {
@@ -221,9 +209,7 @@ describe("EventStore", () => {
       const versionStmt = createMockPreparedStatement(versionRs);
       const conn = createMockConnection([versionStmt]);
 
-      await expect(
-        store.append(conn, "agg-1", "Order", [makeEvent("X")], -1),
-      ).rejects.toThrow(ConcurrencyError);
+      await expect(store.append(conn, "agg-1", "Order", [makeEvent("X")], -1)).rejects.toThrow(ConcurrencyError);
     });
 
     it("handles very long aggregate IDs", async () => {
@@ -236,9 +222,7 @@ describe("EventStore", () => {
       const insertStmt = createMockPreparedStatement(insertRs);
       const conn = createMockConnection([versionStmt, insertStmt]);
 
-      const stored = await store.append(
-        conn, longId, "Order", [makeEvent("X")], 0,
-      );
+      const stored = await store.append(conn, longId, "Order", [makeEvent("X")], 0);
       expect(stored[0].aggregateId).toBe(longId);
     });
 
@@ -252,9 +236,7 @@ describe("EventStore", () => {
       insertStmt.executeQuery.mockRejectedValue(new Error("DB error"));
       const conn = createMockConnection([versionStmt, insertStmt]);
 
-      await expect(
-        store.append(conn, "agg-1", "Order", [makeEvent("X")], 0),
-      ).rejects.toThrow("DB error");
+      await expect(store.append(conn, "agg-1", "Order", [makeEvent("X")], 0)).rejects.toThrow("DB error");
 
       expect(insertStmt.close).toHaveBeenCalled();
     });
@@ -265,14 +247,26 @@ describe("EventStore", () => {
       const store = new EventStore();
       const rows = [
         {
-          event_id: "e1", aggregate_id: "agg-1", aggregate_type: "Order",
-          event_type: "Created", payload: '{"x":1}', version: 1, sequence: 1,
-          timestamp: "2026-01-01T00:00:00Z", metadata: null,
+          event_id: "e1",
+          aggregate_id: "agg-1",
+          aggregate_type: "Order",
+          event_type: "Created",
+          payload: '{"x":1}',
+          version: 1,
+          sequence: 1,
+          timestamp: "2026-01-01T00:00:00Z",
+          metadata: null,
         },
         {
-          event_id: "e2", aggregate_id: "agg-1", aggregate_type: "Order",
-          event_type: "Updated", payload: '{"x":2}', version: 2, sequence: 2,
-          timestamp: "2026-01-01T01:00:00Z", metadata: null,
+          event_id: "e2",
+          aggregate_id: "agg-1",
+          aggregate_type: "Order",
+          event_type: "Updated",
+          payload: '{"x":2}',
+          version: 2,
+          sequence: 2,
+          timestamp: "2026-01-01T01:00:00Z",
+          metadata: null,
         },
       ];
 
@@ -326,11 +320,19 @@ describe("EventStore", () => {
 
     it("parses JSON payload from string", async () => {
       const store = new EventStore();
-      const rs = createMockResultSet([{
-        event_id: "e1", aggregate_id: "agg-1", aggregate_type: "Order",
-        event_type: "X", payload: '{"deep":{"nested":true}}', version: 1,
-        sequence: 1, timestamp: "2026-01-01T00:00:00Z", metadata: null,
-      }]);
+      const rs = createMockResultSet([
+        {
+          event_id: "e1",
+          aggregate_id: "agg-1",
+          aggregate_type: "Order",
+          event_type: "X",
+          payload: '{"deep":{"nested":true}}',
+          version: 1,
+          sequence: 1,
+          timestamp: "2026-01-01T00:00:00Z",
+          metadata: null,
+        },
+      ]);
       const stmt = createMockPreparedStatement(rs);
       const conn = createMockConnection([stmt]);
 
@@ -341,11 +343,19 @@ describe("EventStore", () => {
     it("handles already-parsed payload objects", async () => {
       const store = new EventStore();
       const payloadObj = { alreadyParsed: true };
-      const rs = createMockResultSet([{
-        event_id: "e1", aggregate_id: "agg-1", aggregate_type: "Order",
-        event_type: "X", payload: payloadObj, version: 1,
-        sequence: 1, timestamp: new Date("2026-01-01"), metadata: null,
-      }]);
+      const rs = createMockResultSet([
+        {
+          event_id: "e1",
+          aggregate_id: "agg-1",
+          aggregate_type: "Order",
+          event_type: "X",
+          payload: payloadObj,
+          version: 1,
+          sequence: 1,
+          timestamp: new Date("2026-01-01"),
+          metadata: null,
+        },
+      ]);
       const stmt = createMockPreparedStatement(rs);
       const conn = createMockConnection([stmt]);
 
@@ -355,11 +365,19 @@ describe("EventStore", () => {
 
     it("parses metadata when present as string", async () => {
       const store = new EventStore();
-      const rs = createMockResultSet([{
-        event_id: "e1", aggregate_id: "agg-1", aggregate_type: "Order",
-        event_type: "X", payload: "{}", version: 1, sequence: 1,
-        timestamp: "2026-01-01", metadata: '{"userId":"u1"}',
-      }]);
+      const rs = createMockResultSet([
+        {
+          event_id: "e1",
+          aggregate_id: "agg-1",
+          aggregate_type: "Order",
+          event_type: "X",
+          payload: "{}",
+          version: 1,
+          sequence: 1,
+          timestamp: "2026-01-01",
+          metadata: '{"userId":"u1"}',
+        },
+      ]);
       const stmt = createMockPreparedStatement(rs);
       const conn = createMockConnection([stmt]);
 
@@ -369,11 +387,19 @@ describe("EventStore", () => {
 
     it("returns undefined metadata when null", async () => {
       const store = new EventStore();
-      const rs = createMockResultSet([{
-        event_id: "e1", aggregate_id: "agg-1", aggregate_type: "Order",
-        event_type: "X", payload: "{}", version: 1, sequence: 1,
-        timestamp: "2026-01-01", metadata: null,
-      }]);
+      const rs = createMockResultSet([
+        {
+          event_id: "e1",
+          aggregate_id: "agg-1",
+          aggregate_type: "Order",
+          event_type: "X",
+          payload: "{}",
+          version: 1,
+          sequence: 1,
+          timestamp: "2026-01-01",
+          metadata: null,
+        },
+      ]);
       const stmt = createMockPreparedStatement(rs);
       const conn = createMockConnection([stmt]);
 
@@ -452,9 +478,7 @@ describe("EventStore", () => {
     });
 
     it("rejects invalid table names with special characters", () => {
-      expect(() => new EventStore({ tableName: "my-events.v2" })).toThrow(
-        /Invalid tableName/,
-      );
+      expect(() => new EventStore({ tableName: "my-events.v2" })).toThrow(/Invalid tableName/);
     });
 
     it("generates schema-qualified table in DDL", () => {

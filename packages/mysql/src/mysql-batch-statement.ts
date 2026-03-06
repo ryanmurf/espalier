@@ -1,6 +1,6 @@
-import type { PoolConnection as MysqlPoolConnection, ResultSetHeader } from "mysql2/promise";
 import type { BatchStatement, SqlValue } from "espalier-jdbc";
-import { QueryError, convertPositionalParams } from "espalier-jdbc";
+import { convertPositionalParams, QueryError } from "espalier-jdbc";
+import type { PoolConnection as MysqlPoolConnection, ResultSetHeader } from "mysql2/promise";
 import { mapMysqlErrorCode } from "./error-codes.js";
 
 export class MysqlBatchStatement implements BatchStatement {
@@ -63,17 +63,12 @@ export class MysqlBatchStatement implements BatchStatement {
     // Replace the VALUES (...) clause with multi-row version
     // Regex handles one level of nested parens (e.g., COALESCE($1, 0))
     const baseSql = convertPositionalParams(this.sql);
-    const multiSql = baseSql.replace(
-      /VALUES\s*\((?:[^)(]|\([^)]*\))*\)/i,
-      `VALUES ${valueClauses.join(", ")}`,
-    );
+    const multiSql = baseSql.replace(/VALUES\s*\((?:[^)(]|\([^)]*\))*\)/i, `VALUES ${valueClauses.join(", ")}`);
 
     try {
       const [result] = await this.connection.query(multiSql, allParams);
       const totalRows = (result as ResultSetHeader).affectedRows ?? this.batches.length;
-      return new Array<number>(this.batches.length).fill(
-        Math.floor(totalRows / this.batches.length),
-      );
+      return new Array<number>(this.batches.length).fill(Math.floor(totalRows / this.batches.length));
     } catch (err) {
       throw new QueryError(
         `Failed to execute batch insert: ${(err as Error).message}`,

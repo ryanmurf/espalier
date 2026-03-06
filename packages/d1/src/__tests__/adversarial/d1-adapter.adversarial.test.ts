@@ -14,26 +14,18 @@
  * - executeUpdate returns meta.changes (not rowCount)
  * - D1Result has { results?, success, meta } shape
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import {
-  ConnectionError,
-  TransactionError,
-  QueryError,
-  DatabaseErrorCode,
-  IsolationLevel,
-} from "espalier-jdbc";
-import type { D1Database, D1PreparedStatement, D1Result, D1ResultMeta } from "../../d1-types.js";
-import { D1ResultSet } from "../../d1-result-set.js";
-import { D1StatementImpl, D1PreparedStatementImpl } from "../../d1-statement.js";
+
+import { ConnectionError, DatabaseErrorCode, IsolationLevel, QueryError, TransactionError } from "espalier-jdbc";
+import { describe, expect, it, vi } from "vitest";
 import { D1Connection } from "../../d1-connection.js";
 import { D1DataSource } from "../../d1-data-source.js";
+import { D1ResultSet } from "../../d1-result-set.js";
+import { D1PreparedStatementImpl, D1StatementImpl } from "../../d1-statement.js";
+import type { D1Database, D1PreparedStatement, D1Result, D1ResultMeta } from "../../d1-types.js";
 
 // -- Mock helpers ------------------------------------------------------------
 
-function createD1Result(
-  results: Record<string, unknown>[] = [],
-  meta: Partial<D1ResultMeta> = {},
-): D1Result {
+function createD1Result(results: Record<string, unknown>[] = [], meta: Partial<D1ResultMeta> = {}): D1Result {
   return {
     results,
     success: true,
@@ -50,7 +42,9 @@ function createD1Result(
 
 function createMockD1Stmt(overrides: Partial<D1PreparedStatement> = {}): D1PreparedStatement {
   const stmt: D1PreparedStatement = {
-    bind: vi.fn(function (this: D1PreparedStatement) { return this; }) as any,
+    bind: vi.fn(function (this: D1PreparedStatement) {
+      return this;
+    }) as any,
     first: vi.fn().mockResolvedValue(null),
     run: vi.fn().mockResolvedValue(createD1Result([], { changes: 0 })),
     all: vi.fn().mockResolvedValue(createD1Result([])),
@@ -81,7 +75,11 @@ describe("D1ResultSet", () => {
   });
 
   it("iterates through all rows", async () => {
-    const rows = [{ id: 1, name: "a" }, { id: 2, name: "b" }, { id: 3, name: "c" }];
+    const rows = [
+      { id: 1, name: "a" },
+      { id: 2, name: "b" },
+      { id: 3, name: "c" },
+    ];
     const rs = new D1ResultSet(createD1Result(rows));
     const collected: Record<string, unknown>[] = [];
     while (await rs.next()) {
@@ -139,14 +137,17 @@ describe("D1ResultSet", () => {
   });
 
   it("getBoolean() coerces values", async () => {
-    const rs = new D1ResultSet(createD1Result([
-      { a: true }, { a: false }, { a: 0 }, { a: 1 }, { a: "" },
-    ]));
-    await rs.next(); expect(rs.getBoolean("a")).toBe(true);
-    await rs.next(); expect(rs.getBoolean("a")).toBe(false);
-    await rs.next(); expect(rs.getBoolean("a")).toBe(false);
-    await rs.next(); expect(rs.getBoolean("a")).toBe(true);
-    await rs.next(); expect(rs.getBoolean("a")).toBe(false);
+    const rs = new D1ResultSet(createD1Result([{ a: true }, { a: false }, { a: 0 }, { a: 1 }, { a: "" }]));
+    await rs.next();
+    expect(rs.getBoolean("a")).toBe(true);
+    await rs.next();
+    expect(rs.getBoolean("a")).toBe(false);
+    await rs.next();
+    expect(rs.getBoolean("a")).toBe(false);
+    await rs.next();
+    expect(rs.getBoolean("a")).toBe(true);
+    await rs.next();
+    expect(rs.getBoolean("a")).toBe(false);
   });
 
   it("getDate() returns null for null", async () => {
@@ -194,7 +195,7 @@ describe("D1ResultSet", () => {
     const rs = new D1ResultSet(createD1Result([{ id: 1, name: "a", active: true }]));
     const meta = rs.getMetadata();
     expect(meta).toHaveLength(3);
-    expect(meta.map(m => m.name)).toEqual(["id", "name", "active"]);
+    expect(meta.map((m) => m.name)).toEqual(["id", "name", "active"]);
     expect(meta[0].dataType).toBe("unknown");
     expect(meta[0].nullable).toBe(true);
     expect(meta[0].primaryKey).toBe(false);
@@ -411,7 +412,7 @@ describe("D1PreparedStatementImpl", () => {
     const bindFn = vi.fn().mockReturnThis();
     const mockStmt = createMockD1Stmt({ run: runFn, bind: bindFn as any });
     const db = createMockDb({ prepare: vi.fn().mockReturnValue(mockStmt) });
-    const data = new Uint8Array([0xDE, 0xAD]);
+    const data = new Uint8Array([0xde, 0xad]);
     const ps = new D1PreparedStatementImpl(db, "INSERT INTO t (blob) VALUES ($1)");
     ps.setParameter(1, data);
     await ps.executeUpdate();
@@ -815,15 +816,15 @@ describe("D1DataSource", () => {
   it("typeConverters are passed to connections", async () => {
     const mockRegistry = { get: vi.fn(), register: vi.fn() } as any;
     const ds = new D1DataSource({ binding: createMockDb(), typeConverters: mockRegistry });
-    const conn = await ds.getConnection() as D1Connection;
+    const conn = (await ds.getConnection()) as D1Connection;
     expect(conn.getTypeConverterRegistry()).toBe(mockRegistry);
   });
 
   it("multiple connections share the same D1 binding", async () => {
     const db = createMockDb();
     const ds = new D1DataSource({ binding: db });
-    const conn1 = await ds.getConnection() as D1Connection;
-    const conn2 = await ds.getConnection() as D1Connection;
+    const conn1 = (await ds.getConnection()) as D1Connection;
+    const conn2 = (await ds.getConnection()) as D1Connection;
     // Both connections work independently
     expect(conn1.isClosed()).toBe(false);
     expect(conn2.isClosed()).toBe(false);
@@ -912,8 +913,8 @@ describe("concurrent operations", () => {
       ),
     );
     const results = await Promise.all(promises);
-    const successes = results.filter(r => r.success);
-    const failures = results.filter(r => !r.success);
+    const successes = results.filter((r) => r.success);
+    const failures = results.filter((r) => !r.success);
     expect(successes.length).toBeGreaterThan(0);
     expect(failures.length).toBeGreaterThan(0);
     for (const f of failures) {
@@ -957,7 +958,7 @@ describe("resource cleanup", () => {
     const ds = new D1DataSource({ binding: db });
     const connections: D1Connection[] = [];
     for (let i = 0; i < 100; i++) {
-      connections.push(await ds.getConnection() as D1Connection);
+      connections.push((await ds.getConnection()) as D1Connection);
     }
     for (const c of connections) {
       await c.close();

@@ -1,21 +1,31 @@
-import type { PoolClient } from "pg";
-import type { Connection, TypeAwareConnection, CacheableConnection, PreparedStatement, NamedPreparedStatement, BatchStatement, Statement, TypeConverterRegistry, StatementCacheStats, StatementCache } from "espalier-jdbc";
+import type {
+  BatchStatement,
+  CacheableConnection,
+  NamedPreparedStatement,
+  PreparedStatement,
+  Statement,
+  StatementCache,
+  StatementCacheStats,
+  TypeAwareConnection,
+  TypeConverterRegistry,
+} from "espalier-jdbc";
 import {
-  type Transaction,
-  type IsolationLevel,
   ConnectionError,
-  TransactionError,
   DatabaseErrorCode,
+  DbAttributes,
   getGlobalLogger,
-  LogLevel,
   getGlobalTracerProvider,
+  type IsolationLevel,
+  LogLevel,
   SpanKind,
   SpanStatusCode,
-  DbAttributes,
+  type Transaction,
+  TransactionError,
 } from "espalier-jdbc";
-import { PgStatement, PgPreparedStatement } from "./pg-statement.js";
-import { PgNamedPreparedStatement } from "./pg-named-statement.js";
+import type { PoolClient } from "pg";
 import { PgBatchStatement } from "./pg-batch-statement.js";
+import { PgNamedPreparedStatement } from "./pg-named-statement.js";
+import { PgPreparedStatement, PgStatement } from "./pg-statement.js";
 
 export class PgConnection implements TypeAwareConnection, CacheableConnection {
   private closed = false;
@@ -81,9 +91,7 @@ export class PgConnection implements TypeAwareConnection, CacheableConnection {
     try {
       await this.client.query("BEGIN");
       if (isolation) {
-        await this.client.query(
-          `SET TRANSACTION ISOLATION LEVEL ${isolation}`,
-        );
+        await this.client.query(`SET TRANSACTION ISOLATION LEVEL ${isolation}`);
       }
     } catch (err) {
       txSpan.setStatus({ code: SpanStatusCode.ERROR, message: (err as Error).message });
@@ -212,11 +220,7 @@ export class PgConnection implements TypeAwareConnection, CacheableConnection {
 
   private ensureOpen(): void {
     if (this.closed) {
-      throw new ConnectionError(
-        "Connection is closed",
-        undefined,
-        DatabaseErrorCode.CONNECTION_CLOSED,
-      );
+      throw new ConnectionError("Connection is closed", undefined, DatabaseErrorCode.CONNECTION_CLOSED);
     }
   }
 }

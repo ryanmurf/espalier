@@ -1,15 +1,9 @@
+import type { PreparedStatement, ResultSet, SqlValue, Statement, StreamingResultSet } from "espalier-jdbc";
+import { DatabaseErrorCode, DbAttributes, getGlobalLogger, LogLevel, QueryError } from "espalier-jdbc";
 import type { PoolClient } from "pg";
 import Cursor from "pg-cursor";
-import type {
-  Statement,
-  PreparedStatement,
-  ResultSet,
-  StreamingResultSet,
-  SqlValue,
-} from "espalier-jdbc";
-import { QueryError, DatabaseErrorCode, getGlobalLogger, LogLevel, DbAttributes } from "espalier-jdbc";
-import { PgResultSet } from "./pg-result-set.js";
 import { PgCursorResultSet } from "./pg-cursor-result-set.js";
+import { PgResultSet } from "./pg-result-set.js";
 import { traceQuery } from "./trace-query.js";
 
 function mapPgErrorCode(err: unknown): DatabaseErrorCode {
@@ -49,7 +43,11 @@ export class PgStatement implements Statement {
         span.setAttribute(DbAttributes.ROWS_AFFECTED, result.rowCount ?? 0);
         return new PgResultSet(result);
       } catch (err) {
-        logger.error("query failed", { sql: truncateSql(sql), duration: Date.now() - startTime, error: (err as Error).message });
+        logger.error("query failed", {
+          sql: truncateSql(sql),
+          duration: Date.now() - startTime,
+          error: (err as Error).message,
+        });
         throw new QueryError(
           `Failed to execute query: ${(err as Error).message}`,
           sql,
@@ -73,7 +71,11 @@ export class PgStatement implements Statement {
         span.setAttribute(DbAttributes.ROWS_AFFECTED, rowCount);
         return rowCount;
       } catch (err) {
-        logger.error("update failed", { sql: truncateSql(sql), duration: Date.now() - startTime, error: (err as Error).message });
+        logger.error("update failed", {
+          sql: truncateSql(sql),
+          duration: Date.now() - startTime,
+          error: (err as Error).message,
+        });
         throw new QueryError(
           `Failed to execute update: ${(err as Error).message}`,
           sql,
@@ -131,12 +133,21 @@ export class PgPreparedStatement extends PgStatement implements PreparedStatemen
       try {
         const result = await this.client.query(queryText, params);
         if (logger.isEnabled(LogLevel.DEBUG)) {
-          logger.debug("prepared query executed", { sql: truncateSql(queryText), paramCount: params.length, duration: Date.now() - startTime });
+          logger.debug("prepared query executed", {
+            sql: truncateSql(queryText),
+            paramCount: params.length,
+            duration: Date.now() - startTime,
+          });
         }
         span.setAttribute(DbAttributes.ROWS_AFFECTED, result.rowCount ?? 0);
         return new PgResultSet(result);
       } catch (err) {
-        logger.error("prepared query failed", { sql: truncateSql(queryText), paramCount: params.length, duration: Date.now() - startTime, error: (err as Error).message });
+        logger.error("prepared query failed", {
+          sql: truncateSql(queryText),
+          paramCount: params.length,
+          duration: Date.now() - startTime,
+          error: (err as Error).message,
+        });
         throw new QueryError(
           `Failed to execute prepared query: ${(err as Error).message}`,
           queryText,
@@ -157,13 +168,22 @@ export class PgPreparedStatement extends PgStatement implements PreparedStatemen
       try {
         const result = await this.client.query(queryText, params);
         if (logger.isEnabled(LogLevel.DEBUG)) {
-          logger.debug("prepared update executed", { sql: truncateSql(queryText), paramCount: params.length, duration: Date.now() - startTime });
+          logger.debug("prepared update executed", {
+            sql: truncateSql(queryText),
+            paramCount: params.length,
+            duration: Date.now() - startTime,
+          });
         }
         const rowCount = result.rowCount ?? 0;
         span.setAttribute(DbAttributes.ROWS_AFFECTED, rowCount);
         return rowCount;
       } catch (err) {
-        logger.error("prepared update failed", { sql: truncateSql(queryText), paramCount: params.length, duration: Date.now() - startTime, error: (err as Error).message });
+        logger.error("prepared update failed", {
+          sql: truncateSql(queryText),
+          paramCount: params.length,
+          duration: Date.now() - startTime,
+          error: (err as Error).message,
+        });
         throw new QueryError(
           `Failed to execute prepared update: ${(err as Error).message}`,
           queryText,

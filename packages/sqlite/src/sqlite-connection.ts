@@ -1,17 +1,24 @@
 import type Database from "better-sqlite3";
-import type { Connection, TypeAwareConnection, PreparedStatement, NamedPreparedStatement, BatchStatement, Statement, TypeConverterRegistry } from "espalier-jdbc";
+import type {
+  BatchStatement,
+  NamedPreparedStatement,
+  PreparedStatement,
+  Statement,
+  TypeAwareConnection,
+  TypeConverterRegistry,
+} from "espalier-jdbc";
 import {
-  type Transaction,
-  type IsolationLevel,
   ConnectionError,
-  TransactionError,
   DatabaseErrorCode,
   getGlobalLogger,
+  type IsolationLevel,
   LogLevel,
+  type Transaction,
+  TransactionError,
 } from "espalier-jdbc";
-import { SqliteStatement, SqlitePreparedStatement } from "./sqlite-statement.js";
-import { SqliteNamedPreparedStatement } from "./sqlite-named-statement.js";
 import { SqliteBatchStatement } from "./sqlite-batch-statement.js";
+import { SqliteNamedPreparedStatement } from "./sqlite-named-statement.js";
+import { SqlitePreparedStatement, SqliteStatement } from "./sqlite-statement.js";
 
 export class SqliteConnection implements TypeAwareConnection {
   private closed = false;
@@ -150,11 +157,7 @@ export class SqliteConnection implements TypeAwareConnection {
 
   private ensureOpen(): void {
     if (this.closed) {
-      throw new ConnectionError(
-        "Connection is closed",
-        undefined,
-        DatabaseErrorCode.CONNECTION_CLOSED,
-      );
+      throw new ConnectionError("Connection is closed", undefined, DatabaseErrorCode.CONNECTION_CLOSED);
     }
   }
 }

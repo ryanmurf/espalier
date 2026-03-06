@@ -1,9 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { QueryBatcher, QueryBatcherRegistry } from "../query/query-batcher.js";
-import type { QueryBatcherConfig } from "../query/query-batcher.js";
+import type { ColumnMetadata, Connection, DataSource, PreparedStatement, ResultSet, SqlValue } from "espalier-jdbc";
+import { describe, expect, it } from "vitest";
 import type { EntityMetadata, FieldMapping } from "../mapping/entity-metadata.js";
 import type { RowMapper } from "../mapping/row-mapper.js";
-import type { DataSource, Connection, PreparedStatement, ResultSet, SqlValue, ColumnMetadata } from "espalier-jdbc";
+import { QueryBatcher, QueryBatcherRegistry } from "../query/query-batcher.js";
 
 // ---------------------------------------------------------------------------
 // Test entity and mock helpers
@@ -121,9 +120,7 @@ function createMockDataSource(
                 throw opts.errorOnQuery;
               }
               // Filter rows based on the IDs in params
-              const matchingRows = rows.filter((r) =>
-                params.some((p) => String(p) === String(r.id)),
-              );
+              const matchingRows = rows.filter((r) => params.some((p) => String(p) === String(r.id)));
               return createMockResultSet(matchingRows);
             },
             async executeUpdate() {
@@ -168,7 +165,10 @@ describe("QueryBatcher — basic batching", () => {
   it("batches 2 load calls into one query", async () => {
     const sqlCapture: string[] = [];
     const ds = createMockDataSource(
-      [{ id: 1, name: "Alice" }, { id: 2, name: "Bob" }],
+      [
+        { id: 1, name: "Alice" },
+        { id: 2, name: "Bob" },
+      ],
       { captureSql: sqlCapture },
     );
     const batcher = new QueryBatcher(ds, testMetadata, createRowMapper<TestEntity>());
@@ -216,17 +216,10 @@ describe("QueryBatcher — basic batching", () => {
 describe("QueryBatcher — duplicate ID deduplication", () => {
   it("duplicate IDs result in single query param, all callers get result", async () => {
     const paramCapture: SqlValue[][] = [];
-    const ds = createMockDataSource(
-      [{ id: 1, name: "Alice" }],
-      { captureParams: paramCapture },
-    );
+    const ds = createMockDataSource([{ id: 1, name: "Alice" }], { captureParams: paramCapture });
     const batcher = new QueryBatcher(ds, testMetadata, createRowMapper<TestEntity>());
 
-    const [r1, r2, r3] = await Promise.all([
-      batcher.load(1),
-      batcher.load(1),
-      batcher.load(1),
-    ]);
+    const [r1, r2, r3] = await Promise.all([batcher.load(1), batcher.load(1), batcher.load(1)]);
 
     expect(r1).toEqual({ id: 1, name: "Alice" });
     expect(r2).toEqual({ id: 1, name: "Alice" });
@@ -246,12 +239,7 @@ describe("QueryBatcher — duplicate ID deduplication", () => {
     ]);
     const batcher = new QueryBatcher(ds, testMetadata, createRowMapper<TestEntity>());
 
-    const [r1, r2, r3, r4] = await Promise.all([
-      batcher.load(1),
-      batcher.load(2),
-      batcher.load(1),
-      batcher.load(2),
-    ]);
+    const [r1, r2, r3, r4] = await Promise.all([batcher.load(1), batcher.load(2), batcher.load(1), batcher.load(2)]);
 
     expect(r1!.name).toBe("Alice");
     expect(r2!.name).toBe("Bob");
@@ -294,11 +282,7 @@ describe("QueryBatcher — non-existent IDs", () => {
     const ds = createMockDataSource([]);
     const batcher = new QueryBatcher(ds, testMetadata, createRowMapper<TestEntity>());
 
-    const [r1, r2, r3] = await Promise.all([
-      batcher.load(100),
-      batcher.load(200),
-      batcher.load(300),
-    ]);
+    const [r1, r2, r3] = await Promise.all([batcher.load(100), batcher.load(200), batcher.load(300)]);
 
     expect(r1).toBeNull();
     expect(r2).toBeNull();
@@ -313,7 +297,10 @@ describe("QueryBatcher — batch window behavior", () => {
   it("calls in same microtask are batched", async () => {
     const sqlCapture: string[] = [];
     const ds = createMockDataSource(
-      [{ id: 1, name: "A" }, { id: 2, name: "B" }],
+      [
+        { id: 1, name: "A" },
+        { id: 2, name: "B" },
+      ],
       { captureSql: sqlCapture },
     );
     const batcher = new QueryBatcher(ds, testMetadata, createRowMapper<TestEntity>());
@@ -325,7 +312,10 @@ describe("QueryBatcher — batch window behavior", () => {
   it("calls in separate ticks are separate batches", async () => {
     const sqlCapture: string[] = [];
     const ds = createMockDataSource(
-      [{ id: 1, name: "A" }, { id: 2, name: "B" }],
+      [
+        { id: 1, name: "A" },
+        { id: 2, name: "B" },
+      ],
       { captureSql: sqlCapture },
     );
     const batcher = new QueryBatcher(ds, testMetadata, createRowMapper<TestEntity>());
@@ -376,7 +366,11 @@ describe("QueryBatcher — max batch size", () => {
   });
 
   it("maxBatchSize=1 produces individual queries", async () => {
-    const rows = [{ id: 1, name: "A" }, { id: 2, name: "B" }, { id: 3, name: "C" }];
+    const rows = [
+      { id: 1, name: "A" },
+      { id: 2, name: "B" },
+      { id: 3, name: "C" },
+    ];
     const sqlCapture: string[] = [];
     const ds = createMockDataSource(rows, { captureSql: sqlCapture });
     const batcher = new QueryBatcher(ds, testMetadata, createRowMapper<TestEntity>(), {
@@ -467,22 +461,13 @@ describe("QueryBatcher — cross-entity isolation", () => {
     const userSql: string[] = [];
     const productSql: string[] = [];
 
-    const userDs = createMockDataSource(
-      [{ id: 1, name: "Alice" }],
-      { captureSql: userSql },
-    );
-    const productDs = createMockDataSource(
-      [{ id: 1, title: "Widget" }],
-      { captureSql: productSql },
-    );
+    const userDs = createMockDataSource([{ id: 1, name: "Alice" }], { captureSql: userSql });
+    const productDs = createMockDataSource([{ id: 1, title: "Widget" }], { captureSql: productSql });
 
     const userBatcher = new QueryBatcher(userDs, testMetadata, createRowMapper<TestEntity>());
     const productBatcher = new QueryBatcher(productDs, productMetadata, createRowMapper<TestProduct>());
 
-    const [user, product] = await Promise.all([
-      userBatcher.load(1),
-      productBatcher.load(1),
-    ]);
+    const [user, product] = await Promise.all([userBatcher.load(1), productBatcher.load(1)]);
 
     expect(user).toEqual({ id: 1, name: "Alice" });
     expect(product).toEqual({ id: 1, title: "Widget" });
@@ -572,7 +557,10 @@ describe("QueryBatcher — SQL generation", () => {
   it("generates proper SELECT ... WHERE id IN ($1, $2, ...)", async () => {
     const sqlCapture: string[] = [];
     const ds = createMockDataSource(
-      [{ id: 1, name: "A" }, { id: 2, name: "B" }],
+      [
+        { id: 1, name: "A" },
+        { id: 2, name: "B" },
+      ],
       { captureSql: sqlCapture },
     );
     const batcher = new QueryBatcher(ds, testMetadata, createRowMapper<TestEntity>());
@@ -595,10 +583,7 @@ describe("QueryBatcher — SQL generation", () => {
 
   it("passes correct parameter values", async () => {
     const paramCapture: SqlValue[][] = [];
-    const ds = createMockDataSource(
-      [{ id: 42, name: "X" }],
-      { captureParams: paramCapture },
-    );
+    const ds = createMockDataSource([{ id: 42, name: "X" }], { captureParams: paramCapture });
     const batcher = new QueryBatcher(ds, testMetadata, createRowMapper<TestEntity>());
 
     await batcher.load(42);
@@ -619,7 +604,7 @@ describe("QueryBatcher — clear()", () => {
     const batcher = new QueryBatcher(ds, testMetadata, createRowMapper<TestEntity>());
 
     // Enqueue but immediately clear before microtask fires
-    const promise = batcher.load(1);
+    const _promise = batcher.load(1);
     batcher.clear();
 
     // The promise will never resolve because we cleared
@@ -672,10 +657,7 @@ describe("QueryBatcher — string IDs", () => {
     ]);
     const batcher = new QueryBatcher(ds, uuidMeta, createRowMapper<any>());
 
-    const [r1, r2] = await Promise.all([
-      batcher.load("abc-123"),
-      batcher.load("def-456"),
-    ]);
+    const [r1, r2] = await Promise.all([batcher.load("abc-123"), batcher.load("def-456")]);
 
     expect(r1?.name).toBe("Alice");
     expect(r2?.name).toBe("Bob");
@@ -683,16 +665,10 @@ describe("QueryBatcher — string IDs", () => {
 
   it("duplicate string IDs are deduplicated", async () => {
     const paramCapture: SqlValue[][] = [];
-    const ds = createMockDataSource(
-      [{ id: "abc", name: "Alice" }],
-      { captureParams: paramCapture },
-    );
+    const ds = createMockDataSource([{ id: "abc", name: "Alice" }], { captureParams: paramCapture });
     const batcher = new QueryBatcher(ds, testMetadata, createRowMapper<any>());
 
-    const [r1, r2] = await Promise.all([
-      batcher.load("abc"),
-      batcher.load("abc"),
-    ]);
+    const [r1, r2] = await Promise.all([batcher.load("abc"), batcher.load("abc")]);
 
     expect(r1?.name).toBe("Alice");
     expect(r2?.name).toBe("Alice");

@@ -1,13 +1,8 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { createTestDataSource, isPostgresAvailable } from "./setup.js";
-import {
-  Table,
-  Column,
-  Id,
-  createDerivedRepository,
-} from "espalier-data";
 import type { EntityCache } from "espalier-data";
+import { Column, createDerivedRepository, Id, Table } from "espalier-data";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { PgDataSource } from "../../pg-data-source.js";
+import { createTestDataSource, isPostgresAvailable } from "./setup.js";
 
 const canConnect = await isPostgresAvailable();
 
@@ -50,11 +45,7 @@ describe.skipIf(!canConnect)("E2E: Entity Cache with Repository", { timeout: 150
   });
 
   function createRepo(cacheConfig?: { enabled?: boolean; maxSize?: number }) {
-    return createDerivedRepository<CacheTestUser, number>(
-      CacheTestUser,
-      ds,
-      cacheConfig ?? { enabled: true },
-    );
+    return createDerivedRepository<CacheTestUser, number>(CacheTestUser, ds, cacheConfig ?? { enabled: true });
   }
 
   function getCache(repo: any): EntityCache {
@@ -138,7 +129,7 @@ describe.skipIf(!canConnect)("E2E: Entity Cache with Repository", { timeout: 150
     const saved = await repo.save(entity);
 
     saved.name = "Dave Updated";
-    const updated = await repo.save(saved);
+    const _updated = await repo.save(saved);
 
     const fromCache = await repo.findById(saved.id);
     expect(fromCache!.name).toBe("Dave Updated");

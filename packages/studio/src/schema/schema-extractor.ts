@@ -1,18 +1,12 @@
+import type { ColumnMetadataEntry, EntityMetadata, VectorMetadataEntry } from "espalier-data";
 import {
-  getEntityMetadata,
   getColumnMetadataEntries,
+  getEntityMetadata,
   getSoftDeleteMetadata,
-  isAuditedEntity,
   getVectorFields,
+  isAuditedEntity,
 } from "espalier-data";
-import type { EntityMetadata, ColumnMetadataEntry, VectorMetadataEntry } from "espalier-data";
-import type {
-  SchemaModel,
-  SchemaTable,
-  SchemaColumn,
-  SchemaRelation,
-  RelationType,
-} from "./schema-model.js";
+import type { RelationType, SchemaColumn, SchemaModel, SchemaRelation, SchemaTable } from "./schema-model.js";
 
 export interface SchemaExtractorOptions {
   entities: (new (...args: any[]) => any)[];
@@ -31,14 +25,9 @@ function resolveTargetTableName(
   }
 }
 
-function buildColumns(
-  entityClass: new (...args: any[]) => any,
-  meta: EntityMetadata,
-): SchemaColumn[] {
-  const columnEntries: Map<string | symbol, ColumnMetadataEntry> =
-    getColumnMetadataEntries(entityClass);
-  const vectorEntries: Map<string | symbol, VectorMetadataEntry> =
-    getVectorFields(entityClass);
+function buildColumns(entityClass: new (...args: any[]) => any, meta: EntityMetadata): SchemaColumn[] {
+  const columnEntries: Map<string | symbol, ColumnMetadataEntry> = getColumnMetadataEntries(entityClass);
+  const vectorEntries: Map<string | symbol, VectorMetadataEntry> = getVectorFields(entityClass);
 
   const columns: SchemaColumn[] = [];
   for (const field of meta.fields) {
@@ -69,10 +58,7 @@ function buildColumns(
   return columns;
 }
 
-function buildRelations(
-  meta: EntityMetadata,
-  metaMap: Map<Function, EntityMetadata>,
-): SchemaRelation[] {
+function buildRelations(meta: EntityMetadata, metaMap: Map<Function, EntityMetadata>): SchemaRelation[] {
   const relations: SchemaRelation[] = [];
 
   for (const rel of meta.manyToOneRelations) {

@@ -1,15 +1,15 @@
 import type { Connection, PreparedStatement, Statement } from "espalier-jdbc";
 import {
-  type Transaction,
-  type IsolationLevel,
   ConnectionError,
-  TransactionError,
   DatabaseErrorCode,
   getGlobalLogger,
+  type IsolationLevel,
   LogLevel,
+  type Transaction,
+  TransactionError,
 } from "espalier-jdbc";
+import { LibSqlPreparedStatementImpl, LibSqlStatementImpl } from "./libsql-statement.js";
 import type { LibSqlClient, LibSqlTransaction } from "./libsql-types.js";
-import { LibSqlStatementImpl, LibSqlPreparedStatementImpl } from "./libsql-statement.js";
 
 /**
  * Connection implementation for LibSQL/Turso.
@@ -58,11 +58,7 @@ export class LibSqlConnection implements Connection {
     return {
       async commit(): Promise<void> {
         if (completed) {
-          throw new TransactionError(
-            "Transaction already completed",
-            undefined,
-            DatabaseErrorCode.TX_COMMIT_FAILED,
-          );
+          throw new TransactionError("Transaction already completed", undefined, DatabaseErrorCode.TX_COMMIT_FAILED);
         }
         completed = true;
         try {
@@ -83,11 +79,7 @@ export class LibSqlConnection implements Connection {
 
       async rollback(): Promise<void> {
         if (completed) {
-          throw new TransactionError(
-            "Transaction already completed",
-            undefined,
-            DatabaseErrorCode.TX_ROLLBACK_FAILED,
-          );
+          throw new TransactionError("Transaction already completed", undefined, DatabaseErrorCode.TX_ROLLBACK_FAILED);
         }
         completed = true;
         try {
@@ -108,11 +100,7 @@ export class LibSqlConnection implements Connection {
 
       async setSavepoint(name: string): Promise<void> {
         if (completed) {
-          throw new TransactionError(
-            "Transaction already completed",
-            undefined,
-            DatabaseErrorCode.TX_SAVEPOINT_FAILED,
-          );
+          throw new TransactionError("Transaction already completed", undefined, DatabaseErrorCode.TX_SAVEPOINT_FAILED);
         }
         if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name)) {
           throw new Error(`Invalid savepoint name: "${name}". Only alphanumeric and underscore characters allowed.`);
@@ -122,11 +110,7 @@ export class LibSqlConnection implements Connection {
 
       async rollbackTo(name: string): Promise<void> {
         if (completed) {
-          throw new TransactionError(
-            "Transaction already completed",
-            undefined,
-            DatabaseErrorCode.TX_ROLLBACK_FAILED,
-          );
+          throw new TransactionError("Transaction already completed", undefined, DatabaseErrorCode.TX_ROLLBACK_FAILED);
         }
         if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name)) {
           throw new Error(`Invalid savepoint name: "${name}". Only alphanumeric and underscore characters allowed.`);
@@ -154,11 +138,7 @@ export class LibSqlConnection implements Connection {
 
   private ensureOpen(): void {
     if (this.closed) {
-      throw new ConnectionError(
-        "Connection is closed",
-        undefined,
-        DatabaseErrorCode.CONNECTION_CLOSED,
-      );
+      throw new ConnectionError("Connection is closed", undefined, DatabaseErrorCode.CONNECTION_CLOSED);
     }
   }
 }

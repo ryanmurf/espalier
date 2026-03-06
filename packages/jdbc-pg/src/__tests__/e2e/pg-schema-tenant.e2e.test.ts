@@ -12,15 +12,11 @@
  * - resetOnRelease flag behavior
  * - No-tenant-set behavior (with and without defaultSchema)
  */
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { createTestDataSource, isPostgresAvailable } from "./setup.js";
-import {
-  TenantContext,
-  TenantAwareDataSource,
-  NoTenantException,
-  SchemaSetupError,
-} from "espalier-data";
+
+import { NoTenantException, SchemaSetupError, TenantAwareDataSource, TenantContext } from "espalier-data";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { PgDataSource } from "../../pg-data-source.js";
+import { createTestDataSource, isPostgresAvailable } from "./setup.js";
 
 const canConnect = await isPostgresAvailable();
 
@@ -92,17 +88,13 @@ describe.skipIf(!canConnect)("TenantAwareDataSource — E2E", () => {
         const conn = await tenantDs.getConnection();
         const stmt = conn.createStatement();
         try {
-          await stmt.executeUpdate(
-            `INSERT INTO ${TABLE} (name, value) VALUES ('item-a', 100)`,
-          );
+          await stmt.executeUpdate(`INSERT INTO ${TABLE} (name, value) VALUES ('item-a', 100)`);
           const rs = await stmt.executeQuery(`SELECT name, value FROM ${TABLE}`);
           const rows: Array<{ name: string; value: number }> = [];
           while (await rs.next()) {
             rows.push({ name: rs.getString("name")!, value: rs.getNumber("value")! });
           }
-          expect(rows.some((r) => r.name === "item-a" && r.value === 100)).toBe(
-            true,
-          );
+          expect(rows.some((r) => r.name === "item-a" && r.value === 100)).toBe(true);
         } finally {
           await stmt.close();
           await conn.close();
@@ -133,9 +125,7 @@ describe.skipIf(!canConnect)("TenantAwareDataSource — E2E", () => {
         const conn = await tenantDs.getConnection();
         const stmt = conn.createStatement();
         try {
-          await stmt.executeUpdate(
-            `INSERT INTO ${TABLE} (name, value) VALUES ('item-b', 200)`,
-          );
+          await stmt.executeUpdate(`INSERT INTO ${TABLE} (name, value) VALUES ('item-b', 200)`);
           const rs = await stmt.executeQuery(`SELECT name FROM ${TABLE}`);
           const rows: string[] = [];
           while (await rs.next()) {
@@ -315,9 +305,7 @@ describe.skipIf(!canConnect)("TenantAwareDataSource — E2E", () => {
         try {
           // SET search_path succeeds even for non-existent schemas in PG
           // but the table won't be found
-          await expect(
-            stmt.executeQuery(`SELECT 1 FROM ${TABLE}`),
-          ).rejects.toThrow();
+          await expect(stmt.executeQuery(`SELECT 1 FROM ${TABLE}`)).rejects.toThrow();
         } finally {
           await stmt.close();
           await conn.close();
@@ -332,7 +320,7 @@ describe.skipIf(!canConnect)("TenantAwareDataSource — E2E", () => {
 
   describe("concurrent tenant isolation", () => {
     it("20 concurrent operations across 2 tenants see only their own data", async () => {
-      const results: Array<{ tenant: string; rows: string[] }> = [];
+      const _results: Array<{ tenant: string; rows: string[] }> = [];
 
       const ops = Array.from({ length: 20 }, (_, i) => {
         const tenantKey = i % 2 === 0 ? "a" : "b";
@@ -489,9 +477,7 @@ describe.skipIf(!canConnect)("TenantAwareDataSource — E2E", () => {
       const conn = await rawDs.getConnection();
       const stmt = conn.createStatement();
       try {
-        await stmt.executeUpdate(
-          `CREATE TABLE IF NOT EXISTS public.shared_config (key TEXT PRIMARY KEY, value TEXT)`,
-        );
+        await stmt.executeUpdate(`CREATE TABLE IF NOT EXISTS public.shared_config (key TEXT PRIMARY KEY, value TEXT)`);
         await stmt.executeUpdate(
           `INSERT INTO public.shared_config (key, value) VALUES ('app_version', '1.0') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
         );
@@ -505,9 +491,7 @@ describe.skipIf(!canConnect)("TenantAwareDataSource — E2E", () => {
         const tConn = await tenantDs.getConnection();
         const tStmt = tConn.createStatement();
         try {
-          const rs = await tStmt.executeQuery(
-            `SELECT value FROM shared_config WHERE key = 'app_version'`,
-          );
+          const rs = await tStmt.executeQuery(`SELECT value FROM shared_config WHERE key = 'app_version'`);
           expect(await rs.next()).toBe(true);
           expect(rs.getString("value")).toBe("1.0");
         } finally {
@@ -544,9 +528,7 @@ describe.skipIf(!canConnect)("TenantAwareDataSource — E2E", () => {
       await tds.close();
 
       // After close, getting a connection should fail
-      await expect(
-        TenantContext.run("a", () => tds.getConnection()),
-      ).rejects.toThrow();
+      await expect(TenantContext.run("a", () => tds.getConnection())).rejects.toThrow();
     });
   });
 

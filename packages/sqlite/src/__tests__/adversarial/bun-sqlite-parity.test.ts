@@ -6,21 +6,16 @@
  * the adapter classes directly via their internal BunSqliteDatabase interface.
  * E2E parity tests requiring actual bun:sqlite are skipped when not under Bun.
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import {
-  ConnectionError,
-  TransactionError,
-  QueryError,
-  DatabaseErrorCode,
-  IsolationLevel,
-} from "espalier-jdbc";
-import type { BunSqliteDatabase } from "../../bun-sqlite-statement.js";
+
+import { ConnectionError, DatabaseErrorCode, IsolationLevel, QueryError, TransactionError } from "espalier-jdbc";
+import { describe, expect, it, vi } from "vitest";
+import { BunSqliteConnection } from "../../bun-sqlite-connection.js";
 import type { BunColumnDefinition } from "../../bun-sqlite-result-set.js";
 import { BunSqliteResultSet } from "../../bun-sqlite-result-set.js";
-import { BunSqliteStatementImpl, BunSqlitePreparedStatement } from "../../bun-sqlite-statement.js";
-import { BunSqliteConnection } from "../../bun-sqlite-connection.js";
-import { createSqliteDataSource } from "../../sqlite-factory.js";
+import type { BunSqliteDatabase } from "../../bun-sqlite-statement.js";
+import { BunSqlitePreparedStatement, BunSqliteStatementImpl } from "../../bun-sqlite-statement.js";
 import { SqliteDataSource } from "../../sqlite-data-source.js";
+import { createSqliteDataSource } from "../../sqlite-factory.js";
 
 // ── Mock bun:sqlite Database ─────────────────────────────────────────────────
 
@@ -47,8 +42,15 @@ describe("BunSqliteResultSet", () => {
   });
 
   it("iterates through all rows", async () => {
-    const rows = [{ id: 1, name: "a" }, { id: 2, name: "b" }, { id: 3, name: "c" }];
-    const cols: BunColumnDefinition[] = [{ name: "id", type: "INTEGER" }, { name: "name", type: "TEXT" }];
+    const rows = [
+      { id: 1, name: "a" },
+      { id: 2, name: "b" },
+      { id: 3, name: "c" },
+    ];
+    const cols: BunColumnDefinition[] = [
+      { name: "id", type: "INTEGER" },
+      { name: "name", type: "TEXT" },
+    ];
     const rs = new BunSqliteResultSet(rows, cols);
 
     const collected: Record<string, unknown>[] = [];
@@ -102,10 +104,7 @@ describe("BunSqliteResultSet", () => {
   });
 
   it("getBoolean() coerces 0 to false, 1 to true", async () => {
-    const rs = new BunSqliteResultSet(
-      [{ flag: 0 }, { flag: 1 }],
-      [{ name: "flag", type: "INTEGER" }],
-    );
+    const rs = new BunSqliteResultSet([{ flag: 0 }, { flag: 1 }], [{ name: "flag", type: "INTEGER" }]);
     await rs.next();
     expect(rs.getBoolean("flag")).toBe(false);
     await rs.next();
@@ -137,7 +136,11 @@ describe("BunSqliteResultSet", () => {
   it("getValue by column index (number)", async () => {
     const rs = new BunSqliteResultSet(
       [{ a: "first", b: "second", c: "third" }],
-      [{ name: "a", type: "TEXT" }, { name: "b", type: "TEXT" }, { name: "c", type: "TEXT" }],
+      [
+        { name: "a", type: "TEXT" },
+        { name: "b", type: "TEXT" },
+        { name: "c", type: "TEXT" },
+      ],
     );
     await rs.next();
     expect(rs.getString(0)).toBe("first");
@@ -259,7 +262,9 @@ describe("BunSqliteStatementImpl", () => {
 
   it("executeQuery wraps errors in QueryError", async () => {
     const db = createMockDb({
-      query: vi.fn(() => { throw new Error("no such table: t"); }),
+      query: vi.fn(() => {
+        throw new Error("no such table: t");
+      }),
     });
     const stmt = new BunSqliteStatementImpl(db);
     try {
@@ -274,7 +279,9 @@ describe("BunSqliteStatementImpl", () => {
 
   it("executeUpdate wraps errors in QueryError", async () => {
     const db = createMockDb({
-      query: vi.fn(() => { throw new Error("syntax error"); }),
+      query: vi.fn(() => {
+        throw new Error("syntax error");
+      }),
     });
     const stmt = new BunSqliteStatementImpl(db);
     try {
@@ -302,7 +309,10 @@ describe("BunSqlitePreparedStatement", () => {
       query: vi.fn(() => ({
         all: allFn,
         run: vi.fn(() => ({ changes: 0 })),
-        columns: vi.fn(() => [{ name: "id", type: "INTEGER" }, { name: "name", type: "TEXT" }]),
+        columns: vi.fn(() => [
+          { name: "id", type: "INTEGER" },
+          { name: "name", type: "TEXT" },
+        ]),
         finalize: vi.fn(),
       })),
     });
@@ -358,7 +368,7 @@ describe("BunSqlitePreparedStatement", () => {
         finalize: vi.fn(),
       })),
     });
-    const data = new Uint8Array([0xDE, 0xAD]);
+    const data = new Uint8Array([0xde, 0xad]);
     const ps = new BunSqlitePreparedStatement(db, "INSERT INTO t (data) VALUES ($1)");
     ps.setParameter(1, data);
     await ps.executeUpdate();
@@ -401,7 +411,9 @@ describe("BunSqlitePreparedStatement", () => {
   it("wraps query errors in QueryError with SQL", async () => {
     const db = createMockDb({
       query: vi.fn(() => ({
-        all: vi.fn(() => { throw new Error("constraint violation"); }),
+        all: vi.fn(() => {
+          throw new Error("constraint violation");
+        }),
         run: vi.fn(() => ({ changes: 0 })),
         columns: vi.fn(() => []),
         finalize: vi.fn(),
@@ -524,7 +536,9 @@ describe("BunSqliteConnection", () => {
 
   it("beginTransaction wraps errors in TransactionError", async () => {
     const db = createMockDb({
-      exec: vi.fn(() => { throw new Error("database is locked"); }),
+      exec: vi.fn(() => {
+        throw new Error("database is locked");
+      }),
     });
     const conn = new BunSqliteConnection(db);
     try {
@@ -621,15 +635,7 @@ describe("BunSqliteConnection", () => {
     const conn = new BunSqliteConnection(db);
     const tx = await conn.beginTransaction();
 
-    const badNames = [
-      "'; DROP TABLE users; --",
-      "sp 1",
-      "sp-1",
-      "1sp",
-      "",
-      "sp;DROP",
-      "sp\nDROP",
-    ];
+    const badNames = ["'; DROP TABLE users; --", "sp 1", "sp-1", "1sp", "", "sp;DROP", "sp\nDROP"];
 
     for (const name of badNames) {
       try {
@@ -733,7 +739,7 @@ describe("BunSqliteDataSource (non-Bun environment)", () => {
 describe("resource cleanup edge cases", () => {
   it("open and close 100 connections rapidly — no throws", async () => {
     const db = createMockDb();
-    const conn = new BunSqliteConnection(db);
+    const _conn = new BunSqliteConnection(db);
 
     // BunSqliteConnection close doesn't actually do anything heavy,
     // but verify the pattern works
@@ -829,9 +835,7 @@ describe("concurrent operations", () => {
     });
 
     const stmt = new BunSqliteStatementImpl(db);
-    const promises = Array.from({ length: 20 }, () =>
-      stmt.executeQuery("SELECT 1"),
-    );
+    const promises = Array.from({ length: 20 }, () => stmt.executeQuery("SELECT 1"));
     const results = await Promise.all(promises);
     expect(results).toHaveLength(20);
     for (const rs of results) {

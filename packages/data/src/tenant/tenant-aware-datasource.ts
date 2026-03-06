@@ -1,7 +1,6 @@
 import type { Connection, DataSource } from "espalier-jdbc";
 import { validateIdentifier } from "espalier-jdbc";
-import { TenantContext } from "./tenant-context.js";
-import { NoTenantException } from "./tenant-context.js";
+import { NoTenantException, TenantContext } from "./tenant-context.js";
 
 /**
  * Options for creating a TenantAwareDataSource.
@@ -124,8 +123,7 @@ export class TenantAwareDataSource implements DataSource {
       }
       if (resetFailed) {
         throw new Error(
-          "Failed to reset search_path on connection release. " +
-          "A DISCARD ALL was attempted as a fallback.",
+          "Failed to reset search_path on connection release. " + "A DISCARD ALL was attempted as a fallback.",
         );
       }
     };

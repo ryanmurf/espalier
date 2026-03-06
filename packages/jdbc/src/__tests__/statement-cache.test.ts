@@ -1,6 +1,6 @@
-import { describe, it, expect, vi } from "vitest";
-import { StatementCache } from "../statement-cache.js";
+import { describe, expect, it, vi } from "vitest";
 import type { PreparedStatement } from "../statement.js";
+import { StatementCache } from "../statement-cache.js";
 
 function mockStmt(): PreparedStatement {
   return {
@@ -188,8 +188,8 @@ describe("StatementCache", () => {
       const cache = new StatementCache({ maxSize: 2 });
       cache.put("SELECT 1", mockStmt()); // put 1
       cache.put("SELECT 2", mockStmt()); // put 2
-      cache.get("SELECT 1");             // hit 1
-      cache.get("SELECT 3");             // miss 1
+      cache.get("SELECT 1"); // hit 1
+      cache.get("SELECT 3"); // miss 1
       cache.put("SELECT 3", mockStmt()); // put 3, eviction 1
 
       const stats = cache.getStats();

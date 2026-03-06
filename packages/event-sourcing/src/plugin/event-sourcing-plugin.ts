@@ -1,11 +1,11 @@
 import type { Plugin, PluginContext } from "espalier-data/plugins";
 import type { DataSource } from "espalier-jdbc";
-import { EventStore } from "../store/event-store.js";
-import { OutboxStore } from "../outbox/outbox-store.js";
-import type { EventStoreOptions, OutboxOptions, DomainEvent } from "../types.js";
-import { getAggregateRootMetadata } from "../aggregate/aggregate-root.js";
 import type { AggregateBase } from "../aggregate/aggregate-base.js";
+import { getAggregateRootMetadata } from "../aggregate/aggregate-root.js";
 import { isOutboxEntity } from "../outbox/outbox-decorator.js";
+import { OutboxStore } from "../outbox/outbox-store.js";
+import { EventStore } from "../store/event-store.js";
+import type { DomainEvent, EventStoreOptions, OutboxOptions } from "../types.js";
 
 // Access Web Crypto API available in Node 19+, Bun, Deno, and browsers
 const _crypto = (globalThis as Record<string, unknown>)["crypto"] as {
@@ -123,10 +123,7 @@ export class EventSourcingPlugin implements Plugin {
     return this.outboxStore;
   }
 
-  private async writeOutboxEvent(
-    action: string,
-    payload: unknown,
-  ): Promise<void> {
+  private async writeOutboxEvent(action: string, payload: unknown): Promise<void> {
     if (payload == null || typeof payload !== "object") return;
 
     const entityPayload = payload as {
@@ -141,9 +138,7 @@ export class EventSourcingPlugin implements Plugin {
 
     const entity = entityPayload.entity;
     const aggregateType = entityPayload.entityClass.name;
-    const aggregateId = String(
-      entity["id"] ?? entity["_id"] ?? _crypto.randomUUID(),
-    );
+    const aggregateId = String(entity["id"] ?? entity["_id"] ?? _crypto.randomUUID());
 
     const event: DomainEvent = {
       eventType: `entity.${action}`,

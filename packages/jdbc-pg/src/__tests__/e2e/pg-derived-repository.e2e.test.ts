@@ -1,13 +1,8 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { createTestDataSource, isPostgresAvailable } from "./setup.js";
-import {
-  Table,
-  Column,
-  Id,
-  createDerivedRepository,
-} from "espalier-data";
-import type { PgDataSource } from "../../pg-data-source.js";
+import { Column, createDerivedRepository, Id, Table } from "espalier-data";
 import type { Connection } from "espalier-jdbc";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import type { PgDataSource } from "../../pg-data-source.js";
+import { createTestDataSource, isPostgresAvailable } from "./setup.js";
 
 const canConnect = await isPostgresAvailable();
 

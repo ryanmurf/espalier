@@ -1,13 +1,8 @@
-import { describe, it, expect, vi } from "vitest";
+import { ConnectionError, DatabaseErrorCode, QueryError, TransactionError } from "espalier-jdbc";
 import type { PoolClient } from "pg";
+import { describe, expect, it, vi } from "vitest";
 import { PgConnection } from "../pg-connection.js";
-import { PgStatement, PgPreparedStatement } from "../pg-statement.js";
-import {
-  DatabaseErrorCode,
-  ConnectionError,
-  TransactionError,
-  QueryError,
-} from "espalier-jdbc";
+import { PgPreparedStatement, PgStatement } from "../pg-statement.js";
 
 function createMockClient() {
   return {
@@ -26,26 +21,20 @@ describe("PgConnection error codes", () => {
       expect.unreachable("should have thrown");
     } catch (err) {
       expect(err).toBeInstanceOf(ConnectionError);
-      expect((err as ConnectionError).code).toBe(
-        DatabaseErrorCode.CONNECTION_CLOSED,
-      );
+      expect((err as ConnectionError).code).toBe(DatabaseErrorCode.CONNECTION_CLOSED);
     }
   });
 
   it("beginTransaction wraps error with TX_BEGIN_FAILED code", async () => {
     const client = createMockClient();
-    (client.query as ReturnType<typeof vi.fn>).mockRejectedValue(
-      new Error("pg error"),
-    );
+    (client.query as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("pg error"));
     const conn = new PgConnection(client);
     try {
       await conn.beginTransaction();
       expect.unreachable("should have thrown");
     } catch (err) {
       expect(err).toBeInstanceOf(TransactionError);
-      expect((err as TransactionError).code).toBe(
-        DatabaseErrorCode.TX_BEGIN_FAILED,
-      );
+      expect((err as TransactionError).code).toBe(DatabaseErrorCode.TX_BEGIN_FAILED);
     }
   });
 
@@ -53,17 +42,13 @@ describe("PgConnection error codes", () => {
     const client = createMockClient();
     const conn = new PgConnection(client);
     const tx = await conn.beginTransaction();
-    (client.query as ReturnType<typeof vi.fn>).mockRejectedValue(
-      new Error("commit failed"),
-    );
+    (client.query as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("commit failed"));
     try {
       await tx.commit();
       expect.unreachable("should have thrown");
     } catch (err) {
       expect(err).toBeInstanceOf(TransactionError);
-      expect((err as TransactionError).code).toBe(
-        DatabaseErrorCode.TX_COMMIT_FAILED,
-      );
+      expect((err as TransactionError).code).toBe(DatabaseErrorCode.TX_COMMIT_FAILED);
     }
   });
 
@@ -71,17 +56,13 @@ describe("PgConnection error codes", () => {
     const client = createMockClient();
     const conn = new PgConnection(client);
     const tx = await conn.beginTransaction();
-    (client.query as ReturnType<typeof vi.fn>).mockRejectedValue(
-      new Error("rollback failed"),
-    );
+    (client.query as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("rollback failed"));
     try {
       await tx.rollback();
       expect.unreachable("should have thrown");
     } catch (err) {
       expect(err).toBeInstanceOf(TransactionError);
-      expect((err as TransactionError).code).toBe(
-        DatabaseErrorCode.TX_ROLLBACK_FAILED,
-      );
+      expect((err as TransactionError).code).toBe(DatabaseErrorCode.TX_ROLLBACK_FAILED);
     }
   });
 
@@ -89,17 +70,13 @@ describe("PgConnection error codes", () => {
     const client = createMockClient();
     const conn = new PgConnection(client);
     const tx = await conn.beginTransaction();
-    (client.query as ReturnType<typeof vi.fn>).mockRejectedValue(
-      new Error("savepoint failed"),
-    );
+    (client.query as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("savepoint failed"));
     try {
       await tx.setSavepoint("sp");
       expect.unreachable("should have thrown");
     } catch (err) {
       expect(err).toBeInstanceOf(TransactionError);
-      expect((err as TransactionError).code).toBe(
-        DatabaseErrorCode.TX_SAVEPOINT_FAILED,
-      );
+      expect((err as TransactionError).code).toBe(DatabaseErrorCode.TX_SAVEPOINT_FAILED);
     }
   });
 
@@ -107,17 +84,13 @@ describe("PgConnection error codes", () => {
     const client = createMockClient();
     const conn = new PgConnection(client);
     const tx = await conn.beginTransaction();
-    (client.query as ReturnType<typeof vi.fn>).mockRejectedValue(
-      new Error("rollback to failed"),
-    );
+    (client.query as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("rollback to failed"));
     try {
       await tx.rollbackTo("sp");
       expect.unreachable("should have thrown");
     } catch (err) {
       expect(err).toBeInstanceOf(TransactionError);
-      expect((err as TransactionError).code).toBe(
-        DatabaseErrorCode.TX_ROLLBACK_FAILED,
-      );
+      expect((err as TransactionError).code).toBe(DatabaseErrorCode.TX_ROLLBACK_FAILED);
     }
   });
 });
@@ -189,9 +162,7 @@ describe("PgStatement error code mapping", () => {
 
   it("maps errors without pg code to QUERY_FAILED", async () => {
     const client = createMockClient();
-    (client.query as ReturnType<typeof vi.fn>).mockRejectedValue(
-      new Error("generic error"),
-    );
+    (client.query as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("generic error"));
     const stmt = new PgStatement(client);
     try {
       await stmt.executeQuery("SELECT 1");

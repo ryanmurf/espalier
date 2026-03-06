@@ -4,16 +4,16 @@
  * multiple decorators on same method, async callbacks,
  * inheritance edge cases.
  */
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-  PrePersist,
-  PostPersist,
-  PreUpdate,
-  PostUpdate,
-  PreRemove,
-  PostRemove,
-  PostLoad,
   getLifecycleCallbacks,
+  PostLoad,
+  PostPersist,
+  PostRemove,
+  PostUpdate,
+  PrePersist,
+  PreRemove,
+  PreUpdate,
 } from "../../decorators/lifecycle.js";
 
 // ══════════════════════════════════════════════════

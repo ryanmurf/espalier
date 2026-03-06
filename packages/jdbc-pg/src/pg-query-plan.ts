@@ -1,4 +1,4 @@
-import type { Connection, SqlValue, QueryPlanAnalyzer, QueryPlan, PlanNode, ExplainOptions } from "espalier-jdbc";
+import type { Connection, ExplainOptions, PlanNode, QueryPlan, QueryPlanAnalyzer, SqlValue } from "espalier-jdbc";
 
 /**
  * PostgreSQL EXPLAIN implementation that parses JSON-format query plans.
@@ -14,9 +14,7 @@ export class PgQueryPlanAnalyzer implements QueryPlanAnalyzer {
     if (options?.analyze) {
       const trimmed = sql.trimStart().toUpperCase();
       if (!trimmed.startsWith("SELECT") && !trimmed.startsWith("WITH")) {
-        throw new Error(
-          "EXPLAIN ANALYZE is only allowed on SELECT/WITH queries to prevent side effects",
-        );
+        throw new Error("EXPLAIN ANALYZE is only allowed on SELECT/WITH queries to prevent side effects");
       }
     }
 

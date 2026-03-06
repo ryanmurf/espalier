@@ -1,6 +1,6 @@
-import { describe, it, expect, vi } from "vitest";
-import { Table, Column, Id, Version, CreatedDate, LastModifiedDate } from "espalier-data";
-import { EntityFactory, createFactory } from "../factory/entity-factory.js";
+import { Column, CreatedDate, Id, LastModifiedDate, Table, Version } from "espalier-data";
+import { describe, expect, it, vi } from "vitest";
+import { createFactory, EntityFactory } from "../factory/entity-factory.js";
 
 // ==========================================================================
 // Test entities
@@ -203,10 +203,7 @@ describe("EntityFactory.build — auto-generated defaults", () => {
 
 describe("EntityFactory — sequences", () => {
   it("increments sequence values across builds", () => {
-    const factory = createFactory(User).sequence(
-      "email",
-      (n) => `user${n}@test.com`,
-    );
+    const factory = createFactory(User).sequence("email", (n) => `user${n}@test.com`);
     const u1 = factory.build();
     const u2 = factory.build();
     const u3 = factory.build();
@@ -216,19 +213,13 @@ describe("EntityFactory — sequences", () => {
   });
 
   it("all sequence values unique across 1000 builds", () => {
-    const factory = createFactory(User).sequence(
-      "email",
-      (n) => `user${n}@test.com`,
-    );
+    const factory = createFactory(User).sequence("email", (n) => `user${n}@test.com`);
     const emails = new Set(factory.buildList(1000).map((u) => u.email));
     expect(emails.size).toBe(1000);
   });
 
   it("sequence resets after resetSequences()", () => {
-    const factory = createFactory(User).sequence(
-      "email",
-      (n) => `user${n}@test.com`,
-    );
+    const factory = createFactory(User).sequence("email", (n) => `user${n}@test.com`);
     factory.build();
     factory.build();
     factory.resetSequences();
@@ -246,19 +237,13 @@ describe("EntityFactory — sequences", () => {
   });
 
   it("explicit override takes precedence over sequence", () => {
-    const factory = createFactory(User).sequence(
-      "email",
-      (n) => `user${n}@test.com`,
-    );
+    const factory = createFactory(User).sequence("email", (n) => `user${n}@test.com`);
     const user = factory.build({ email: "custom@test.com" });
     expect(user.email).toBe("custom@test.com");
   });
 
   it("sequence counter still increments even when overridden", () => {
-    const factory = createFactory(User).sequence(
-      "email",
-      (n) => `user${n}@test.com`,
-    );
+    const factory = createFactory(User).sequence("email", (n) => `user${n}@test.com`);
     factory.build({ email: "custom@test.com" }); // counter goes to 1
     const user = factory.build(); // counter goes to 2
     expect(user.email).toBe("user2@test.com");
@@ -319,7 +304,7 @@ describe("EntityFactory — traits", () => {
 describe("EntityFactory — associations", () => {
   it("builds associated entity", () => {
     const profileFactory = createFactory(Profile);
-    const userFactory = createFactory(User);
+    const _userFactory = createFactory(User);
 
     // Manually test association building
     const profile = profileFactory.build();
@@ -402,9 +387,15 @@ describe("EntityFactory — afterBuild hooks", () => {
   it("multiple afterBuild hooks run in order", () => {
     const order: number[] = [];
     const factory = createFactory(User)
-      .afterBuild(() => { order.push(1); })
-      .afterBuild(() => { order.push(2); })
-      .afterBuild(() => { order.push(3); });
+      .afterBuild(() => {
+        order.push(1);
+      })
+      .afterBuild(() => {
+        order.push(2);
+      })
+      .afterBuild(() => {
+        order.push(3);
+      });
     factory.build();
     expect(order).toEqual([1, 2, 3]);
   });
@@ -412,9 +403,15 @@ describe("EntityFactory — afterBuild hooks", () => {
   it("afterBuild hooks from constructor options and .afterBuild() both run", () => {
     const order: string[] = [];
     const factory = new EntityFactory(User, {
-      afterBuild: [() => { order.push("constructor"); }],
+      afterBuild: [
+        () => {
+          order.push("constructor");
+        },
+      ],
     });
-    factory.afterBuild(() => { order.push("method"); });
+    factory.afterBuild(() => {
+      order.push("method");
+    });
     factory.build();
     expect(order).toEqual(["constructor", "method"]);
   });
@@ -482,10 +479,7 @@ describe("EntityFactory.buildList", () => {
   });
 
   it("each entity in buildList is independent", () => {
-    const factory = createFactory(User).sequence(
-      "email",
-      (n) => `user${n}@test.com`,
-    );
+    const factory = createFactory(User).sequence("email", (n) => `user${n}@test.com`);
     const users = factory.buildList(3);
     expect(users[0].email).toBe("user1@test.com");
     expect(users[1].email).toBe("user2@test.com");
@@ -570,15 +564,9 @@ describe("EntityFactory — state isolation", () => {
 
 describe("EntityFactory — concurrent builds", () => {
   it("parallel buildList calls on same factory produce unique sequences", () => {
-    const factory = createFactory(User).sequence(
-      "email",
-      (n) => `user${n}@test.com`,
-    );
+    const factory = createFactory(User).sequence("email", (n) => `user${n}@test.com`);
     // Build in rapid succession (JS is single-threaded, so this tests synchronous reentrancy)
-    const results = [
-      ...factory.buildList(50),
-      ...factory.buildList(50),
-    ];
+    const results = [...factory.buildList(50), ...factory.buildList(50)];
     const emails = new Set(results.map((u) => u.email));
     expect(emails.size).toBe(100);
   });

@@ -2,6 +2,17 @@
   "name": "espalier-playground",
   "version": "2.0.0",
   "description": "Interactive sandbox with examples and sharing for Espalier ORM",
+  "license": "Apache-2.0",
+  "author": "Ryan Murphy",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ryanmurf/espalier.git",
+    "directory": "packages/playground"
+  },
+  "bugs": {
+    "url": "https://github.com/ryanmurf/espalier/issues"
+  },
+  "homepage": "https://github.com/ryanmurf/espalier#readme",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",

@@ -1,11 +1,11 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
+import type { GraphQLPaginationAdapter } from "../../graphql/pagination-adapter.js";
 import {
+  getDefaultPaginationAdapter,
+  KeysetPaginationAdapter,
   OffsetPaginationAdapter,
   RelayCursorPaginationAdapter,
-  KeysetPaginationAdapter,
-  getDefaultPaginationAdapter,
 } from "../../graphql/pagination-adapter.js";
-import type { GraphQLPaginationAdapter } from "../../graphql/pagination-adapter.js";
 
 // ==========================================================================
 // OffsetPaginationAdapter — adversarial
@@ -308,8 +308,9 @@ describe("KeysetPaginationAdapter — adversarial", () => {
     });
 
     it("invalid sortDirection — throws validation error", () => {
-      expect(() => adapter.mapResolverArgs({ sortColumn: "x", sortDirection: "INVALID" }))
-        .toThrow("Invalid sortDirection");
+      expect(() => adapter.mapResolverArgs({ sortColumn: "x", sortDirection: "INVALID" })).toThrow(
+        "Invalid sortDirection",
+      );
     });
   });
 

@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { PlaygroundEngine } from "../../engine/playground-engine.js";
+import { builtInExamples } from "../../examples/built-in-examples.js";
 import { ExampleRegistry } from "../../examples/example-registry.js";
 import { PlaygroundSerializer } from "../../share/playground-serializer.js";
-import { builtInExamples } from "../../examples/built-in-examples.js";
 
 // ==========================================
 // PlaygroundEngine
@@ -70,14 +70,7 @@ describe("PlaygroundEngine — adversarial", () => {
   });
 
   it("execute() skips blank lines", async () => {
-    const code = [
-      "",
-      "CREATE TABLE t (id INTEGER)",
-      "",
-      "",
-      "SELECT * FROM t",
-      "",
-    ].join("\n");
+    const code = ["", "CREATE TABLE t (id INTEGER)", "", "", "SELECT * FROM t", ""].join("\n");
 
     const result = await engine.execute(code);
     expect(result.success).toBe(true);
@@ -99,9 +92,7 @@ describe("PlaygroundEngine — adversarial", () => {
   it("execute() with SQL injection attempt in values (handled by sqlite)", async () => {
     await engine.execute("CREATE TABLE t (id INTEGER, name TEXT)");
     // This is just a string value — sqlite will handle it as literal text
-    const result = await engine.execute(
-      "INSERT INTO t (id, name) VALUES (1, 'Robert''); DROP TABLE t;--')",
-    );
+    const result = await engine.execute("INSERT INTO t (id, name) VALUES (1, 'Robert''); DROP TABLE t;--')");
     // Should fail (unmatched quotes) or be treated as raw statement
     // The important thing is it doesn't silently drop the table
     expect(result).toBeDefined();
@@ -459,7 +450,7 @@ describe("PlaygroundSerializer — adversarial", () => {
   });
 
   it("handles unicode characters in code", () => {
-    const code = 'SELECT * FROM users WHERE name = \'\u00e9\u00e0\u00fc\u00f1\u2603\'';
+    const code = "SELECT * FROM users WHERE name = '\u00e9\u00e0\u00fc\u00f1\u2603'";
     const encoded = serializer.serialize(code);
     const result = serializer.deserialize(encoded);
     expect(result.code).toBe(code);
@@ -501,11 +492,7 @@ describe("PlaygroundSerializer — adversarial", () => {
   });
 
   it("generateUrl includes schema when provided", () => {
-    const url = serializer.generateUrl(
-      "https://example.com/play",
-      "SELECT * FROM t",
-      "CREATE TABLE t (id INT)",
-    );
+    const url = serializer.generateUrl("https://example.com/play", "SELECT * FROM t", "CREATE TABLE t (id INT)");
     const encoded = url.split("?p=")[1];
     const result = serializer.deserialize(encoded);
     expect(result.code).toBe("SELECT * FROM t");

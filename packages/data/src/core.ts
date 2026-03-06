@@ -1,159 +1,174 @@
 // Subpath export: espalier-data/core
 // Core decorators, repository, query builder, entity metadata, and related types.
 
-export { Table, getTableName } from "./decorators/table.js";
-export { Column, getColumnMappings, getColumnTypeMappings, getColumnMetadataEntries } from "./decorators/column.js";
-export type { ColumnOptions, ColumnMetadataEntry } from "./decorators/column.js";
-export { Id, getIdField } from "./decorators/id.js";
+export type { AuditEntry, AuditFieldChange, AuditOperation, AuditUser } from "./audit/index.js";
+export { AuditContext, AuditLogWriter, getAuditLog, getAuditLogForEntity, getFieldHistory } from "./audit/index.js";
+export type {
+  EntityCacheConfig,
+  EntityCacheStats,
+  QueryCacheConfig,
+  QueryCacheKey,
+  QueryCacheStats,
+} from "./cache/index.js";
+export { EntityCache, QueryCache } from "./cache/index.js";
+// Audit trail
+export type { AuditedOptions } from "./decorators/audited.js";
+export { Audited, getAuditedMetadata, isAuditedEntity } from "./decorators/audited.js";
 export {
   CreatedDate,
-  LastModifiedDate,
   getCreatedDateField,
   getLastModifiedDateField,
+  LastModifiedDate,
 } from "./decorators/auditing.js";
-export { Embeddable, isEmbeddable, Embedded, getEmbeddedFields } from "./decorators/embeddable.js";
-export type { EmbeddedOptions, EmbeddedField } from "./decorators/embeddable.js";
-export { Projection, getProjectionMetadata } from "./decorators/projection.js";
-export type { ProjectionOptions } from "./decorators/projection.js";
-export { Version, getVersionField } from "./decorators/version.js";
 export { Cacheable, getCacheableMetadata, registerCacheable } from "./decorators/cacheable.js";
+export type { ColumnMetadataEntry, ColumnOptions } from "./decorators/column.js";
+export { Column, getColumnMappings, getColumnMetadataEntries, getColumnTypeMappings } from "./decorators/column.js";
+export type { EmbeddedField, EmbeddedOptions } from "./decorators/embeddable.js";
+export { Embeddable, Embedded, getEmbeddedFields, isEmbeddable } from "./decorators/embeddable.js";
+export { getIdField, Id } from "./decorators/id.js";
 export type { LifecycleEvent } from "./decorators/lifecycle.js";
 export {
-  PrePersist,
-  PostPersist,
-  PreUpdate,
-  PostUpdate,
-  PreRemove,
-  PostRemove,
-  PostLoad,
   getLifecycleCallbacks,
+  PostLoad,
+  PostPersist,
+  PostRemove,
+  PostUpdate,
+  PrePersist,
+  PreRemove,
+  PreUpdate,
 } from "./decorators/lifecycle.js";
-export { Repository, getRepositoryMetadata, getRegisteredRepositories } from "./decorators/repository.js";
+export type { ProjectionOptions } from "./decorators/projection.js";
+export { getProjectionMetadata, Projection } from "./decorators/projection.js";
 export type { RepositoryOptions } from "./decorators/repository.js";
-
-export type { Repository as RepositoryInterface } from "./repository/repository.js";
+export { getRegisteredRepositories, getRepositoryMetadata, Repository } from "./decorators/repository.js";
+// Soft delete
+export type { SoftDeleteOptions } from "./decorators/soft-delete.js";
+export { getSoftDeleteMetadata, isSoftDeleteEntity, SoftDelete } from "./decorators/soft-delete.js";
+export { getTableName, Table } from "./decorators/table.js";
+export { getVersionField, Version } from "./decorators/version.js";
+export type {
+  EntityEvent,
+  EntityLoadedEvent,
+  EntityPersistedEvent,
+  EntityRemovedEvent,
+  EntityUpdatedEvent,
+} from "./events/index.js";
+export { ENTITY_EVENTS, EventBus, getGlobalEventBus } from "./events/index.js";
+// Global query filters
+export type { FilterDefinition, FilterOptions, FilterRegistration } from "./filter/index.js";
+export {
+  Filter,
+  FilterContext,
+  getFilters,
+  registerFilter,
+  resolveActiveFilters,
+  unregisterFilter,
+} from "./filter/index.js";
+export type { FieldChange } from "./mapping/change-tracker.js";
+export { EntityChangeTracker } from "./mapping/change-tracker.js";
+export type { EntityMetadata, FieldMapping } from "./mapping/entity-metadata.js";
+export { getEntityMetadata } from "./mapping/entity-metadata.js";
+export type { ProjectionMapper } from "./mapping/projection-mapper.js";
+export { createProjectionMapper } from "./mapping/projection-mapper.js";
+export type { RowMapper } from "./mapping/row-mapper.js";
+export { createRowMapper } from "./mapping/row-mapper.js";
+export type {
+  Migration,
+  MigrationRecord,
+  MigrationRunner,
+  MigrationRunnerConfig,
+} from "./migration/migration.js";
+export { DEFAULT_MIGRATION_TABLE, DEFAULT_SCHEMA } from "./migration/migration.js";
+export type {
+  BuiltQuery,
+  Criteria,
+  CriteriaType,
+  DerivedQueryDescriptor,
+  JoinType,
+  OrderByExpression,
+  PropertyExpression,
+  QueryOperator,
+  SortDirection,
+  Specification,
+  VectorMetric,
+} from "./query/index.js";
+export {
+  and,
+  BetweenCriteria,
+  between,
+  buildDerivedQuery,
+  ColumnRef,
+  ComparisonCriteria,
+  col,
+  DeleteBuilder,
+  ExpressionRef,
+  equal,
+  expr,
+  greaterThan,
+  InCriteria,
+  InsertBuilder,
+  isIn,
+  isNotNull,
+  isNull,
+  LogicalCriteria,
+  lessThan,
+  like,
+  NotCriteria,
+  NullCriteria,
+  not,
+  or,
+  parseDerivedQueryMethod,
+  QueryBuilder,
+  RawComparisonCriteria,
+  SelectBuilder,
+  Specifications,
+  UpdateBuilder,
+  VectorDistanceCriteria,
+  VectorOrderExpression,
+} from "./query/index.js";
+export type { AutoRepositoryOptions, MethodValidationError, ValidatedMethod } from "./repository/auto-repository.js";
+export {
+  createAutoRepository,
+  getDeclaredDerivedMethods,
+  validateDerivedMethods,
+} from "./repository/auto-repository.js";
 export type {
   CrudRepository,
   PagingAndSortingRepository,
 } from "./repository/crud-repository.js";
-export type { Sort, Pageable, Page } from "./repository/paging.js";
-export { createPageable, createPage } from "./repository/paging.js";
-export type { StreamOptions } from "./repository/streaming.js";
-export type { LazyInitializer } from "./repository/lazy-proxy.js";
-export { isLazyProxy, isInitialized, initializeProxy } from "./repository/lazy-proxy.js";
 export type { DerivedRepositoryOptions, SimilarityOptions, SimilarityResult } from "./repository/derived-repository.js";
 export { createDerivedRepository } from "./repository/derived-repository.js";
-export { createRepository } from "./repository/repository-factory.js";
-export type { CreateRepositoryOptions } from "./repository/repository-factory.js";
-export { createAutoRepository, getDeclaredDerivedMethods, validateDerivedMethods } from "./repository/auto-repository.js";
-export type { AutoRepositoryOptions, ValidatedMethod, MethodValidationError } from "./repository/auto-repository.js";
-export { OptimisticLockException } from "./repository/optimistic-lock.js";
 export { EntityNotFoundException } from "./repository/entity-not-found.js";
-
-export type { EntityMetadata, FieldMapping } from "./mapping/entity-metadata.js";
-export { getEntityMetadata } from "./mapping/entity-metadata.js";
-export type { RowMapper } from "./mapping/row-mapper.js";
-export { createRowMapper } from "./mapping/row-mapper.js";
-export type { ProjectionMapper } from "./mapping/projection-mapper.js";
-export { createProjectionMapper } from "./mapping/projection-mapper.js";
-export type { FieldChange } from "./mapping/change-tracker.js";
-export { EntityChangeTracker } from "./mapping/change-tracker.js";
-
-export type { Criteria, CriteriaType, VectorMetric, BuiltQuery, JoinType, SortDirection } from "./query/index.js";
-export {
-  ComparisonCriteria,
-  RawComparisonCriteria,
-  InCriteria,
-  BetweenCriteria,
-  NullCriteria,
-  LogicalCriteria,
-  NotCriteria,
-  VectorDistanceCriteria,
-  VectorOrderExpression,
-  and,
-  or,
-  not,
-  ColumnRef,
-  ExpressionRef,
-  col,
-  expr,
-  QueryBuilder,
-  SelectBuilder,
-  InsertBuilder,
-  UpdateBuilder,
-  DeleteBuilder,
-} from "./query/index.js";
-export type {
-  QueryOperator,
-  PropertyExpression,
-  OrderByExpression,
-  DerivedQueryDescriptor,
-} from "./query/index.js";
-export { parseDerivedQueryMethod, buildDerivedQuery } from "./query/index.js";
-export type { Specification } from "./query/index.js";
-export {
-  Specifications,
-  equal,
-  like,
-  greaterThan,
-  lessThan,
-  between,
-  isIn,
-  isNull,
-  isNotNull,
-} from "./query/index.js";
-
-export type { EntityCacheConfig, EntityCacheStats } from "./cache/index.js";
-export { EntityCache } from "./cache/index.js";
-export type { QueryCacheConfig, QueryCacheKey, QueryCacheStats } from "./cache/index.js";
-export { QueryCache } from "./cache/index.js";
-
+export type { LazyInitializer } from "./repository/lazy-proxy.js";
+export { initializeProxy, isInitialized, isLazyProxy } from "./repository/lazy-proxy.js";
+export { OptimisticLockException } from "./repository/optimistic-lock.js";
+export type { Page, Pageable, Sort } from "./repository/paging.js";
+export { createPage, createPageable } from "./repository/paging.js";
+export type { Repository as RepositoryInterface } from "./repository/repository.js";
+export type { CreateRepositoryOptions } from "./repository/repository-factory.js";
+export { createRepository } from "./repository/repository-factory.js";
+export type { StreamOptions } from "./repository/streaming.js";
 export type { DdlOptions, DropTableOptions } from "./schema/ddl-generator.js";
 export { DdlGenerator } from "./schema/ddl-generator.js";
-
-export { EventBus, getGlobalEventBus } from "./events/index.js";
-export type {
-  EntityEvent,
-  EntityPersistedEvent,
-  EntityUpdatedEvent,
-  EntityRemovedEvent,
-  EntityLoadedEvent,
-} from "./events/index.js";
-export { ENTITY_EVENTS } from "./events/index.js";
-
-export type {
-  Migration,
-  MigrationRecord,
-  MigrationRunnerConfig,
-  MigrationRunner,
-} from "./migration/migration.js";
-export { DEFAULT_MIGRATION_TABLE, DEFAULT_SCHEMA } from "./migration/migration.js";
-
-// Global query filters
-export type { FilterDefinition, FilterRegistration, FilterOptions } from "./filter/index.js";
-export { Filter, getFilters, registerFilter, unregisterFilter, resolveActiveFilters, FilterContext } from "./filter/index.js";
-
-// Soft delete
-export type { SoftDeleteOptions } from "./decorators/soft-delete.js";
-export { SoftDelete, getSoftDeleteMetadata, isSoftDeleteEntity } from "./decorators/soft-delete.js";
-
-// Audit trail
-export type { AuditedOptions } from "./decorators/audited.js";
-export { Audited, getAuditedMetadata, isAuditedEntity } from "./decorators/audited.js";
-export type { AuditUser, AuditEntry, AuditFieldChange, AuditOperation } from "./audit/index.js";
-export { AuditContext, AuditLogWriter, getAuditLog, getAuditLogForEntity, getFieldHistory } from "./audit/index.js";
-
 // Entity snapshots
-export type { Snapshot } from "./snapshot/index.js";
-export type { DiffResult, FieldDiff } from "./snapshot/index.js";
-export { snapshot, diff, diffEntity } from "./snapshot/index.js";
-
+export type { DiffResult, FieldDiff, Snapshot } from "./snapshot/index.js";
+export { diff, diffEntity, snapshot } from "./snapshot/index.js";
 // Vector & AI
-export type { VectorOptions, VectorMetadataEntry } from "./vector/index.js";
-export { Vector, getVectorFields, getVectorFieldMetadata } from "./vector/index.js";
-export type { VectorIndexOptions } from "./vector/index.js";
-export { VectorIndexManager } from "./vector/index.js";
-export type { EmbeddingProvider, EmbeddingHookOptions } from "./vector/index.js";
-export { createEmbeddingHook, registerEmbeddingHook } from "./vector/index.js";
-export type { NearestToResult } from "./vector/index.js";
-export { similarTo, nearestTo } from "./vector/index.js";
+export type {
+  EmbeddingHookOptions,
+  EmbeddingProvider,
+  NearestToResult,
+  VectorIndexOptions,
+  VectorMetadataEntry,
+  VectorOptions,
+} from "./vector/index.js";
+export {
+  createEmbeddingHook,
+  getVectorFieldMetadata,
+  getVectorFields,
+  nearestTo,
+  registerEmbeddingHook,
+  similarTo,
+  Vector,
+  VectorIndexManager,
+} from "./vector/index.js";

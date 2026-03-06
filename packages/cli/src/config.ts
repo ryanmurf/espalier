@@ -1,5 +1,5 @@
-import { readFileSync, existsSync } from "node:fs";
-import { resolve, join } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 export interface EspalierConfig {
   adapter: "pg" | "mysql" | "sqlite";
@@ -11,11 +11,7 @@ export interface EspalierConfig {
   };
 }
 
-const CONFIG_FILE_NAMES = [
-  "espalier.config.json",
-  "espalier.config.js",
-  "espalier.config.ts",
-];
+const CONFIG_FILE_NAMES = ["espalier.config.json", "espalier.config.js", "espalier.config.ts"];
 
 export function loadConfig(cwd?: string): EspalierConfig {
   const baseDir = cwd ?? process.cwd();
@@ -32,9 +28,7 @@ export function loadConfig(cwd?: string): EspalierConfig {
     }
   }
 
-  throw new Error(
-    `No espalier config file found. Create an espalier.config.json in ${baseDir}.`,
-  );
+  throw new Error(`No espalier config file found. Create an espalier.config.json in ${baseDir}.`);
 }
 
 function parseJsonConfig(filePath: string): EspalierConfig {

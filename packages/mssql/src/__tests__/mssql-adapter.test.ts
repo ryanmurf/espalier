@@ -11,19 +11,19 @@
  * - Dialect helpers: identifier quoting, pagination, type mapping
  * - DataSource lifecycle
  */
-import { describe, it, expect } from "vitest";
-import {
-  MssqlDataSource,
-  MssqlConnection,
-  MssqlStatement,
-  MssqlPreparedStatement,
-  MssqlTransaction,
-  MssqlResultSet,
-  quoteMssqlIdentifier,
-  mssqlPagination,
-  MSSQL_TYPE_MAP,
-} from "../index.js";
+import { describe, expect, it } from "vitest";
 import type { MssqlConfig } from "../index.js";
+import {
+  MSSQL_TYPE_MAP,
+  MssqlConnection,
+  MssqlDataSource,
+  MssqlPreparedStatement,
+  MssqlResultSet,
+  MssqlStatement,
+  MssqlTransaction,
+  mssqlPagination,
+  quoteMssqlIdentifier,
+} from "../index.js";
 
 // ══════════════════════════════════════════════════
 // DataSource
@@ -210,16 +210,12 @@ describe("MssqlPreparedStatement", () => {
 
   it("executeQuery with sql override throws stub error", async () => {
     const ps = new MssqlPreparedStatement(null, "SELECT 1");
-    await expect(ps.executeQuery("SELECT 2")).rejects.toThrow(
-      /MSSQL adapter stub.*prepared executeQuery/,
-    );
+    await expect(ps.executeQuery("SELECT 2")).rejects.toThrow(/MSSQL adapter stub.*prepared executeQuery/);
   });
 
   it("executeUpdate with sql override throws stub error", async () => {
     const ps = new MssqlPreparedStatement(null, "UPDATE x SET a = 1");
-    await expect(ps.executeUpdate("UPDATE x SET a = 2")).rejects.toThrow(
-      /MSSQL adapter stub.*prepared executeUpdate/,
-    );
+    await expect(ps.executeUpdate("UPDATE x SET a = 2")).rejects.toThrow(/MSSQL adapter stub.*prepared executeUpdate/);
   });
 
   it("throws after close", async () => {
@@ -463,9 +459,7 @@ describe("mssqlPagination", () => {
   });
 
   it("handles large values", () => {
-    expect(mssqlPagination(1000000, 50)).toBe(
-      "OFFSET 1000000 ROWS FETCH NEXT 50 ROWS ONLY",
-    );
+    expect(mssqlPagination(1000000, 50)).toBe("OFFSET 1000000 ROWS FETCH NEXT 50 ROWS ONLY");
   });
 
   // Validation was added as a security fix — negative/zero values now throw
@@ -485,9 +479,21 @@ describe("mssqlPagination", () => {
 describe("MSSQL_TYPE_MAP", () => {
   it("has all expected base types", () => {
     const expectedKeys = [
-      "TEXT", "VARCHAR", "BOOLEAN", "SERIAL", "BIGSERIAL",
-      "UUID", "TIMESTAMP", "BYTEA", "JSON", "JSONB",
-      "FLOAT", "DOUBLE", "INTEGER", "BIGINT", "SMALLINT",
+      "TEXT",
+      "VARCHAR",
+      "BOOLEAN",
+      "SERIAL",
+      "BIGSERIAL",
+      "UUID",
+      "TIMESTAMP",
+      "BYTEA",
+      "JSON",
+      "JSONB",
+      "FLOAT",
+      "DOUBLE",
+      "INTEGER",
+      "BIGINT",
+      "SMALLINT",
     ];
     for (const key of expectedKeys) {
       expect(MSSQL_TYPE_MAP).toHaveProperty(key);

@@ -1,5 +1,13 @@
-import type { Connection, DataSource, PreparedStatement, ResultSet, Statement, Transaction, SqlValue } from "espalier-jdbc";
-import type { IsolationLevel } from "espalier-jdbc";
+import type {
+  Connection,
+  DataSource,
+  IsolationLevel,
+  PreparedStatement,
+  ResultSet,
+  SqlValue,
+  Statement,
+  Transaction,
+} from "espalier-jdbc";
 
 /**
  * A captured query execution record.
@@ -100,9 +108,7 @@ class InstrumentedPreparedStatement implements PreparedStatement {
     const actualSql = sql ?? this._sql;
     const params = this._collectParams();
     const start = Date.now();
-    const result = sql
-      ? await (this._inner as Statement).executeQuery(sql)
-      : await this._inner.executeQuery();
+    const result = sql ? await (this._inner as Statement).executeQuery(sql) : await this._inner.executeQuery();
     this._log.record(actualSql, params, Date.now() - start);
     return result;
   }
@@ -111,9 +117,7 @@ class InstrumentedPreparedStatement implements PreparedStatement {
     const actualSql = sql ?? this._sql;
     const params = this._collectParams();
     const start = Date.now();
-    const result = sql
-      ? await (this._inner as Statement).executeUpdate(sql)
-      : await this._inner.executeUpdate();
+    const result = sql ? await (this._inner as Statement).executeUpdate(sql) : await this._inner.executeUpdate();
     this._log.record(actualSql, params, Date.now() - start);
     return result;
   }
@@ -145,11 +149,7 @@ class InstrumentedConnection implements Connection {
   }
 
   prepareStatement(sql: string): PreparedStatement {
-    return new InstrumentedPreparedStatement(
-      this._inner.prepareStatement(sql),
-      this._log,
-      sql,
-    );
+    return new InstrumentedPreparedStatement(this._inner.prepareStatement(sql), this._log, sql);
   }
 
   async beginTransaction(isolation?: IsolationLevel): Promise<Transaction> {
@@ -187,10 +187,7 @@ class InstrumentedDataSource implements DataSource {
 /**
  * Create an instrumented DataSource that logs all queries to a QueryLog.
  */
-export function createInstrumentedDataSource(
-  dataSource: DataSource,
-  queryLog: QueryLog,
-): DataSource {
+export function createInstrumentedDataSource(dataSource: DataSource, queryLog: QueryLog): DataSource {
   return new InstrumentedDataSource(dataSource, queryLog);
 }
 
@@ -226,63 +223,55 @@ export interface AssertionResult {
 /**
  * Assert exactly n queries were executed.
  */
-export function assertQueryCount(
-  queryLog: QueryLog,
-  expected: number,
-): AssertionResult {
+export function assertQueryCount(queryLog: QueryLog, expected: number): AssertionResult {
   const actual = queryLog.count;
   return {
     pass: actual === expected,
-    message: actual === expected
-      ? `Query count is ${expected} as expected`
-      : `Expected ${expected} queries, but ${actual} were executed`,
+    message:
+      actual === expected
+        ? `Query count is ${expected} as expected`
+        : `Expected ${expected} queries, but ${actual} were executed`,
   };
 }
 
 /**
  * Assert at most n queries were executed.
  */
-export function assertMaxQueries(
-  queryLog: QueryLog,
-  max: number,
-): AssertionResult {
+export function assertMaxQueries(queryLog: QueryLog, max: number): AssertionResult {
   const actual = queryLog.count;
   return {
     pass: actual <= max,
-    message: actual <= max
-      ? `Query count (${actual}) is within max (${max})`
-      : `Expected at most ${max} queries, but ${actual} were executed`,
+    message:
+      actual <= max
+        ? `Query count (${actual}) is within max (${max})`
+        : `Expected at most ${max} queries, but ${actual} were executed`,
   };
 }
 
 /**
  * Assert no queries match the given pattern.
  */
-export function assertNoQueriesMatching(
-  queryLog: QueryLog,
-  pattern: string | RegExp,
-): AssertionResult {
+export function assertNoQueriesMatching(queryLog: QueryLog, pattern: string | RegExp): AssertionResult {
   const matching = queryLog.queriesMatching(pattern);
   return {
     pass: matching.length === 0,
-    message: matching.length === 0
-      ? `No queries matched pattern ${String(pattern)}`
-      : `Expected no queries matching ${String(pattern)}, but ${matching.length} matched: ${matching[0].sql}`,
+    message:
+      matching.length === 0
+        ? `No queries matched pattern ${String(pattern)}`
+        : `Expected no queries matching ${String(pattern)}, but ${matching.length} matched: ${matching[0].sql}`,
   };
 }
 
 /**
  * Assert at least one query matches the given pattern.
  */
-export function assertQueriesMatching(
-  queryLog: QueryLog,
-  pattern: string | RegExp,
-): AssertionResult {
+export function assertQueriesMatching(queryLog: QueryLog, pattern: string | RegExp): AssertionResult {
   const matching = queryLog.queriesMatching(pattern);
   return {
     pass: matching.length > 0,
-    message: matching.length > 0
-      ? `Found ${matching.length} queries matching ${String(pattern)}`
-      : `Expected queries matching ${String(pattern)}, but none were found`,
+    message:
+      matching.length > 0
+        ? `Found ${matching.length} queries matching ${String(pattern)}`
+        : `Expected queries matching ${String(pattern)}, but none were found`,
   };
 }

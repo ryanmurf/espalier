@@ -1,16 +1,16 @@
-import { describe, it, expect } from "vitest";
-import {
-  Specifications,
-  equal,
-  like,
-  greaterThan,
-  lessThan,
-  between,
-  isIn,
-  isNull,
-  isNotNull,
-} from "../../query/specification.js";
+import { describe, expect, it } from "vitest";
 import type { EntityMetadata } from "../../mapping/entity-metadata.js";
+import {
+  between,
+  equal,
+  greaterThan,
+  isIn,
+  isNotNull,
+  isNull,
+  lessThan,
+  like,
+  Specifications,
+} from "../../query/specification.js";
 
 // Minimal metadata for unit testing
 const metadata: EntityMetadata = {
@@ -117,10 +117,7 @@ describe("Specification", () => {
 
   describe("composition", () => {
     it("Specifications.and(spec1, spec2) produces AND criteria", () => {
-      const spec = Specifications.and(
-        equal<TestUser>("name", "alice"),
-        greaterThan<TestUser>("age", 25),
-      );
+      const spec = Specifications.and(equal<TestUser>("name", "alice"), greaterThan<TestUser>("age", 25));
       const criteria = spec.toPredicate(metadata);
       const result = criteria.toSql(1);
       expect(result.sql).toContain("AND");
@@ -130,10 +127,7 @@ describe("Specification", () => {
     });
 
     it("Specifications.or(spec1, spec2) produces OR criteria", () => {
-      const spec = Specifications.or(
-        equal<TestUser>("name", "alice"),
-        equal<TestUser>("name", "bob"),
-      );
+      const spec = Specifications.or(equal<TestUser>("name", "alice"), equal<TestUser>("name", "bob"));
       const criteria = spec.toPredicate(metadata);
       const result = criteria.toSql(1);
       expect(result.sql).toContain("OR");
@@ -143,9 +137,7 @@ describe("Specification", () => {
     });
 
     it("Specifications.not(spec) produces NOT criteria", () => {
-      const spec = Specifications.not(
-        equal<TestUser>("status", "inactive"),
-      );
+      const spec = Specifications.not(equal<TestUser>("status", "inactive"));
       const criteria = spec.toPredicate(metadata);
       const result = criteria.toSql(1);
       expect(result.sql).toContain("NOT");
@@ -180,13 +172,8 @@ describe("Specification", () => {
 
     it("deep composition: and(or(a, b), not(c)) works correctly", () => {
       const spec = Specifications.and(
-        Specifications.or(
-          equal<TestUser>("name", "alice"),
-          equal<TestUser>("name", "bob"),
-        ),
-        Specifications.not(
-          equal<TestUser>("status", "inactive"),
-        ),
+        Specifications.or(equal<TestUser>("name", "alice"), equal<TestUser>("name", "bob")),
+        Specifications.not(equal<TestUser>("status", "inactive")),
       );
       const criteria = spec.toPredicate(metadata);
       const result = criteria.toSql(1);
@@ -220,9 +207,7 @@ describe("Specification", () => {
 
     it("throws for non-existent field", () => {
       const spec = equal<any>("nonExistent", "value");
-      expect(() => spec.toPredicate(metadata)).toThrow(
-        /Unknown property "nonExistent"/,
-      );
+      expect(() => spec.toPredicate(metadata)).toThrow(/Unknown property "nonExistent"/);
     });
   });
 
@@ -232,10 +217,7 @@ describe("Specification", () => {
 
   describe("SQL generation", () => {
     it("param offsets are correct in composed specs", () => {
-      const spec = Specifications.and(
-        between<TestUser>("age", 20, 30),
-        equal<TestUser>("status", "active"),
-      );
+      const spec = Specifications.and(between<TestUser>("age", 20, 30), equal<TestUser>("status", "active"));
       const criteria = spec.toPredicate(metadata);
       const result = criteria.toSql(1);
       expect(result.sql).toContain("$1");
@@ -246,10 +228,7 @@ describe("Specification", () => {
 
     it("parentheses in complex expressions are correct", () => {
       const spec = Specifications.and(
-        Specifications.or(
-          equal<TestUser>("name", "alice"),
-          equal<TestUser>("name", "bob"),
-        ),
+        Specifications.or(equal<TestUser>("name", "alice"), equal<TestUser>("name", "bob")),
         greaterThan<TestUser>("age", 18),
       );
       const criteria = spec.toPredicate(metadata);

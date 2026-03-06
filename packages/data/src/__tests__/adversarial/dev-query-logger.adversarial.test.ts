@@ -1,8 +1,6 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { DevQueryLogger, createDevLogger } from "../../observability/dev-query-logger.js";
-import type { DevLoggerOptions } from "../../observability/dev-query-logger.js";
 import { LogLevel } from "espalier-jdbc";
-import type { Logger } from "espalier-jdbc";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { createDevLogger, DevQueryLogger } from "../../observability/dev-query-logger.js";
 
 // ==========================================================================
 // Helpers
@@ -33,9 +31,7 @@ function sqlCtx(sql: string, durationMs?: number, params?: unknown[]): Record<st
 }
 
 function lastLogOutput(): string {
-  return consoleSpy.mock.calls.length > 0
-    ? String(consoleSpy.mock.calls[consoleSpy.mock.calls.length - 1][0])
-    : "";
+  return consoleSpy.mock.calls.length > 0 ? String(consoleSpy.mock.calls[consoleSpy.mock.calls.length - 1][0]) : "";
 }
 
 // ==========================================================================
@@ -187,11 +183,7 @@ describe("DevQueryLogger — parameter display", () => {
 
   it("SQL injection in param does NOT execute — it's display only", () => {
     const logger = new DevQueryLogger({ colorize: false, showParams: true });
-    logger.debug("query", sqlCtx(
-      "SELECT * FROM users WHERE name = $1",
-      1,
-      ["'; DROP TABLE users; --"],
-    ));
+    logger.debug("query", sqlCtx("SELECT * FROM users WHERE name = $1", 1, ["'; DROP TABLE users; --"]));
     const output = lastLogOutput();
     // The malicious string appears as a quoted param value, not as executed SQL
     expect(output).toContain("'''; DROP TABLE users; --'");
@@ -207,11 +199,7 @@ describe("DevQueryLogger — parameter display", () => {
 
   it("multiple params interpolated in correct order", () => {
     const logger = new DevQueryLogger({ colorize: false, showParams: true });
-    logger.debug("query", sqlCtx(
-      "SELECT * FROM users WHERE name = $1 AND age = $2",
-      1,
-      ["Alice", 30],
-    ));
+    logger.debug("query", sqlCtx("SELECT * FROM users WHERE name = $1 AND age = $2", 1, ["Alice", 30]));
     const output = lastLogOutput();
     expect(output).toContain("'Alice'");
     expect(output).toContain("30");
@@ -221,11 +209,14 @@ describe("DevQueryLogger — parameter display", () => {
 
   it("param index out of range is preserved as $N", () => {
     const logger = new DevQueryLogger({ colorize: false, showParams: true });
-    logger.debug("query", sqlCtx(
-      "SELECT * FROM users WHERE id = $1 AND name = $2",
-      1,
-      [42], // only one param for two placeholders
-    ));
+    logger.debug(
+      "query",
+      sqlCtx(
+        "SELECT * FROM users WHERE id = $1 AND name = $2",
+        1,
+        [42], // only one param for two placeholders
+      ),
+    );
     const output = lastLogOutput();
     expect(output).toContain("42");
     expect(output).toContain("$2"); // no substitution for missing param

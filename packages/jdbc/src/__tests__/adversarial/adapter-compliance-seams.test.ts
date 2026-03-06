@@ -6,17 +6,16 @@
  * - Suite options validation
  * - Integration with the DriverAdapter interface
  */
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { runAdapterComplianceTests } from "../../adapter-compliance.js";
-import type { AdapterComplianceOptions } from "../../adapter-compliance.js";
-import type { DriverAdapter, DriverCapabilities } from "../../driver-adapter.js";
+import type { DriverCapabilities } from "../../driver-adapter.js";
 import { IsolationLevel } from "../../transaction.js";
 
 describe("adapter compliance suite seam tests", () => {
   it("throws when runner option is missing", () => {
     expect(() => {
       runAdapterComplianceTests({
-        createDataSource: async () => ({} as any),
+        createDataSource: async () => ({}) as any,
         createTableSql: "CREATE TABLE test (id INT)",
         dropTableSql: "DROP TABLE test",
         tableName: "test",
@@ -30,7 +29,7 @@ describe("adapter compliance suite seam tests", () => {
     // Just verify it does not throw during setup
     expect(() => {
       runAdapterComplianceTests({
-        createDataSource: async () => ({} as any),
+        createDataSource: async () => ({}) as any,
         createTableSql: "CREATE TABLE test (id INT)",
         dropTableSql: "DROP TABLE test",
         tableName: "test",
@@ -38,7 +37,7 @@ describe("adapter compliance suite seam tests", () => {
         runner: {
           describe: () => {},
           it: () => {},
-          expect: () => ({} as any),
+          expect: () => ({}) as any,
           beforeAll: () => {},
           afterAll: () => {},
           beforeEach: () => {},

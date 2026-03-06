@@ -4,21 +4,21 @@
  * "all" expansion, no-cascade defaults, and per-relation-type storage.
  * E2E tests are in packages/jdbc-pg/src/__tests__/e2e/pg-cascade.e2e.test.ts
  */
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
+import type { CascadeType } from "../../index.js";
 import {
-  Table,
   Column,
-  Id,
-  ManyToOne,
-  OneToMany,
-  ManyToMany,
-  OneToOne,
+  getManyToManyRelations,
   getManyToOneRelations,
   getOneToManyRelations,
-  getManyToManyRelations,
   getOneToOneRelations,
+  Id,
+  ManyToMany,
+  ManyToOne,
+  OneToMany,
+  OneToOne,
+  Table,
 } from "../../index.js";
-import type { CascadeType } from "../../index.js";
 
 // ══════════════════════════════════════════════════
 // Section 1: parseCascade — Cascade Metadata Parsing
@@ -268,8 +268,8 @@ describe("cascade metadata: edge cases", () => {
     }
     const inst = new CscMulti();
     const rels = getManyToOneRelations(inst.constructor);
-    const relA = rels.find(r => String(r.fieldName) === "relA")!;
-    const relB = rels.find(r => String(r.fieldName) === "relB")!;
+    const relA = rels.find((r) => String(r.fieldName) === "relA")!;
+    const relB = rels.find((r) => String(r.fieldName) === "relB")!;
     expect(relA.cascade.has("persist")).toBe(true);
     expect(relA.cascade.has("remove")).toBe(false);
     expect(relB.cascade.has("remove")).toBe(true);

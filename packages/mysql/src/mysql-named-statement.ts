@@ -1,9 +1,8 @@
-import type { PoolConnection as MysqlPoolConnection, FieldPacket, ResultSetHeader } from "mysql2/promise";
-import type { NamedPreparedStatement, ResultSet, SqlValue } from "espalier-jdbc";
-import { QueryError, parseNamedParams, convertPositionalParams } from "espalier-jdbc";
-import type { ParsedNamedQuery } from "espalier-jdbc";
-import { MysqlResultSet } from "./mysql-result-set.js";
+import type { NamedPreparedStatement, ParsedNamedQuery, ResultSet, SqlValue } from "espalier-jdbc";
+import { convertPositionalParams, parseNamedParams, QueryError } from "espalier-jdbc";
+import type { FieldPacket, PoolConnection as MysqlPoolConnection, ResultSetHeader } from "mysql2/promise";
 import { mapMysqlErrorCode } from "./error-codes.js";
+import { MysqlResultSet } from "./mysql-result-set.js";
 
 export class MysqlNamedPreparedStatement implements NamedPreparedStatement {
   private readonly namedParams = new Map<string, SqlValue>();
@@ -26,10 +25,7 @@ export class MysqlNamedPreparedStatement implements NamedPreparedStatement {
     const params = this.collectParameters();
     try {
       const [rows, fields] = await this.connection.execute(queryText, params);
-      return new MysqlResultSet(
-        rows as Record<string, unknown>[],
-        fields as FieldPacket[],
-      );
+      return new MysqlResultSet(rows as Record<string, unknown>[], fields as FieldPacket[]);
     } catch (err) {
       throw new QueryError(
         `Failed to execute named query: ${(err as Error).message}`,
@@ -62,8 +58,6 @@ export class MysqlNamedPreparedStatement implements NamedPreparedStatement {
   }
 
   private collectParameters(): SqlValue[] {
-    return this.parsed.paramOrder.map(
-      (name) => this.namedParams.get(name) ?? null,
-    );
+    return this.parsed.paramOrder.map((name) => this.namedParams.get(name) ?? null);
   }
 }

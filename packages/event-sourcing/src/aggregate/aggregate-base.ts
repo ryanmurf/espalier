@@ -33,10 +33,7 @@ export abstract class AggregateBase {
    * Apply a domain event to this aggregate.
    * Calls the appropriate event handler method and records the event as uncommitted.
    */
-  protected apply(
-    eventType: string,
-    payload: Record<string, unknown>,
-  ): void {
+  protected apply(eventType: string, payload: Record<string, unknown>): void {
     const event: DomainEvent = {
       eventType,
       aggregateId: this._id,
@@ -78,7 +75,7 @@ export abstract class AggregateBase {
       if (event.version <= this._version) {
         throw new Error(
           `Out-of-order event: event version ${event.version} is <= current aggregate version ${this._version}. ` +
-          `Events must be ordered by ascending version.`,
+            `Events must be ordered by ascending version.`,
         );
       }
       this.applyEvent(event);

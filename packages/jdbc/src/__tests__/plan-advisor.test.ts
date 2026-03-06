@@ -1,9 +1,8 @@
 /**
  * Adversarial tests for PlanAdvisor query plan inefficiency detection (Y3 Q3).
  */
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { PlanAdvisor } from "../plan-advisor.js";
-import type { PlanWarning } from "../plan-advisor.js";
 import type { PlanNode, QueryPlan } from "../query-plan.js";
 
 // ══════════════════════════════════════════════════
@@ -42,7 +41,7 @@ describe("PlanAdvisor", () => {
       const plan = makePlan({ nodeType: "Seq Scan", estimatedRows: 50000, relation: "users" });
 
       const warnings = advisor.analyze(plan);
-      const seqWarn = warnings.find(w => w.message.includes("Sequential scan") && w.message.includes("users"));
+      const seqWarn = warnings.find((w) => w.message.includes("Sequential scan") && w.message.includes("users"));
       expect(seqWarn).toBeDefined();
       expect(seqWarn!.severity).toBe("warning");
       expect(seqWarn!.affectedRelation).toBe("users");
@@ -53,7 +52,7 @@ describe("PlanAdvisor", () => {
       const plan = makePlan({ nodeType: "Seq Scan", estimatedRows: 100, relation: "small_table" });
 
       const warnings = advisor.analyze(plan);
-      const seqWarn = warnings.find(w => w.severity === "warning" && w.message.includes("Sequential scan"));
+      const seqWarn = warnings.find((w) => w.severity === "warning" && w.message.includes("Sequential scan"));
       expect(seqWarn).toBeUndefined();
     });
 
@@ -63,7 +62,7 @@ describe("PlanAdvisor", () => {
 
       const warnings = advisor.analyze(plan);
       // estimatedRows > threshold means 10000 > 10000 is false
-      const seqWarn = warnings.find(w => w.severity === "warning" && w.message.includes("Sequential scan"));
+      const seqWarn = warnings.find((w) => w.severity === "warning" && w.message.includes("Sequential scan"));
       expect(seqWarn).toBeUndefined();
     });
 
@@ -72,7 +71,7 @@ describe("PlanAdvisor", () => {
       const plan = makePlan({ nodeType: "Seq Scan", estimatedRows: 10001, relation: "boundary" });
 
       const warnings = advisor.analyze(plan);
-      const seqWarn = warnings.find(w => w.severity === "warning" && w.message.includes("Sequential scan"));
+      const seqWarn = warnings.find((w) => w.severity === "warning" && w.message.includes("Sequential scan"));
       expect(seqWarn).toBeDefined();
     });
 
@@ -81,7 +80,7 @@ describe("PlanAdvisor", () => {
       const plan = makePlan({ nodeType: "Seq Scan", estimatedRows: 50000 });
 
       const warnings = advisor.analyze(plan);
-      const seqWarn = warnings.find(w => w.message.includes("unknown table"));
+      const seqWarn = warnings.find((w) => w.message.includes("unknown table"));
       expect(seqWarn).toBeDefined();
     });
 
@@ -90,7 +89,7 @@ describe("PlanAdvisor", () => {
       const plan = makePlan({ nodeType: "Index Scan", estimatedRows: 50000, relation: "users" });
 
       const warnings = advisor.analyze(plan);
-      const seqWarn = warnings.find(w => w.message.includes("Sequential scan"));
+      const seqWarn = warnings.find((w) => w.message.includes("Sequential scan"));
       expect(seqWarn).toBeUndefined();
     });
   });
@@ -110,7 +109,7 @@ describe("PlanAdvisor", () => {
       });
 
       const warnings = advisor.analyze(plan);
-      const filterWarn = warnings.find(w => w.severity === "info" && w.message.includes("filter"));
+      const filterWarn = warnings.find((w) => w.severity === "info" && w.message.includes("filter"));
       expect(filterWarn).toBeDefined();
       expect(filterWarn!.suggestion).toContain("index");
       expect(filterWarn!.affectedRelation).toBe("orders");
@@ -121,7 +120,7 @@ describe("PlanAdvisor", () => {
       const plan = makePlan({ nodeType: "Seq Scan", estimatedRows: 50, relation: "orders" });
 
       const warnings = advisor.analyze(plan);
-      const filterWarn = warnings.find(w => w.severity === "info" && w.message.includes("filter"));
+      const filterWarn = warnings.find((w) => w.severity === "info" && w.message.includes("filter"));
       expect(filterWarn).toBeUndefined();
     });
 
@@ -135,7 +134,7 @@ describe("PlanAdvisor", () => {
       });
 
       const warnings = advisor.analyze(plan);
-      const seqFilterWarn = warnings.find(w => w.message.includes("Sequential scan with filter"));
+      const seqFilterWarn = warnings.find((w) => w.message.includes("Sequential scan with filter"));
       expect(seqFilterWarn).toBeUndefined();
     });
 
@@ -149,7 +148,7 @@ describe("PlanAdvisor", () => {
       });
 
       const warnings = advisor.analyze(plan);
-      const seqWarn = warnings.filter(w => w.message.includes("Sequential scan"));
+      const seqWarn = warnings.filter((w) => w.message.includes("Sequential scan"));
       // One "warning" for large table scan + one "info" for filter
       expect(seqWarn.length).toBe(2);
     });
@@ -170,7 +169,7 @@ describe("PlanAdvisor", () => {
       });
 
       const warnings = advisor.analyze(plan);
-      const nlWarn = warnings.find(w => w.nodeType === "Nested Loop");
+      const nlWarn = warnings.find((w) => w.nodeType === "Nested Loop");
       expect(nlWarn).toBeDefined();
       expect(nlWarn!.severity).toBe("warning");
       expect(nlWarn!.suggestion).toContain("hash join");
@@ -186,7 +185,7 @@ describe("PlanAdvisor", () => {
       });
 
       const warnings = advisor.analyze(plan);
-      const nlWarn = warnings.find(w => w.nodeType === "Nested Loop");
+      const nlWarn = warnings.find((w) => w.nodeType === "Nested Loop");
       expect(nlWarn).toBeUndefined();
     });
 
@@ -201,7 +200,7 @@ describe("PlanAdvisor", () => {
       });
 
       const warnings = advisor.analyze(plan);
-      const nlWarn = warnings.find(w => w.nodeType === "Nested Loop");
+      const nlWarn = warnings.find((w) => w.nodeType === "Nested Loop");
       expect(nlWarn).toBeUndefined();
     });
 
@@ -211,7 +210,7 @@ describe("PlanAdvisor", () => {
 
       // children[0] is undefined — outerChild check should be safe
       const warnings = advisor.analyze(plan);
-      const nlWarn = warnings.find(w => w.nodeType === "Nested Loop");
+      const nlWarn = warnings.find((w) => w.nodeType === "Nested Loop");
       expect(nlWarn).toBeUndefined();
     });
   });
@@ -226,7 +225,7 @@ describe("PlanAdvisor", () => {
       const plan = makePlan({ nodeType: "Hash Join", totalCost: 200000 });
 
       const warnings = advisor.analyze(plan);
-      const costWarn = warnings.find(w => w.severity === "critical");
+      const costWarn = warnings.find((w) => w.severity === "critical");
       expect(costWarn).toBeDefined();
       expect(costWarn!.message).toContain("200000");
     });
@@ -236,7 +235,7 @@ describe("PlanAdvisor", () => {
       const plan = makePlan({ nodeType: "Seq Scan", totalCost: 500, estimatedRows: 10 });
 
       const warnings = advisor.analyze(plan);
-      const costWarn = warnings.find(w => w.severity === "critical");
+      const costWarn = warnings.find((w) => w.severity === "critical");
       expect(costWarn).toBeUndefined();
     });
 
@@ -245,7 +244,7 @@ describe("PlanAdvisor", () => {
       const plan = makePlan({ nodeType: "Seq Scan", totalCost: 100, estimatedRows: 10 });
 
       const warnings = advisor.analyze(plan);
-      const costWarn = warnings.find(w => w.severity === "critical");
+      const costWarn = warnings.find((w) => w.severity === "critical");
       expect(costWarn).toBeDefined();
     });
   });
@@ -265,7 +264,7 @@ describe("PlanAdvisor", () => {
       });
 
       const warnings = advisor.analyze(plan);
-      const mismatchWarn = warnings.find(w => w.message.includes("estimate mismatch"));
+      const mismatchWarn = warnings.find((w) => w.message.includes("estimate mismatch"));
       expect(mismatchWarn).toBeDefined();
       expect(mismatchWarn!.suggestion).toContain("ANALYZE");
     });
@@ -279,7 +278,7 @@ describe("PlanAdvisor", () => {
       });
 
       const warnings = advisor.analyze(plan);
-      const mismatchWarn = warnings.find(w => w.message.includes("estimate mismatch"));
+      const mismatchWarn = warnings.find((w) => w.message.includes("estimate mismatch"));
       expect(mismatchWarn).toBeDefined();
     });
 
@@ -292,7 +291,7 @@ describe("PlanAdvisor", () => {
       });
 
       const warnings = advisor.analyze(plan);
-      const mismatchWarn = warnings.find(w => w.message.includes("estimate mismatch"));
+      const mismatchWarn = warnings.find((w) => w.message.includes("estimate mismatch"));
       expect(mismatchWarn).toBeUndefined();
     });
 
@@ -301,7 +300,7 @@ describe("PlanAdvisor", () => {
       const plan = makePlan({ nodeType: "Seq Scan", estimatedRows: 10000 });
 
       const warnings = advisor.analyze(plan);
-      const mismatchWarn = warnings.find(w => w.message.includes("estimate mismatch"));
+      const mismatchWarn = warnings.find((w) => w.message.includes("estimate mismatch"));
       expect(mismatchWarn).toBeUndefined();
     });
 
@@ -314,7 +313,7 @@ describe("PlanAdvisor", () => {
       });
 
       const warnings = advisor.analyze(plan);
-      const mismatchWarn = warnings.find(w => w.message.includes("estimate mismatch"));
+      const mismatchWarn = warnings.find((w) => w.message.includes("estimate mismatch"));
       // inverseRatio = 10000 / max(0,1) = 10000 > 10
       expect(mismatchWarn).toBeDefined();
     });
@@ -328,7 +327,7 @@ describe("PlanAdvisor", () => {
       });
 
       const warnings = advisor.analyze(plan);
-      const mismatchWarn = warnings.find(w => w.message.includes("estimate mismatch"));
+      const mismatchWarn = warnings.find((w) => w.message.includes("estimate mismatch"));
       // estimatedRows > 0 is false, so this rule is skipped entirely
       expect(mismatchWarn).toBeUndefined();
     });
@@ -342,7 +341,7 @@ describe("PlanAdvisor", () => {
       });
 
       const warnings = advisor.analyze(plan);
-      const mismatchWarn = warnings.find(w => w.message.includes("estimate mismatch"));
+      const mismatchWarn = warnings.find((w) => w.message.includes("estimate mismatch"));
       expect(mismatchWarn).toBeDefined();
     });
   });
@@ -361,7 +360,7 @@ describe("PlanAdvisor", () => {
       });
 
       const warnings = advisor.analyze(plan);
-      const sortWarn = warnings.find(w => w.nodeType === "Sort" && w.severity === "info");
+      const sortWarn = warnings.find((w) => w.nodeType === "Sort" && w.severity === "info");
       expect(sortWarn).toBeDefined();
       expect(sortWarn!.suggestion).toContain("work_mem");
     });
@@ -375,7 +374,7 @@ describe("PlanAdvisor", () => {
       });
 
       const warnings = advisor.analyze(plan);
-      const sortWarn = warnings.find(w => w.nodeType === "Sort" && w.severity === "info");
+      const sortWarn = warnings.find((w) => w.nodeType === "Sort" && w.severity === "info");
       expect(sortWarn).toBeUndefined();
     });
 
@@ -388,7 +387,7 @@ describe("PlanAdvisor", () => {
       });
 
       const warnings = advisor.analyze(plan);
-      const sortWarn = warnings.find(w => w.nodeType === "Sort" && w.severity === "info");
+      const sortWarn = warnings.find((w) => w.nodeType === "Sort" && w.severity === "info");
       expect(sortWarn).toBeUndefined();
     });
   });
@@ -441,7 +440,7 @@ describe("PlanAdvisor", () => {
       const plan = makePlan({ nodeType: "Seq Scan", estimatedRows: 200, relation: "t" });
 
       const warnings = advisor.analyze(plan);
-      const seqWarn = warnings.find(w => w.severity === "warning" && w.message.includes("Sequential scan"));
+      const seqWarn = warnings.find((w) => w.severity === "warning" && w.message.includes("Sequential scan"));
       expect(seqWarn).toBeDefined();
     });
 
@@ -449,14 +448,11 @@ describe("PlanAdvisor", () => {
       const advisor = new PlanAdvisor({ nestedLoopRowThreshold: 10 });
       const plan = makePlan({
         nodeType: "Nested Loop",
-        children: [
-          makeNode({ estimatedRows: 50 }),
-          makeNode({ estimatedRows: 1 }),
-        ],
+        children: [makeNode({ estimatedRows: 50 }), makeNode({ estimatedRows: 1 })],
       });
 
       const warnings = advisor.analyze(plan);
-      const nlWarn = warnings.find(w => w.nodeType === "Nested Loop");
+      const nlWarn = warnings.find((w) => w.nodeType === "Nested Loop");
       expect(nlWarn).toBeDefined();
     });
 
@@ -515,8 +511,8 @@ describe("PlanAdvisor", () => {
       });
 
       const warnings = advisor.analyze(plan);
-      const ordersWarn = warnings.find(w => w.affectedRelation === "orders" && w.severity === "warning");
-      const usersWarn = warnings.find(w => w.affectedRelation === "users" && w.severity === "warning");
+      const ordersWarn = warnings.find((w) => w.affectedRelation === "orders" && w.severity === "warning");
+      const usersWarn = warnings.find((w) => w.affectedRelation === "users" && w.severity === "warning");
       expect(ordersWarn).toBeDefined();
       expect(usersWarn).toBeDefined();
     });
@@ -545,7 +541,7 @@ describe("PlanAdvisor", () => {
       });
 
       const warnings = advisor.analyze(plan);
-      const deepWarn = warnings.find(w => w.affectedRelation === "deep_table");
+      const deepWarn = warnings.find((w) => w.affectedRelation === "deep_table");
       expect(deepWarn).toBeDefined();
     });
   });
@@ -565,7 +561,7 @@ describe("PlanAdvisor", () => {
 
       const warnings = advisor.analyze(plan);
       // NaN > 10000 is false, so no seq scan warning. Debatable if this is correct.
-      const seqWarn = warnings.find(w => w.severity === "warning" && w.message.includes("Sequential scan"));
+      const seqWarn = warnings.find((w) => w.severity === "warning" && w.message.includes("Sequential scan"));
       expect(seqWarn).toBeUndefined();
     });
 
@@ -578,7 +574,7 @@ describe("PlanAdvisor", () => {
       });
 
       const warnings = advisor.analyze(plan);
-      const costWarn = warnings.find(w => w.severity === "critical");
+      const costWarn = warnings.find((w) => w.severity === "critical");
       expect(costWarn).toBeUndefined();
     });
 
@@ -591,7 +587,7 @@ describe("PlanAdvisor", () => {
       });
 
       const warnings = advisor.analyze(plan);
-      const costWarn = warnings.find(w => w.severity === "critical");
+      const costWarn = warnings.find((w) => w.severity === "critical");
       expect(costWarn).toBeDefined();
     });
 
@@ -604,7 +600,7 @@ describe("PlanAdvisor", () => {
       });
 
       const warnings = advisor.analyze(plan);
-      const seqWarn = warnings.find(w => w.severity === "warning" && w.message.includes("Sequential scan"));
+      const seqWarn = warnings.find((w) => w.severity === "warning" && w.message.includes("Sequential scan"));
       expect(seqWarn).toBeUndefined();
     });
 
@@ -621,7 +617,7 @@ describe("PlanAdvisor", () => {
       const plan = makePlan({ nodeType: "Seq Scan", totalCost: NaN, estimatedRows: 0 });
 
       const warnings = advisor.analyze(plan);
-      const costWarn = warnings.find(w => w.severity === "critical");
+      const costWarn = warnings.find((w) => w.severity === "critical");
       // NaN > 0 is false
       expect(costWarn).toBeUndefined();
     });
@@ -638,7 +634,7 @@ describe("PlanAdvisor", () => {
       // NaN !== undefined, so the check enters the block.
       // ratio = NaN / 100 = NaN, inverseRatio = 100 / max(NaN, 1) = 100 / NaN = NaN
       // NaN > 10 is false for both, so no warning.
-      const mismatchWarn = warnings.find(w => w.message.includes("estimate mismatch"));
+      const mismatchWarn = warnings.find((w) => w.message.includes("estimate mismatch"));
       expect(mismatchWarn).toBeUndefined();
     });
 
@@ -654,7 +650,7 @@ describe("PlanAdvisor", () => {
       });
 
       const warnings = advisor.analyze(plan);
-      const severities = new Set(warnings.map(w => w.severity));
+      const severities = new Set(warnings.map((w) => w.severity));
       // Should have: warning (seq scan large), info (filter), critical (high cost), warning (mismatch)
       expect(severities.has("warning")).toBe(true);
       expect(severities.has("info")).toBe(true);
@@ -677,11 +673,15 @@ describe("PlanAdvisor", () => {
 
       // 10000 rows — exactly at threshold, should NOT trigger
       const plan1 = makePlan({ nodeType: "Seq Scan", estimatedRows: 10000, relation: "t" });
-      expect(advisor.analyze(plan1).find(w => w.severity === "warning" && w.message.includes("Sequential scan"))).toBeUndefined();
+      expect(
+        advisor.analyze(plan1).find((w) => w.severity === "warning" && w.message.includes("Sequential scan")),
+      ).toBeUndefined();
 
       // 10001 rows — above threshold, SHOULD trigger
       const plan2 = makePlan({ nodeType: "Seq Scan", estimatedRows: 10001, relation: "t" });
-      expect(advisor.analyze(plan2).find(w => w.severity === "warning" && w.message.includes("Sequential scan"))).toBeDefined();
+      expect(
+        advisor.analyze(plan2).find((w) => w.severity === "warning" && w.message.includes("Sequential scan")),
+      ).toBeDefined();
     });
   });
 });

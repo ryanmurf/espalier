@@ -1,10 +1,11 @@
 import type { Connection, DataSource, Transaction } from "espalier-jdbc";
 
 declare const console: { warn(...args: unknown[]): void };
-import { createRepository } from "espalier-data";
+
 import type { CrudRepository } from "espalier-data";
+import { createRepository } from "espalier-data";
+import type { FactoryOptions } from "../factory/entity-factory.js";
 import { EntityFactory } from "../factory/entity-factory.js";
-import type { FactoryOptions, PersistFn } from "../factory/entity-factory.js";
 
 /**
  * Generate a short unique ID for savepoint names using crypto.randomUUID()
@@ -12,13 +13,13 @@ import type { FactoryOptions, PersistFn } from "../factory/entity-factory.js";
  * since there is no shared global counter.
  */
 function randomSavepointId(): string {
-  const crypto = (globalThis as Record<string, unknown>)['crypto'] as
-    | { randomUUID?: () => string }
-    | undefined;
-  if (typeof crypto?.randomUUID === 'function') {
-    return crypto.randomUUID().replace(/-/g, '').slice(0, 8);
+  const crypto = (globalThis as Record<string, unknown>)["crypto"] as { randomUUID?: () => string } | undefined;
+  if (typeof crypto?.randomUUID === "function") {
+    return crypto.randomUUID().replace(/-/g, "").slice(0, 8);
   }
-  return Math.floor(Math.random() * 0xffffffff).toString(16).padStart(8, '0');
+  return Math.floor(Math.random() * 0xffffffff)
+    .toString(16)
+    .padStart(8, "0");
 }
 
 /**
@@ -29,11 +30,7 @@ function randomSavepointId(): string {
  * of the test. Pass an explicit persist function to override this behavior.
  */
 export class BoundEntityFactory<T> extends EntityFactory<T> {
-  constructor(
-    entityClass: new (...args: unknown[]) => T,
-    txDataSource: DataSource,
-    options?: FactoryOptions<T>,
-  ) {
+  constructor(entityClass: new (...args: unknown[]) => T, txDataSource: DataSource, options?: FactoryOptions<T>) {
     super(entityClass, options);
     // Pre-bind the default persist fn to the transactional repository
     const repo = createRepository<T, unknown>(entityClass, txDataSource);
@@ -71,9 +68,7 @@ export interface TestTransactionContext {
   /**
    * Create a CrudRepository bound to this test transaction.
    */
-  createRepository<T, ID>(
-    entityClass: new (...args: any[]) => T,
-  ): CrudRepository<T, ID>;
+  createRepository<T, ID>(entityClass: new (...args: any[]) => T): CrudRepository<T, ID>;
 
   /**
    * Create an EntityFactory bound to the transactional connection.
@@ -81,10 +76,7 @@ export interface TestTransactionContext {
    * entities are automatically rolled back at the end of the test.
    * Pass an explicit persistFn to `.create()` to override the transactional default.
    */
-  factory<T>(
-    entityClass: new (...args: unknown[]) => T,
-    options?: FactoryOptions<T>,
-  ): BoundEntityFactory<T>;
+  factory<T>(entityClass: new (...args: unknown[]) => T, options?: FactoryOptions<T>): BoundEntityFactory<T>;
 
   /**
    * Explicitly commit the transaction. Issues a console warning since this
@@ -132,16 +124,11 @@ export async function withTestTransaction<R>(
     transaction,
     dataSource: txDataSource,
 
-    createRepository<T, ID>(
-      entityClass: new (...args: any[]) => T,
-    ): CrudRepository<T, ID> {
+    createRepository<T, ID>(entityClass: new (...args: any[]) => T): CrudRepository<T, ID> {
       return createRepository<T, ID>(entityClass, txDataSource);
     },
 
-    factory<T>(
-      entityClass: new (...args: unknown[]) => T,
-      factoryOptions?: FactoryOptions<T>,
-    ): EntityFactory<T> {
+    factory<T>(entityClass: new (...args: unknown[]) => T, factoryOptions?: FactoryOptions<T>): EntityFactory<T> {
       // Use BoundEntityFactory so .create() persists via the transactional connection
       return new BoundEntityFactory(entityClass, txDataSource, factoryOptions);
     },
@@ -149,7 +136,7 @@ export async function withTestTransaction<R>(
     async commit(): Promise<void> {
       console.warn(
         "[espalier-testing] Explicit commit in withTestTransaction — " +
-        "this defeats test isolation. Use only when intentional.",
+          "this defeats test isolation. Use only when intentional.",
       );
       await transaction.commit();
     },

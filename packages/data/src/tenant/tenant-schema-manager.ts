@@ -1,5 +1,5 @@
 import type { Connection, DataSource } from "espalier-jdbc";
-import { validateIdentifier, quoteIdentifier } from "espalier-jdbc";
+import { quoteIdentifier, validateIdentifier } from "espalier-jdbc";
 import { DdlGenerator } from "../schema/ddl-generator.js";
 
 /**

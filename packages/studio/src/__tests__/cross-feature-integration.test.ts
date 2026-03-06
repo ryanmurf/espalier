@@ -9,31 +9,31 @@
  * - Studio server lifecycle (start + stop, connection cleanup)
  * - All exports are accessible from the main package index
  */
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { Hono } from "hono";
-import { PgDataSource } from "espalier-jdbc-pg";
+
 import {
-  Table,
   Column,
-  Id,
-  Version,
-  ManyToOne,
-  OneToMany,
-  ManyToMany,
-  OneToOne,
   CreatedDate,
-  LastModifiedDate,
-  TenantId,
   Embeddable,
   Embedded,
+  Id,
+  LastModifiedDate,
+  ManyToMany,
+  ManyToOne,
+  OneToMany,
+  OneToOne,
+  Table,
+  TenantId,
+  Version,
 } from "espalier-data";
-import { extractSchema } from "../schema/index.js";
+import { PgDataSource } from "espalier-jdbc-pg";
+import { Hono } from "hono";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { runDiagramCommand } from "../cli/diagram-command.js";
 import { generateDiagram } from "../diagram/index.js";
+import { extractSchema } from "../schema/index.js";
+import type { SchemaModel } from "../schema/schema-model.js";
 import { createApiRoutes } from "../server/api-routes.js";
 import { createStudioServer } from "../server/index.js";
-import { runDiagramCommand } from "../cli/diagram-command.js";
-import type { ApiRouteContext } from "../server/api-routes.js";
-import type { SchemaModel } from "../schema/schema-model.js";
 
 // =============================================================================
 // Postgres connectivity check
@@ -49,7 +49,11 @@ async function isPostgresAvailable(): Promise<boolean> {
     await ds.close();
     return true;
   } catch {
-    try { await ds.close(); } catch { /* ignore */ }
+    try {
+      await ds.close();
+    } catch {
+      /* ignore */
+    }
     return false;
   }
 }
@@ -258,16 +262,12 @@ describe("cross-feature integration — schema extractor + diagram", () => {
     const diagram = generateDiagram(schema, { format: "mermaid" });
     // integ_categories should reference itself
     const lines = diagram.split("\n");
-    const catRelLines = lines.filter(
-      (l) => l.includes("integ_categories") && l.includes(":"),
-    );
+    const catRelLines = lines.filter((l) => l.includes("integ_categories") && l.includes(":"));
     expect(catRelLines.length).toBeGreaterThan(0);
   });
 
   it("ManyToMany join table info preserved in schema", () => {
-    const rolePerms = schema.relations.find(
-      (r) => r.sourceTable === "integ_roles" && r.fieldName === "permissions",
-    );
+    const rolePerms = schema.relations.find((r) => r.sourceTable === "integ_roles" && r.fieldName === "permissions");
     expect(rolePerms).toBeDefined();
     expect(rolePerms!.joinTable).toBeDefined();
     expect(rolePerms!.joinTable!.name).toBe("role_permissions");
@@ -329,121 +329,116 @@ describe("cross-feature integration — studio exports", () => {
   });
 });
 
-describe.skipIf(!canConnect)(
-  "cross-feature integration — studio server + connection pool (E2E)",
-  () => {
-    let ds: PgDataSource;
-    const TEST_TABLE = "integ_test_pool";
+describe.skipIf(!canConnect)("cross-feature integration — studio server + connection pool (E2E)", () => {
+  let ds: PgDataSource;
+  const TEST_TABLE = "integ_test_pool";
 
-    beforeAll(async () => {
-      ds = createTestDataSource();
-      const conn = await ds.getConnection();
-      const stmt = conn.createStatement();
-      await stmt.executeUpdate(`DROP TABLE IF EXISTS ${TEST_TABLE} CASCADE`);
-      await stmt.executeUpdate(`
+  beforeAll(async () => {
+    ds = createTestDataSource();
+    const conn = await ds.getConnection();
+    const stmt = conn.createStatement();
+    await stmt.executeUpdate(`DROP TABLE IF EXISTS ${TEST_TABLE} CASCADE`);
+    await stmt.executeUpdate(`
         CREATE TABLE ${TEST_TABLE} (
           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
           name VARCHAR(255) NOT NULL
         )
       `);
-      await stmt.executeUpdate(`INSERT INTO ${TEST_TABLE} (name) VALUES ('test1')`);
-      await stmt.close();
-      await conn.close();
-    });
+    await stmt.executeUpdate(`INSERT INTO ${TEST_TABLE} (name) VALUES ('test1')`);
+    await stmt.close();
+    await conn.close();
+  });
 
-    afterAll(async () => {
-      const conn = await ds.getConnection();
-      const stmt = conn.createStatement();
-      await stmt.executeUpdate(`DROP TABLE IF EXISTS ${TEST_TABLE} CASCADE`);
-      await stmt.close();
-      await conn.close();
-      await ds.close();
-    });
+  afterAll(async () => {
+    const conn = await ds.getConnection();
+    const stmt = conn.createStatement();
+    await stmt.executeUpdate(`DROP TABLE IF EXISTS ${TEST_TABLE} CASCADE`);
+    await stmt.close();
+    await conn.close();
+    await ds.close();
+  });
 
-    it("studio API requests release connections back to pool", async () => {
-      @Table(TEST_TABLE)
-      class IntegPoolItem {
-        @Id @Column({ type: "UUID" }) id!: string;
-        @Column({ type: "VARCHAR(255)" }) name!: string;
-      }
-      new IntegPoolItem();
+  it("studio API requests release connections back to pool", async () => {
+    @Table(TEST_TABLE)
+    class IntegPoolItem {
+      @Id @Column({ type: "UUID" }) id!: string;
+      @Column({ type: "VARCHAR(255)" }) name!: string;
+    }
+    new IntegPoolItem();
 
-      const schema = extractSchema({ entities: [IntegPoolItem] });
-      const app = new Hono();
-      createApiRoutes(app, { schema, dataSource: ds, readOnly: true });
+    const schema = extractSchema({ entities: [IntegPoolItem] });
+    const app = new Hono();
+    createApiRoutes(app, { schema, dataSource: ds, readOnly: true });
 
-      // Make many sequential requests to verify connections are released
-      for (let i = 0; i < 20; i++) {
-        const res = await app.request(`http://localhost/api/tables/${TEST_TABLE}/rows`);
-        expect(res.status).toBe(200);
-        const body: any = await res.json();
-        expect(body.rows.length).toBeGreaterThan(0);
-      }
-    });
-
-    it("concurrent studio requests don't exhaust pool", async () => {
-      @Table(TEST_TABLE)
-      class IntegPoolItem2 {
-        @Id @Column({ type: "UUID" }) id!: string;
-        @Column({ type: "VARCHAR(255)" }) name!: string;
-      }
-      new IntegPoolItem2();
-
-      const schema = extractSchema({ entities: [IntegPoolItem2] });
-      const app = new Hono();
-      createApiRoutes(app, { schema, dataSource: ds, readOnly: true });
-
-      const requests = Array.from({ length: 15 }, () =>
-        app.request(`http://localhost/api/tables/${TEST_TABLE}/rows`),
-      );
-      const responses = await Promise.all(requests);
-      for (const res of responses) {
-        expect(res.status).toBe(200);
-      }
-    });
-
-    it("createStudioServer returns correct interface shape", () => {
-      const schema = extractSchema({ entities: ALL_ENTITIES });
-      const server = createStudioServer({
-        schema,
-        dataSource: ds,
-        port: 0,
-        readOnly: true,
-      });
-
-      expect(typeof server.start).toBe("function");
-      expect(typeof server.stop).toBe("function");
-      expect(typeof server.port).toBe("number");
-      expect(server.app).toBeDefined();
-    });
-
-    it("schema + query API integration (query playground reads real data)", async () => {
-      @Table(TEST_TABLE)
-      class IntegPoolItem3 {
-        @Id @Column({ type: "UUID" }) id!: string;
-        @Column({ type: "VARCHAR(255)" }) name!: string;
-      }
-      new IntegPoolItem3();
-
-      const schema = extractSchema({ entities: [IntegPoolItem3] });
-      const app = new Hono();
-      createApiRoutes(app, { schema, dataSource: ds, readOnly: true });
-
-      // Use query playground to read from the same table
-      const queryRes = await app.request("http://localhost/api/query", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sql: `SELECT * FROM ${TEST_TABLE}` }),
-      });
-      expect(queryRes.status).toBe(200);
-      const body: any = await queryRes.json();
+    // Make many sequential requests to verify connections are released
+    for (let i = 0; i < 20; i++) {
+      const res = await app.request(`http://localhost/api/tables/${TEST_TABLE}/rows`);
+      expect(res.status).toBe(200);
+      const body: any = await res.json();
       expect(body.rows.length).toBeGreaterThan(0);
+    }
+  });
 
-      // Schema endpoint should show the table
-      const schemaRes = await app.request("http://localhost/api/schema");
-      expect(schemaRes.status).toBe(200);
-      const schemaBody: any = await schemaRes.json();
-      expect(schemaBody.tables.some((t: any) => t.tableName === TEST_TABLE)).toBe(true);
+  it("concurrent studio requests don't exhaust pool", async () => {
+    @Table(TEST_TABLE)
+    class IntegPoolItem2 {
+      @Id @Column({ type: "UUID" }) id!: string;
+      @Column({ type: "VARCHAR(255)" }) name!: string;
+    }
+    new IntegPoolItem2();
+
+    const schema = extractSchema({ entities: [IntegPoolItem2] });
+    const app = new Hono();
+    createApiRoutes(app, { schema, dataSource: ds, readOnly: true });
+
+    const requests = Array.from({ length: 15 }, () => app.request(`http://localhost/api/tables/${TEST_TABLE}/rows`));
+    const responses = await Promise.all(requests);
+    for (const res of responses) {
+      expect(res.status).toBe(200);
+    }
+  });
+
+  it("createStudioServer returns correct interface shape", () => {
+    const schema = extractSchema({ entities: ALL_ENTITIES });
+    const server = createStudioServer({
+      schema,
+      dataSource: ds,
+      port: 0,
+      readOnly: true,
     });
-  },
-);
+
+    expect(typeof server.start).toBe("function");
+    expect(typeof server.stop).toBe("function");
+    expect(typeof server.port).toBe("number");
+    expect(server.app).toBeDefined();
+  });
+
+  it("schema + query API integration (query playground reads real data)", async () => {
+    @Table(TEST_TABLE)
+    class IntegPoolItem3 {
+      @Id @Column({ type: "UUID" }) id!: string;
+      @Column({ type: "VARCHAR(255)" }) name!: string;
+    }
+    new IntegPoolItem3();
+
+    const schema = extractSchema({ entities: [IntegPoolItem3] });
+    const app = new Hono();
+    createApiRoutes(app, { schema, dataSource: ds, readOnly: true });
+
+    // Use query playground to read from the same table
+    const queryRes = await app.request("http://localhost/api/query", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sql: `SELECT * FROM ${TEST_TABLE}` }),
+    });
+    expect(queryRes.status).toBe(200);
+    const body: any = await queryRes.json();
+    expect(body.rows.length).toBeGreaterThan(0);
+
+    // Schema endpoint should show the table
+    const schemaRes = await app.request("http://localhost/api/schema");
+    expect(schemaRes.status).toBe(200);
+    const schemaBody: any = await schemaRes.json();
+    expect(schemaBody.tables.some((t: any) => t.tableName === TEST_TABLE)).toBe(true);
+  });
+});

@@ -9,18 +9,14 @@
  * #58: No rate limiting on health checks
  * #60: Redaction regex bypass patterns
  */
-import { describe, it, expect, vi } from "vitest";
-import {
-  HealthCheckRegistry,
-  ConnectivityHealthCheck,
-  PoolHealthCheck,
-} from "../health.js";
+import { describe, expect, it, vi } from "vitest";
 import type { HealthCheck, HealthCheckResult, HealthStatus } from "../health.js";
+import { ConnectivityHealthCheck, HealthCheckRegistry, PoolHealthCheck } from "../health.js";
+import type { DataSource } from "../index.js";
 import type { MonitoredPooledDataSource, PoolStats } from "../pool.js";
-import type { DataSource, Connection, Statement, ResultSet } from "../index.js";
-import { SlowQueryDetector } from "../slow-query-detector.js";
-import type { SlowQueryEvent } from "../slow-query-detector.js";
 import { QueryStatisticsCollector } from "../query-statistics.js";
+import type { SlowQueryEvent } from "../slow-query-detector.js";
+import { SlowQueryDetector } from "../slow-query-detector.js";
 
 // ══════════════════════════════════════════════════
 // Mock factories
@@ -52,7 +48,7 @@ function mockPoolDataSource(stats: PoolStats): MonitoredPooledDataSource {
   } as unknown as MonitoredPooledDataSource;
 }
 
-function staticCheck(name: string, status: HealthStatus): HealthCheck {
+function _staticCheck(name: string, status: HealthStatus): HealthCheck {
   return {
     name,
     async check(): Promise<HealthCheckResult> {
@@ -67,43 +63,39 @@ function staticCheck(name: string, status: HealthStatus): HealthCheck {
 
 describe("#50: ConnectivityHealthCheck SQL injection guard", () => {
   it("rejects DROP TABLE", () => {
-    expect(() => new ConnectivityHealthCheck("db", mockDataSource(), { query: "DROP TABLE users" }))
-      .toThrow();
+    expect(() => new ConnectivityHealthCheck("db", mockDataSource(), { query: "DROP TABLE users" })).toThrow();
   });
 
   it("rejects DELETE", () => {
-    expect(() => new ConnectivityHealthCheck("db", mockDataSource(), { query: "DELETE FROM users" }))
-      .toThrow();
+    expect(() => new ConnectivityHealthCheck("db", mockDataSource(), { query: "DELETE FROM users" })).toThrow();
   });
 
   it("rejects INSERT", () => {
-    expect(() => new ConnectivityHealthCheck("db", mockDataSource(), { query: "INSERT INTO x VALUES(1)" }))
-      .toThrow();
+    expect(() => new ConnectivityHealthCheck("db", mockDataSource(), { query: "INSERT INTO x VALUES(1)" })).toThrow();
   });
 
   it("rejects UPDATE", () => {
-    expect(() => new ConnectivityHealthCheck("db", mockDataSource(), { query: "UPDATE users SET active=false" }))
-      .toThrow();
+    expect(
+      () => new ConnectivityHealthCheck("db", mockDataSource(), { query: "UPDATE users SET active=false" }),
+    ).toThrow();
   });
 
   it("rejects TRUNCATE", () => {
-    expect(() => new ConnectivityHealthCheck("db", mockDataSource(), { query: "TRUNCATE users" }))
-      .toThrow();
+    expect(() => new ConnectivityHealthCheck("db", mockDataSource(), { query: "TRUNCATE users" })).toThrow();
   });
 
   it("rejects SELECT with subcommand in custom SQL", () => {
-    expect(() => new ConnectivityHealthCheck("db", mockDataSource(), { query: "SELECT 1; DROP TABLE users" }))
-      .toThrow();
+    expect(
+      () => new ConnectivityHealthCheck("db", mockDataSource(), { query: "SELECT 1; DROP TABLE users" }),
+    ).toThrow();
   });
 
   it("rejects SQL comment injection", () => {
-    expect(() => new ConnectivityHealthCheck("db", mockDataSource(), { query: "SELECT 1 -- innocent" }))
-      .toThrow();
+    expect(() => new ConnectivityHealthCheck("db", mockDataSource(), { query: "SELECT 1 -- innocent" })).toThrow();
   });
 
   it("rejects COPY command", () => {
-    expect(() => new ConnectivityHealthCheck("db", mockDataSource(), { query: "COPY users TO '/tmp/leak'" }))
-      .toThrow();
+    expect(() => new ConnectivityHealthCheck("db", mockDataSource(), { query: "COPY users TO '/tmp/leak'" })).toThrow();
   });
 
   it("allows SELECT 1 (default)", () => {
@@ -119,7 +111,9 @@ describe("#50: ConnectivityHealthCheck SQL injection guard", () => {
   });
 
   it("allows SELECT current_timestamp", () => {
-    expect(() => new ConnectivityHealthCheck("db", mockDataSource(), { query: "SELECT current_timestamp" })).not.toThrow();
+    expect(
+      () => new ConnectivityHealthCheck("db", mockDataSource(), { query: "SELECT current_timestamp" }),
+    ).not.toThrow();
   });
 
   it("allows SELECT version()", () => {
@@ -127,14 +121,12 @@ describe("#50: ConnectivityHealthCheck SQL injection guard", () => {
   });
 
   it("rejects case-variant injection (lowercase select but dangerous payload)", () => {
-    expect(() => new ConnectivityHealthCheck("db", mockDataSource(), { query: "select pg_sleep(1000)" }))
-      .toThrow();
+    expect(() => new ConnectivityHealthCheck("db", mockDataSource(), { query: "select pg_sleep(1000)" })).toThrow();
   });
 
   it("rejects leading whitespace evasion", () => {
     // Extra whitespace should be normalized, but the query itself is still not in the allowlist
-    expect(() => new ConnectivityHealthCheck("db", mockDataSource(), { query: "  SELECT  1; DROP TABLE x" }))
-      .toThrow();
+    expect(() => new ConnectivityHealthCheck("db", mockDataSource(), { query: "  SELECT  1; DROP TABLE x" })).toThrow();
   });
 
   it("allows SELECT 1 with extra whitespace (normalized)", () => {
@@ -224,7 +216,9 @@ describe("#55: SlowQueryDetector redacts SQL in callback", () => {
     let captured: SlowQueryEvent | undefined;
     const detector = new SlowQueryDetector({
       thresholdMs: 0,
-      callback: (e) => { captured = e; },
+      callback: (e) => {
+        captured = e;
+      },
     });
 
     detector.record("SELECT * FROM users WHERE name = 'Alice'", 10);
@@ -237,7 +231,9 @@ describe("#55: SlowQueryDetector redacts SQL in callback", () => {
     let captured: SlowQueryEvent | undefined;
     const detector = new SlowQueryDetector({
       thresholdMs: 0,
-      callback: (e) => { captured = e; },
+      callback: (e) => {
+        captured = e;
+      },
     });
 
     detector.record("SELECT * FROM users WHERE id = 12345", 10);
@@ -249,7 +245,9 @@ describe("#55: SlowQueryDetector redacts SQL in callback", () => {
     let captured: SlowQueryEvent | undefined;
     const detector = new SlowQueryDetector({
       thresholdMs: 0,
-      callback: (e) => { captured = e; },
+      callback: (e) => {
+        captured = e;
+      },
     });
 
     detector.record("SELECT * FROM users WHERE password = 'supersecret123'", 10);
@@ -261,7 +259,9 @@ describe("#55: SlowQueryDetector redacts SQL in callback", () => {
     let captured: SlowQueryEvent | undefined;
     const detector = new SlowQueryDetector({
       thresholdMs: 0,
-      callback: (e) => { captured = e; },
+      callback: (e) => {
+        captured = e;
+      },
     });
 
     detector.record("INSERT INTO users (name, email) VALUES ('Alice', 'alice@example.com')", 10);
@@ -274,7 +274,9 @@ describe("#55: SlowQueryDetector redacts SQL in callback", () => {
     let captured: SlowQueryEvent | undefined;
     const detector = new SlowQueryDetector({
       thresholdMs: 0,
-      callback: (e) => { captured = e; },
+      callback: (e) => {
+        captured = e;
+      },
     });
 
     detector.record("SELECT * FROM prices WHERE amount > 99.99", 10);
@@ -286,7 +288,9 @@ describe("#55: SlowQueryDetector redacts SQL in callback", () => {
     let captured: SlowQueryEvent | undefined;
     const detector = new SlowQueryDetector({
       thresholdMs: 0,
-      callback: (e) => { captured = e; },
+      callback: (e) => {
+        captured = e;
+      },
     });
 
     const longSql = "SELECT " + "x".repeat(500);
@@ -419,7 +423,7 @@ describe("#58: Health check rate limiting", () => {
     expect(callCount).toBe(1);
 
     const results = await registry.checkAll();
-    const dbResult = results.find(r => r.name === "db");
+    const dbResult = results.find((r) => r.name === "db");
     expect(dbResult!.details.rateLimited).toBe(true);
     expect(callCount).toBe(1);
   });
@@ -439,7 +443,7 @@ describe("#58: Health check rate limiting", () => {
     expect(callCount).toBe(1);
 
     // Wait for rate limit to expire
-    await new Promise(r => setTimeout(r, 60));
+    await new Promise((r) => setTimeout(r, 60));
 
     await registry.checkOne("test");
     expect(callCount).toBe(2);
@@ -447,7 +451,8 @@ describe("#58: Health check rate limiting", () => {
 
   it("different checks have independent rate limits", async () => {
     const registry = new HealthCheckRegistry({ minIntervalMs: 5000 });
-    let aCount = 0, bCount = 0;
+    let aCount = 0,
+      bCount = 0;
     registry.register({
       name: "a",
       async check() {
@@ -562,13 +567,11 @@ describe("#58: Health check rate limiting", () => {
     });
 
     // Simulate 100 rapid-fire health check requests
-    const results = await Promise.all(
-      Array.from({ length: 100 }, () => registry.checkOne("expensive")),
-    );
+    const results = await Promise.all(Array.from({ length: 100 }, () => registry.checkOne("expensive")));
 
     // Only the first should actually execute
     expect(callCount).toBe(1);
-    const rateLimited = results.filter(r => r.details.rateLimited === true);
+    const rateLimited = results.filter((r) => r.details.rateLimited === true);
     expect(rateLimited.length).toBe(99);
   });
 });
@@ -583,7 +586,9 @@ describe("#60: Redaction regex bypass patterns", () => {
     let captured: SlowQueryEvent | undefined;
     const detector = new SlowQueryDetector({
       thresholdMs: 0,
-      callback: (e) => { captured = e; },
+      callback: (e) => {
+        captured = e;
+      },
     });
     detector.record(rawSql, 10);
     return captured!.sql;
@@ -605,7 +610,7 @@ describe("#60: Redaction regex bypass patterns", () => {
 
   it("dollar-quoted strings are handled (PostgreSQL extension)", () => {
     // $$ delimited strings — the regex may not handle these, which would be a bug
-    const result = captureRedactedSql("SELECT $$secret_value$$");
+    const _result = captureRedactedSql("SELECT $$secret_value$$");
     // Dollar-quoted strings are a PostgreSQL extension
     // If they're NOT redacted, that's a potential leak
     // This test documents current behavior

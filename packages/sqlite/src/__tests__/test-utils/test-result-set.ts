@@ -3,7 +3,7 @@
  * Implements the full ResultSet interface correctly, replacing
  * the scattered mockResultSet() anti-pattern.
  */
-import type { ResultSet, ColumnMetadata } from "espalier-jdbc";
+import type { ColumnMetadata, ResultSet } from "espalier-jdbc";
 
 export class TestResultSet implements ResultSet {
   private rows: Record<string, unknown>[];
@@ -48,7 +48,7 @@ export class TestResultSet implements ResultSet {
     if (val instanceof Date) return val;
     if (typeof val === "string" || typeof val === "number") {
       const d = new Date(val);
-      return isNaN(d.getTime()) ? null : d;
+      return Number.isNaN(d.getTime()) ? null : d;
     }
     return null;
   }

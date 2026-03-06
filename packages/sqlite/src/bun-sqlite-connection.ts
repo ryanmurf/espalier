@@ -1,15 +1,15 @@
-import type { Connection, TypeAwareConnection, PreparedStatement, Statement, TypeConverterRegistry } from "espalier-jdbc";
+import type { PreparedStatement, Statement, TypeAwareConnection, TypeConverterRegistry } from "espalier-jdbc";
 import {
-  type Transaction,
-  type IsolationLevel,
   ConnectionError,
-  TransactionError,
   DatabaseErrorCode,
   getGlobalLogger,
+  type IsolationLevel,
   LogLevel,
+  type Transaction,
+  TransactionError,
 } from "espalier-jdbc";
 import type { BunSqliteDatabase } from "./bun-sqlite-statement.js";
-import { BunSqliteStatementImpl, BunSqlitePreparedStatement } from "./bun-sqlite-statement.js";
+import { BunSqlitePreparedStatement, BunSqliteStatementImpl } from "./bun-sqlite-statement.js";
 
 export class BunSqliteConnection implements TypeAwareConnection {
   private closed = false;
@@ -137,11 +137,7 @@ export class BunSqliteConnection implements TypeAwareConnection {
 
   private ensureOpen(): void {
     if (this.closed) {
-      throw new ConnectionError(
-        "Connection is closed",
-        undefined,
-        DatabaseErrorCode.CONNECTION_CLOSED,
-      );
+      throw new ConnectionError("Connection is closed", undefined, DatabaseErrorCode.CONNECTION_CLOSED);
     }
   }
 }

@@ -1,8 +1,8 @@
-import { describe, it, expect } from "vitest";
-import { Version, getVersionField } from "../../decorators/version.js";
-import { Table } from "../../decorators/table.js";
+import { describe, expect, it } from "vitest";
 import { Column } from "../../decorators/column.js";
 import { Id } from "../../decorators/id.js";
+import { Table } from "../../decorators/table.js";
+import { getVersionField, Version } from "../../decorators/version.js";
 import { getEntityMetadata } from "../../mapping/entity-metadata.js";
 import { OptimisticLockException } from "../../repository/optimistic-lock.js";
 

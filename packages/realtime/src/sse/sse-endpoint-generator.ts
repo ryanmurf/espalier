@@ -115,10 +115,7 @@ export class SseEndpointGenerator {
    * @param options SSE configuration
    * @returns Object with a handler function for Fastify route registration
    */
-  generateFastifyPlugin<T>(
-    changeSource: AsyncIterable<ChangeEvent<T>>,
-    options?: SseOptions,
-  ): FastifyPluginResult {
+  generateFastifyPlugin<T>(changeSource: AsyncIterable<ChangeEvent<T>>, options?: SseOptions): FastifyPluginResult {
     const coreHandler = this.generateHandler(changeSource, options);
 
     return {
@@ -172,10 +169,7 @@ export class SseEndpointGenerator {
                 timestamp: event.timestamp.toISOString(),
               });
 
-              const chunk =
-                `id: ${eventCounter}\n` +
-                `event: ${eventType}\n` +
-                `data: ${data}\n\n`;
+              const chunk = `id: ${eventCounter}\n` + `event: ${eventType}\n` + `data: ${data}\n\n`;
 
               controller.enqueue(encoder.encode(chunk));
             }

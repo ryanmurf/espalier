@@ -6,29 +6,36 @@
  * - TenantRoutingDataSource routes between factory-created DataSources
  * - TenantContext integrates correctly with new adapter lifecycle
  */
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import {
-  TenantContext,
-  NoTenantException,
-  TenantAwareDataSource,
-  RoutingDataSource,
-  TenantRoutingDataSource,
-  RoutingError,
-} from "../../tenant/index.js";
-import type { TenantAwareDataSourceOptions } from "../../tenant/index.js";
-import type { DataSource, Connection, Statement, PreparedStatement, ResultSet, Transaction } from "espalier-jdbc";
+
+import type { Connection, DataSource, ResultSet, Statement } from "espalier-jdbc";
+import { describe, expect, it, vi } from "vitest";
+import { TenantAwareDataSource, TenantContext, TenantRoutingDataSource } from "../../tenant/index.js";
 
 // -- Mock infrastructure --
 function createMockResultSet(rows: Record<string, unknown>[] = []): ResultSet {
   let idx = -1;
   return {
-    async next() { return ++idx < rows.length; },
-    getString(col: string | number) { return rows[idx]?.[col as string] as string ?? null; },
-    getNumber(col: string | number) { return rows[idx]?.[col as string] as number ?? null; },
-    getBoolean(col: string | number) { return rows[idx]?.[col as string] as boolean ?? null; },
-    getDate(col: string | number) { return null; },
-    getRow() { return rows[idx] ?? {}; },
-    getMetadata() { return []; },
+    async next() {
+      return ++idx < rows.length;
+    },
+    getString(col: string | number) {
+      return (rows[idx]?.[col as string] as string) ?? null;
+    },
+    getNumber(col: string | number) {
+      return (rows[idx]?.[col as string] as number) ?? null;
+    },
+    getBoolean(col: string | number) {
+      return (rows[idx]?.[col as string] as boolean) ?? null;
+    },
+    getDate(col: string | number) {
+      return null;
+    },
+    getRow() {
+      return rows[idx] ?? {};
+    },
+    getMetadata() {
+      return [];
+    },
     async close() {},
     [Symbol.asyncIterator]() {
       return {
@@ -43,8 +50,12 @@ function createMockResultSet(rows: Record<string, unknown>[] = []): ResultSet {
 
 function createMockStatement(overrides?: Partial<Statement>): Statement {
   return {
-    async executeQuery(sql: string) { return createMockResultSet(); },
-    async executeUpdate(sql: string) { return 0; },
+    async executeQuery(sql: string) {
+      return createMockResultSet();
+    },
+    async executeUpdate(sql: string) {
+      return 0;
+    },
     async close() {},
     ...overrides,
   };
@@ -53,12 +64,18 @@ function createMockStatement(overrides?: Partial<Statement>): Statement {
 function createMockConnection(overrides?: Partial<Connection>): Connection {
   let closed = false;
   return {
-    createStatement() { return createMockStatement(); },
+    createStatement() {
+      return createMockStatement();
+    },
     prepareStatement(sql: string) {
       return {
         setParameter: vi.fn(),
-        async executeQuery() { return createMockResultSet(); },
-        async executeUpdate() { return 0; },
+        async executeQuery() {
+          return createMockResultSet();
+        },
+        async executeUpdate() {
+          return 0;
+        },
         async close() {},
       } as any;
     },
@@ -70,8 +87,12 @@ function createMockConnection(overrides?: Partial<Connection>): Connection {
         async rollbackTo() {},
       };
     },
-    async close() { closed = true; },
-    isClosed() { return closed; },
+    async close() {
+      closed = true;
+    },
+    isClosed() {
+      return closed;
+    },
     ...overrides,
   };
 }
@@ -83,7 +104,9 @@ function createMockDataSource(overrides?: Partial<DataSource>): DataSource {
       if (closed) throw new Error("DataSource closed");
       return createMockConnection();
     },
-    async close() { closed = true; },
+    async close() {
+      closed = true;
+    },
     ...overrides,
   };
 }
@@ -107,7 +130,9 @@ describe("factory + tenant-aware DataSource seams", () => {
     it("propagates close to inner DataSource", async () => {
       let innerClosed = false;
       const innerDs = createMockDataSource({
-        async close() { innerClosed = true; },
+        async close() {
+          innerClosed = true;
+        },
       });
       const tads = new TenantAwareDataSource({
         dataSource: innerDs,
@@ -149,7 +174,10 @@ describe("factory + tenant-aware DataSource seams", () => {
       });
 
       const routing = new TenantRoutingDataSource({
-        dataSources: new Map([["acme", dsA], ["corp", dsB]]),
+        dataSources: new Map([
+          ["acme", dsA],
+          ["corp", dsB],
+        ]),
       });
 
       await TenantContext.run("acme", async () => {
@@ -185,8 +213,22 @@ describe("factory + tenant-aware DataSource seams", () => {
 
       const routing = new TenantRoutingDataSource({
         dataSources: new Map([
-          ["a", createMockDataSource({ async close() { aClosed = true; } })],
-          ["b", createMockDataSource({ async close() { bClosed = true; } })],
+          [
+            "a",
+            createMockDataSource({
+              async close() {
+                aClosed = true;
+              },
+            }),
+          ],
+          [
+            "b",
+            createMockDataSource({
+              async close() {
+                bClosed = true;
+              },
+            }),
+          ],
         ]),
       });
 

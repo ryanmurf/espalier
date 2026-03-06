@@ -1,7 +1,7 @@
 import type { Connection, DataSource, TypeConverterRegistry } from "espalier-jdbc";
 import { ConnectionError, DatabaseErrorCode, getGlobalLogger } from "espalier-jdbc";
-import type { D1Database, D1PreparedStatement, D1Result } from "./d1-types.js";
 import { D1Connection } from "./d1-connection.js";
+import type { D1Database, D1PreparedStatement, D1Result } from "./d1-types.js";
 
 export interface D1DataSourceConfig {
   /** The D1Database binding from the Cloudflare Workers env. */
@@ -32,11 +32,7 @@ export class D1DataSource implements DataSource {
 
   async getConnection(): Promise<Connection> {
     if (this.closed) {
-      throw new ConnectionError(
-        "DataSource is closed",
-        undefined,
-        DatabaseErrorCode.CONNECTION_CLOSED,
-      );
+      throw new ConnectionError("DataSource is closed", undefined, DatabaseErrorCode.CONNECTION_CLOSED);
     }
     return new D1Connection(this.binding, this.typeConverters);
   }
@@ -50,11 +46,7 @@ export class D1DataSource implements DataSource {
    */
   async batch(statements: D1PreparedStatement[]): Promise<D1Result[]> {
     if (this.closed) {
-      throw new ConnectionError(
-        "DataSource is closed",
-        undefined,
-        DatabaseErrorCode.CONNECTION_CLOSED,
-      );
+      throw new ConnectionError("DataSource is closed", undefined, DatabaseErrorCode.CONNECTION_CLOSED);
     }
     return this.binding.batch(statements);
   }

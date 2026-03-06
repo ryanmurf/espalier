@@ -12,23 +12,24 @@
  * - Schema extraction from factory's entity class vs raw class
  * - Sequences and traits do not corrupt metadata
  */
-import { describe, it, expect } from "vitest";
+
 import {
-  Table,
   Column,
-  Id,
-  Version,
   CreatedDate,
-  LastModifiedDate,
-  TenantId,
   Embeddable,
   Embedded,
+  Id,
+  LastModifiedDate,
   ManyToOne,
   OneToMany,
+  Table,
+  TenantId,
+  Version,
 } from "espalier-data";
 import { createFactory } from "espalier-testing";
+import { describe, expect, it } from "vitest";
+import type { SchemaColumn, SchemaModel, SchemaTable } from "../schema/index.js";
 import { extractSchema } from "../schema/index.js";
-import type { SchemaModel, SchemaTable, SchemaColumn } from "../schema/index.js";
 
 // =============================================================================
 // Helpers
@@ -102,9 +103,7 @@ describe("QA Seam: Studio schema extractor + espalier-testing factories", () => 
 
       expect(schemaFromClass.tables.length).toBe(schemaFromBuilt.tables.length);
       expect(schemaFromClass.tables[0].tableName).toBe(schemaFromBuilt.tables[0].tableName);
-      expect(schemaFromClass.tables[0].columns.length).toBe(
-        schemaFromBuilt.tables[0].columns.length,
-      );
+      expect(schemaFromClass.tables[0].columns.length).toBe(schemaFromBuilt.tables[0].columns.length);
     });
 
     it("factory-built entity has all fields the schema expects", () => {
@@ -145,9 +144,7 @@ describe("QA Seam: Studio schema extractor + espalier-testing factories", () => 
       const order = factory.build();
       expect(typeof order.id).toBe("string");
       // UUID format check
-      expect(order.id).toMatch(
-        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
-      );
+      expect(order.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
     });
   });
 
@@ -175,10 +172,7 @@ describe("QA Seam: Studio schema extractor + espalier-testing factories", () => 
   describe("factory with association + schema relations", () => {
     it("factory association builds correct related entity", () => {
       const lineItemFactory = createFactory(FactoryLineItem);
-      const orderFactory = createFactory(FactoryOrder).association(
-        "lineItems" as any,
-        lineItemFactory,
-      );
+      const _orderFactory = createFactory(FactoryOrder).association("lineItems" as any, lineItemFactory);
 
       const schema = extractSchema({ entities: [FactoryOrder, FactoryLineItem] });
       // Verify the relation is captured

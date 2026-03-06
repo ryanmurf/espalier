@@ -4,18 +4,12 @@
  * Tests against live Postgres. Uses same server as both "primary" and "replica"
  * (separate PgDataSource instances) to verify routing logic end-to-end.
  */
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { createTestDataSource, isPostgresAvailable } from "./setup.js";
-import {
-  ReadWriteContext,
-  ReadReplicaDataSource,
-  Table,
-  Column,
-  Id,
-  createDerivedRepository,
-} from "espalier-data";
+
 import type { CrudRepository } from "espalier-data";
+import { Column, createDerivedRepository, Id, ReadReplicaDataSource, ReadWriteContext, Table } from "espalier-data";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { PgDataSource } from "../../pg-data-source.js";
+import { createTestDataSource, isPostgresAvailable } from "./setup.js";
 
 const canConnect = await isPostgresAvailable();
 
@@ -143,9 +137,7 @@ describe.skipIf(!canConnect)("ReadReplicaDataSource — E2E", () => {
         return repo.save(item);
       });
 
-      const reads = Array.from({ length: 5 }, () =>
-        ReadWriteContext.runReadOnly(() => repo.findAll()),
-      );
+      const reads = Array.from({ length: 5 }, () => ReadWriteContext.runReadOnly(() => repo.findAll()));
 
       const results = await Promise.all([...writes, ...reads]);
       expect(results.length).toBe(10);

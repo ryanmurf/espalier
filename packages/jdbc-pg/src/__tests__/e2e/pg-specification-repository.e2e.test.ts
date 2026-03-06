@@ -1,22 +1,21 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { createTestDataSource, isPostgresAvailable } from "./setup.js";
 import {
-  Table,
-  Column,
-  Id,
-  createDerivedRepository,
-  Specifications,
-  equal,
-  like,
-  greaterThan,
-  lessThan,
   between,
+  Column,
+  createDerivedRepository,
+  equal,
+  greaterThan,
+  Id,
   isIn,
-  isNull,
   isNotNull,
+  isNull,
+  lessThan,
+  like,
+  Specifications,
+  Table,
 } from "espalier-data";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { PgDataSource } from "../../pg-data-source.js";
-import type { Connection } from "espalier-jdbc";
+import { createTestDataSource, isPostgresAvailable } from "./setup.js";
 
 const canConnect = await isPostgresAvailable();
 
@@ -68,7 +67,7 @@ describe.skipIf(!canConnect)("E2E: Specification Repository", { timeout: 15000 }
       { name: "Action Figure", price: 19.99, category: "Toys", in_stock: true },
       { name: "Board Game", price: 34.99, category: "Toys", in_stock: true },
       { name: "Puzzle", price: 15.99, category: "Toys", in_stock: false },
-      { name: "Misc Item", price: 5.00, category: null as any, in_stock: true },
+      { name: "Misc Item", price: 5.0, category: null as any, in_stock: true },
     ];
 
     for (const p of products) {
@@ -141,9 +140,7 @@ describe.skipIf(!canConnect)("E2E: Specification Repository", { timeout: 15000 }
   });
 
   it("findAll with NOT filter", async () => {
-    const spec = Specifications.not(
-      equal<SpecTestProduct>("category", "Toys"),
-    );
+    const spec = Specifications.not(equal<SpecTestProduct>("category", "Toys"));
     const results = await repo.findAll(spec);
     for (const p of results) {
       expect(p.category).not.toBe("Toys");
@@ -207,13 +204,8 @@ describe.skipIf(!canConnect)("E2E: Specification Repository", { timeout: 15000 }
 
   it("complex composition: and(or(a, b), not(c))", async () => {
     const spec = Specifications.and(
-      Specifications.or(
-        equal<SpecTestProduct>("category", "Electronics"),
-        equal<SpecTestProduct>("category", "Books"),
-      ),
-      Specifications.not(
-        greaterThan<SpecTestProduct>("price", 100),
-      ),
+      Specifications.or(equal<SpecTestProduct>("category", "Electronics"), equal<SpecTestProduct>("category", "Books")),
+      Specifications.not(greaterThan<SpecTestProduct>("price", 100)),
     );
     const results = await repo.findAll(spec);
     for (const p of results) {

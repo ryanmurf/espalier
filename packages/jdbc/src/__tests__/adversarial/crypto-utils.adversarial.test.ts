@@ -2,9 +2,10 @@
  * Adversarial tests for crypto-utils (Web Crypto sha256 replacement).
  * Y4 Q2 — Task T2-Test
  */
-import { describe, it, expect, vi, afterEach } from "vitest";
-import { sha256 } from "../../crypto-utils.js";
+
 import { createHash } from "node:crypto";
+import { afterEach, describe, expect, it } from "vitest";
+import { sha256 } from "../../crypto-utils.js";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -113,16 +114,12 @@ describe("hash correctness — Web Crypto matches Node crypto", () => {
 
   it("known SHA-256 test vector: empty string", async () => {
     const result = await sha256("");
-    expect(result).toBe(
-      "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    );
+    expect(result).toBe("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
   });
 
   it("known SHA-256 test vector: 'abc'", async () => {
     const result = await sha256("abc");
-    expect(result).toBe(
-      "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
-    );
+    expect(result).toBe("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
   });
 
   it("returns lowercase hex string", async () => {
@@ -149,13 +146,7 @@ describe("hash determinism", () => {
   });
 
   it("different inputs produce different outputs", async () => {
-    const results = await Promise.all([
-      sha256("a"),
-      sha256("b"),
-      sha256("c"),
-      sha256("ab"),
-      sha256("abc"),
-    ]);
+    const results = await Promise.all([sha256("a"), sha256("b"), sha256("c"), sha256("ab"), sha256("abc")]);
     const unique = new Set(results);
     expect(unique.size).toBe(5);
   });
@@ -244,9 +235,7 @@ describe("concurrent hashing", () => {
 
   it("concurrent calls with identical inputs produce identical results", async () => {
     const input = "concurrent-same";
-    const results = await Promise.all(
-      Array.from({ length: 50 }, () => sha256(input)),
-    );
+    const results = await Promise.all(Array.from({ length: 50 }, () => sha256(input)));
     const unique = new Set(results);
     expect(unique.size).toBe(1);
     expect(results[0]).toBe(nodeSha256(input));
@@ -282,32 +271,20 @@ describe("migration checksum stability", () => {
   });
 
   it("checksum differs when migration SQL changes", async () => {
-    const v1 = await sha256(
-      `version:001\ndescription:init\nup:CREATE TABLE t (id INT)\ndown:DROP TABLE t`,
-    );
-    const v2 = await sha256(
-      `version:001\ndescription:init\nup:CREATE TABLE t (id BIGINT)\ndown:DROP TABLE t`,
-    );
+    const v1 = await sha256(`version:001\ndescription:init\nup:CREATE TABLE t (id INT)\ndown:DROP TABLE t`);
+    const v2 = await sha256(`version:001\ndescription:init\nup:CREATE TABLE t (id BIGINT)\ndown:DROP TABLE t`);
     expect(v1).not.toBe(v2);
   });
 
   it("checksum differs when description changes", async () => {
-    const v1 = await sha256(
-      `version:001\ndescription:init\nup:CREATE TABLE t (id INT)\ndown:DROP TABLE t`,
-    );
-    const v2 = await sha256(
-      `version:001\ndescription:initialize\nup:CREATE TABLE t (id INT)\ndown:DROP TABLE t`,
-    );
+    const v1 = await sha256(`version:001\ndescription:init\nup:CREATE TABLE t (id INT)\ndown:DROP TABLE t`);
+    const v2 = await sha256(`version:001\ndescription:initialize\nup:CREATE TABLE t (id INT)\ndown:DROP TABLE t`);
     expect(v1).not.toBe(v2);
   });
 
   it("checksum differs when version changes", async () => {
-    const v1 = await sha256(
-      `version:001\ndescription:init\nup:CREATE TABLE t (id INT)\ndown:DROP TABLE t`,
-    );
-    const v2 = await sha256(
-      `version:002\ndescription:init\nup:CREATE TABLE t (id INT)\ndown:DROP TABLE t`,
-    );
+    const v1 = await sha256(`version:001\ndescription:init\nup:CREATE TABLE t (id INT)\ndown:DROP TABLE t`);
+    const v2 = await sha256(`version:002\ndescription:init\nup:CREATE TABLE t (id INT)\ndown:DROP TABLE t`);
     expect(v1).not.toBe(v2);
   });
 
@@ -320,11 +297,7 @@ describe("migration checksum stability", () => {
   });
 
   it("multi-statement migration checksum is stable", async () => {
-    const statements = [
-      "CREATE TABLE a (id INT)",
-      "CREATE TABLE b (id INT)",
-      "CREATE INDEX idx_a ON a (id)",
-    ];
+    const statements = ["CREATE TABLE a (id INT)", "CREATE TABLE b (id INT)", "CREATE INDEX idx_a ON a (id)"];
     const content = `version:003\ndescription:multi\nup:${statements.join("\n")}\ndown:DROP TABLE b; DROP TABLE a`;
     const h1 = await sha256(content);
     const h2 = await sha256(content);
@@ -389,10 +362,7 @@ describe("no node:crypto leakage in crypto-utils source", () => {
   it("crypto-utils.ts does not import from node:crypto", async () => {
     // Read the source file and verify no node:crypto imports
     const fs = await import("node:fs/promises");
-    const source = await fs.readFile(
-      new URL("../../crypto-utils.ts", import.meta.url),
-      "utf-8",
-    );
+    const source = await fs.readFile(new URL("../../crypto-utils.ts", import.meta.url), "utf-8");
     expect(source).not.toContain("node:crypto");
     expect(source).not.toContain("require('crypto')");
     expect(source).not.toContain('require("crypto")');
@@ -402,10 +372,7 @@ describe("no node:crypto leakage in crypto-utils source", () => {
 
   it("crypto-utils.ts uses globalThis.crypto.subtle", async () => {
     const fs = await import("node:fs/promises");
-    const source = await fs.readFile(
-      new URL("../../crypto-utils.ts", import.meta.url),
-      "utf-8",
-    );
+    const source = await fs.readFile(new URL("../../crypto-utils.ts", import.meta.url), "utf-8");
     expect(source).toContain("globalThis.crypto.subtle");
   });
 });

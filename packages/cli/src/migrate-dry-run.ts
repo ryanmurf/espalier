@@ -1,5 +1,5 @@
-import type { EspalierConfig } from "./config.js";
 import { createAdapter } from "./adapter-factory.js";
+import type { EspalierConfig } from "./config.js";
 import { loadMigrations } from "./migrate-loader.js";
 
 export interface MigrateDryRunOptions {
@@ -18,9 +18,7 @@ export interface MigrateDryRunResult {
   pending: DryRunStatement[];
 }
 
-export async function migrateDryRun(
-  options: MigrateDryRunOptions,
-): Promise<MigrateDryRunResult> {
+export async function migrateDryRun(options: MigrateDryRunOptions): Promise<MigrateDryRunResult> {
   const { config, migrationsDir, toVersion } = options;
   const { dataSource, runner } = await createAdapter(config);
 

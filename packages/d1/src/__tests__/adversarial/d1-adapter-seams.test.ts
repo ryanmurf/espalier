@@ -8,11 +8,11 @@
  * - Connection lifecycle after DataSource close
  * - D1 batch API interaction with JDBC interface
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { D1DataSource } from "../../d1-data-source.js";
+import { describe, expect, it, vi } from "vitest";
 import { D1Connection } from "../../d1-connection.js";
-import { D1StatementImpl, D1PreparedStatementImpl } from "../../d1-statement.js";
+import { D1DataSource } from "../../d1-data-source.js";
 import { D1ResultSet } from "../../d1-result-set.js";
+import { D1StatementImpl } from "../../d1-statement.js";
 import type { D1Database, D1PreparedStatement, D1Result } from "../../d1-types.js";
 
 // -- Mock D1 Database --
@@ -25,9 +25,7 @@ function createMockD1Database(overrides?: Partial<D1Database>): D1Database {
   };
 }
 
-function createMockD1PreparedStatement(
-  overrides?: Partial<D1PreparedStatement>,
-): D1PreparedStatement {
+function createMockD1PreparedStatement(overrides?: Partial<D1PreparedStatement>): D1PreparedStatement {
   const stmt: D1PreparedStatement = {
     bind: vi.fn(function (this: D1PreparedStatement) {
       return this;
@@ -478,9 +476,7 @@ describe("D1 adapter seam tests", () => {
       });
 
       const stmt = new D1StatementImpl(db);
-      await expect(
-        stmt.executeQuery("SELECT * FROM nonexistent"),
-      ).rejects.toThrow(/Failed to execute query.*D1_ERROR/);
+      await expect(stmt.executeQuery("SELECT * FROM nonexistent")).rejects.toThrow(/Failed to execute query.*D1_ERROR/);
     });
 
     it("executeUpdate wraps D1 errors in QueryError", async () => {
@@ -494,9 +490,7 @@ describe("D1 adapter seam tests", () => {
       });
 
       const stmt = new D1StatementImpl(db);
-      await expect(
-        stmt.executeUpdate("INSERT INTO t VALUES (1)"),
-      ).rejects.toThrow(/Failed to execute update/);
+      await expect(stmt.executeUpdate("INSERT INTO t VALUES (1)")).rejects.toThrow(/Failed to execute update/);
     });
 
     it("executeUpdate returns changes count from meta", async () => {

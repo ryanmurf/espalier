@@ -5,26 +5,27 @@
  * soft delete + audit, global filters + pagination, audit + soft-delete lifecycle,
  * concurrent multi-feature operations.
  */
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
-import type { PgDataSource } from "../../pg-data-source.js";
-import { createTestDataSource, isPostgresAvailable } from "./setup.js";
+
+import type { AuditEntry, CrudRepository } from "espalier-data";
 import {
-  Table,
-  Column,
-  Id,
-  Version,
-  SoftDelete,
-  Audited,
   AuditContext,
-  FilterContext,
-  Filter,
+  Audited,
+  Column,
   createDerivedRepository,
+  createPageable,
+  Filter,
+  FilterContext,
   getAuditLog,
   getFieldHistory,
+  Id,
+  SoftDelete,
   Specifications,
-  createPageable,
+  Table,
+  Version,
 } from "espalier-data";
-import type { CrudRepository, AuditEntry, Specification, Pageable } from "espalier-data";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import type { PgDataSource } from "../../pg-data-source.js";
+import { createTestDataSource, isPostgresAvailable } from "./setup.js";
 
 const canConnect = await isPostgresAvailable();
 
@@ -56,10 +57,7 @@ class XfTask {
 
 @Audited()
 @SoftDelete()
-@Filter(
-  "activeOnly",
-  () => new (Specifications as any).ComparisonCriteria("eq", "priority", 1),
-)
+@Filter("activeOnly", () => new (Specifications as any).ComparisonCriteria("eq", "priority", 1))
 @Table("e2e_xf_filtered")
 class XfFiltered {
   @Id @Column({ type: "SERIAL" }) id!: number;
@@ -200,9 +198,15 @@ describe.skipIf(!canConnect)("E2E: Cross-feature integration (Y5 Q2)", { timeout
   // ══════════════════════════════════════════════════════
 
   it("derived query findByCategory excludes soft-deleted items", async () => {
-    const a = new XfItem(); a.name = "A"; a.category = "cat1";
-    const b = new XfItem(); b.name = "B"; b.category = "cat1";
-    const c = new XfItem(); c.name = "C"; c.category = "cat2";
+    const a = new XfItem();
+    a.name = "A";
+    a.category = "cat1";
+    const b = new XfItem();
+    b.name = "B";
+    b.category = "cat1";
+    const c = new XfItem();
+    c.name = "C";
+    c.category = "cat2";
 
     const savedA = await itemRepo.save(a);
     await itemRepo.save(b);
@@ -218,7 +222,9 @@ describe.skipIf(!canConnect)("E2E: Cross-feature integration (Y5 Q2)", { timeout
   });
 
   it("derived query findByName returns empty for soft-deleted entity", async () => {
-    const item = new XfItem(); item.name = "UniqueItem"; item.category = "x";
+    const item = new XfItem();
+    item.name = "UniqueItem";
+    item.category = "x";
     const saved = await itemRepo.save(item);
     await itemRepo.delete(saved);
 
@@ -234,7 +240,10 @@ describe.skipIf(!canConnect)("E2E: Cross-feature integration (Y5 Q2)", { timeout
     ];
     const saved: XfItem[] = [];
     for (const data of items) {
-      const item = new XfItem(); item.name = data.name; item.category = "test"; item.priority = data.priority;
+      const item = new XfItem();
+      item.name = data.name;
+      item.category = "test";
+      item.priority = data.priority;
       saved.push(await itemRepo.save(item));
     }
 
@@ -251,7 +260,9 @@ describe.skipIf(!canConnect)("E2E: Cross-feature integration (Y5 Q2)", { timeout
   // ══════════════════════════════════════════════════════
 
   it("soft-delete then restore: audit trail captures both operations", async () => {
-    const item = new XfItem(); item.name = "Lifecycle"; item.category = "test";
+    const item = new XfItem();
+    item.name = "Lifecycle";
+    item.category = "test";
     const saved = await AuditContext.withUser({ id: "creator" }, () => itemRepo.save(item));
 
     // Soft-delete
@@ -259,7 +270,7 @@ describe.skipIf(!canConnect)("E2E: Cross-feature integration (Y5 Q2)", { timeout
 
     // Restore
     const deleted = await itemRepo.findOnlyDeleted();
-    const toRestore = deleted.find(d => d.name === "Lifecycle")!;
+    const toRestore = deleted.find((d) => d.name === "Lifecycle")!;
     await AuditContext.withUser({ id: "restorer" }, () => itemRepo.restore(toRestore));
 
     const c = await ds.getConnection();
@@ -271,7 +282,7 @@ describe.skipIf(!canConnect)("E2E: Cross-feature integration (Y5 Q2)", { timeout
     // in the audit trail. After a delete+restore cycle, there's no record
     // of the restore operation.
     expect(log.length).toBeGreaterThanOrEqual(2);
-    const ops = log.map(e => e.operation);
+    const ops = log.map((e) => e.operation);
     expect(ops).toContain("INSERT");
     expect(ops).toContain("DELETE");
 
@@ -282,7 +293,9 @@ describe.skipIf(!canConnect)("E2E: Cross-feature integration (Y5 Q2)", { timeout
   });
 
   it("audit trail persists after soft-delete (entity hidden but audit visible)", async () => {
-    const item = new XfItem(); item.name = "AuditPersist"; item.category = "test";
+    const item = new XfItem();
+    item.name = "AuditPersist";
+    item.category = "test";
     const saved = await AuditContext.withUser({ id: "admin" }, () => itemRepo.save(item));
 
     await itemRepo.delete(saved);
@@ -303,30 +316,36 @@ describe.skipIf(!canConnect)("E2E: Cross-feature integration (Y5 Q2)", { timeout
   // ══════════════════════════════════════════════════════
 
   it("@Audited({fields:['status']}) + @SoftDelete: status change audited, assignee change not", async () => {
-    const task = new XfTask(); task.title = "Task1"; task.status = "open"; task.assignee = "Alice";
+    const task = new XfTask();
+    task.title = "Task1";
+    task.status = "open";
+    task.assignee = "Alice";
     const saved = await taskRepo.save(task);
 
     saved.status = "in-progress";
     saved.assignee = "Bob";
-    const updated = await AuditContext.withUser({ id: "pm" }, () => taskRepo.save(saved));
+    const _updated = await AuditContext.withUser({ id: "pm" }, () => taskRepo.save(saved));
 
     const c = await ds.getConnection();
     const log = await getAuditLog(XfTask, saved.id, c);
     await c.close();
 
     // INSERT + UPDATE
-    const updateEntry = log.find(e => e.operation === "UPDATE");
+    const updateEntry = log.find((e) => e.operation === "UPDATE");
     expect(updateEntry).toBeDefined();
 
     // Only status should be in the changes (fields filter)
-    const fields = updateEntry!.changes.map(ch => ch.field);
+    const fields = updateEntry!.changes.map((ch) => ch.field);
     expect(fields).toContain("status");
     expect(fields).not.toContain("assignee");
     expect(fields).not.toContain("title");
   });
 
   it("partial audit + soft-delete: DELETE audit entry is still written", async () => {
-    const task = new XfTask(); task.title = "ToDelete"; task.status = "open"; task.assignee = "X";
+    const task = new XfTask();
+    task.title = "ToDelete";
+    task.status = "open";
+    task.assignee = "X";
     const saved = await taskRepo.save(task);
 
     await AuditContext.withUser({ id: "deleter" }, () => taskRepo.delete(saved));
@@ -335,7 +354,7 @@ describe.skipIf(!canConnect)("E2E: Cross-feature integration (Y5 Q2)", { timeout
     const log = await getAuditLog(XfTask, saved.id, c);
     await c.close();
 
-    const deleteEntry = log.find(e => e.operation === "DELETE");
+    const deleteEntry = log.find((e) => e.operation === "DELETE");
     expect(deleteEntry).toBeDefined();
     expect(deleteEntry!.userId).toBe("deleter");
   });
@@ -346,7 +365,9 @@ describe.skipIf(!canConnect)("E2E: Cross-feature integration (Y5 Q2)", { timeout
 
   it("count() excludes soft-deleted items", async () => {
     for (let i = 0; i < 5; i++) {
-      const item = new XfItem(); item.name = `Item-${i}`; item.category = "countTest";
+      const item = new XfItem();
+      item.name = `Item-${i}`;
+      item.category = "countTest";
       await itemRepo.save(item);
     }
 
@@ -363,7 +384,9 @@ describe.skipIf(!canConnect)("E2E: Cross-feature integration (Y5 Q2)", { timeout
   // ══════════════════════════════════════════════════════
 
   it("FilterContext.withoutFilters shows soft-deleted items, audit still works", async () => {
-    const item = new XfItem(); item.name = "FilterTest"; item.category = "test";
+    const item = new XfItem();
+    item.name = "FilterTest";
+    item.category = "test";
     const saved = await itemRepo.save(item);
     await itemRepo.delete(saved);
 
@@ -387,7 +410,8 @@ describe.skipIf(!canConnect)("E2E: Cross-feature integration (Y5 Q2)", { timeout
   // ══════════════════════════════════════════════════════
 
   it("soft-delete on versioned+audited entity: version increments, audit captured", async () => {
-    const item = new XfVersioned(); item.name = "Versioned";
+    const item = new XfVersioned();
+    item.name = "Versioned";
     const saved = await AuditContext.withUser({ id: "v-user" }, () => versionedRepo.save(item));
     const initialVersion = saved.version;
 
@@ -395,7 +419,7 @@ describe.skipIf(!canConnect)("E2E: Cross-feature integration (Y5 Q2)", { timeout
 
     // Check version incremented from initial
     const all = await versionedRepo.findIncludingDeleted();
-    const deletedItem = all.find(i => i.name === "Versioned")!;
+    const deletedItem = all.find((i) => i.name === "Versioned")!;
     expect(deletedItem.version).toBe(initialVersion + 1);
     expect(deletedItem.deletedAt).toBeInstanceOf(Date);
 
@@ -413,7 +437,9 @@ describe.skipIf(!canConnect)("E2E: Cross-feature integration (Y5 Q2)", { timeout
   it("concurrent creates with audit context isolation", async () => {
     const results = await Promise.all(
       Array.from({ length: 10 }, (_, i) => {
-        const item = new XfItem(); item.name = `Concurrent-${i}`; item.category = "stress";
+        const item = new XfItem();
+        item.name = `Concurrent-${i}`;
+        item.category = "stress";
         item.priority = i;
         return AuditContext.withUser({ id: `user-${i}` }, () => itemRepo.save(item));
       }),
@@ -438,7 +464,10 @@ describe.skipIf(!canConnect)("E2E: Cross-feature integration (Y5 Q2)", { timeout
 
   it("full lifecycle with audit trail verification", async () => {
     // Create
-    const item = new XfItem(); item.name = "FullCycle"; item.category = "lifecycle"; item.priority = 1;
+    const item = new XfItem();
+    item.name = "FullCycle";
+    item.category = "lifecycle";
+    item.priority = 1;
     const saved = await AuditContext.withUser({ id: "creator" }, () => itemRepo.save(item));
 
     // Update
@@ -455,9 +484,7 @@ describe.skipIf(!canConnect)("E2E: Cross-feature integration (Y5 Q2)", { timeout
     // Restore
     const deleted = await itemRepo.findOnlyDeleted();
     expect(deleted).toHaveLength(1);
-    const restored = await AuditContext.withUser({ id: "restorer" }, () =>
-      itemRepo.restore(deleted[0]),
-    );
+    const _restored = await AuditContext.withUser({ id: "restorer" }, () => itemRepo.restore(deleted[0]));
 
     // Verify active again
     const active = await itemRepo.findById(saved.id);
@@ -473,7 +500,7 @@ describe.skipIf(!canConnect)("E2E: Cross-feature integration (Y5 Q2)", { timeout
     // NOTE: restore() does NOT create an audit entry (audit gap)
     expect(log.length).toBeGreaterThanOrEqual(3);
 
-    const users = log.map(e => e.userId);
+    const users = log.map((e) => e.userId);
     expect(users).toContain("creator");
     expect(users).toContain("updater");
     expect(users).toContain("deleter");
@@ -488,7 +515,9 @@ describe.skipIf(!canConnect)("E2E: Cross-feature integration (Y5 Q2)", { timeout
     // Create 10 items, soft-delete 3
     const saved: XfItem[] = [];
     for (let i = 0; i < 10; i++) {
-      const item = new XfItem(); item.name = `Page-${i}`; item.category = "page";
+      const item = new XfItem();
+      item.name = `Page-${i}`;
+      item.category = "page";
       item.priority = i;
       saved.push(await itemRepo.save(item));
     }
@@ -516,7 +545,10 @@ describe.skipIf(!canConnect)("E2E: Cross-feature integration (Y5 Q2)", { timeout
   // ══════════════════════════════════════════════════════
 
   it("save after restore creates correct audit diff", async () => {
-    const item = new XfItem(); item.name = "RestoreThenUpdate"; item.category = "reg"; item.priority = 1;
+    const item = new XfItem();
+    item.name = "RestoreThenUpdate";
+    item.category = "reg";
+    item.priority = 1;
     const saved = await AuditContext.withUser({ id: "u1" }, () => itemRepo.save(item));
 
     // Soft-delete
@@ -524,20 +556,20 @@ describe.skipIf(!canConnect)("E2E: Cross-feature integration (Y5 Q2)", { timeout
 
     // Restore
     const deleted = await itemRepo.findOnlyDeleted();
-    const toRestore = deleted.find(d => d.name === "RestoreThenUpdate")!;
+    const toRestore = deleted.find((d) => d.name === "RestoreThenUpdate")!;
     await itemRepo.restore(toRestore);
 
     // Now update the restored entity
     const active = await itemRepo.findById(saved.id);
     active!.name = "UpdatedAfterRestore";
-    const finalSaved = await AuditContext.withUser({ id: "u2" }, () => itemRepo.save(active!));
+    const _finalSaved = await AuditContext.withUser({ id: "u2" }, () => itemRepo.save(active!));
 
     const c = await ds.getConnection();
     const nameHistory = await getFieldHistory(XfItem, saved.id, "name", c);
     await c.close();
 
     // Should have the name change from RestoreThenUpdate -> UpdatedAfterRestore
-    const nameTransitions = nameHistory.map(h => `${h.oldValue}->${h.newValue}`);
+    const nameTransitions = nameHistory.map((h) => `${h.oldValue}->${h.newValue}`);
     expect(nameTransitions).toContain("RestoreThenUpdate->UpdatedAfterRestore");
   });
 
@@ -548,7 +580,9 @@ describe.skipIf(!canConnect)("E2E: Cross-feature integration (Y5 Q2)", { timeout
   it("deleteAll only affects active entities (soft-deleted are already hidden)", async () => {
     const items: XfItem[] = [];
     for (let i = 0; i < 5; i++) {
-      const item = new XfItem(); item.name = `Bulk-${i}`; item.category = "bulk";
+      const item = new XfItem();
+      item.name = `Bulk-${i}`;
+      item.category = "bulk";
       items.push(await itemRepo.save(item));
     }
 

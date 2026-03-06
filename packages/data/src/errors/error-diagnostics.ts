@@ -22,10 +22,7 @@ export interface DiagnosticError {
 export function enhanceError(error: Error, context?: ErrorContext): Error {
   const diagnostic = diagnose(error.message, context);
   if (diagnostic) {
-    const enhanced = new Error(
-      `${diagnostic.diagnosticMessage}\n\n` +
-      `  Hint: ${diagnostic.hint}\n`,
-    );
+    const enhanced = new Error(`${diagnostic.diagnosticMessage}\n\n` + `  Hint: ${diagnostic.hint}\n`);
     enhanced.name = error.name;
     enhanced.stack = error.stack?.replace(error.message, enhanced.message);
     return enhanced;
@@ -44,10 +41,7 @@ export interface ErrorContext {
 /**
  * Attempt to diagnose an error message and produce a helpful hint.
  */
-export function diagnose(
-  message: string,
-  context?: ErrorContext,
-): DiagnosticError | null {
+export function diagnose(message: string, context?: ErrorContext): DiagnosticError | null {
   const lower = message.toLowerCase();
 
   // Missing @Table decorator
@@ -80,20 +74,23 @@ export function diagnose(
     return {
       originalMessage: message,
       diagnosticMessage: `Could not connect to database.`,
-      hint: `Check your connection string and ensure the database server is running. ` +
+      hint:
+        `Check your connection string and ensure the database server is running. ` +
         `Common causes: wrong host/port, database not started, firewall blocking.`,
     };
   }
 
   // Column not found (check before table — "column X of relation Y does not exist" matches both)
   if (
-    lower.includes("column") && (lower.includes("does not exist") || lower.includes("not found") || lower.includes("unknown column"))
+    lower.includes("column") &&
+    (lower.includes("does not exist") || lower.includes("not found") || lower.includes("unknown column"))
   ) {
     const colName = extractQuoted(message) ?? context?.columnName;
     return {
       originalMessage: message,
       diagnosticMessage: `Column '${colName ?? "unknown"}' not found.`,
-      hint: `Check your @Column mapping or run migrations. ` +
+      hint:
+        `Check your @Column mapping or run migrations. ` +
         `Ensure the column name in @Column('${colName ?? "name"}') matches the database column.`,
       columnName: colName ?? undefined,
       tableName: context?.tableName,
@@ -102,14 +99,15 @@ export function diagnose(
 
   // Table not found / relation does not exist
   if (
-    lower.includes("relation") && lower.includes("does not exist") ||
-    lower.includes("table") && (lower.includes("doesn't exist") || lower.includes("not found"))
+    (lower.includes("relation") && lower.includes("does not exist")) ||
+    (lower.includes("table") && (lower.includes("doesn't exist") || lower.includes("not found")))
   ) {
     const tableName = extractQuoted(message) ?? context?.tableName;
     return {
       originalMessage: message,
       diagnosticMessage: `Table '${tableName ?? "unknown"}' does not exist.`,
-      hint: `Did you run migrations? Use \`espalier migrate up\` to apply pending migrations. ` +
+      hint:
+        `Did you run migrations? Use \`espalier migrate up\` to apply pending migrations. ` +
         `Or check that the table name in @Table matches your database schema.`,
       tableName: tableName ?? undefined,
     };
@@ -117,12 +115,14 @@ export function diagnose(
 
   // Unique constraint violation
   if (
-    lower.includes("unique") && (lower.includes("constraint") || lower.includes("violation") || lower.includes("duplicate"))
+    lower.includes("unique") &&
+    (lower.includes("constraint") || lower.includes("violation") || lower.includes("duplicate"))
   ) {
     return {
       originalMessage: message,
       diagnosticMessage: `Duplicate value for unique constraint.`,
-      hint: `A record with this value already exists. ` +
+      hint:
+        `A record with this value already exists. ` +
         `${context?.entityName ? `Entity: ${context.entityName}. ` : ""}` +
         `${context?.fieldName ? `Field: ${context.fieldName}. ` : ""}` +
         `Check for duplicate data or use upsert/merge operations.`,
@@ -132,13 +132,12 @@ export function diagnose(
   }
 
   // Foreign key violation
-  if (
-    lower.includes("foreign key") && (lower.includes("constraint") || lower.includes("violation"))
-  ) {
+  if (lower.includes("foreign key") && (lower.includes("constraint") || lower.includes("violation"))) {
     return {
       originalMessage: message,
       diagnosticMessage: `Foreign key constraint violation.`,
-      hint: `The referenced record does not exist or you're trying to delete a record ` +
+      hint:
+        `The referenced record does not exist or you're trying to delete a record ` +
         `that has dependent records. Check cascade settings or create the referenced record first.`,
       entityName: context?.entityName,
     };
@@ -149,7 +148,8 @@ export function diagnose(
     return {
       originalMessage: message,
       diagnosticMessage: `Database access denied.`,
-      hint: `The database user doesn't have sufficient permissions. ` +
+      hint:
+        `The database user doesn't have sufficient permissions. ` +
         `Check your connection credentials and GRANT the necessary privileges.`,
     };
   }
@@ -159,7 +159,8 @@ export function diagnose(
     return {
       originalMessage: message,
       diagnosticMessage: message,
-      hint: `SQL syntax error. If using derived queries, check your method name follows the ` +
+      hint:
+        `SQL syntax error. If using derived queries, check your method name follows the ` +
         `naming convention (findByFieldName, countByField, etc.). ` +
         `If using raw SQL, verify the query syntax.`,
     };

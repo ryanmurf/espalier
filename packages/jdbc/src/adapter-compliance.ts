@@ -1,5 +1,4 @@
 import type { DataSource } from "./data-source.js";
-import type { Connection } from "./connection.js";
 import type { DriverAdapter } from "./driver-adapter.js";
 import { IsolationLevel } from "./transaction.js";
 
@@ -68,7 +67,7 @@ export function runAdapterComplianceTests(options: AdapterComplianceOptions): vo
   if (!options.runner) {
     throw new Error(
       "AdapterComplianceOptions.runner is required. " +
-      "Pass { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest'.",
+        "Pass { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest'.",
     );
   }
   const { describe, it, expect, beforeAll, afterAll, beforeEach } = options.runner;
@@ -137,9 +136,7 @@ export function runAdapterComplianceTests(options: AdapterComplianceOptions): vo
       const conn = await ds.getConnection();
       try {
         const stmt = conn.createStatement();
-        const count = await stmt.executeUpdate(
-          `INSERT INTO ${options.tableName} (name, value) VALUES ('test', 42)`,
-        );
+        const count = await stmt.executeUpdate(`INSERT INTO ${options.tableName} (name, value) VALUES ('test', 42)`);
         expect(count).toBe(1);
         await stmt.close();
       } finally {
@@ -151,12 +148,8 @@ export function runAdapterComplianceTests(options: AdapterComplianceOptions): vo
       const conn = await ds.getConnection();
       try {
         const stmt = conn.createStatement();
-        await stmt.executeUpdate(
-          `INSERT INTO ${options.tableName} (name, value) VALUES ('query-test', 99)`,
-        );
-        const rs = await stmt.executeQuery(
-          `SELECT name, value FROM ${options.tableName} WHERE name = 'query-test'`,
-        );
+        await stmt.executeUpdate(`INSERT INTO ${options.tableName} (name, value) VALUES ('query-test', 99)`);
+        const rs = await stmt.executeQuery(`SELECT name, value FROM ${options.tableName} WHERE name = 'query-test'`);
         expect(await rs.next()).toBe(true);
         const row = rs.getRow();
         expect(row.name).toBe("query-test");
@@ -172,15 +165,9 @@ export function runAdapterComplianceTests(options: AdapterComplianceOptions): vo
       const conn = await ds.getConnection();
       try {
         const stmt = conn.createStatement();
-        await stmt.executeUpdate(
-          `INSERT INTO ${options.tableName} (name, value) VALUES ('upd1', 1)`,
-        );
-        await stmt.executeUpdate(
-          `INSERT INTO ${options.tableName} (name, value) VALUES ('upd2', 2)`,
-        );
-        const count = await stmt.executeUpdate(
-          `UPDATE ${options.tableName} SET value = 0 WHERE name LIKE 'upd%'`,
-        );
+        await stmt.executeUpdate(`INSERT INTO ${options.tableName} (name, value) VALUES ('upd1', 1)`);
+        await stmt.executeUpdate(`INSERT INTO ${options.tableName} (name, value) VALUES ('upd2', 2)`);
+        const count = await stmt.executeUpdate(`UPDATE ${options.tableName} SET value = 0 WHERE name LIKE 'upd%'`);
         expect(count).toBe(2);
         await stmt.close();
       } finally {
@@ -192,12 +179,8 @@ export function runAdapterComplianceTests(options: AdapterComplianceOptions): vo
       const conn = await ds.getConnection();
       try {
         const stmt = conn.createStatement();
-        await stmt.executeUpdate(
-          `INSERT INTO ${options.tableName} (name, value) VALUES ('del', 1)`,
-        );
-        const count = await stmt.executeUpdate(
-          `DELETE FROM ${options.tableName} WHERE name = 'del'`,
-        );
+        await stmt.executeUpdate(`INSERT INTO ${options.tableName} (name, value) VALUES ('del', 1)`);
+        const count = await stmt.executeUpdate(`DELETE FROM ${options.tableName} WHERE name = 'del'`);
         expect(count).toBe(1);
         await stmt.close();
       } finally {
@@ -210,10 +193,11 @@ export function runAdapterComplianceTests(options: AdapterComplianceOptions): vo
     it("parameterized INSERT and SELECT", async () => {
       const conn = await ds.getConnection();
       try {
-        const p = options.paramStyle === "positional" ? "$" : "?";
-        const insertSql = options.paramStyle === "positional"
-          ? `INSERT INTO ${options.tableName} (name, value) VALUES ($1, $2)`
-          : `INSERT INTO ${options.tableName} (name, value) VALUES (?, ?)`;
+        const _p = options.paramStyle === "positional" ? "$" : "?";
+        const insertSql =
+          options.paramStyle === "positional"
+            ? `INSERT INTO ${options.tableName} (name, value) VALUES ($1, $2)`
+            : `INSERT INTO ${options.tableName} (name, value) VALUES (?, ?)`;
 
         const insert = conn.prepareStatement(insertSql);
         insert.setParameter(1, "prepared");
@@ -222,9 +206,10 @@ export function runAdapterComplianceTests(options: AdapterComplianceOptions): vo
         expect(count).toBe(1);
         await insert.close();
 
-        const selectSql = options.paramStyle === "positional"
-          ? `SELECT name, value FROM ${options.tableName} WHERE name = $1`
-          : `SELECT name, value FROM ${options.tableName} WHERE name = ?`;
+        const selectSql =
+          options.paramStyle === "positional"
+            ? `SELECT name, value FROM ${options.tableName} WHERE name = $1`
+            : `SELECT name, value FROM ${options.tableName} WHERE name = ?`;
 
         const select = conn.prepareStatement(selectSql);
         select.setParameter(1, "prepared");
@@ -240,9 +225,10 @@ export function runAdapterComplianceTests(options: AdapterComplianceOptions): vo
     it("null parameter handling", async () => {
       const conn = await ds.getConnection();
       try {
-        const insertSql = options.paramStyle === "positional"
-          ? `INSERT INTO ${options.tableName} (name, value) VALUES ($1, $2)`
-          : `INSERT INTO ${options.tableName} (name, value) VALUES (?, ?)`;
+        const insertSql =
+          options.paramStyle === "positional"
+            ? `INSERT INTO ${options.tableName} (name, value) VALUES ($1, $2)`
+            : `INSERT INTO ${options.tableName} (name, value) VALUES (?, ?)`;
 
         const stmt = conn.prepareStatement(insertSql);
         stmt.setParameter(1, "null-test");
@@ -251,9 +237,7 @@ export function runAdapterComplianceTests(options: AdapterComplianceOptions): vo
         await stmt.close();
 
         const selectStmt = conn.createStatement();
-        const rs = await selectStmt.executeQuery(
-          `SELECT value FROM ${options.tableName} WHERE name = 'null-test'`,
-        );
+        const rs = await selectStmt.executeQuery(`SELECT value FROM ${options.tableName} WHERE name = 'null-test'`);
         expect(await rs.next()).toBe(true);
         expect(rs.getRow().value).toBeNull();
         await selectStmt.close();
@@ -269,9 +253,7 @@ export function runAdapterComplianceTests(options: AdapterComplianceOptions): vo
       try {
         const tx = await conn.beginTransaction();
         const stmt = conn.createStatement();
-        await stmt.executeUpdate(
-          `INSERT INTO ${options.tableName} (name, value) VALUES ('tx-commit', 1)`,
-        );
+        await stmt.executeUpdate(`INSERT INTO ${options.tableName} (name, value) VALUES ('tx-commit', 1)`);
         await tx.commit();
         await stmt.close();
       } finally {
@@ -282,9 +264,7 @@ export function runAdapterComplianceTests(options: AdapterComplianceOptions): vo
       const conn2 = await ds.getConnection();
       try {
         const stmt = conn2.createStatement();
-        const rs = await stmt.executeQuery(
-          `SELECT name FROM ${options.tableName} WHERE name = 'tx-commit'`,
-        );
+        const rs = await stmt.executeQuery(`SELECT name FROM ${options.tableName} WHERE name = 'tx-commit'`);
         expect(await rs.next()).toBe(true);
         await stmt.close();
       } finally {
@@ -297,9 +277,7 @@ export function runAdapterComplianceTests(options: AdapterComplianceOptions): vo
       try {
         const tx = await conn.beginTransaction();
         const stmt = conn.createStatement();
-        await stmt.executeUpdate(
-          `INSERT INTO ${options.tableName} (name, value) VALUES ('tx-rollback', 1)`,
-        );
+        await stmt.executeUpdate(`INSERT INTO ${options.tableName} (name, value) VALUES ('tx-rollback', 1)`);
         await tx.rollback();
         await stmt.close();
       } finally {
@@ -310,9 +288,7 @@ export function runAdapterComplianceTests(options: AdapterComplianceOptions): vo
       const conn2 = await ds.getConnection();
       try {
         const stmt = conn2.createStatement();
-        const rs = await stmt.executeQuery(
-          `SELECT name FROM ${options.tableName} WHERE name = 'tx-rollback'`,
-        );
+        const rs = await stmt.executeQuery(`SELECT name FROM ${options.tableName} WHERE name = 'tx-rollback'`);
         expect(await rs.next()).toBe(false);
         await stmt.close();
       } finally {
@@ -326,9 +302,7 @@ export function runAdapterComplianceTests(options: AdapterComplianceOptions): vo
       try {
         const tx = await conn.beginTransaction(levels[0]);
         const stmt = conn.createStatement();
-        await stmt.executeUpdate(
-          `INSERT INTO ${options.tableName} (name, value) VALUES ('tx-iso', 1)`,
-        );
+        await stmt.executeUpdate(`INSERT INTO ${options.tableName} (name, value) VALUES ('tx-iso', 1)`);
         await tx.commit();
         await stmt.close();
       } finally {
@@ -345,13 +319,9 @@ export function runAdapterComplianceTests(options: AdapterComplianceOptions): vo
           const tx = await conn.beginTransaction();
           const stmt = conn.createStatement();
 
-          await stmt.executeUpdate(
-            `INSERT INTO ${options.tableName} (name, value) VALUES ('sp-keep', 1)`,
-          );
+          await stmt.executeUpdate(`INSERT INTO ${options.tableName} (name, value) VALUES ('sp-keep', 1)`);
           await tx.setSavepoint("sp1");
-          await stmt.executeUpdate(
-            `INSERT INTO ${options.tableName} (name, value) VALUES ('sp-discard', 2)`,
-          );
+          await stmt.executeUpdate(`INSERT INTO ${options.tableName} (name, value) VALUES ('sp-discard', 2)`);
           await tx.rollbackTo("sp1");
           await tx.commit();
           await stmt.close();
@@ -362,9 +332,7 @@ export function runAdapterComplianceTests(options: AdapterComplianceOptions): vo
         const conn2 = await ds.getConnection();
         try {
           const stmt = conn2.createStatement();
-          const rs = await stmt.executeQuery(
-            `SELECT name FROM ${options.tableName} ORDER BY name`,
-          );
+          const rs = await stmt.executeQuery(`SELECT name FROM ${options.tableName} ORDER BY name`);
           const rows: string[] = [];
           while (await rs.next()) {
             rows.push(rs.getRow().name as string);
@@ -384,9 +352,7 @@ export function runAdapterComplianceTests(options: AdapterComplianceOptions): vo
       const conn = await ds.getConnection();
       try {
         const stmt = conn.createStatement();
-        await expect(
-          stmt.executeQuery("SELECT * FROM nonexistent_table_xyz_123"),
-        ).rejects.toThrow();
+        await expect(stmt.executeQuery("SELECT * FROM nonexistent_table_xyz_123")).rejects.toThrow();
         await stmt.close();
       } finally {
         await conn.close();

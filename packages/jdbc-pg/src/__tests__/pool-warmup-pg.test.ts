@@ -1,6 +1,6 @@
-import { describe, it, expect, afterEach } from "vitest";
-import { isPostgresAvailable } from "./e2e/setup.js";
+import { afterEach, describe, expect, it } from "vitest";
 import { PgDataSource } from "../pg-data-source.js";
+import { isPostgresAvailable } from "./e2e/setup.js";
 
 const canConnect = await isPostgresAvailable();
 
@@ -15,14 +15,16 @@ const PG_CONFIG = {
 describe.skipIf(!canConnect)("E2E: Pool Warmup & Pre-ping", { timeout: 30000 }, () => {
   const dataSources: PgDataSource[] = [];
 
-  function createDS(opts: {
-    minConnections?: number;
-    maxConnections?: number;
-    prePing?: boolean;
-    prePingQuery?: string;
-    prePingIntervalMs?: number;
-    acquireTimeout?: number;
-  } = {}) {
+  function createDS(
+    opts: {
+      minConnections?: number;
+      maxConnections?: number;
+      prePing?: boolean;
+      prePingQuery?: string;
+      prePingIntervalMs?: number;
+      acquireTimeout?: number;
+    } = {},
+  ) {
     const ds = new PgDataSource({
       pg: PG_CONFIG,
       pool: {
@@ -40,7 +42,11 @@ describe.skipIf(!canConnect)("E2E: Pool Warmup & Pre-ping", { timeout: 30000 }, 
 
   afterEach(async () => {
     for (const ds of dataSources) {
-      try { await ds.close(); } catch { /* ignore */ }
+      try {
+        await ds.close();
+      } catch {
+        /* ignore */
+      }
     }
     dataSources.length = 0;
   });

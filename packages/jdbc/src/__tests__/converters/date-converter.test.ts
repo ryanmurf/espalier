@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { DateConverter } from "../../converters/date-converter.js";
 
 describe("DateConverter", () => {
@@ -58,9 +58,7 @@ describe("DateConverter", () => {
     });
 
     it("preserves null through round-trip", () => {
-      expect(
-        converter.fromDatabaseValue(converter.toDatabaseValue(null)),
-      ).toBeNull();
+      expect(converter.fromDatabaseValue(converter.toDatabaseValue(null))).toBeNull();
     });
   });
 });

@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { Migration, MigrationRecord, MigrationRunner } from "espalier-data";
 import type { DataSource } from "espalier-jdbc";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../adapter-factory.js", () => ({
   createAdapter: vi.fn(),
@@ -10,10 +10,10 @@ vi.mock("../../migrate-loader.js", () => ({
   loadMigrations: vi.fn(),
 }));
 
-import { migrateStatus, formatStatusTable } from "../../migrate-status.js";
-import type { MigrateStatusResult, MigrationStatusEntry } from "../../migrate-status.js";
 import { createAdapter } from "../../adapter-factory.js";
 import { loadMigrations } from "../../migrate-loader.js";
+import type { MigrateStatusResult } from "../../migrate-status.js";
+import { formatStatusTable, migrateStatus } from "../../migrate-status.js";
 
 // --- Helpers ---
 
@@ -73,9 +73,9 @@ describe("migrateStatus adversarial", () => {
     it("propagates createAdapter failure and does NOT call dataSource.close()", async () => {
       vi.mocked(createAdapter).mockRejectedValue(new Error("ECONNREFUSED"));
 
-      await expect(
-        migrateStatus({ config: baseConfig, migrationsDir: "/tmp/migrations" }),
-      ).rejects.toThrow("ECONNREFUSED");
+      await expect(migrateStatus({ config: baseConfig, migrationsDir: "/tmp/migrations" })).rejects.toThrow(
+        "ECONNREFUSED",
+      );
 
       // loadMigrations should never be called if createAdapter fails
       expect(loadMigrations).not.toHaveBeenCalled();
@@ -87,9 +87,9 @@ describe("migrateStatus adversarial", () => {
       vi.mocked(runner.initialize).mockRejectedValue(new Error("cannot create tracking table"));
       vi.mocked(createAdapter).mockResolvedValue({ dataSource: ds, runner });
 
-      await expect(
-        migrateStatus({ config: baseConfig, migrationsDir: "/tmp/migrations" }),
-      ).rejects.toThrow("cannot create tracking table");
+      await expect(migrateStatus({ config: baseConfig, migrationsDir: "/tmp/migrations" })).rejects.toThrow(
+        "cannot create tracking table",
+      );
 
       expect(ds.close).toHaveBeenCalled();
     });
@@ -97,15 +97,13 @@ describe("migrateStatus adversarial", () => {
     it("propagates getAppliedMigrations failure and still closes dataSource", async () => {
       const ds = createMockDataSource();
       const runner = createMockRunner();
-      vi.mocked(runner.getAppliedMigrations).mockRejectedValue(
-        new Error("relation does not exist"),
-      );
+      vi.mocked(runner.getAppliedMigrations).mockRejectedValue(new Error("relation does not exist"));
       vi.mocked(createAdapter).mockResolvedValue({ dataSource: ds, runner });
       vi.mocked(loadMigrations).mockResolvedValue([]);
 
-      await expect(
-        migrateStatus({ config: baseConfig, migrationsDir: "/tmp/migrations" }),
-      ).rejects.toThrow("relation does not exist");
+      await expect(migrateStatus({ config: baseConfig, migrationsDir: "/tmp/migrations" })).rejects.toThrow(
+        "relation does not exist",
+      );
 
       expect(ds.close).toHaveBeenCalled();
     });
@@ -117,9 +115,7 @@ describe("migrateStatus adversarial", () => {
       vi.mocked(createAdapter).mockResolvedValue({ dataSource: ds, runner });
       vi.mocked(loadMigrations).mockResolvedValue([]);
 
-      await expect(
-        migrateStatus({ config: baseConfig, migrationsDir: "/tmp/migrations" }),
-      ).rejects.toThrow("timeout");
+      await expect(migrateStatus({ config: baseConfig, migrationsDir: "/tmp/migrations" })).rejects.toThrow("timeout");
 
       expect(ds.close).toHaveBeenCalled();
     });
@@ -134,9 +130,7 @@ describe("migrateStatus adversarial", () => {
       // The finally block calls ds.close(), which also throws.
       // In JS, the finally exception replaces the try exception.
       // This means the original "init failed" error is LOST.
-      await expect(
-        migrateStatus({ config: baseConfig, migrationsDir: "/tmp/migrations" }),
-      ).rejects.toThrow();
+      await expect(migrateStatus({ config: baseConfig, migrationsDir: "/tmp/migrations" })).rejects.toThrow();
     });
   });
 
@@ -145,13 +139,11 @@ describe("migrateStatus adversarial", () => {
       const ds = createMockDataSource();
       const runner = createMockRunner();
       vi.mocked(createAdapter).mockResolvedValue({ dataSource: ds, runner });
-      vi.mocked(loadMigrations).mockRejectedValue(
-        new Error("Migrations directory not found: /nonexistent"),
-      );
+      vi.mocked(loadMigrations).mockRejectedValue(new Error("Migrations directory not found: /nonexistent"));
 
-      await expect(
-        migrateStatus({ config: baseConfig, migrationsDir: "/nonexistent" }),
-      ).rejects.toThrow("Migrations directory not found");
+      await expect(migrateStatus({ config: baseConfig, migrationsDir: "/nonexistent" })).rejects.toThrow(
+        "Migrations directory not found",
+      );
 
       expect(ds.close).toHaveBeenCalled();
     });
@@ -196,10 +188,7 @@ describe("migrateStatus adversarial", () => {
     });
 
     it("orphaned records do NOT appear in entries array", async () => {
-      const applied = [
-        makeRecord("20260101120000", "on_disk"),
-        makeRecord("20260199000000", "deleted_from_disk"),
-      ];
+      const applied = [makeRecord("20260101120000", "on_disk"), makeRecord("20260199000000", "deleted_from_disk")];
       const ds = createMockDataSource();
       const runner = createMockRunner(applied);
       vi.mocked(createAdapter).mockResolvedValue({ dataSource: ds, runner });
@@ -326,11 +315,7 @@ describe("migrateStatus adversarial", () => {
 
       const result = await migrateStatus({ config: baseConfig, migrationsDir: "/tmp/m" });
 
-      expect(result.entries.map((e) => e.version)).toEqual([
-        "20260101000000",
-        "20260901000000",
-        "20261201000000",
-      ]);
+      expect(result.entries.map((e) => e.version)).toEqual(["20260101000000", "20260901000000", "20261201000000"]);
     });
 
     it("sorts versions with different lengths correctly via localeCompare", async () => {
@@ -452,9 +437,7 @@ describe("formatStatusTable adversarial", () => {
         entries: [],
         appliedCount: 0,
         pendingCount: 0,
-        orphanedRecords: [
-          { version: "20260101120000", description: "ghost", appliedAt: new Date(), checksum: "x" },
-        ],
+        orphanedRecords: [{ version: "20260101120000", description: "ghost", appliedAt: new Date(), checksum: "x" }],
         currentVersion: null,
       };
 
@@ -471,9 +454,7 @@ describe("formatStatusTable adversarial", () => {
         entries: [],
         appliedCount: 0,
         pendingCount: 0,
-        orphanedRecords: [
-          { version: "20260101120000", description: "orphan", appliedAt: new Date(), checksum: "x" },
-        ],
+        orphanedRecords: [{ version: "20260101120000", description: "orphan", appliedAt: new Date(), checksum: "x" }],
         currentVersion: null,
       };
 
@@ -493,9 +474,7 @@ describe("formatStatusTable adversarial", () => {
     it("handles extremely long version strings", () => {
       const longVersion = "V".repeat(500);
       const result: MigrateStatusResult = {
-        entries: [
-          { version: longVersion, description: "test", status: "pending", appliedAt: null },
-        ],
+        entries: [{ version: longVersion, description: "test", status: "pending", appliedAt: null }],
         appliedCount: 0,
         pendingCount: 1,
         orphanedRecords: [],
@@ -513,7 +492,12 @@ describe("formatStatusTable adversarial", () => {
       const longDesc = "d".repeat(1000);
       const result: MigrateStatusResult = {
         entries: [
-          { version: "20260101120000", description: longDesc, status: "applied", appliedAt: new Date("2026-01-15T12:00:00Z") },
+          {
+            version: "20260101120000",
+            description: longDesc,
+            status: "applied",
+            appliedAt: new Date("2026-01-15T12:00:00Z"),
+          },
         ],
         appliedCount: 1,
         pendingCount: 0,
@@ -529,9 +513,7 @@ describe("formatStatusTable adversarial", () => {
   describe("special characters in descriptions", () => {
     it("sanitizes description with newline characters to preserve table formatting", () => {
       const result: MigrateStatusResult = {
-        entries: [
-          { version: "20260101120000", description: "line1\nline2", status: "pending", appliedAt: null },
-        ],
+        entries: [{ version: "20260101120000", description: "line1\nline2", status: "pending", appliedAt: null }],
         appliedCount: 0,
         pendingCount: 1,
         orphanedRecords: [],
@@ -546,9 +528,7 @@ describe("formatStatusTable adversarial", () => {
 
     it("sanitizes description with tab characters to preserve table formatting", () => {
       const result: MigrateStatusResult = {
-        entries: [
-          { version: "20260101120000", description: "col1\tcol2", status: "pending", appliedAt: null },
-        ],
+        entries: [{ version: "20260101120000", description: "col1\tcol2", status: "pending", appliedAt: null }],
         appliedCount: 0,
         pendingCount: 1,
         orphanedRecords: [],
@@ -563,9 +543,7 @@ describe("formatStatusTable adversarial", () => {
 
     it("handles description with ANSI escape codes", () => {
       const result: MigrateStatusResult = {
-        entries: [
-          { version: "20260101120000", description: "\x1b[31mred\x1b[0m", status: "pending", appliedAt: null },
-        ],
+        entries: [{ version: "20260101120000", description: "\x1b[31mred\x1b[0m", status: "pending", appliedAt: null }],
         appliedCount: 0,
         pendingCount: 1,
         orphanedRecords: [],
@@ -581,7 +559,12 @@ describe("formatStatusTable adversarial", () => {
     it("handles description with unicode characters", () => {
       const result: MigrateStatusResult = {
         entries: [
-          { version: "20260101120000", description: "\u79FB\u884C\u30C6\u30B9\u30C8", status: "pending", appliedAt: null },
+          {
+            version: "20260101120000",
+            description: "\u79FB\u884C\u30C6\u30B9\u30C8",
+            status: "pending",
+            appliedAt: null,
+          },
         ],
         appliedCount: 0,
         pendingCount: 1,
@@ -622,7 +605,12 @@ describe("formatStatusTable adversarial", () => {
       }
       const result: MigrateStatusResult = {
         entries: [
-          { version: "20260101120000", description: "only_one", status: "applied", appliedAt: new Date("2026-01-15T12:00:00Z") },
+          {
+            version: "20260101120000",
+            description: "only_one",
+            status: "applied",
+            appliedAt: new Date("2026-01-15T12:00:00Z"),
+          },
         ],
         appliedCount: 1,
         pendingCount: 0,
@@ -639,27 +627,35 @@ describe("formatStatusTable adversarial", () => {
     it("orphan description with special chars is displayed as-is", () => {
       const result: MigrateStatusResult = {
         entries: [
-          { version: "20260101120000", description: "test", status: "applied", appliedAt: new Date("2026-01-15T12:00:00Z") },
+          {
+            version: "20260101120000",
+            description: "test",
+            status: "applied",
+            appliedAt: new Date("2026-01-15T12:00:00Z"),
+          },
         ],
         appliedCount: 1,
         pendingCount: 0,
         orphanedRecords: [
-          { version: "20260199000000", description: "O'Reilly \"special\" <test>", appliedAt: new Date(), checksum: "x" },
+          {
+            version: "20260199000000",
+            description: 'O\'Reilly "special" <test>',
+            appliedAt: new Date(),
+            checksum: "x",
+          },
         ],
         currentVersion: "20260101120000",
       };
 
       const output = formatStatusTable(result);
-      expect(output).toContain("O'Reilly \"special\" <test>");
+      expect(output).toContain('O\'Reilly "special" <test>');
     });
   });
 
   describe("date formatting edge cases", () => {
     it("handles epoch date (1970-01-01)", () => {
       const result: MigrateStatusResult = {
-        entries: [
-          { version: "20260101120000", description: "test", status: "applied", appliedAt: new Date(0) },
-        ],
+        entries: [{ version: "20260101120000", description: "test", status: "applied", appliedAt: new Date(0) }],
         appliedCount: 1,
         pendingCount: 0,
         orphanedRecords: [],
@@ -673,7 +669,12 @@ describe("formatStatusTable adversarial", () => {
     it("handles far-future date (9999-12-31)", () => {
       const result: MigrateStatusResult = {
         entries: [
-          { version: "20260101120000", description: "test", status: "applied", appliedAt: new Date("9999-12-31T23:59:59Z") },
+          {
+            version: "20260101120000",
+            description: "test",
+            status: "applied",
+            appliedAt: new Date("9999-12-31T23:59:59Z"),
+          },
         ],
         appliedCount: 1,
         pendingCount: 0,
@@ -709,9 +710,7 @@ describe("formatStatusTable adversarial", () => {
   describe("currentVersion display", () => {
     it("does not show 'Current version' line when currentVersion is null", () => {
       const result: MigrateStatusResult = {
-        entries: [
-          { version: "20260101120000", description: "test", status: "pending", appliedAt: null },
-        ],
+        entries: [{ version: "20260101120000", description: "test", status: "pending", appliedAt: null }],
         appliedCount: 0,
         pendingCount: 1,
         orphanedRecords: [],
@@ -724,9 +723,7 @@ describe("formatStatusTable adversarial", () => {
 
     it("shows 'Current version' when currentVersion is empty string", () => {
       const result: MigrateStatusResult = {
-        entries: [
-          { version: "", description: "test", status: "applied", appliedAt: new Date("2026-01-15T12:00:00Z") },
-        ],
+        entries: [{ version: "", description: "test", status: "applied", appliedAt: new Date("2026-01-15T12:00:00Z") }],
         appliedCount: 1,
         pendingCount: 0,
         orphanedRecords: [],
@@ -740,9 +737,7 @@ describe("formatStatusTable adversarial", () => {
 
     it("shows currentVersion even if it does not match any entry", () => {
       const result: MigrateStatusResult = {
-        entries: [
-          { version: "20260101120000", description: "test", status: "pending", appliedAt: null },
-        ],
+        entries: [{ version: "20260101120000", description: "test", status: "pending", appliedAt: null }],
         appliedCount: 0,
         pendingCount: 1,
         orphanedRecords: [],
@@ -777,9 +772,7 @@ describe("formatStatusTable adversarial", () => {
     it("formatter trusts provided counts even if they disagree with entries", () => {
       // Intentionally wrong counts to test formatter passthrough
       const result: MigrateStatusResult = {
-        entries: [
-          { version: "1", description: "a", status: "applied", appliedAt: new Date("2026-01-15T12:00:00Z") },
-        ],
+        entries: [{ version: "1", description: "a", status: "applied", appliedAt: new Date("2026-01-15T12:00:00Z") }],
         appliedCount: 999,
         pendingCount: 42,
         orphanedRecords: [],
@@ -797,7 +790,12 @@ describe("formatStatusTable adversarial", () => {
       const result: MigrateStatusResult = {
         entries: [
           { version: "1", description: "short", status: "applied", appliedAt: new Date("2026-01-15T12:00:00Z") },
-          { version: "20260101120000", description: "a very long description here", status: "pending", appliedAt: null },
+          {
+            version: "20260101120000",
+            description: "a very long description here",
+            status: "pending",
+            appliedAt: null,
+          },
         ],
         appliedCount: 1,
         pendingCount: 1,
@@ -816,7 +814,12 @@ describe("formatStatusTable adversarial", () => {
     it("handles single entry table formatting", () => {
       const result: MigrateStatusResult = {
         entries: [
-          { version: "20260101120000", description: "only_one", status: "applied", appliedAt: new Date("2026-01-15T12:00:00Z") },
+          {
+            version: "20260101120000",
+            description: "only_one",
+            status: "applied",
+            appliedAt: new Date("2026-01-15T12:00:00Z"),
+          },
         ],
         appliedCount: 1,
         pendingCount: 0,

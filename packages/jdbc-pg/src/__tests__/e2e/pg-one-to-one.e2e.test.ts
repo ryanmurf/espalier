@@ -3,18 +3,12 @@
  * Tests save/load, constraint violations, self-referencing, dangling FKs,
  * and inverse-side loading against live Postgres.
  */
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { createTestDataSource, isPostgresAvailable } from "./setup.js";
-import {
-  Table,
-  Column,
-  Id,
-  OneToOne,
-  DdlGenerator,
-  createRepository,
-} from "espalier-data";
-import type { PgDataSource } from "../../pg-data-source.js";
+
+import { Column, createRepository, DdlGenerator, Id, OneToOne, Table } from "espalier-data";
 import type { Connection } from "espalier-jdbc";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import type { PgDataSource } from "../../pg-data-source.js";
+import { createTestDataSource, isPostgresAvailable } from "./setup.js";
 
 const canConnect = await isPostgresAvailable();
 const generator = new DdlGenerator();
@@ -364,9 +358,7 @@ describe.skipIf(!canConnect)("@OneToOne adversarial: repository E2E (Postgres)",
 
       // Update it to point to itself using raw SQL
       const stmt = conn.createStatement();
-      await stmt.executeUpdate(
-        `UPDATE e2e_oto_nodes SET next_id = ${saved.id} WHERE id = ${saved.id}`,
-      );
+      await stmt.executeUpdate(`UPDATE e2e_oto_nodes SET next_id = ${saved.id} WHERE id = ${saved.id}`);
 
       // Use fresh repo to bypass stale entity cache from save()
       const freshRepo = createRepository<E2eNode, number>(E2eNode, ds);
@@ -554,14 +546,14 @@ describe.skipIf(!canConnect)("@OneToOne adversarial: repository E2E (Postgres)",
       const all = await userRepo.findAll();
       expect(all).toHaveLength(3);
 
-      const withProfile = all.filter(u => u.profile != null);
-      const withoutProfile = all.filter(u => u.profile == null);
+      const withProfile = all.filter((u) => u.profile != null);
+      const withoutProfile = all.filter((u) => u.profile == null);
 
       expect(withProfile).toHaveLength(2);
       expect(withoutProfile).toHaveLength(1);
 
       // Verify profiles have correct bio
-      const bios = withProfile.map(u => u.profile!.bio).sort();
+      const bios = withProfile.map((u) => u.profile!.bio).sort();
       expect(bios).toEqual(["Bio1", "Bio2"]);
     });
   });

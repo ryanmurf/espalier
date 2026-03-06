@@ -3,17 +3,17 @@
  * Covers: decorator metadata edge cases, DDL generation, change tracking.
  * Repository E2E tests are in packages/jdbc-pg/src/__tests__/e2e/pg-embedded.e2e.test.ts
  */
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-  Table,
   Column,
-  Id,
+  DdlGenerator,
   Embeddable,
   Embedded,
-  isEmbeddable,
   getEmbeddedFields,
   getEntityMetadata,
-  DdlGenerator,
+  Id,
+  isEmbeddable,
+  Table,
 } from "../../index.js";
 import { EntityChangeTracker } from "../../mapping/change-tracker.js";
 
@@ -55,9 +55,7 @@ describe("@Embeddable/@Embedded adversarial: metadata edge cases", () => {
     new BadTarget();
     new BadEntity();
 
-    expect(() => getEntityMetadata(BadEntity)).toThrow(
-      /not decorated with @Embeddable/,
-    );
+    expect(() => getEntityMetadata(BadEntity)).toThrow(/not decorated with @Embeddable/);
   });
 
   it("@Embedded with empty prefix — columns use embeddable's column names directly", () => {
@@ -77,11 +75,11 @@ describe("@Embeddable/@Embedded adversarial: metadata edge cases", () => {
     new EmptyPrefixEntity();
 
     const metadata = getEntityMetadata(EmptyPrefixEntity);
-    const embFields = metadata.fields.filter(f =>
-      typeof f.fieldName === "string" && f.fieldName.startsWith("address."),
+    const embFields = metadata.fields.filter(
+      (f) => typeof f.fieldName === "string" && f.fieldName.startsWith("address."),
     );
     // With empty prefix, column names should be the raw column names
-    const columnNames = embFields.map(f => f.columnName);
+    const columnNames = embFields.map((f) => f.columnName);
     expect(columnNames).toContain("street");
     expect(columnNames).toContain("city");
   });
@@ -103,10 +101,8 @@ describe("@Embeddable/@Embedded adversarial: metadata edge cases", () => {
     new PrefixEntity();
 
     const metadata = getEntityMetadata(PrefixEntity);
-    const embFields = metadata.fields.filter(f =>
-      typeof f.fieldName === "string" && f.fieldName.startsWith("home."),
-    );
-    const columnNames = embFields.map(f => f.columnName);
+    const embFields = metadata.fields.filter((f) => typeof f.fieldName === "string" && f.fieldName.startsWith("home."));
+    const columnNames = embFields.map((f) => f.columnName);
     expect(columnNames).toContain("home_street");
     expect(columnNames).toContain("home_city");
   });
@@ -130,17 +126,17 @@ describe("@Embeddable/@Embedded adversarial: metadata edge cases", () => {
     new DualEntity();
 
     const metadata = getEntityMetadata(DualEntity);
-    const homeFields = metadata.fields.filter(f =>
-      typeof f.fieldName === "string" && f.fieldName.startsWith("homeAddress."),
+    const homeFields = metadata.fields.filter(
+      (f) => typeof f.fieldName === "string" && f.fieldName.startsWith("homeAddress."),
     );
-    const workFields = metadata.fields.filter(f =>
-      typeof f.fieldName === "string" && f.fieldName.startsWith("workAddress."),
+    const workFields = metadata.fields.filter(
+      (f) => typeof f.fieldName === "string" && f.fieldName.startsWith("workAddress."),
     );
 
-    expect(homeFields.map(f => f.columnName)).toContain("home_street");
-    expect(homeFields.map(f => f.columnName)).toContain("home_city");
-    expect(workFields.map(f => f.columnName)).toContain("work_street");
-    expect(workFields.map(f => f.columnName)).toContain("work_city");
+    expect(homeFields.map((f) => f.columnName)).toContain("home_street");
+    expect(homeFields.map((f) => f.columnName)).toContain("home_city");
+    expect(workFields.map((f) => f.columnName)).toContain("work_street");
+    expect(workFields.map((f) => f.columnName)).toContain("work_city");
   });
 
   it("nested @Embedded — should throw", () => {
@@ -166,9 +162,7 @@ describe("@Embeddable/@Embedded adversarial: metadata edge cases", () => {
     new OuterEmb();
     new NestedEntity();
 
-    expect(() => getEntityMetadata(NestedEntity)).toThrow(
-      /Nested @Embedded is not supported/,
-    );
+    expect(() => getEntityMetadata(NestedEntity)).toThrow(/Nested @Embedded is not supported/);
   });
 
   it("@Embeddable class with no @Column fields — metadata has no embedded columns", () => {
@@ -185,8 +179,8 @@ describe("@Embeddable/@Embedded adversarial: metadata edge cases", () => {
     new EmptyColsEntity();
 
     const metadata = getEntityMetadata(EmptyColsEntity);
-    const embFields = metadata.fields.filter(f =>
-      typeof f.fieldName === "string" && f.fieldName.startsWith("empty."),
+    const embFields = metadata.fields.filter(
+      (f) => typeof f.fieldName === "string" && f.fieldName.startsWith("empty."),
     );
     expect(embFields).toHaveLength(0);
   });
@@ -264,10 +258,10 @@ describe("@Embeddable/@Embedded adversarial: metadata edge cases", () => {
     new CustomColEntity();
 
     const metadata = getEntityMetadata(CustomColEntity);
-    const embFields = metadata.fields.filter(f =>
-      typeof f.fieldName === "string" && f.fieldName.startsWith("address."),
+    const embFields = metadata.fields.filter(
+      (f) => typeof f.fieldName === "string" && f.fieldName.startsWith("address."),
     );
-    const columnNames = embFields.map(f => f.columnName);
+    const columnNames = embFields.map((f) => f.columnName);
     // Prefix should be applied to the custom column names
     expect(columnNames).toContain("addr_postal_code");
     expect(columnNames).toContain("addr_country_name");
@@ -501,7 +495,7 @@ describe("@Embeddable/@Embedded adversarial: change tracking", () => {
     expect(tracker.isDirty(entity)).toBe(true);
     const dirtyFields = tracker.getDirtyFields(entity);
     expect(dirtyFields).toHaveLength(2);
-    const fieldNames = dirtyFields.map(d => d.field);
+    const fieldNames = dirtyFields.map((d) => d.field);
     expect(fieldNames).toContain("addr.street");
     expect(fieldNames).toContain("addr.city");
   });
@@ -540,7 +534,7 @@ describe("@Embeddable/@Embedded adversarial: change tracking", () => {
     const dirtyFields = tracker.getDirtyFields(entity);
     // When addr is null, getFieldValue("addr.street") returns undefined
     expect(dirtyFields.length).toBeGreaterThanOrEqual(1);
-    const streetChange = dirtyFields.find(d => d.field === "addr.street");
+    const streetChange = dirtyFields.find((d) => d.field === "addr.street");
     expect(streetChange).toBeDefined();
     expect(streetChange!.oldValue).toBe("Has St");
     expect(streetChange!.newValue).toBeUndefined();

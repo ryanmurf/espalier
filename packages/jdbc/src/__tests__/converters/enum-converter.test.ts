@@ -1,14 +1,10 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { EnumConverter } from "../../converters/enum-converter.js";
 
 type Status = "active" | "inactive" | "pending";
 
 describe("EnumConverter", () => {
-  const converter = new EnumConverter<Status>("enum:status", [
-    "active",
-    "inactive",
-    "pending",
-  ]);
+  const converter = new EnumConverter<Status>("enum:status", ["active", "inactive", "pending"]);
 
   it("has the configured name and dbType 'varchar'", () => {
     expect(converter.name).toBe("enum:status");
@@ -27,15 +23,11 @@ describe("EnumConverter", () => {
     });
 
     it("throws for an invalid value", () => {
-      expect(() =>
-        converter.toDatabaseValue("deleted" as Status),
-      ).toThrow(/Invalid enum value "deleted"/);
+      expect(() => converter.toDatabaseValue("deleted" as Status)).toThrow(/Invalid enum value "deleted"/);
     });
 
     it("includes allowed values in the error message", () => {
-      expect(() =>
-        converter.toDatabaseValue("unknown" as Status),
-      ).toThrow(/Allowed values: active, inactive, pending/);
+      expect(() => converter.toDatabaseValue("unknown" as Status)).toThrow(/Allowed values: active, inactive, pending/);
     });
   });
 
@@ -50,15 +42,11 @@ describe("EnumConverter", () => {
     });
 
     it("throws for an invalid database value", () => {
-      expect(() =>
-        converter.fromDatabaseValue("deleted"),
-      ).toThrow(/Invalid enum value "deleted" from database/);
+      expect(() => converter.fromDatabaseValue("deleted")).toThrow(/Invalid enum value "deleted" from database/);
     });
 
     it("includes converter name in the error message", () => {
-      expect(() =>
-        converter.fromDatabaseValue("bad"),
-      ).toThrow(/converter "enum:status"/);
+      expect(() => converter.fromDatabaseValue("bad")).toThrow(/converter "enum:status"/);
     });
   });
 

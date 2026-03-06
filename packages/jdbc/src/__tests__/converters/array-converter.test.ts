@@ -1,8 +1,5 @@
-import { describe, it, expect } from "vitest";
-import {
-  ArrayConverter,
-  PostgresArrayConverter,
-} from "../../converters/array-converter.js";
+import { describe, expect, it } from "vitest";
+import { ArrayConverter, PostgresArrayConverter } from "../../converters/array-converter.js";
 
 describe("ArrayConverter", () => {
   const converter = new ArrayConverter<string>();
@@ -101,9 +98,7 @@ describe("PostgresArrayConverter", () => {
     });
 
     it("converts null elements to NULL", () => {
-      expect(
-        converter.toDatabaseValue([null as unknown as string, "a"]),
-      ).toBe("{NULL,a}");
+      expect(converter.toDatabaseValue([null as unknown as string, "a"])).toBe("{NULL,a}");
     });
 
     it("handles empty array", () => {
@@ -125,9 +120,7 @@ describe("PostgresArrayConverter", () => {
     });
 
     it("parses escaped quotes inside quoted elements", () => {
-      expect(converter.fromDatabaseValue('{"say \\"hi\\""}')).toEqual([
-        'say "hi"',
-      ]);
+      expect(converter.fromDatabaseValue('{"say \\"hi\\""}')).toEqual(['say "hi"']);
     });
 
     it("parses escaped backslashes", () => {

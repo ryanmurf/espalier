@@ -1,15 +1,15 @@
 #!/usr/bin/env node
 
 import { parseArgs, printUsage } from "./args.js";
-import { loadConfig, getMigrationsDir } from "./config.js";
+import { getMigrationsDir, loadConfig } from "./config.js";
 import { createMigration } from "./migrate-create.js";
-import { migrateUp } from "./migrate-up.js";
 import { migrateDown } from "./migrate-down.js";
-import { migrateStatus, formatStatusTable } from "./migrate-status.js";
-import { migrateDryRun, formatDryRunOutput } from "./migrate-dry-run.js";
-import { seedRun, seedStatus, formatSeedStatusTable } from "./seed-run.js";
-import { schemaDiff, formatSchemaDiff } from "./schema-diff.js";
+import { formatDryRunOutput, migrateDryRun } from "./migrate-dry-run.js";
+import { formatStatusTable, migrateStatus } from "./migrate-status.js";
+import { migrateUp } from "./migrate-up.js";
+import { formatSchemaDiff, schemaDiff } from "./schema-diff.js";
 import { generateMigrationFromDiff } from "./schema-generate.js";
+import { formatSeedStatusTable, seedRun, seedStatus } from "./seed-run.js";
 
 function main(): void {
   const parsed = parseArgs(process.argv);
@@ -49,11 +49,7 @@ function main(): void {
   process.exitCode = 1;
 }
 
-function handleMigrate(
-  subcommand: string,
-  positional: string[],
-  flags: Record<string, string | boolean>,
-): void {
+function handleMigrate(subcommand: string, positional: string[], flags: Record<string, string | boolean>): void {
   if (subcommand === "create") {
     handleMigrateCreate(positional, flags);
     return;
@@ -79,10 +75,7 @@ function handleMigrate(
   process.exitCode = 1;
 }
 
-function handleMigrateCreate(
-  positional: string[],
-  flags: Record<string, string | boolean>,
-): void {
+function handleMigrateCreate(positional: string[], flags: Record<string, string | boolean>): void {
   const name = positional[0];
   if (!name) {
     process.stderr.write("Error: Migration name is required.\n");
@@ -91,9 +84,7 @@ function handleMigrateCreate(
     return;
   }
 
-  const configDir = typeof flags.config === "string"
-    ? flags.config
-    : undefined;
+  const configDir = typeof flags.config === "string" ? flags.config : undefined;
 
   let migrationsDir: string;
   if (typeof flags.dir === "string") {
@@ -129,9 +120,7 @@ function handleMigrateUp(flags: Record<string, string | boolean>): void {
     return;
   }
 
-  const migrationsDir = typeof flags.dir === "string"
-    ? flags.dir
-    : getMigrationsDir(config, configDir);
+  const migrationsDir = typeof flags.dir === "string" ? flags.dir : getMigrationsDir(config, configDir);
 
   const toVersion = typeof flags.to === "string" ? flags.to : undefined;
 
@@ -166,10 +155,7 @@ function handleMigrateUp(flags: Record<string, string | boolean>): void {
     });
 }
 
-function handleMigrateDown(
-  positional: string[],
-  flags: Record<string, string | boolean>,
-): void {
+function handleMigrateDown(positional: string[], flags: Record<string, string | boolean>): void {
   const configDir = typeof flags.config === "string" ? flags.config : undefined;
 
   let config;
@@ -181,9 +167,7 @@ function handleMigrateDown(
     return;
   }
 
-  const migrationsDir = typeof flags.dir === "string"
-    ? flags.dir
-    : getMigrationsDir(config, configDir);
+  const migrationsDir = typeof flags.dir === "string" ? flags.dir : getMigrationsDir(config, configDir);
 
   const toVersion = typeof flags.to === "string" ? flags.to : undefined;
 
@@ -191,7 +175,7 @@ function handleMigrateDown(
   if (toVersion === undefined) {
     const stepsArg = positional[0];
     steps = stepsArg ? parseInt(stepsArg, 10) : 1;
-    if (isNaN(steps) || steps < 1) {
+    if (Number.isNaN(steps) || steps < 1) {
       process.stderr.write("Error: Steps must be a positive integer.\n");
       process.stderr.write("Usage: espalier migrate down [steps] [--to <version>]\n");
       process.exitCode = 1;
@@ -230,9 +214,7 @@ function handleMigrateStatus(flags: Record<string, string | boolean>): void {
     return;
   }
 
-  const migrationsDir = typeof flags.dir === "string"
-    ? flags.dir
-    : getMigrationsDir(config, configDir);
+  const migrationsDir = typeof flags.dir === "string" ? flags.dir : getMigrationsDir(config, configDir);
 
   migrateStatus({ config, migrationsDir })
     .then((result) => {
@@ -244,10 +226,7 @@ function handleMigrateStatus(flags: Record<string, string | boolean>): void {
     });
 }
 
-function handleSeed(
-  subcommand: string,
-  flags: Record<string, string | boolean>,
-): void {
+function handleSeed(subcommand: string, flags: Record<string, string | boolean>): void {
   const configDir = typeof flags.config === "string" ? flags.config : undefined;
 
   let config;
@@ -259,9 +238,7 @@ function handleSeed(
     return;
   }
 
-  const seedsDir = typeof flags.dir === "string"
-    ? flags.dir
-    : "seeds";
+  const seedsDir = typeof flags.dir === "string" ? flags.dir : "seeds";
 
   const env = typeof flags.env === "string" ? flags.env : undefined;
 
@@ -343,30 +320,29 @@ function handleStudio(flags: Record<string, string | boolean>): void {
   const writeMode = flags["write-mode"] === true;
   const noOpen = flags["no-open"] === true;
 
-  Promise.all([
-    import("espalier-studio/cli"),
-    import("./adapter-factory.js"),
-  ]).then(([{ startStudio }, { createAdapter }]) => {
-    return createAdapter(config!).then((resources) => {
-      const entities = (config as any)?.entities ?? [];
-      if (entities.length === 0) {
-        process.stderr.write("Error: No entities configured. Add 'entities' to your espalier.config.json.\n");
-        process.exitCode = 1;
-        return;
-      }
-      return startStudio({
-        entities,
-        dataSource: resources.dataSource,
-        port,
-        host,
-        writeMode,
-        open: !noOpen,
+  Promise.all([import("espalier-studio/cli"), import("./adapter-factory.js")])
+    .then(([{ startStudio }, { createAdapter }]) => {
+      return createAdapter(config!).then((resources) => {
+        const entities = (config as any)?.entities ?? [];
+        if (entities.length === 0) {
+          process.stderr.write("Error: No entities configured. Add 'entities' to your espalier.config.json.\n");
+          process.exitCode = 1;
+          return;
+        }
+        return startStudio({
+          entities,
+          dataSource: resources.dataSource,
+          port,
+          host,
+          writeMode,
+          open: !noOpen,
+        });
       });
+    })
+    .catch((err: Error) => {
+      process.stderr.write(`Error: ${err.message}\n`);
+      process.exitCode = 1;
     });
-  }).catch((err: Error) => {
-    process.stderr.write(`Error: ${err.message}\n`);
-    process.exitCode = 1;
-  });
 }
 
 function handleDiagram(flags: Record<string, string | boolean>): void {
@@ -386,29 +362,28 @@ function handleDiagram(flags: Record<string, string | boolean>): void {
   const output = typeof flags.output === "string" ? flags.output : undefined;
   const title = typeof flags.title === "string" ? flags.title : undefined;
 
-  import("espalier-studio/cli").then(({ runDiagramCommand }) => {
-    const entities = (config as any)?.entities ?? [];
-    if (entities.length === 0) {
-      process.stderr.write("Error: No entities configured. Add 'entities' to your espalier.config.json.\n");
+  import("espalier-studio/cli")
+    .then(({ runDiagramCommand }) => {
+      const entities = (config as any)?.entities ?? [];
+      if (entities.length === 0) {
+        process.stderr.write("Error: No entities configured. Add 'entities' to your espalier.config.json.\n");
+        process.exitCode = 1;
+        return;
+      }
+      runDiagramCommand({
+        entities,
+        format: format as any,
+        output,
+        title,
+      });
+    })
+    .catch((err: Error) => {
+      process.stderr.write(`Error: ${err.message}\n`);
       process.exitCode = 1;
-      return;
-    }
-    runDiagramCommand({
-      entities,
-      format: format as any,
-      output,
-      title,
     });
-  }).catch((err: Error) => {
-    process.stderr.write(`Error: ${err.message}\n`);
-    process.exitCode = 1;
-  });
 }
 
-function handleSchema(
-  subcommand: string,
-  flags: Record<string, string | boolean>,
-): void {
+function handleSchema(subcommand: string, flags: Record<string, string | boolean>): void {
   const configDir = typeof flags.config === "string" ? flags.config : undefined;
 
   let config;
@@ -422,64 +397,62 @@ function handleSchema(
   }
 
   if (subcommand === "diff" || subcommand === "generate") {
-    Promise.all([
-      import("./adapter-factory.js"),
-    ]).then(([{ createAdapter }]) => {
-      return createAdapter(config!).then(async (resources) => {
-        const entities = (config as any)?.entities ?? [];
-        if (entities.length === 0) {
-          process.stderr.write("Error: No entities configured. Add 'entities' to your espalier.config.json.\n");
-          process.exitCode = 1;
-          return;
-        }
-
-        const introspector = resources.introspector;
-        if (!introspector) {
-          process.stderr.write("Error: Schema introspection not available for this adapter.\n");
-          process.exitCode = 1;
-          return;
-        }
-        const schema = typeof flags.schema === "string" ? flags.schema : undefined;
-
-        const result = await schemaDiff({
-          config: config!,
-          introspector,
-          entityClasses: entities,
-          schema,
-        });
-
-        if (subcommand === "diff") {
-          process.stdout.write(formatSchemaDiff(result));
-        } else {
-          // generate
-          if (!result.hasChanges) {
-            process.stdout.write("Schema is up to date. No migration needed.\n");
+    Promise.all([import("./adapter-factory.js")])
+      .then(([{ createAdapter }]) => {
+        return createAdapter(config!).then(async (resources) => {
+          const entities = (config as any)?.entities ?? [];
+          if (entities.length === 0) {
+            process.stderr.write("Error: No entities configured. Add 'entities' to your espalier.config.json.\n");
+            process.exitCode = 1;
             return;
           }
 
-          const migrationsDir = typeof flags.dir === "string"
-            ? flags.dir
-            : getMigrationsDir(config!, configDir);
+          const introspector = resources.introspector;
+          if (!introspector) {
+            process.stderr.write("Error: Schema introspection not available for this adapter.\n");
+            process.exitCode = 1;
+            return;
+          }
+          const schema = typeof flags.schema === "string" ? flags.schema : undefined;
 
-          const name = typeof flags.name === "string" ? flags.name : undefined;
-
-          const genResult = generateMigrationFromDiff({
-            diffResult: result,
-            migrationsDir,
-            name,
+          const result = await schemaDiff({
+            config: config!,
+            introspector,
+            entityClasses: entities,
+            schema,
           });
 
-          process.stdout.write(`Generated migration: ${genResult.filePath}\n`);
-          process.stdout.write(`  Version: ${genResult.version}\n`);
-          process.stdout.write(`  Statements: ${genResult.statementsCount}\n`);
-        }
+          if (subcommand === "diff") {
+            process.stdout.write(formatSchemaDiff(result));
+          } else {
+            // generate
+            if (!result.hasChanges) {
+              process.stdout.write("Schema is up to date. No migration needed.\n");
+              return;
+            }
 
-        await resources.dataSource.close();
+            const migrationsDir = typeof flags.dir === "string" ? flags.dir : getMigrationsDir(config!, configDir);
+
+            const name = typeof flags.name === "string" ? flags.name : undefined;
+
+            const genResult = generateMigrationFromDiff({
+              diffResult: result,
+              migrationsDir,
+              name,
+            });
+
+            process.stdout.write(`Generated migration: ${genResult.filePath}\n`);
+            process.stdout.write(`  Version: ${genResult.version}\n`);
+            process.stdout.write(`  Statements: ${genResult.statementsCount}\n`);
+          }
+
+          await resources.dataSource.close();
+        });
+      })
+      .catch((err: Error) => {
+        process.stderr.write(`Error: ${err.message}\n`);
+        process.exitCode = 1;
       });
-    }).catch((err: Error) => {
-      process.stderr.write(`Error: ${err.message}\n`);
-      process.exitCode = 1;
-    });
     return;
   }
 

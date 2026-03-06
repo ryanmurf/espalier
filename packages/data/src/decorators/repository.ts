@@ -7,10 +7,7 @@ const repositoryMetadata = new WeakMap<object, RepositoryOptions>();
 const registeredRepositories = new Map<new (...args: any[]) => any, new (...args: any[]) => any>();
 
 export function Repository(options: RepositoryOptions) {
-  return function <T extends abstract new (...args: any[]) => any>(
-    target: T,
-    _context: ClassDecoratorContext<T>,
-  ): T {
+  return <T extends abstract new (...args: any[]) => any>(target: T, _context: ClassDecoratorContext<T>): T => {
     repositoryMetadata.set(target, options);
     registeredRepositories.set(options.entity, target as unknown as new (...args: any[]) => any);
     return target;

@@ -8,21 +8,22 @@
  * - Bug 5: batchLoadOneToMany() doesn't select the FK column, so it can't group
  *   children by parent. Even if Bug 4 is fixed, BATCH @OneToMany will return empty.
  */
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { createTestDataSource, isPostgresAvailable } from "./setup.js";
+
 import {
-  Table,
   Column,
+  createRepository,
+  DdlGenerator,
   Id,
+  ManyToMany,
   ManyToOne,
   OneToMany,
-  ManyToMany,
   OneToOne,
-  DdlGenerator,
-  createRepository,
+  Table,
 } from "espalier-data";
-import type { PgDataSource } from "../../pg-data-source.js";
 import type { Connection } from "espalier-jdbc";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import type { PgDataSource } from "../../pg-data-source.js";
+import { createTestDataSource, isPostgresAvailable } from "./setup.js";
 
 const canConnect = await isPostgresAvailable();
 const generator = new DdlGenerator();
@@ -178,9 +179,7 @@ describe.skipIf(!canConnect)("Eager fetch adversarial: repository E2E (Postgres)
       const emp = newEntity(EfEmployee, { empName: "Alice", department: dept });
       const savedEmp = await empRepo.save(emp);
 
-      const ps = conn.prepareStatement(
-        `SELECT dept_id FROM e2e_ef_employees WHERE id = $1`,
-      );
+      const ps = conn.prepareStatement(`SELECT dept_id FROM e2e_ef_employees WHERE id = $1`);
       ps.setParameter(1, savedEmp.id);
       const rs = await ps.executeQuery();
       await rs.next();
@@ -201,9 +200,7 @@ describe.skipIf(!canConnect)("Eager fetch adversarial: repository E2E (Postgres)
       const comment = newEntity(EfComment, { body: "Hello", item });
       const savedComment = await commentRepo.save(comment);
 
-      const ps = conn.prepareStatement(
-        `SELECT item_id FROM e2e_ef_comments WHERE id = $1`,
-      );
+      const ps = conn.prepareStatement(`SELECT item_id FROM e2e_ef_comments WHERE id = $1`);
       ps.setParameter(1, savedComment.id);
       const rs = await ps.executeQuery();
       await rs.next();
@@ -228,9 +225,7 @@ describe.skipIf(!canConnect)("Eager fetch adversarial: repository E2E (Postgres)
       // Workaround Bug 4: save employee without dept, then set FK via raw SQL
       const emp = await empRepo.save(newEntity(EfEmployee, { empName: "Alice" }));
       const rawStmt = conn.createStatement();
-      await rawStmt.executeUpdate(
-        `UPDATE e2e_ef_employees SET dept_id = ${dept.id} WHERE id = ${emp.id}`,
-      );
+      await rawStmt.executeUpdate(`UPDATE e2e_ef_employees SET dept_id = ${dept.id} WHERE id = ${emp.id}`);
 
       const freshRepo = createRepository<EfEmployee, number>(EfEmployee, ds);
       const loaded = await freshRepo.findById(emp.id);
@@ -276,9 +271,9 @@ describe.skipIf(!canConnect)("Eager fetch adversarial: repository E2E (Postgres)
       const all = await freshRepo.findAll();
       expect(all).toHaveLength(3);
 
-      const aliceLoaded = all.find(e => e.empName === "Alice");
-      const bobLoaded = all.find(e => e.empName === "Bob");
-      const carol = all.find(e => e.empName === "Carol");
+      const aliceLoaded = all.find((e) => e.empName === "Alice");
+      const bobLoaded = all.find((e) => e.empName === "Bob");
+      const carol = all.find((e) => e.empName === "Carol");
 
       expect(aliceLoaded!.department!.name).toBe("Eng");
       expect(bobLoaded!.department!.name).toBe("Sales");
@@ -297,12 +292,14 @@ describe.skipIf(!canConnect)("Eager fetch adversarial: repository E2E (Postgres)
 
       // Workaround Bug 4: set FK via raw SQL
       const rawStmt = conn.createStatement();
-      await rawStmt.executeUpdate(`UPDATE e2e_ef_employees SET dept_id = ${dept.id} WHERE id IN (${emp1.id}, ${emp2.id})`);
+      await rawStmt.executeUpdate(
+        `UPDATE e2e_ef_employees SET dept_id = ${dept.id} WHERE id IN (${emp1.id}, ${emp2.id})`,
+      );
 
       const freshRepo = createRepository<EfEmployee, number>(EfEmployee, ds);
       const all = await freshRepo.findAll();
       expect(all).toHaveLength(2);
-      expect(all.every(e => e.department!.name === "SharedDept")).toBe(true);
+      expect(all.every((e) => e.department!.name === "SharedDept")).toBe(true);
     });
   });
 
@@ -369,7 +366,7 @@ describe.skipIf(!canConnect)("Eager fetch adversarial: repository E2E (Postgres)
       expect(loaded!.title).toBe("BatchItem");
       // Now correctly loads 3 comments
       expect(loaded!.comments.length).toBe(3);
-      const bodies = loaded!.comments.map(c => c.body).sort();
+      const bodies = loaded!.comments.map((c) => c.body).sort();
       expect(bodies).toEqual(["C1", "C2", "C3"]);
     });
   });
@@ -414,7 +411,7 @@ describe.skipIf(!canConnect)("Eager fetch adversarial: repository E2E (Postgres)
       const loaded = await freshRepo.findById(item.id);
       expect(loaded).not.toBeNull();
       expect(loaded!.tags).toHaveLength(2);
-      const labels = loaded!.tags.map(t => t.label).sort();
+      const labels = loaded!.tags.map((t) => t.label).sort();
       expect(labels).toEqual(["Bug", "Urgent"]);
     });
 
@@ -457,13 +454,13 @@ describe.skipIf(!canConnect)("Eager fetch adversarial: repository E2E (Postgres)
       const all = await freshRepo.findAll();
       expect(all).toHaveLength(2);
 
-      const i1 = all.find(i => i.title === "I1")!;
-      const i2 = all.find(i => i.title === "I2")!;
+      const i1 = all.find((i) => i.title === "I1")!;
+      const i2 = all.find((i) => i.title === "I2")!;
 
       expect(i1.tags).toHaveLength(2);
       expect(i2.tags).toHaveLength(2);
-      expect(i1.tags.map(t => t.label).sort()).toEqual(["T1", "T2"]);
-      expect(i2.tags.map(t => t.label).sort()).toEqual(["T2", "T3"]);
+      expect(i1.tags.map((t) => t.label).sort()).toEqual(["T1", "T2"]);
+      expect(i2.tags.map((t) => t.label).sort()).toEqual(["T2", "T3"]);
     });
   });
 
@@ -487,14 +484,10 @@ describe.skipIf(!canConnect)("Eager fetch adversarial: repository E2E (Postgres)
       await rawStmt.executeUpdate(`UPDATE e2e_ef_items SET dept_id = ${dept.id} WHERE id = ${item.id}`);
 
       // Insert comment via raw SQL
-      await rawStmt.executeUpdate(
-        `INSERT INTO e2e_ef_comments (body, item_id) VALUES ('Mixed comment', ${item.id})`,
-      );
+      await rawStmt.executeUpdate(`INSERT INTO e2e_ef_comments (body, item_id) VALUES ('Mixed comment', ${item.id})`);
 
       // Insert tag association
-      await rawStmt.executeUpdate(
-        `INSERT INTO e2e_ef_item_tags (item_id, tag_id) VALUES (${item.id}, ${tag.id})`,
-      );
+      await rawStmt.executeUpdate(`INSERT INTO e2e_ef_item_tags (item_id, tag_id) VALUES (${item.id}, ${tag.id})`);
 
       const freshRepo = createRepository<EfItem, number>(EfItem, ds);
       const loaded = await freshRepo.findById(item.id);
@@ -582,9 +575,7 @@ describe.skipIf(!canConnect)("Eager fetch adversarial: repository E2E (Postgres)
       const rawStmt = conn.createStatement();
       for (const item of items) {
         for (const tag of tags) {
-          await rawStmt.executeUpdate(
-            `INSERT INTO e2e_ef_item_tags (item_id, tag_id) VALUES (${item.id}, ${tag.id})`,
-          );
+          await rawStmt.executeUpdate(`INSERT INTO e2e_ef_item_tags (item_id, tag_id) VALUES (${item.id}, ${tag.id})`);
         }
       }
 
@@ -593,7 +584,7 @@ describe.skipIf(!canConnect)("Eager fetch adversarial: repository E2E (Postgres)
       expect(all).toHaveLength(5);
       for (const item of all) {
         expect(item.tags).toHaveLength(4);
-        expect(item.tags.map(t => t.label).sort()).toEqual(["Tag0", "Tag1", "Tag2", "Tag3"]);
+        expect(item.tags.map((t) => t.label).sort()).toEqual(["Tag0", "Tag1", "Tag2", "Tag3"]);
       }
     });
   });

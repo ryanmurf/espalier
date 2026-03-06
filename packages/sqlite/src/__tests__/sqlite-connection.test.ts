@@ -1,15 +1,10 @@
-import { describe, it, expect, vi } from "vitest";
 import type Database from "better-sqlite3";
-import { SqliteConnection } from "../sqlite-connection.js";
-import { SqliteStatement, SqlitePreparedStatement } from "../sqlite-statement.js";
-import { SqliteNamedPreparedStatement } from "../sqlite-named-statement.js";
+import { ConnectionError, DatabaseErrorCode, IsolationLevel, TransactionError } from "espalier-jdbc";
+import { describe, expect, it, vi } from "vitest";
 import { SqliteBatchStatement } from "../sqlite-batch-statement.js";
-import {
-  IsolationLevel,
-  TransactionError,
-  ConnectionError,
-  DatabaseErrorCode,
-} from "espalier-jdbc";
+import { SqliteConnection } from "../sqlite-connection.js";
+import { SqliteNamedPreparedStatement } from "../sqlite-named-statement.js";
+import { SqlitePreparedStatement, SqliteStatement } from "../sqlite-statement.js";
 
 function createMockDb(): Database.Database {
   return {
@@ -37,27 +32,21 @@ describe("SqliteConnection", () => {
   describe("prepareStatement()", () => {
     it("returns a SqlitePreparedStatement", () => {
       const conn = new SqliteConnection(createMockDb());
-      expect(conn.prepareStatement("SELECT 1")).toBeInstanceOf(
-        SqlitePreparedStatement,
-      );
+      expect(conn.prepareStatement("SELECT 1")).toBeInstanceOf(SqlitePreparedStatement);
     });
   });
 
   describe("prepareNamedStatement()", () => {
     it("returns a SqliteNamedPreparedStatement", () => {
       const conn = new SqliteConnection(createMockDb());
-      expect(
-        conn.prepareNamedStatement("SELECT * FROM t WHERE id = :id"),
-      ).toBeInstanceOf(SqliteNamedPreparedStatement);
+      expect(conn.prepareNamedStatement("SELECT * FROM t WHERE id = :id")).toBeInstanceOf(SqliteNamedPreparedStatement);
     });
   });
 
   describe("prepareBatchStatement()", () => {
     it("returns a SqliteBatchStatement", () => {
       const conn = new SqliteConnection(createMockDb());
-      expect(
-        conn.prepareBatchStatement("INSERT INTO t (x) VALUES ($1)"),
-      ).toBeInstanceOf(SqliteBatchStatement);
+      expect(conn.prepareBatchStatement("INSERT INTO t (x) VALUES ($1)")).toBeInstanceOf(SqliteBatchStatement);
     });
   });
 
@@ -103,9 +92,7 @@ describe("SqliteConnection", () => {
         expect.unreachable("should have thrown");
       } catch (err) {
         expect(err).toBeInstanceOf(TransactionError);
-        expect((err as TransactionError).code).toBe(
-          DatabaseErrorCode.TX_BEGIN_FAILED,
-        );
+        expect((err as TransactionError).code).toBe(DatabaseErrorCode.TX_BEGIN_FAILED);
       }
     });
 
@@ -154,9 +141,7 @@ describe("SqliteConnection", () => {
           expect.unreachable("should have thrown");
         } catch (err) {
           expect(err).toBeInstanceOf(TransactionError);
-          expect((err as TransactionError).code).toBe(
-            DatabaseErrorCode.TX_COMMIT_FAILED,
-          );
+          expect((err as TransactionError).code).toBe(DatabaseErrorCode.TX_COMMIT_FAILED);
         }
       });
 
@@ -172,9 +157,7 @@ describe("SqliteConnection", () => {
           expect.unreachable("should have thrown");
         } catch (err) {
           expect(err).toBeInstanceOf(TransactionError);
-          expect((err as TransactionError).code).toBe(
-            DatabaseErrorCode.TX_ROLLBACK_FAILED,
-          );
+          expect((err as TransactionError).code).toBe(DatabaseErrorCode.TX_ROLLBACK_FAILED);
         }
       });
 
@@ -190,9 +173,7 @@ describe("SqliteConnection", () => {
           expect.unreachable("should have thrown");
         } catch (err) {
           expect(err).toBeInstanceOf(TransactionError);
-          expect((err as TransactionError).code).toBe(
-            DatabaseErrorCode.TX_SAVEPOINT_FAILED,
-          );
+          expect((err as TransactionError).code).toBe(DatabaseErrorCode.TX_SAVEPOINT_FAILED);
         }
       });
 
@@ -208,9 +189,7 @@ describe("SqliteConnection", () => {
           expect.unreachable("should have thrown");
         } catch (err) {
           expect(err).toBeInstanceOf(TransactionError);
-          expect((err as TransactionError).code).toBe(
-            DatabaseErrorCode.TX_ROLLBACK_FAILED,
-          );
+          expect((err as TransactionError).code).toBe(DatabaseErrorCode.TX_ROLLBACK_FAILED);
         }
       });
     });
@@ -242,17 +221,13 @@ describe("SqliteConnection", () => {
     it("prepareNamedStatement throws ConnectionError", async () => {
       const conn = new SqliteConnection(createMockDb());
       await conn.close();
-      expect(() => conn.prepareNamedStatement("SELECT :id")).toThrow(
-        ConnectionError,
-      );
+      expect(() => conn.prepareNamedStatement("SELECT :id")).toThrow(ConnectionError);
     });
 
     it("prepareBatchStatement throws ConnectionError", async () => {
       const conn = new SqliteConnection(createMockDb());
       await conn.close();
-      expect(() =>
-        conn.prepareBatchStatement("INSERT INTO t VALUES ($1)"),
-      ).toThrow(ConnectionError);
+      expect(() => conn.prepareBatchStatement("INSERT INTO t VALUES ($1)")).toThrow(ConnectionError);
     });
 
     it("beginTransaction throws ConnectionError", async () => {
@@ -269,9 +244,7 @@ describe("SqliteConnection", () => {
         expect.unreachable("should have thrown");
       } catch (err) {
         expect(err).toBeInstanceOf(ConnectionError);
-        expect((err as ConnectionError).code).toBe(
-          DatabaseErrorCode.CONNECTION_CLOSED,
-        );
+        expect((err as ConnectionError).code).toBe(DatabaseErrorCode.CONNECTION_CLOSED);
       }
     });
   });

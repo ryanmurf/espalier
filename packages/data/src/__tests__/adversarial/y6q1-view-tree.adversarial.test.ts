@@ -5,26 +5,26 @@
  * These tests are intentionally hostile — they probe SQL injection vectors,
  * edge cases, circular references, metadata immutability, and read-only enforcement.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import {
-  View,
-  getViewMetadata,
-  isViewEntity,
-  MaterializedView,
-  getMaterializedViewMetadata,
-  isMaterializedViewEntity,
-  Tree,
-  getTreeMetadata,
-  isTreeEntity,
-  ClosureTableManager,
-  MaterializedPathManager,
-  DdlGenerator,
-  Table,
-  Id,
-  Column,
-} from "../../index.js";
-import type { ViewOptions, MaterializedViewOptions, TreeOptions } from "../../index.js";
+
 import type { Connection, PreparedStatement, ResultSet, SqlValue } from "espalier-jdbc";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  ClosureTableManager,
+  Column,
+  DdlGenerator,
+  getMaterializedViewMetadata,
+  getTreeMetadata,
+  getViewMetadata,
+  Id,
+  isMaterializedViewEntity,
+  isTreeEntity,
+  isViewEntity,
+  MaterializedPathManager,
+  MaterializedView,
+  Table,
+  Tree,
+  View,
+} from "../../index.js";
 
 // ---------------------------------------------------------------------------
 // Mock helpers
@@ -59,7 +59,7 @@ function createMockStatement(resultSet?: ResultSet): PreparedStatement {
 function createMockConnection(stmtFactory?: () => PreparedStatement): Connection {
   const defaultStmt = createMockStatement();
   return {
-    prepareStatement: vi.fn(() => stmtFactory ? stmtFactory() : defaultStmt),
+    prepareStatement: vi.fn(() => (stmtFactory ? stmtFactory() : defaultStmt)),
     close: vi.fn(async () => {}),
     beginTransaction: vi.fn(async () => ({
       commit: vi.fn(async () => {}),
@@ -77,11 +77,9 @@ function captureSql(conn: Connection): { sql: string; params: SqlValue[] }[] {
   origPrepare.mockImplementation((sql: string) => {
     const params: SqlValue[] = [];
     const stmt = createMockStatement();
-    (stmt.setParameter as ReturnType<typeof vi.fn>).mockImplementation(
-      (_idx: number, val: SqlValue) => {
-        params.push(val);
-      },
-    );
+    (stmt.setParameter as ReturnType<typeof vi.fn>).mockImplementation((_idx: number, val: SqlValue) => {
+      params.push(val);
+    });
     captured.push({ sql, params });
     return stmt;
   });
@@ -342,9 +340,7 @@ describe("@MaterializedView — Adversarial", () => {
       new PlainEntity2();
 
       const ddl = new DdlGenerator();
-      expect(() => ddl.generateMaterializedViewDdl(PlainEntity2)).toThrow(
-        "not decorated with @MaterializedView",
-      );
+      expect(() => ddl.generateMaterializedViewDdl(PlainEntity2)).toThrow("not decorated with @MaterializedView");
     });
   });
 
@@ -504,11 +500,7 @@ describe("ClosureTableManager — Adversarial", () => {
       const conn = createMockConnection();
       const captured = captureSql(conn);
 
-      await manager.insertNode(
-        conn,
-        1 as SqlValue,
-        "999; DROP TABLE--" as SqlValue,
-      );
+      await manager.insertNode(conn, 1 as SqlValue, "999; DROP TABLE--" as SqlValue);
 
       // Two statements: self-reference + ancestor copy
       expect(captured.length).toBe(2);
@@ -553,10 +545,7 @@ describe("ClosureTableManager — Adversarial", () => {
 
   describe("SQL injection via table names", () => {
     it("uses quoteIdentifier for table name in SQL", async () => {
-      const evilManager = new ClosureTableManager(
-        'evil"; DROP TABLE users; --',
-        "id",
-      );
+      const evilManager = new ClosureTableManager('evil"; DROP TABLE users; --', "id");
 
       const conn = createMockConnection();
       const captured = captureSql(conn);
@@ -593,16 +582,14 @@ describe("ClosureTableManager — Adversarial", () => {
       const circularRs = createMockResultSet([{ "?column?": 1 }]);
       const conn = createMockConnection(() => createMockStatement(circularRs));
 
-      await expect(
-        manager.moveNode(conn, 1 as SqlValue, 5 as SqlValue),
-      ).rejects.toThrow(/cycle/i);
+      await expect(manager.moveNode(conn, 1 as SqlValue, 5 as SqlValue)).rejects.toThrow(/cycle/i);
     });
 
     it("moveNode rejects moving a node under itself", async () => {
       const conn = createMockConnection();
-      await expect(
-        manager.moveNode(conn, 1 as SqlValue, 1 as SqlValue),
-      ).rejects.toThrow(/Cannot move node under itself/);
+      await expect(manager.moveNode(conn, 1 as SqlValue, 1 as SqlValue)).rejects.toThrow(
+        /Cannot move node under itself/,
+      );
     });
   });
 
@@ -631,11 +618,7 @@ describe("ClosureTableManager — Adversarial", () => {
 
   describe("findDescendants", () => {
     it("returns descendant IDs excluding self (depth > 0)", async () => {
-      const rs = createMockResultSet([
-        { descendant_id: 2 },
-        { descendant_id: 3 },
-        { descendant_id: 4 },
-      ]);
+      const rs = createMockResultSet([{ descendant_id: 2 }, { descendant_id: 3 }, { descendant_id: 4 }]);
       const conn = createMockConnection(() => createMockStatement(rs));
 
       const ids = await manager.findDescendants(conn, 1 as SqlValue);
@@ -666,10 +649,7 @@ describe("ClosureTableManager — Adversarial", () => {
 
   describe("findAncestors", () => {
     it("returns ancestor IDs excluding self (depth > 0)", async () => {
-      const rs = createMockResultSet([
-        { ancestor_id: 10 },
-        { ancestor_id: 5 },
-      ]);
+      const rs = createMockResultSet([{ ancestor_id: 10 }, { ancestor_id: 5 }]);
       const conn = createMockConnection(() => createMockStatement(rs));
 
       const ids = await manager.findAncestors(conn, 20 as SqlValue);
@@ -679,10 +659,7 @@ describe("ClosureTableManager — Adversarial", () => {
 
   describe("findRoots", () => {
     it("returns nodes with no ancestors (only self-reference)", async () => {
-      const rs = createMockResultSet([
-        { ancestor_id: 1 },
-        { ancestor_id: 100 },
-      ]);
+      const rs = createMockResultSet([{ ancestor_id: 1 }, { ancestor_id: 100 }]);
       const conn = createMockConnection(() => createMockStatement(rs));
 
       const ids = await manager.findRoots(conn);
@@ -701,10 +678,7 @@ describe("ClosureTableManager — Adversarial", () => {
 
   describe("findChildren", () => {
     it("returns direct children (depth = 1)", async () => {
-      const rs = createMockResultSet([
-        { descendant_id: 2 },
-        { descendant_id: 3 },
-      ]);
+      const rs = createMockResultSet([{ descendant_id: 2 }, { descendant_id: 3 }]);
       const conn = createMockConnection(() => createMockStatement(rs));
 
       const ids = await manager.findChildren(conn, 1 as SqlValue);
@@ -714,10 +688,7 @@ describe("ClosureTableManager — Adversarial", () => {
 
   describe("findLeaves", () => {
     it("returns nodes with no children", async () => {
-      const rs = createMockResultSet([
-        { descendant_id: 5 },
-        { descendant_id: 8 },
-      ]);
+      const rs = createMockResultSet([{ descendant_id: 5 }, { descendant_id: 8 }]);
       const conn = createMockConnection(() => createMockStatement(rs));
 
       const ids = await manager.findLeaves(conn);
@@ -858,27 +829,23 @@ describe("MaterializedPathManager — Adversarial", () => {
       const conn = createMockConnection();
 
       // Node at /1/2/ trying to move under /1/2/3/ (a descendant)
-      await expect(
-        manager.moveNode(conn, 2 as SqlValue, "/1/2/", "/1/2/3/"),
-      ).rejects.toThrow("Cannot move node 2: new parent is a descendant of the node.");
+      await expect(manager.moveNode(conn, 2 as SqlValue, "/1/2/", "/1/2/3/")).rejects.toThrow(
+        "Cannot move node 2: new parent is a descendant of the node.",
+      );
     });
 
     it("throws when moving node to itself", async () => {
       const conn = createMockConnection();
 
       // Moving to own path
-      await expect(
-        manager.moveNode(conn, 2 as SqlValue, "/1/2/", "/1/2/"),
-      ).rejects.toThrow("Cannot move node 2");
+      await expect(manager.moveNode(conn, 2 as SqlValue, "/1/2/", "/1/2/")).rejects.toThrow("Cannot move node 2");
     });
 
     it("allows move to non-descendant path", async () => {
       const conn = createMockConnection();
 
       // Node at /1/2/ moving to /3/ — valid move
-      await expect(
-        manager.moveNode(conn, 2 as SqlValue, "/1/2/", "/3/"),
-      ).resolves.not.toThrow();
+      await expect(manager.moveNode(conn, 2 as SqlValue, "/1/2/", "/3/")).resolves.not.toThrow();
     });
   });
 
@@ -945,10 +912,7 @@ describe("MaterializedPathManager — Adversarial", () => {
       const conn = createMockConnection();
       const captured = captureSql(conn);
 
-      await manager.findDescendants(
-        conn,
-        "/1/' OR '1'='1/" as SqlValue,
-      );
+      await manager.findDescendants(conn, "/1/' OR '1'='1/" as SqlValue);
 
       // Path should only appear in params
       expect(captured[0].sql).not.toContain("OR '1'='1");
@@ -1164,9 +1128,7 @@ describe("generateAllDdl — includes closure tables for @Tree entities", () => 
     const ddl = new DdlGenerator();
     const statements = ddl.generateAllDdl([MixedRegular, MixedView, MixedTree]);
 
-    const hasRegularTable = statements.some(
-      (s) => s.includes("CREATE TABLE") && s.includes("mixed_regular"),
-    );
+    const hasRegularTable = statements.some((s) => s.includes("CREATE TABLE") && s.includes("mixed_regular"));
     const hasView = statements.some((s) => s.includes("CREATE OR REPLACE VIEW"));
     const hasClosureTable = statements.some((s) => s.includes("mixed_tree_closure"));
 

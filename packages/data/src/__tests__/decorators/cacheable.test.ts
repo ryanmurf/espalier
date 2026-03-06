@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { Cacheable, getCacheableMetadata, registerCacheable } from "../../decorators/cacheable.js";
 import { SelectBuilder } from "../../query/query-builder.js";
 

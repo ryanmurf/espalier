@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { AcquireEvent, ReleaseEvent, ErrorEvent, TimeoutEvent } from "espalier-jdbc";
+import type { AcquireEvent, ErrorEvent, ReleaseEvent, TimeoutEvent } from "espalier-jdbc";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock pg module
 const mockPoolConnect = vi.fn();
@@ -134,7 +134,11 @@ describe("PgDataSource pool monitoring", () => {
       mockPoolConnect.mockRejectedValue(timeoutError);
 
       const ds = new PgDataSource({ pg: {} });
-      try { await ds.getConnection(); } catch { /* expected */ }
+      try {
+        await ds.getConnection();
+      } catch {
+        /* expected */
+      }
 
       expect(ds.getPoolMetrics().totalTimeouts).toBe(1);
     });
@@ -165,9 +169,9 @@ describe("PgDataSource pool monitoring", () => {
       ds.getPoolMonitor().onError((e) => events.push(e));
 
       // Simulate pool error by calling the registered handler
-      const errorHandler = mockPoolOn.mock.calls.find(
-        (call: unknown[]) => call[0] === "error",
-      )![1] as (err: Error) => void;
+      const errorHandler = mockPoolOn.mock.calls.find((call: unknown[]) => call[0] === "error")![1] as (
+        err: Error,
+      ) => void;
 
       errorHandler(new Error("idle connection lost"));
 
@@ -180,7 +184,11 @@ describe("PgDataSource pool monitoring", () => {
       mockPoolConnect.mockRejectedValue(new Error("connection refused"));
 
       const ds = new PgDataSource({ pg: {} });
-      try { await ds.getConnection(); } catch { /* expected */ }
+      try {
+        await ds.getConnection();
+      } catch {
+        /* expected */
+      }
 
       expect(ds.getPoolMetrics().totalErrors).toBe(1);
     });

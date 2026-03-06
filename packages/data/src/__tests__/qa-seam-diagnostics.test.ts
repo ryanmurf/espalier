@@ -8,7 +8,7 @@
  * Focus: does diagnose() correctly identify errors that come from
  * relationship loading, missing tables (after migrations), column mismatches?
  */
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { diagnose, enhanceError } from "../errors/error-diagnostics.js";
 
 // =============================================================================
@@ -124,7 +124,7 @@ describe("Seam: diagnose() — adapter connection errors", () => {
   });
 
   it("detects authentication failure (wrong password)", () => {
-    const msg = "password authentication failed for user \"nesify\"";
+    const msg = 'password authentication failed for user "nesify"';
     const result = diagnose(msg);
     expect(result).not.toBeNull();
     expect(result!.hint).toContain("username and password");

@@ -1,4 +1,4 @@
-import type { RouteDefinition, RestHandler, HttpMethod } from "./handler.js";
+import type { RestHandler, RouteDefinition } from "./handler.js";
 
 /**
  * Per-entity route customization options.
@@ -73,13 +73,7 @@ export function customizeRoutes(
 /**
  * Add HATEOAS links to a paginated response.
  */
-export function addHateoasLinks(
-  response: any,
-  basePath: string,
-  page: number,
-  size: number,
-  totalPages: number,
-): any {
+export function addHateoasLinks(response: any, basePath: string, page: number, size: number, totalPages: number): any {
   const links: Record<string, string> = {
     self: `${basePath}?page=${page}&size=${size}`,
   };

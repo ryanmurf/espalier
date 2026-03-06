@@ -76,10 +76,5 @@ export interface ExplainOptions {
  * Analyzes query execution plans.
  */
 export interface QueryPlanAnalyzer {
-  explain(
-    connection: Connection,
-    sql: string,
-    params?: SqlValue[],
-    options?: ExplainOptions,
-  ): Promise<QueryPlan>;
+  explain(connection: Connection, sql: string, params?: SqlValue[], options?: ExplainOptions): Promise<QueryPlan>;
 }

@@ -1,14 +1,14 @@
-import type { CrudRepository } from "../repository/crud-repository.js";
-import type { Pageable, Sort, Page } from "../repository/paging.js";
-import type { Specification } from "../query/specification.js";
+import { isAuditedEntity } from "../decorators/audited.js";
+import { getSearchableFields } from "../decorators/searchable.js";
+import { getSoftDeleteMetadata } from "../decorators/soft-delete.js";
+import { getTenantIdField } from "../decorators/tenant.js";
+import { getVectorFields } from "../decorators/vector.js";
 import type { EntityMetadata } from "../mapping/entity-metadata.js";
 import { getEntityMetadata } from "../mapping/entity-metadata.js";
-import { getTenantIdField } from "../decorators/tenant.js";
-import { getSoftDeleteMetadata } from "../decorators/soft-delete.js";
-import { isAuditedEntity } from "../decorators/audited.js";
-import { getVectorFields } from "../decorators/vector.js";
-import { getSearchableFields } from "../decorators/searchable.js";
+import type { Specification } from "../query/specification.js";
 import { equal, Specifications } from "../query/specification.js";
+import type { CrudRepository } from "../repository/crud-repository.js";
+import type { Page, Pageable, Sort } from "../repository/paging.js";
 import { createPageable } from "../repository/paging.js";
 import { TenantContext } from "../tenant/tenant-context.js";
 import type { GraphQLPaginationAdapter } from "./pagination-adapter.js";
@@ -155,9 +155,7 @@ export class ResolverGenerator {
     entityClass: new (...args: any[]) => any,
   ): ResolverFn {
     return async (_parent: any, args: { id: any }, context: any) => {
-      return this.withTenantContext(context, metadata, entityClass, () =>
-        repository.findById(args.id),
-      );
+      return this.withTenantContext(context, metadata, entityClass, () => repository.findById(args.id));
     };
   }
 
@@ -167,13 +165,18 @@ export class ResolverGenerator {
     entityClass: new (...args: any[]) => any,
   ): ResolverFn {
     const hasSoftDelete = !!getSoftDeleteMetadata(entityClass);
-    return async (_parent: any, args: { page?: number; size?: number; sort?: string; includeDeleted?: boolean }, context: any) => {
+    return async (
+      _parent: any,
+      args: { page?: number; size?: number; sort?: string; includeDeleted?: boolean },
+      context: any,
+    ) => {
       return this.withTenantContext(context, metadata, entityClass, async () => {
         const pageable = this.toPageable(args, metadata);
         const repo = repository as any;
-        const page: Page<any> = hasSoftDelete && args.includeDeleted && typeof repo.findIncludingDeleted === "function"
-          ? await repo.findIncludingDeleted(pageable)
-          : await repository.findAll(pageable);
+        const page: Page<any> =
+          hasSoftDelete && args.includeDeleted && typeof repo.findIncludingDeleted === "function"
+            ? await repo.findIncludingDeleted(pageable)
+            : await repository.findAll(pageable);
         return {
           content: page.content,
           pageInfo: {
@@ -236,9 +239,7 @@ export class ResolverGenerator {
     entityClass: new (...args: any[]) => any,
   ): ResolverFn {
     return async (_parent: any, _args: any, context: any) => {
-      return this.withTenantContext(context, metadata, entityClass, () =>
-        repository.count(),
-      );
+      return this.withTenantContext(context, metadata, entityClass, () => repository.count());
     };
   }
 
@@ -319,9 +320,7 @@ export class ResolverGenerator {
         let entity: any;
         if (typeof repo.findIncludingDeleted === "function") {
           const all = await repo.findIncludingDeleted();
-          entity = Array.isArray(all)
-            ? all.find((e: any) => String(e.id) === String(args.id))
-            : undefined;
+          entity = Array.isArray(all) ? all.find((e: any) => String(e.id) === String(args.id)) : undefined;
         }
         if (!entity) {
           throw new Error("Entity not found");
@@ -361,7 +360,11 @@ export class ResolverGenerator {
   ): ResolverFn {
     const VALID_METRICS = new Set(["l2", "cosine", "inner_product"]);
 
-    return async (_parent: any, args: { field: string; vector: number[]; limit?: number; maxDistance?: number; metric?: string }, context: any) => {
+    return async (
+      _parent: any,
+      args: { field: string; vector: number[]; limit?: number; maxDistance?: number; metric?: string },
+      context: any,
+    ) => {
       // Validate metric
       if (args.metric != null && !VALID_METRICS.has(args.metric)) {
         throw new Error(`Invalid metric "${args.metric}". Must be one of: l2, cosine, inner_product`);
@@ -390,9 +393,7 @@ export class ResolverGenerator {
     entityClass: new (...args: any[]) => any,
     searchableFields: Map<string | symbol, any>,
   ): ResolverFn {
-    const validFieldNames = new Set(
-      [...searchableFields.keys()].filter((k): k is string => typeof k === "string"),
-    );
+    const _validFieldNames = new Set([...searchableFields.keys()].filter((k): k is string => typeof k === "string"));
 
     return async (_parent: any, args: { query: string; limit?: number; offset?: number }, context: any) => {
       if (typeof args.query !== "string" || args.query.trim().length === 0) {
@@ -459,15 +460,11 @@ export class ResolverGenerator {
  * Generate a filter specification from GraphQL filter args.
  * Maps { field: value } args to Specification.equal() conjunctions.
  */
-export function createFilterSpec<T>(
-  filter: Record<string, any>,
-): Specification<T> | undefined {
+export function createFilterSpec<T>(filter: Record<string, any>): Specification<T> | undefined {
   const entries = Object.entries(filter).filter(([, v]) => v != null);
   if (entries.length === 0) return undefined;
 
-  const specs = entries.map(([field, value]) =>
-    equal<T>(field as keyof T & string, value),
-  );
+  const specs = entries.map(([field, value]) => equal<T>(field as keyof T & string, value));
 
   if (specs.length === 1) return specs[0];
 
@@ -483,9 +480,7 @@ const PROTOTYPE_POISON_KEYS = new Set(["__proto__", "constructor", "prototype"])
  * known entity column field names, and reject prototype pollution keys.
  */
 function sanitizeInput(input: Record<string, unknown>, metadata: EntityMetadata): Record<string, unknown> {
-  const allowedFields = new Set(
-    metadata.fields.map((f) => String(f.fieldName)),
-  );
+  const allowedFields = new Set(metadata.fields.map((f) => String(f.fieldName)));
   const result: Record<string, unknown> = {};
   for (const key of Object.keys(input)) {
     if (PROTOTYPE_POISON_KEYS.has(key)) continue;

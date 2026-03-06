@@ -17,16 +17,16 @@
  */
 
 import type {
-  DataSource,
+  ColumnMetadata,
   Connection,
-  Statement,
+  DataSource,
+  IsolationLevel,
   PreparedStatement,
   ResultSet,
+  SqlValue,
+  Statement,
   Transaction,
-  ColumnMetadata,
 } from "espalier-jdbc";
-import type { SqlValue } from "espalier-jdbc";
-import { IsolationLevel } from "espalier-jdbc";
 
 // ─── Configuration ───────────────────────────────────────────────────
 
@@ -120,6 +120,7 @@ export class OracleResultSet implements ResultSet {
 
 export class OracleStatement implements Statement {
   protected driver: any;
+  protected sql: string = "";
   private closed = false;
 
   constructor(driver: any) {
@@ -148,7 +149,6 @@ export class OracleStatement implements Statement {
 // ─── PreparedStatement ───────────────────────────────────────────────
 
 export class OraclePreparedStatement extends OracleStatement implements PreparedStatement {
-  private readonly sql: string;
   protected readonly params = new Map<number, SqlValue>();
 
   constructor(driver: any, sql: string) {
@@ -236,7 +236,7 @@ export class OracleConnection implements Connection {
 // ─── DataSource ──────────────────────────────────────────────────────
 
 export class OracleDataSource implements DataSource {
-  private readonly config: OracleConfig;
+  private config: OracleConfig;
   private closed = false;
 
   constructor(config: OracleConfig) {
@@ -245,7 +245,9 @@ export class OracleDataSource implements DataSource {
 
   async getConnection(): Promise<Connection> {
     if (this.closed) throw new Error("DataSource is closed");
-    throw new Error("OracleDataSource is a stub adapter. Install and configure a real Oracle driver to use connections.");
+    throw new Error(
+      "OracleDataSource is a stub adapter. Install and configure a real Oracle driver to use connections.",
+    );
   }
 
   async close(): Promise<void> {

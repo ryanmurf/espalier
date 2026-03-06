@@ -1,28 +1,25 @@
 /**
  * Adversarial tests for configureObservability integration wiring (Y3 Q3).
  */
-import { describe, it, expect, vi, afterEach } from "vitest";
-import { configureObservability } from "../observability/observability-config.js";
-import type { ObservabilityConfig } from "../observability/observability-config.js";
-import {
-  setGlobalTracerProvider,
-  getGlobalTracerProvider,
-  NoopTracerProvider,
-  SlowQueryDetector,
-  QueryStatisticsCollector,
-} from "espalier-jdbc";
+
 import type {
-  DataSource,
   Connection,
-  Statement,
-  ResultSet,
-  TracerProvider,
-  Tracer,
-  Span,
-  MonitoredPooledDataSource,
+  DataSource,
   HealthCheck,
   HealthCheckResult,
+  MonitoredPooledDataSource,
+  Statement,
+  TracerProvider,
 } from "espalier-jdbc";
+import {
+  getGlobalTracerProvider,
+  NoopTracerProvider,
+  QueryStatisticsCollector,
+  SlowQueryDetector,
+  setGlobalTracerProvider,
+} from "espalier-jdbc";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { configureObservability } from "../observability/observability-config.js";
 import { TestResultSet } from "./test-utils/test-result-set.js";
 
 // ══════════════════════════════════════════════════
@@ -110,7 +107,9 @@ describe("configureObservability", () => {
       const ds = mockDataSource();
       const provider: TracerProvider = {
         getTracer: vi.fn().mockReturnValue({
-          startSpan: vi.fn().mockReturnValue({ setAttribute: vi.fn(), setStatus: vi.fn(), end: vi.fn(), addEvent: vi.fn() }),
+          startSpan: vi
+            .fn()
+            .mockReturnValue({ setAttribute: vi.fn(), setStatus: vi.fn(), end: vi.fn(), addEvent: vi.fn() }),
         }),
       };
 
@@ -141,7 +140,7 @@ describe("configureObservability", () => {
       expect(detector).toBeInstanceOf(SlowQueryDetector);
 
       // Verify threshold: 499ms should not trigger, 500ms should
-      const cb = vi.fn();
+      const _cb = vi.fn();
       // Can't access the callback directly, but we can verify via wireSlowQueryDetector
     });
 
@@ -162,7 +161,9 @@ describe("configureObservability", () => {
       configureObservability(ds, {
         slowQueryThresholdMs: 0,
         slowQueryCallback: callback,
-        wireSlowQueryDetector: (d) => { capturedDetector = d; },
+        wireSlowQueryDetector: (d) => {
+          capturedDetector = d;
+        },
       });
 
       // Use the captured detector to verify the callback
@@ -292,7 +293,7 @@ describe("configureObservability", () => {
 
       const handle = configureObservability(ds, { healthChecks: [customCheck] });
       const results = await handle.getHealthRegistry().checkAll();
-      const names = results.map(r => r.name);
+      const names = results.map((r) => r.name);
       expect(names).toContain("connectivity");
       expect(names).toContain("redis");
     });
@@ -325,7 +326,13 @@ describe("configureObservability", () => {
       const override: HealthCheck = {
         name: "connectivity",
         async check(): Promise<HealthCheckResult> {
-          return { status: "DOWN", name: "connectivity", details: { custom: true }, checkedAt: new Date(), durationMs: 0 };
+          return {
+            status: "DOWN",
+            name: "connectivity",
+            details: { custom: true },
+            checkedAt: new Date(),
+            durationMs: 0,
+          };
         },
       };
 

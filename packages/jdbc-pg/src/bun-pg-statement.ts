@@ -1,10 +1,5 @@
-import type {
-  Statement,
-  PreparedStatement,
-  ResultSet,
-  SqlValue,
-} from "espalier-jdbc";
-import { QueryError, getGlobalLogger, LogLevel } from "espalier-jdbc";
+import type { PreparedStatement, ResultSet, SqlValue, Statement } from "espalier-jdbc";
+import { getGlobalLogger, LogLevel, QueryError } from "espalier-jdbc";
 import { BunPgResultSet } from "./bun-pg-result-set.js";
 
 /**
@@ -53,12 +48,12 @@ export class BunPgStatementImpl implements Statement {
       }
       return new BunPgResultSet([...result]);
     } catch (err) {
-      logger.error("query failed", { sql: truncateSql(sql), duration: Date.now() - startTime, error: (err as Error).message });
-      throw new QueryError(
-        `Failed to execute query: ${(err as Error).message}`,
-        sql,
-        err as Error,
-      );
+      logger.error("query failed", {
+        sql: truncateSql(sql),
+        duration: Date.now() - startTime,
+        error: (err as Error).message,
+      });
+      throw new QueryError(`Failed to execute query: ${(err as Error).message}`, sql, err as Error);
     }
   }
 
@@ -72,12 +67,12 @@ export class BunPgStatementImpl implements Statement {
       }
       return result.count ?? 0;
     } catch (err) {
-      logger.error("update failed", { sql: truncateSql(sql), duration: Date.now() - startTime, error: (err as Error).message });
-      throw new QueryError(
-        `Failed to execute update: ${(err as Error).message}`,
-        sql,
-        err as Error,
-      );
+      logger.error("update failed", {
+        sql: truncateSql(sql),
+        duration: Date.now() - startTime,
+        error: (err as Error).message,
+      });
+      throw new QueryError(`Failed to execute update: ${(err as Error).message}`, sql, err as Error);
     }
   }
 
@@ -109,16 +104,21 @@ export class BunPgPreparedStatement extends BunPgStatementImpl implements Prepar
     try {
       const result = await this.client.query(queryText, params);
       if (logger.isEnabled(LogLevel.DEBUG)) {
-        logger.debug("prepared query executed", { sql: truncateSql(queryText), paramCount: params.length, duration: Date.now() - startTime });
+        logger.debug("prepared query executed", {
+          sql: truncateSql(queryText),
+          paramCount: params.length,
+          duration: Date.now() - startTime,
+        });
       }
       return new BunPgResultSet([...result]);
     } catch (err) {
-      logger.error("prepared query failed", { sql: truncateSql(queryText), paramCount: params.length, duration: Date.now() - startTime, error: (err as Error).message });
-      throw new QueryError(
-        `Failed to execute prepared query: ${(err as Error).message}`,
-        queryText,
-        err as Error,
-      );
+      logger.error("prepared query failed", {
+        sql: truncateSql(queryText),
+        paramCount: params.length,
+        duration: Date.now() - startTime,
+        error: (err as Error).message,
+      });
+      throw new QueryError(`Failed to execute prepared query: ${(err as Error).message}`, queryText, err as Error);
     }
   }
 
@@ -131,16 +131,21 @@ export class BunPgPreparedStatement extends BunPgStatementImpl implements Prepar
     try {
       const result = await this.client.query(queryText, params);
       if (logger.isEnabled(LogLevel.DEBUG)) {
-        logger.debug("prepared update executed", { sql: truncateSql(queryText), paramCount: params.length, duration: Date.now() - startTime });
+        logger.debug("prepared update executed", {
+          sql: truncateSql(queryText),
+          paramCount: params.length,
+          duration: Date.now() - startTime,
+        });
       }
       return result.count ?? 0;
     } catch (err) {
-      logger.error("prepared update failed", { sql: truncateSql(queryText), paramCount: params.length, duration: Date.now() - startTime, error: (err as Error).message });
-      throw new QueryError(
-        `Failed to execute prepared update: ${(err as Error).message}`,
-        queryText,
-        err as Error,
-      );
+      logger.error("prepared update failed", {
+        sql: truncateSql(queryText),
+        paramCount: params.length,
+        duration: Date.now() - startTime,
+        error: (err as Error).message,
+      });
+      throw new QueryError(`Failed to execute prepared update: ${(err as Error).message}`, queryText, err as Error);
     }
   }
 

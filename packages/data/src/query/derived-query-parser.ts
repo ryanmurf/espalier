@@ -60,9 +60,9 @@ const OPERATOR_PARAM_COUNT: Record<QueryOperator, number> = {
 };
 
 // Operators sorted by length descending so longer suffixes match first
-const OPERATORS_BY_LENGTH: QueryOperator[] = (
-  Object.keys(OPERATOR_PARAM_COUNT) as QueryOperator[]
-).sort((a, b) => b.length - a.length);
+const OPERATORS_BY_LENGTH: QueryOperator[] = (Object.keys(OPERATOR_PARAM_COUNT) as QueryOperator[]).sort(
+  (a, b) => b.length - a.length,
+);
 
 interface PrefixResult {
   action: "find" | "count" | "delete" | "exists";
@@ -77,10 +77,7 @@ function parsePrefix(methodName: string): { prefix: PrefixResult; rest: string }
     return { prefix: { action: "find", distinct: true }, rest };
   }
   if (methodName.startsWith("findDistinct")) {
-    throw new Error(
-      `Invalid derived query method name "${methodName}": ` +
-        `expected "By" after "findDistinct".`,
-    );
+    throw new Error(`Invalid derived query method name "${methodName}": ` + `expected "By" after "findDistinct".`);
   }
 
   // findFirst<N>By... or findFirstBy... or findTop<N>By... or findTopBy...
@@ -157,9 +154,7 @@ function extractOrderBy(predicate: string): {
   const orderByPart = predicate.slice(orderByIdx + "OrderBy".length);
 
   if (!orderByPart) {
-    throw new Error(
-      `Invalid OrderBy clause: expected property name after "OrderBy".`,
-    );
+    throw new Error(`Invalid OrderBy clause: expected property name after "OrderBy".`);
   }
 
   const orderBy: OrderByExpression[] = [];
@@ -183,8 +178,7 @@ function extractOrderBy(predicate: string): {
         if (idx === -1) break;
 
         const afterIdx = idx + dir.length;
-        const atBoundary = afterIdx === remaining.length ||
-          (remaining[afterIdx] >= "A" && remaining[afterIdx] <= "Z");
+        const atBoundary = afterIdx === remaining.length || (remaining[afterIdx] >= "A" && remaining[afterIdx] <= "Z");
 
         if (atBoundary && (bestIdx === -1 || idx < bestIdx)) {
           bestIdx = idx;
@@ -210,9 +204,7 @@ function extractOrderBy(predicate: string): {
     }
 
     if (!propPart) {
-      throw new Error(
-        `Invalid OrderBy clause: expected property name before direction.`,
-      );
+      throw new Error(`Invalid OrderBy clause: expected property name before direction.`);
     }
 
     orderBy.push({
@@ -251,9 +243,7 @@ function parsePropertyExpression(expr: string): PropertyExpression {
   };
 }
 
-function splitProperties(
-  predicate: string,
-): { parts: string[]; connector: "And" | "Or" } {
+function splitProperties(predicate: string): { parts: string[]; connector: "And" | "Or" } {
   // Determine connector: we split on "And" or "Or", but not both
   // We need to find word-boundary splits (uppercase after And/Or)
   // Strategy: try splitting on "And" first, then "Or"
@@ -290,9 +280,7 @@ function findConnectorPositions(predicate: string, connector: string): number[] 
     // - character before connector must be lowercase (end of a property/operator word)
     // - character after connector must be uppercase (start of next property)
     const charBefore = idx > 0 ? predicate[idx - 1] : undefined;
-    const charAfter = idx + connector.length < predicate.length
-      ? predicate[idx + connector.length]
-      : undefined;
+    const charAfter = idx + connector.length < predicate.length ? predicate[idx + connector.length] : undefined;
 
     const validBefore = idx === 0 || (charBefore !== undefined && charBefore >= "a" && charBefore <= "z");
     const validAfter = charAfter === undefined || (charAfter >= "A" && charAfter <= "Z");
@@ -321,9 +309,7 @@ function splitAtPositions(str: string, positions: number[], connectorLength: num
   return parts.filter((p) => p.length > 0);
 }
 
-export function parseDerivedQueryMethod(
-  methodName: string,
-): DerivedQueryDescriptor {
+export function parseDerivedQueryMethod(methodName: string): DerivedQueryDescriptor {
   if (!methodName) {
     throw new Error(`Invalid derived query method name: method name is empty.`);
   }
@@ -331,18 +317,14 @@ export function parseDerivedQueryMethod(
   const { prefix, rest } = parsePrefix(methodName);
 
   if (!rest) {
-    throw new Error(
-      `Invalid derived query method name "${methodName}": ` +
-        `no property predicates found after "By".`,
-    );
+    throw new Error(`Invalid derived query method name "${methodName}": ` + `no property predicates found after "By".`);
   }
 
   const { predicatePart, orderBy } = extractOrderBy(rest);
 
   if (!predicatePart) {
     throw new Error(
-      `Invalid derived query method name "${methodName}": ` +
-        `no property predicates found before "OrderBy".`,
+      `Invalid derived query method name "${methodName}": ` + `no property predicates found before "OrderBy".`,
     );
   }
 

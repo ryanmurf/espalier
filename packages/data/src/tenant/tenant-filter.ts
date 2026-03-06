@@ -1,8 +1,8 @@
 import type { SqlValue } from "espalier-jdbc";
-import type { Specification } from "../query/specification.js";
 import type { EntityMetadata, FieldMapping } from "../mapping/entity-metadata.js";
-import { ComparisonCriteria } from "../query/criteria.js";
 import type { Criteria } from "../query/criteria.js";
+import { ComparisonCriteria } from "../query/criteria.js";
+import type { Specification } from "../query/specification.js";
 
 /**
  * Creates a Specification that filters rows by the given tenant column and value.
@@ -21,8 +21,6 @@ export function tenantFilter<T>(tenantColumnName: string, tenantId: string): Spe
  */
 export function getTenantColumn(metadata: EntityMetadata): string | undefined {
   if (!metadata.tenantIdField) return undefined;
-  const field = metadata.fields.find(
-    (f: FieldMapping) => f.fieldName === metadata.tenantIdField,
-  );
+  const field = metadata.fields.find((f: FieldMapping) => f.fieldName === metadata.tenantIdField);
   return field?.columnName;
 }

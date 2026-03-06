@@ -1,5 +1,5 @@
-import { getGlobalLogger, LogLevel } from "espalier-jdbc";
 import type { Logger } from "espalier-jdbc";
+import { getGlobalLogger, LogLevel } from "espalier-jdbc";
 
 export interface EntityCacheConfig {
   enabled?: boolean;
@@ -189,7 +189,12 @@ export class EntityCache {
     if (!cache) {
       this._misses++;
       if (this.logger.isEnabled(LogLevel.TRACE)) {
-        this.logger.trace("cache miss", { entityType: entityClass.name, id: String(id), hit: false, cacheSize: this.size() });
+        this.logger.trace("cache miss", {
+          entityType: entityClass.name,
+          id: String(id),
+          hit: false,
+          cacheSize: this.size(),
+        });
       }
       return undefined;
     }
@@ -197,12 +202,22 @@ export class EntityCache {
     if (value !== undefined) {
       this._hits++;
       if (this.logger.isEnabled(LogLevel.TRACE)) {
-        this.logger.trace("cache hit", { entityType: entityClass.name, id: String(id), hit: true, cacheSize: this.size() });
+        this.logger.trace("cache hit", {
+          entityType: entityClass.name,
+          id: String(id),
+          hit: true,
+          cacheSize: this.size(),
+        });
       }
     } else {
       this._misses++;
       if (this.logger.isEnabled(LogLevel.TRACE)) {
-        this.logger.trace("cache miss", { entityType: entityClass.name, id: String(id), hit: false, cacheSize: this.size() });
+        this.logger.trace("cache miss", {
+          entityType: entityClass.name,
+          id: String(id),
+          hit: false,
+          cacheSize: this.size(),
+        });
       }
     }
     return value as T | undefined;

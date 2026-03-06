@@ -1,5 +1,5 @@
 import type { Connection } from "espalier-jdbc";
-import type { DomainEvent, StoredEvent, EventStoreOptions } from "../types.js";
+import type { DomainEvent, EventStoreOptions, StoredEvent } from "../types.js";
 import { ConcurrencyError } from "./concurrency-error.js";
 
 // Access Web Crypto API available in Node 19+, Bun, Deno, and browsers
@@ -177,11 +177,7 @@ export class EventStore {
   /**
    * Load events for an aggregate up to (and including) a specific version.
    */
-  async loadEventsUpTo(
-    connection: Connection,
-    aggregateId: string,
-    version: number,
-  ): Promise<StoredEvent[]> {
+  async loadEventsUpTo(connection: Connection, aggregateId: string, version: number): Promise<StoredEvent[]> {
     const sql = `SELECT "event_id", "aggregate_id", "aggregate_type", "event_type", "payload", "version", "sequence", "timestamp", "metadata" FROM ${this.qualifiedTable} WHERE "aggregate_id" = $1 AND "version" <= $2 ORDER BY "version" ASC`;
 
     return this.executeEventQuery(connection, sql, [aggregateId, version]);
@@ -191,10 +187,7 @@ export class EventStore {
    * Get the current (maximum) version number for an aggregate.
    * Returns 0 if no events exist for the aggregate.
    */
-  async getCurrentVersion(
-    connection: Connection,
-    aggregateId: string,
-  ): Promise<number> {
+  async getCurrentVersion(connection: Connection, aggregateId: string): Promise<number> {
     const sql = `SELECT MAX("version") AS "max_version" FROM ${this.qualifiedTable} WHERE "aggregate_id" = $1`;
 
     const stmt = connection.prepareStatement(sql);
@@ -303,13 +296,9 @@ export class EventStore {
       paramIdx++;
     }
 
-    const whereClause = conditions.length > 0
-      ? ` WHERE ${conditions.join(" AND ")}`
-      : "";
+    const whereClause = conditions.length > 0 ? ` WHERE ${conditions.join(" AND ")}` : "";
 
-    const limitClause = options?.limit !== undefined
-      ? ` LIMIT $${paramIdx}`
-      : "";
+    const limitClause = options?.limit !== undefined ? ` LIMIT $${paramIdx}` : "";
 
     if (options?.limit !== undefined) {
       params.push(options.limit);
@@ -343,14 +332,13 @@ export class EventStore {
             aggregateId: row.aggregate_id as string,
             aggregateType: row.aggregate_type as string,
             eventType: row.event_type as string,
-            payload: typeof row.payload === "string"
-              ? (Object.assign(Object.create(null), JSON.parse(row.payload)) as Record<string, unknown>)
-              : (row.payload as Record<string, unknown>),
+            payload:
+              typeof row.payload === "string"
+                ? (Object.assign(Object.create(null), JSON.parse(row.payload)) as Record<string, unknown>)
+                : (row.payload as Record<string, unknown>),
             version: row.version as number,
             sequence: row.sequence as number,
-            timestamp: row.timestamp instanceof Date
-              ? row.timestamp
-              : new Date(row.timestamp as string),
+            timestamp: row.timestamp instanceof Date ? row.timestamp : new Date(row.timestamp as string),
             metadata: row.metadata
               ? typeof row.metadata === "string"
                 ? (Object.assign(Object.create(null), JSON.parse(row.metadata)) as Record<string, unknown>)

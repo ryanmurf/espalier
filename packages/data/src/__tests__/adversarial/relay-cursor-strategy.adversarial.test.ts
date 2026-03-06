@@ -1,10 +1,10 @@
-import { describe, it, expect } from "vitest";
-import { RelayCursorStrategy } from "../../pagination/relay-cursor-strategy.js";
-import type { RelayCursorStrategyOptions } from "../../pagination/relay-cursor-strategy.js";
-import { encodeCursor, decodeCursor } from "../../pagination/cursor-encoding.js";
+import { describe, expect, it } from "vitest";
 import type { CursorPayload } from "../../pagination/cursor-encoding.js";
+import { decodeCursor, encodeCursor } from "../../pagination/cursor-encoding.js";
+import type { RelayCursorStrategyOptions } from "../../pagination/relay-cursor-strategy.js";
+import { RelayCursorStrategy } from "../../pagination/relay-cursor-strategy.js";
+import type { CursorPageable } from "../../pagination/types.js";
 import { SelectBuilder } from "../../query/query-builder.js";
-import type { CursorPageable, CursorPage, Edge } from "../../pagination/types.js";
 
 // ==========================================================================
 // Helpers
@@ -115,7 +115,7 @@ describe("cursor encoding — adversarial", () => {
 
   it("tampered cursor — modified values but valid structure is accepted", () => {
     // No signature/HMAC, so tampered cursors decode just fine
-    const original: CursorPayload = { values: [100], id: 1 };
+    const _original: CursorPayload = { values: [100], id: 1 };
     const tampered: CursorPayload = { values: [999], id: 1 };
     const encoded = encodeCursor(tampered);
     const decoded = decodeCursor(encoded);

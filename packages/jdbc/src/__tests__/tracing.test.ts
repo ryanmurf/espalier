@@ -5,25 +5,25 @@
  * SpanKind/SpanStatusCode enums, DbAttributes, and a recording
  * tracer that verifies end-to-end span lifecycle.
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
+import type {
+  Span,
+  SpanAttributeValue,
+  SpanEvent,
+  SpanOptions,
+  SpanStatus,
+  Tracer,
+  TracerProvider,
+} from "../tracing.js";
 import {
-  SpanKind,
-  SpanStatusCode,
   DbAttributes,
+  getGlobalTracerProvider,
   NoopSpan,
   NoopTracer,
   NoopTracerProvider,
+  SpanKind,
+  SpanStatusCode,
   setGlobalTracerProvider,
-  getGlobalTracerProvider,
-} from "../tracing.js";
-import type {
-  Span,
-  Tracer,
-  TracerProvider,
-  SpanEvent,
-  SpanAttributeValue,
-  SpanStatus,
-  SpanOptions,
 } from "../tracing.js";
 
 // ══════════════════════════════════════════════════
@@ -89,7 +89,7 @@ class RecordingTracerProvider implements TracerProvider {
 // ══════════════════════════════════════════════════
 
 describe("OTel Tracing Interfaces", () => {
-  const originalProvider = getGlobalTracerProvider();
+  const _originalProvider = getGlobalTracerProvider();
 
   afterEach(() => {
     // Restore default noop provider
@@ -166,10 +166,12 @@ describe("OTel Tracing Interfaces", () => {
 
     it("startSpan with options doesn't throw", () => {
       const tracer = new NoopTracer();
-      expect(() => tracer.startSpan("test", {
-        kind: SpanKind.CLIENT,
-        attributes: { [DbAttributes.SYSTEM]: "postgresql" },
-      })).not.toThrow();
+      expect(() =>
+        tracer.startSpan("test", {
+          kind: SpanKind.CLIENT,
+          attributes: { [DbAttributes.SYSTEM]: "postgresql" },
+        }),
+      ).not.toThrow();
     });
 
     it("startSpan without options doesn't throw", () => {
@@ -230,13 +232,15 @@ describe("OTel Tracing Interfaces", () => {
     });
 
     it("setting null provider throws", () => {
-      expect(() => setGlobalTracerProvider(null as unknown as TracerProvider))
-        .toThrow("TracerProvider must not be null or undefined");
+      expect(() => setGlobalTracerProvider(null as unknown as TracerProvider)).toThrow(
+        "TracerProvider must not be null or undefined",
+      );
     });
 
     it("setting undefined provider throws", () => {
-      expect(() => setGlobalTracerProvider(undefined as unknown as TracerProvider))
-        .toThrow("TracerProvider must not be null or undefined");
+      expect(() => setGlobalTracerProvider(undefined as unknown as TracerProvider)).toThrow(
+        "TracerProvider must not be null or undefined",
+      );
     });
   });
 
@@ -299,7 +303,7 @@ describe("OTel Tracing Interfaces", () => {
 
     it("is a frozen/const object", () => {
       // Verify it can't be modified at runtime
-      const original = DbAttributes.SYSTEM;
+      const _original = DbAttributes.SYSTEM;
       (DbAttributes as any).SYSTEM = "hacked";
       // Since it uses `as const`, the type prevents this at compile time,
       // but at runtime the object may or may not be frozen

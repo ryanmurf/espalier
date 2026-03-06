@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { JsonConverter, JsonbConverter } from "../../converters/json-converter.js";
+import { describe, expect, it } from "vitest";
+import { JsonbConverter, JsonConverter } from "../../converters/json-converter.js";
 
 describe("JsonConverter", () => {
   const converter = new JsonConverter();

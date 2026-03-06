@@ -1,12 +1,6 @@
 import type { SqlValue } from "espalier-jdbc";
-import {
-  ComparisonCriteria,
-  RawComparisonCriteria,
-  InCriteria,
-  BetweenCriteria,
-  NullCriteria,
-} from "./criteria.js";
 import type { Criteria } from "./criteria.js";
+import { BetweenCriteria, ComparisonCriteria, InCriteria, NullCriteria, RawComparisonCriteria } from "./criteria.js";
 
 const VALID_COLUMN_NAME = /^[a-zA-Z_][a-zA-Z0-9_]*(\.[a-zA-Z_][a-zA-Z0-9_]*)*$/;
 

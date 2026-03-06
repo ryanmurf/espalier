@@ -1,9 +1,9 @@
 /**
  * Adversarial tests for StatementCache bugs found by code reviewer.
  */
-import { describe, it, expect, vi } from "vitest";
-import { StatementCache } from "../../statement-cache.js";
+import { describe, expect, it, vi } from "vitest";
 import type { PreparedStatement } from "../../statement.js";
+import { StatementCache } from "../../statement-cache.js";
 
 function mockStmt(): PreparedStatement {
   return {

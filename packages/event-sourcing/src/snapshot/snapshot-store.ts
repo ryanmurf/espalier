@@ -39,10 +39,7 @@ export class SnapshotStore {
       : escapeIdent(this.tableName);
   }
 
-  async save(
-    connection: Connection,
-    snapshot: AggregateSnapshot,
-  ): Promise<void> {
+  async save(connection: Connection, snapshot: AggregateSnapshot): Promise<void> {
     const sql = `INSERT INTO ${this.qualifiedTable} ("aggregate_id", "aggregate_type", "version", "state", "timestamp")
 VALUES ($1, $2, $3, $4, $5)
 ON CONFLICT ("aggregate_id", "aggregate_type")
@@ -54,18 +51,17 @@ DO UPDATE SET "version" = $3, "state" = $4, "timestamp" = $5`;
       stmt.setParameter(2, snapshot.aggregateType);
       stmt.setParameter(3, snapshot.version);
       stmt.setParameter(4, snapshot.state);
-      stmt.setParameter(5, snapshot.timestamp instanceof Date ? snapshot.timestamp.toISOString() : String(snapshot.timestamp));
+      stmt.setParameter(
+        5,
+        snapshot.timestamp instanceof Date ? snapshot.timestamp.toISOString() : String(snapshot.timestamp),
+      );
       await stmt.executeUpdate();
     } finally {
       await stmt.close();
     }
   }
 
-  async load(
-    connection: Connection,
-    aggregateId: string,
-    aggregateType: string,
-  ): Promise<AggregateSnapshot | null> {
+  async load(connection: Connection, aggregateId: string, aggregateType: string): Promise<AggregateSnapshot | null> {
     const sql = `SELECT "aggregate_id", "aggregate_type", "version", "state", "timestamp" FROM ${this.qualifiedTable} WHERE "aggregate_id" = $1 AND "aggregate_type" = $2`;
 
     const stmt = connection.prepareStatement(sql);
@@ -81,9 +77,7 @@ DO UPDATE SET "version" = $3, "state" = $4, "timestamp" = $5`;
             aggregateType: row.aggregate_type as string,
             version: row.version as number,
             state: row.state as string,
-            timestamp: row.timestamp instanceof Date
-              ? row.timestamp
-              : new Date(row.timestamp as string),
+            timestamp: row.timestamp instanceof Date ? row.timestamp : new Date(row.timestamp as string),
           };
         }
         return null;
@@ -95,11 +89,7 @@ DO UPDATE SET "version" = $3, "state" = $4, "timestamp" = $5`;
     }
   }
 
-  async delete(
-    connection: Connection,
-    aggregateId: string,
-    aggregateType: string,
-  ): Promise<void> {
+  async delete(connection: Connection, aggregateId: string, aggregateType: string): Promise<void> {
     const sql = `DELETE FROM ${this.qualifiedTable} WHERE "aggregate_id" = $1 AND "aggregate_type" = $2`;
 
     const stmt = connection.prepareStatement(sql);

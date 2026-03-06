@@ -1,6 +1,6 @@
-import { describe, it, expect } from "vitest";
-import { ChangeStream } from "../streams/change-stream.js";
+import { describe, expect, it } from "vitest";
 import type { ChangeNotification } from "../notifications/types.js";
+import { ChangeStream } from "../streams/change-stream.js";
 import type { ChangeEvent } from "../streams/types.js";
 
 interface TestUser {
@@ -17,9 +17,7 @@ function createNotification(payload: string): ChangeNotification {
   };
 }
 
-async function* notificationSource(
-  notifications: ChangeNotification[],
-): AsyncIterable<ChangeNotification> {
+async function* notificationSource(notifications: ChangeNotification[]): AsyncIterable<ChangeNotification> {
   for (const n of notifications) {
     yield n;
   }
@@ -37,19 +35,25 @@ async function collect<T>(iterable: AsyncIterable<T>, limit = 100): Promise<T[]>
 describe("ChangeStream", () => {
   it("should yield change events from notifications", async () => {
     const notifications = [
-      createNotification(JSON.stringify({
-        operation: "INSERT",
-        row: { id: 1, name: "Alice", email: "alice@test.com" },
-      })),
-      createNotification(JSON.stringify({
-        operation: "UPDATE",
-        row: { id: 1, name: "Alice B", email: "alice@test.com" },
-        changed_fields: ["name"],
-      })),
-      createNotification(JSON.stringify({
-        operation: "DELETE",
-        row: { id: 1, name: "Alice B", email: "alice@test.com" },
-      })),
+      createNotification(
+        JSON.stringify({
+          operation: "INSERT",
+          row: { id: 1, name: "Alice", email: "alice@test.com" },
+        }),
+      ),
+      createNotification(
+        JSON.stringify({
+          operation: "UPDATE",
+          row: { id: 1, name: "Alice B", email: "alice@test.com" },
+          changed_fields: ["name"],
+        }),
+      ),
+      createNotification(
+        JSON.stringify({
+          operation: "DELETE",
+          row: { id: 1, name: "Alice B", email: "alice@test.com" },
+        }),
+      ),
     ];
 
     const stream = new ChangeStream<TestUser>(notificationSource(notifications));
@@ -80,21 +84,27 @@ describe("ChangeStream", () => {
 
   it("should filter by fields for UPDATE events", async () => {
     const notifications = [
-      createNotification(JSON.stringify({
-        operation: "UPDATE",
-        row: { id: 1, name: "Alice", email: "new@test.com" },
-        changed_fields: ["email"],
-      })),
-      createNotification(JSON.stringify({
-        operation: "UPDATE",
-        row: { id: 1, name: "Bob", email: "alice@test.com" },
-        changed_fields: ["name"],
-      })),
+      createNotification(
+        JSON.stringify({
+          operation: "UPDATE",
+          row: { id: 1, name: "Alice", email: "new@test.com" },
+          changed_fields: ["email"],
+        }),
+      ),
+      createNotification(
+        JSON.stringify({
+          operation: "UPDATE",
+          row: { id: 1, name: "Bob", email: "alice@test.com" },
+          changed_fields: ["name"],
+        }),
+      ),
       // INSERT should pass through even with field filter
-      createNotification(JSON.stringify({
-        operation: "INSERT",
-        row: { id: 2, name: "Charlie", email: "charlie@test.com" },
-      })),
+      createNotification(
+        JSON.stringify({
+          operation: "INSERT",
+          row: { id: 2, name: "Charlie", email: "charlie@test.com" },
+        }),
+      ),
     ];
 
     const stream = new ChangeStream<TestUser>(notificationSource(notifications));
@@ -120,9 +130,7 @@ describe("ChangeStream", () => {
   });
 
   it("should support custom parser", async () => {
-    const notifications = [
-      createNotification("custom:INSERT:42:Alice"),
-    ];
+    const notifications = [createNotification("custom:INSERT:42:Alice")];
 
     const customParser = (payload: string) => {
       const [, op, id, name] = payload.split(":");

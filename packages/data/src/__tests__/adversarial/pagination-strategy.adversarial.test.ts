@@ -1,16 +1,16 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { getPaginationStrategy, Pagination } from "../../decorators/pagination.js";
+import { Table } from "../../decorators/table.js";
 import { OffsetPaginationStrategy } from "../../pagination/offset-strategy.js";
 import {
-  PaginationStrategyRegistry,
   getGlobalPaginationRegistry,
+  PaginationStrategyRegistry,
   setGlobalPaginationRegistry,
 } from "../../pagination/strategy-registry.js";
-import { SelectBuilder } from "../../query/query-builder.js";
-import { createPageable, createPage } from "../../repository/paging.js";
 import type { PaginationStrategy } from "../../pagination/types.js";
-import type { Pageable, Page } from "../../repository/paging.js";
-import { Pagination, getPaginationStrategy } from "../../decorators/pagination.js";
-import { Table } from "../../decorators/table.js";
+import { SelectBuilder } from "../../query/query-builder.js";
+import type { Page, Pageable } from "../../repository/paging.js";
+import { createPage, createPageable } from "../../repository/paging.js";
 
 // ==========================================================================
 // OffsetPaginationStrategy — adversarial
@@ -147,27 +147,19 @@ describe("OffsetPaginationStrategy — adversarial", () => {
 
 describe("createPage — adversarial", () => {
   it("size 0 throws validation error", () => {
-    expect(() => createPage([], { page: 0, size: 0 }, 10)).toThrow(
-      "Page size must be a positive number",
-    );
+    expect(() => createPage([], { page: 0, size: 0 }, 10)).toThrow("Page size must be a positive number");
   });
 
   it("negative totalElements throws validation error", () => {
-    expect(() => createPage([], { page: 0, size: 10 }, -5)).toThrow(
-      "Total elements must be a non-negative number",
-    );
+    expect(() => createPage([], { page: 0, size: 10 }, -5)).toThrow("Total elements must be a non-negative number");
   });
 
   it("negative page number throws validation error", () => {
-    expect(() => createPage([], { page: -1, size: 10 }, 100)).toThrow(
-      "Page number must be a non-negative number",
-    );
+    expect(() => createPage([], { page: -1, size: 10 }, 100)).toThrow("Page number must be a non-negative number");
   });
 
   it("NaN size throws validation error", () => {
-    expect(() => createPage([], { page: 0, size: NaN }, 10)).toThrow(
-      "Page size must be a positive number",
-    );
+    expect(() => createPage([], { page: 0, size: NaN }, 10)).toThrow("Page size must be a positive number");
   });
 
   it("fractional page and size — no rounding applied to inputs", () => {
@@ -194,7 +186,9 @@ describe("PaginationStrategyRegistry — adversarial", () => {
     const s: PaginationStrategy = {
       name: "",
       applyToQuery() {},
-      buildResult(rows) { return rows; },
+      buildResult(rows) {
+        return rows;
+      },
     };
     registry.register(s);
     expect(registry.has("")).toBe(true);
@@ -210,7 +204,9 @@ describe("PaginationStrategyRegistry — adversarial", () => {
     const fake: PaginationStrategy = {
       name: "offset",
       applyToQuery() {},
-      buildResult() { return { fake: true }; },
+      buildResult() {
+        return { fake: true };
+      },
     };
     registry.register(fake);
     expect(registry.get("offset")).toBe(fake);
@@ -221,7 +217,9 @@ describe("PaginationStrategyRegistry — adversarial", () => {
       registry.register({
         name: `strategy-${i}`,
         applyToQuery() {},
-        buildResult(rows) { return rows; },
+        buildResult(rows) {
+          return rows;
+        },
       });
     }
     expect(registry.getNames().length).toBe(101); // 100 + built-in offset
@@ -246,7 +244,9 @@ describe("PaginationStrategyRegistry — adversarial", () => {
     const s: PaginationStrategy = {
       name: "   ",
       applyToQuery() {},
-      buildResult(rows) { return rows; },
+      buildResult(rows) {
+        return rows;
+      },
     };
     registry.register(s);
     expect(registry.has("   ")).toBe(true);
@@ -263,7 +263,9 @@ describe("PaginationStrategyRegistry — adversarial", () => {
     registry.register({
       name: "cursor",
       applyToQuery() {},
-      buildResult(rows) { return rows; },
+      buildResult(rows) {
+        return rows;
+      },
     });
     try {
       registry.get("nonexistent");
@@ -296,7 +298,9 @@ describe("Global pagination registry — adversarial", () => {
     custom.register({
       name: "test-only",
       applyToQuery() {},
-      buildResult(rows) { return rows; },
+      buildResult(rows) {
+        return rows;
+      },
     });
     setGlobalPaginationRegistry(custom);
     expect(getGlobalPaginationRegistry()).toBe(custom);
@@ -308,7 +312,9 @@ describe("Global pagination registry — adversarial", () => {
     reg.register({
       name: "shared-mutation-test",
       applyToQuery() {},
-      buildResult(rows) { return rows; },
+      buildResult(rows) {
+        return rows;
+      },
     });
     // Another call sees the mutation
     expect(getGlobalPaginationRegistry().has("shared-mutation-test")).toBe(true);
@@ -323,7 +329,9 @@ describe("Global pagination registry — adversarial", () => {
     old.register({
       name: "old-only",
       applyToQuery() {},
-      buildResult(rows) { return rows; },
+      buildResult(rows) {
+        return rows;
+      },
     });
     expect(old.has("old-only")).toBe(true);
     expect(getGlobalPaginationRegistry().has("old-only")).toBe(false);
@@ -403,7 +411,9 @@ describe("@Pagination decorator — adversarial", () => {
 describe("OffsetPaginationStrategy — interface contract", () => {
   it("name is readonly and cannot be reassigned", () => {
     const s = new OffsetPaginationStrategy();
-    expect(() => { (s as any).name = "hacked"; }).not.toThrow();
+    expect(() => {
+      (s as any).name = "hacked";
+    }).not.toThrow();
     // Even if JS allows it, the value should be "offset" due to class field
     // Actually JS WILL allow mutation on a non-frozen object
     // This is a design observation, not necessarily a bug
@@ -417,7 +427,10 @@ describe("OffsetPaginationStrategy — interface contract", () => {
   });
 
   it("buildResult generic preserves row types", () => {
-    interface User { id: number; name: string }
+    interface User {
+      id: number;
+      name: string;
+    }
     const rows: User[] = [{ id: 1, name: "Alice" }];
     const page = new OffsetPaginationStrategy().buildResult(rows, createPageable(0, 10), 1);
     const first: User = page.content[0];
@@ -479,11 +492,7 @@ describe("Cross-cutting pagination integration", () => {
 
   it("offset strategy produces backward-compatible Page shape", () => {
     const strategy = new OffsetPaginationStrategy();
-    const page = strategy.buildResult(
-      [{ id: 1 }, { id: 2 }],
-      createPageable(0, 10),
-      2,
-    );
+    const page = strategy.buildResult([{ id: 1 }, { id: 2 }], createPageable(0, 10), 2);
 
     // Verify all Page<T> fields exist
     expect(page).toHaveProperty("content");
@@ -508,7 +517,9 @@ describe("Registry isolation", () => {
     r1.register({
       name: "r1-only",
       applyToQuery() {},
-      buildResult(rows) { return rows; },
+      buildResult(rows) {
+        return rows;
+      },
     });
 
     expect(r1.has("r1-only")).toBe(true);

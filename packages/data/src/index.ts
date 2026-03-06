@@ -1,282 +1,350 @@
-export { Table, getTableName } from "./decorators/table.js";
-export { Column, getColumnMappings, getColumnTypeMappings, getColumnMetadataEntries } from "./decorators/column.js";
-export type { ColumnOptions, ColumnMetadataEntry } from "./decorators/column.js";
-export { Id, getIdField } from "./decorators/id.js";
+export type { AuditEntry, AuditFieldChange, AuditOperation, AuditUser } from "./audit/index.js";
+export { AuditContext, AuditLogWriter, getAuditLog, getAuditLogForEntity, getFieldHistory } from "./audit/index.js";
+export type {
+  EntityCacheConfig,
+  EntityCacheStats,
+  QueryCacheConfig,
+  QueryCacheKey,
+  QueryCacheStats,
+} from "./cache/index.js";
+export { EntityCache, QueryCache } from "./cache/index.js";
+export type { AuditedOptions } from "./decorators/audited.js";
+export { Audited, getAuditedMetadata, isAuditedEntity } from "./decorators/audited.js";
 export {
   CreatedDate,
-  LastModifiedDate,
   getCreatedDateField,
   getLastModifiedDateField,
+  LastModifiedDate,
 } from "./decorators/auditing.js";
-export { ManyToOne, getManyToOneRelations, OneToMany, getOneToManyRelations, ManyToMany, getManyToManyRelations, OneToOne, getOneToOneRelations } from "./decorators/relations.js";
-export { Embeddable, isEmbeddable, Embedded, getEmbeddedFields } from "./decorators/embeddable.js";
-export type { EmbeddedOptions, EmbeddedField } from "./decorators/embeddable.js";
-export type { ManyToOneOptions, ManyToOneRelation, OneToManyOptions, OneToManyRelation, ManyToManyOptions, ManyToManyRelation, JoinTableConfig, OneToOneOptions, OneToOneRelation, FetchType, FetchOptions, CascadeType } from "./decorators/relations.js";
-export { Projection, getProjectionMetadata } from "./decorators/projection.js";
-export type { ProjectionOptions } from "./decorators/projection.js";
-export { Version, getVersionField } from "./decorators/version.js";
 export { Cacheable, getCacheableMetadata, registerCacheable } from "./decorators/cacheable.js";
+export type { ColumnMetadataEntry, ColumnOptions } from "./decorators/column.js";
+export { Column, getColumnMappings, getColumnMetadataEntries, getColumnTypeMappings } from "./decorators/column.js";
+export type { DeprecatedOptions } from "./decorators/deprecated.js";
+export { Deprecated, getDeprecatedFields, isDeprecatedField } from "./decorators/deprecated.js";
+export type { EmbeddedField, EmbeddedOptions } from "./decorators/embeddable.js";
+export { Embeddable, Embedded, getEmbeddedFields, isEmbeddable } from "./decorators/embeddable.js";
+export { getIdField, Id } from "./decorators/id.js";
 export type { LifecycleEvent } from "./decorators/lifecycle.js";
 export {
-  PrePersist,
-  PostPersist,
-  PreUpdate,
-  PostUpdate,
-  PreRemove,
-  PostRemove,
-  PostLoad,
-  getLifecycleCallbacks,
   addLifecycleCallback,
+  getLifecycleCallbacks,
+  PostLoad,
+  PostPersist,
+  PostRemove,
+  PostUpdate,
+  PrePersist,
+  PreRemove,
+  PreUpdate,
 } from "./decorators/lifecycle.js";
-
-export type { Repository as RepositoryInterface } from "./repository/repository.js";
+export { getPaginationStrategy, Pagination } from "./decorators/pagination.js";
+export type { ProjectionOptions } from "./decorators/projection.js";
+export { getProjectionMetadata, Projection } from "./decorators/projection.js";
+export type {
+  CascadeType,
+  FetchOptions,
+  FetchType,
+  JoinTableConfig,
+  ManyToManyOptions,
+  ManyToManyRelation,
+  ManyToOneOptions,
+  ManyToOneRelation,
+  OneToManyOptions,
+  OneToManyRelation,
+  OneToOneOptions,
+  OneToOneRelation,
+} from "./decorators/relations.js";
+export {
+  getManyToManyRelations,
+  getManyToOneRelations,
+  getOneToManyRelations,
+  getOneToOneRelations,
+  ManyToMany,
+  ManyToOne,
+  OneToMany,
+  OneToOne,
+} from "./decorators/relations.js";
+export type { RepositoryOptions } from "./decorators/repository.js";
+export { getRegisteredRepositories, getRepositoryMetadata, Repository } from "./decorators/repository.js";
+export type { SearchableMetadataEntry, SearchableOptions } from "./decorators/searchable.js";
+export { getSearchableFieldMetadata, getSearchableFields, Searchable } from "./decorators/searchable.js";
+export type { SoftDeleteOptions } from "./decorators/soft-delete.js";
+export { getSoftDeleteMetadata, isSoftDeleteEntity, SoftDelete } from "./decorators/soft-delete.js";
+export { getTableName, Table } from "./decorators/table.js";
+export type { TemporalOptions } from "./decorators/temporal.js";
+export { getTemporalMetadata, isTemporalEntity, Temporal } from "./decorators/temporal.js";
+export { getTenantIdField, TenantId } from "./decorators/tenant.js";
+export type { TreeOptions, TreeStrategy } from "./decorators/tree.js";
+export { getTreeMetadata, isTreeEntity, Tree } from "./decorators/tree.js";
+export type { VectorMetadataEntry, VectorOptions } from "./decorators/vector.js";
+export { getVectorFieldMetadata, getVectorFields, Vector } from "./decorators/vector.js";
+export { getVersionField, Version } from "./decorators/version.js";
+export type { MaterializedViewOptions, ViewOptions } from "./decorators/view.js";
+export {
+  getMaterializedViewMetadata,
+  getViewMetadata,
+  isMaterializedViewEntity,
+  isViewEntity,
+  MaterializedView,
+  View,
+} from "./decorators/view.js";
+export type { DiagnosticError, ErrorContext as DiagnosticErrorContext } from "./errors/error-diagnostics.js";
+export { diagnose, enhanceError } from "./errors/error-diagnostics.js";
+export type {
+  EntityEvent,
+  EntityLoadedEvent,
+  EntityPersistedEvent,
+  EntityRemovedEvent,
+  EntityUpdatedEvent,
+} from "./events/index.js";
+export { ENTITY_EVENTS, EventBus, getGlobalEventBus } from "./events/index.js";
+export type { FilterDefinition, FilterOptions, FilterRegistration } from "./filter/index.js";
+export {
+  Filter,
+  FilterContext,
+  getFilters,
+  registerFilter,
+  resolveActiveFilters,
+  unregisterFilter,
+} from "./filter/index.js";
+export type {
+  BatchLoadFn,
+  EntityRegistration,
+  GeneratedGraphQLSchema,
+  GraphQLPaginationAdapter,
+  GraphQLPluginConfig,
+  GraphQLSchemaOptions,
+  ResolverFn,
+  ResolverGeneratorOptions,
+  ResolverMap,
+} from "./graphql/index.js";
+export type { FieldChange } from "./mapping/change-tracker.js";
+export { EntityChangeTracker } from "./mapping/change-tracker.js";
+export type { EntityMetadata, FieldMapping } from "./mapping/entity-metadata.js";
+export { getEntityMetadata } from "./mapping/entity-metadata.js";
+export type { ProjectionMapper } from "./mapping/projection-mapper.js";
+export { createProjectionMapper } from "./mapping/projection-mapper.js";
+export type { RowMapper } from "./mapping/row-mapper.js";
+export { createRowMapper } from "./mapping/row-mapper.js";
+export type { DataMigration } from "./migration/data-migration.js";
+export { createDataMigration, isDataMigration } from "./migration/data-migration.js";
+export type { ExpandContractMigration } from "./migration/expand-contract.js";
+export { generateExpandContractMigration } from "./migration/expand-contract.js";
+export type {
+  Migration,
+  MigrationRecord,
+  MigrationRunner,
+  MigrationRunnerConfig,
+} from "./migration/migration.js";
+export { DEFAULT_MIGRATION_TABLE, DEFAULT_SCHEMA } from "./migration/migration.js";
+export type {
+  ColumnDiff,
+  ColumnModification,
+  SchemaDiff,
+  TableDiff,
+  TableModification,
+} from "./migration/schema-diff.js";
+export { SchemaDiffEngine } from "./migration/schema-diff.js";
+export type { TenantMigrationOptions, TenantMigrationProgress } from "./migration/tenant-migration-runner.js";
+export { TenantAwareMigrationRunner } from "./migration/tenant-migration-runner.js";
+export type {
+  IndexAdvisorConfig,
+  IndexSuggestion,
+  IndexType,
+  N1DetectionConfig,
+  N1DetectionEvent,
+  ObservabilityConfig,
+  ObservabilityHandle,
+} from "./observability/index.js";
+export { IndexAdvisor, N1DetectionError, N1Detector } from "./observability/index.js";
+export type {
+  CursorPage,
+  CursorPageable,
+  CursorPayload,
+  Edge,
+  KeysetPage,
+  KeysetPageable,
+  KeysetStrategyOptions,
+  PageInfo,
+  PaginatedResult,
+  PaginationStrategy,
+  RelayCursorStrategyOptions,
+} from "./pagination/index.js";
+export {
+  decodeCursor,
+  encodeCursor,
+  getGlobalPaginationRegistry,
+  KeysetPaginationStrategy,
+  OffsetPaginationStrategy,
+  PaginationStrategyRegistry,
+  RelayCursorStrategy,
+  setGlobalPaginationRegistry,
+} from "./pagination/index.js";
+export type {
+  HookContext,
+  HookType,
+  MiddlewareContext,
+  MiddlewareFn,
+  Plugin,
+  PluginContext,
+  PluginDependency,
+  PluginHook,
+} from "./plugin/index.js";
+export {
+  clearDiscoveredPlugins,
+  composeMiddleware,
+  createPluginDecorator,
+  getDiscoveredPlugins,
+  getPluginMetadata,
+  PluginDecorator,
+  PluginManager,
+} from "./plugin/index.js";
+export type {
+  BuiltQuery,
+  BulkDialect,
+  BulkOperationOptions,
+  BulkQuery,
+  CompiledQuery,
+  Criteria,
+  CriteriaType,
+  DerivedQueryDescriptor,
+  JoinType,
+  OrderByExpression,
+  ParamBinding,
+  PreparedStatementPoolConfig,
+  PreparedStatementPoolMetrics,
+  PropertyExpression,
+  QueryBatcherConfig,
+  QueryMetadata,
+  QueryOperator,
+  SortDirection,
+  Specification,
+  VectorMetric,
+} from "./query/index.js";
+export {
+  and,
+  BetweenCriteria,
+  BulkOperationBuilder,
+  between,
+  bindCompiledQuery,
+  buildDerivedQuery,
+  ColumnRef,
+  ComparisonCriteria,
+  col,
+  DeleteBuilder,
+  ExpressionRef,
+  equal,
+  expr,
+  getGlobalPreparedStatementPool,
+  greaterThan,
+  InCriteria,
+  InsertBuilder,
+  isIn,
+  isNotNull,
+  isNull,
+  LogicalCriteria,
+  lessThan,
+  like,
+  NotCriteria,
+  NullCriteria,
+  not,
+  or,
+  PreparedStatementPool,
+  parseDerivedQueryMethod,
+  QueryBatcher,
+  QueryBatcherRegistry,
+  QueryBuilder,
+  QueryCompiler,
+  RawComparisonCriteria,
+  SelectBuilder,
+  Specifications,
+  setGlobalPreparedStatementPool,
+  UpdateBuilder,
+  VectorDistanceCriteria,
+  VectorOrderExpression,
+} from "./query/index.js";
+export type { AutoRepositoryOptions, MethodValidationError, ValidatedMethod } from "./repository/auto-repository.js";
+export {
+  createAutoRepository,
+  getDeclaredDerivedMethods,
+  validateDerivedMethods,
+} from "./repository/auto-repository.js";
 export type {
   CrudRepository,
   PagingAndSortingRepository,
 } from "./repository/crud-repository.js";
-export type { Sort, Pageable, Page } from "./repository/paging.js";
-export { createPageable, createPage } from "./repository/paging.js";
-
-export type { EntityMetadata, FieldMapping } from "./mapping/entity-metadata.js";
-export { getEntityMetadata } from "./mapping/entity-metadata.js";
-export type { RowMapper } from "./mapping/row-mapper.js";
-export { createRowMapper } from "./mapping/row-mapper.js";
-export type { ProjectionMapper } from "./mapping/projection-mapper.js";
-export { createProjectionMapper } from "./mapping/projection-mapper.js";
-export type { FieldChange } from "./mapping/change-tracker.js";
-export { EntityChangeTracker } from "./mapping/change-tracker.js";
-
-export type { Snapshot } from "./snapshot/index.js";
-export type { DiffResult, FieldDiff } from "./snapshot/index.js";
-export { snapshot, diff, diffEntity } from "./snapshot/index.js";
-
-export type { Criteria, CriteriaType, VectorMetric, BuiltQuery, JoinType, SortDirection } from "./query/index.js";
-export {
-  ComparisonCriteria,
-  RawComparisonCriteria,
-  InCriteria,
-  BetweenCriteria,
-  NullCriteria,
-  LogicalCriteria,
-  NotCriteria,
-  VectorDistanceCriteria,
-  VectorOrderExpression,
-  and,
-  or,
-  not,
-  ColumnRef,
-  ExpressionRef,
-  col,
-  expr,
-  QueryBuilder,
-  SelectBuilder,
-  InsertBuilder,
-  UpdateBuilder,
-  DeleteBuilder,
-} from "./query/index.js";
-
-export type {
-  QueryOperator,
-  PropertyExpression,
-  OrderByExpression,
-  DerivedQueryDescriptor,
-} from "./query/index.js";
-export { parseDerivedQueryMethod, buildDerivedQuery } from "./query/index.js";
-
-export type { CompiledQuery, ParamBinding, QueryMetadata } from "./query/index.js";
-export { bindCompiledQuery, QueryCompiler } from "./query/index.js";
-
-export type { QueryBatcherConfig } from "./query/index.js";
-export { QueryBatcher, QueryBatcherRegistry } from "./query/index.js";
-
-export type { BulkDialect, BulkOperationOptions, BulkQuery } from "./query/index.js";
-export { BulkOperationBuilder } from "./query/index.js";
-
-export type { PreparedStatementPoolConfig, PreparedStatementPoolMetrics } from "./query/index.js";
-export { PreparedStatementPool, getGlobalPreparedStatementPool, setGlobalPreparedStatementPool } from "./query/index.js";
-
-export type {
-  PaginationStrategy,
-  CursorPageable,
-  Edge,
-  PageInfo,
-  CursorPage,
-  KeysetPageable,
-  KeysetPage,
-  PaginatedResult,
-} from "./pagination/index.js";
-export {
-  OffsetPaginationStrategy,
-  RelayCursorStrategy,
-  KeysetPaginationStrategy,
-  PaginationStrategyRegistry,
-  getGlobalPaginationRegistry,
-  setGlobalPaginationRegistry,
-  encodeCursor,
-  decodeCursor,
-} from "./pagination/index.js";
-export type { CursorPayload, RelayCursorStrategyOptions, KeysetStrategyOptions } from "./pagination/index.js";
-
-export { Pagination, getPaginationStrategy } from "./decorators/pagination.js";
-
-export type { Specification } from "./query/index.js";
-export {
-  Specifications,
-  equal,
-  like,
-  greaterThan,
-  lessThan,
-  between,
-  isIn,
-  isNull,
-  isNotNull,
-} from "./query/index.js";
-
-export type { StreamOptions } from "./repository/streaming.js";
-export type { LazyInitializer } from "./repository/lazy-proxy.js";
-export { isLazyProxy, isInitialized, initializeProxy } from "./repository/lazy-proxy.js";
 export type { DerivedRepositoryOptions, SimilarityOptions, SimilarityResult } from "./repository/derived-repository.js";
 export { createDerivedRepository } from "./repository/derived-repository.js";
-export { createRepository } from "./repository/repository-factory.js";
-export type { CreateRepositoryOptions } from "./repository/repository-factory.js";
-export { Repository, getRepositoryMetadata, getRegisteredRepositories } from "./decorators/repository.js";
-export type { RepositoryOptions } from "./decorators/repository.js";
-export { createAutoRepository, getDeclaredDerivedMethods, validateDerivedMethods } from "./repository/auto-repository.js";
-export type { AutoRepositoryOptions, ValidatedMethod, MethodValidationError } from "./repository/auto-repository.js";
-export { OptimisticLockException } from "./repository/optimistic-lock.js";
 export { EntityNotFoundException } from "./repository/entity-not-found.js";
-
-export type { EntityCacheConfig, EntityCacheStats } from "./cache/index.js";
-export { EntityCache } from "./cache/index.js";
-
-export type { QueryCacheConfig, QueryCacheKey, QueryCacheStats } from "./cache/index.js";
-export { QueryCache } from "./cache/index.js";
-
+export type { LazyInitializer } from "./repository/lazy-proxy.js";
+export { initializeProxy, isInitialized, isLazyProxy } from "./repository/lazy-proxy.js";
+export { OptimisticLockException } from "./repository/optimistic-lock.js";
+export type { Page, Pageable, Sort } from "./repository/paging.js";
+export { createPage, createPageable } from "./repository/paging.js";
+export type { Repository as RepositoryInterface } from "./repository/repository.js";
+export type { CreateRepositoryOptions } from "./repository/repository-factory.js";
+export { createRepository } from "./repository/repository-factory.js";
+export type { StreamOptions } from "./repository/streaming.js";
+export type {
+  EntityRouteConfig,
+  HttpMethod,
+  OpenApiGeneratorOptions,
+  OpenApiOperation,
+  OpenApiParameter,
+  OpenApiSchema,
+  OpenApiSchemaRef,
+  OpenApiSpec,
+  RestEntityRegistration,
+  RestHandler,
+  RestPluginConfig,
+  RestRequest,
+  RestResponse,
+  RouteDefinition,
+  RouteGeneratorOptions,
+} from "./rest/index.js";
 export type { DdlOptions, DropTableOptions } from "./schema/ddl-generator.js";
 export { DdlGenerator } from "./schema/ddl-generator.js";
-
-export { EventBus, getGlobalEventBus } from "./events/index.js";
+export type { FacetedSearchSpecification, HighlightOptions, SearchMode, SearchOptions } from "./search/index.js";
+export {
+  FullTextSearchCriteria,
+  facetedSearch,
+  SearchHighlightExpression,
+  SearchRankExpression,
+} from "./search/index.js";
+export type { DiffResult, FieldDiff, Snapshot } from "./snapshot/index.js";
+export { diff, diffEntity, snapshot } from "./snapshot/index.js";
+export { generateTemporalDdl } from "./temporal/temporal-ddl.js";
+export { TemporalQueryBuilder } from "./temporal/temporal-query.js";
 export type {
-  EntityEvent,
-  EntityPersistedEvent,
-  EntityUpdatedEvent,
-  EntityRemovedEvent,
-  EntityLoadedEvent,
-} from "./events/index.js";
-export { ENTITY_EVENTS } from "./events/index.js";
-
-export type {
-  Migration,
-  MigrationRecord,
-  MigrationRunnerConfig,
-  MigrationRunner,
-} from "./migration/migration.js";
-export { DEFAULT_MIGRATION_TABLE, DEFAULT_SCHEMA } from "./migration/migration.js";
-
-export type { DataMigration } from "./migration/data-migration.js";
-export { isDataMigration, createDataMigration } from "./migration/data-migration.js";
-
-export type { SchemaDiff, TableDiff, TableModification, ColumnDiff, ColumnModification } from "./migration/schema-diff.js";
-export { SchemaDiffEngine } from "./migration/schema-diff.js";
-
-export type { TenantMigrationProgress, TenantMigrationOptions } from "./migration/tenant-migration-runner.js";
-export { TenantAwareMigrationRunner } from "./migration/tenant-migration-runner.js";
-
-export type { DeprecatedOptions } from "./decorators/deprecated.js";
-export { Deprecated, getDeprecatedFields, isDeprecatedField } from "./decorators/deprecated.js";
-
-export type { ExpandContractMigration } from "./migration/expand-contract.js";
-export { generateExpandContractMigration } from "./migration/expand-contract.js";
-
-export type { TenantIdentifier } from "./tenant/index.js";
-export { TenantContext, NoTenantException } from "./tenant/index.js";
-
-export type { TenantAwareDataSourceOptions } from "./tenant/index.js";
-export { TenantAwareDataSource, SchemaSetupError } from "./tenant/index.js";
-export { tenantFilter } from "./tenant/index.js";
-
-export { TenantId, getTenantIdField } from "./decorators/tenant.js";
-
-export type { FilterDefinition, FilterRegistration, FilterOptions } from "./filter/index.js";
-export { Filter, getFilters, registerFilter, unregisterFilter, resolveActiveFilters, FilterContext } from "./filter/index.js";
-
-export type { SoftDeleteOptions } from "./decorators/soft-delete.js";
-export { SoftDelete, getSoftDeleteMetadata, isSoftDeleteEntity } from "./decorators/soft-delete.js";
-
-export type { VectorOptions, VectorMetadataEntry } from "./decorators/vector.js";
-export { Vector, getVectorFields, getVectorFieldMetadata } from "./decorators/vector.js";
-
-export type { SearchableOptions, SearchableMetadataEntry } from "./decorators/searchable.js";
-export { Searchable, getSearchableFields, getSearchableFieldMetadata } from "./decorators/searchable.js";
-
-export type { SearchOptions, SearchMode, HighlightOptions } from "./search/index.js";
-export { FullTextSearchCriteria, SearchRankExpression, SearchHighlightExpression } from "./search/index.js";
-export type { FacetedSearchSpecification } from "./search/index.js";
-export { facetedSearch } from "./search/index.js";
-
-export type { ViewOptions, MaterializedViewOptions } from "./decorators/view.js";
-export { View, getViewMetadata, isViewEntity, MaterializedView, getMaterializedViewMetadata, isMaterializedViewEntity } from "./decorators/view.js";
-
-export type { TreeOptions, TreeStrategy } from "./decorators/tree.js";
-export { Tree, getTreeMetadata, isTreeEntity } from "./decorators/tree.js";
-
-export { ClosureTableManager } from "./tree/index.js";
-export { MaterializedPathManager } from "./tree/index.js";
-
+  LoadBalancer,
+  ReadReplicaDataSourceOptions,
+  RoutingDataSourceOptions,
+  TenantAwareDataSourceOptions,
+  TenantIdentifier,
+  TenantSchemaManagerOptions,
+} from "./tenant/index.js";
+export {
+  NoTenantException,
+  RandomBalancer,
+  ReadReplicaDataSource,
+  ReadWriteContext,
+  RoundRobinBalancer,
+  RoutingDataSource,
+  RoutingError,
+  SchemaSetupError,
+  TenantAwareDataSource,
+  TenantContext,
+  TenantLimitExceededError,
+  TenantRoutingDataSource,
+  TenantSchemaManager,
+  tenantFilter,
+} from "./tenant/index.js";
+export { ClosureTableManager, MaterializedPathManager } from "./tree/index.js";
+export type { EmbeddingHookOptions, EmbeddingProvider } from "./vector/embedding-hook.js";
+export { createEmbeddingHook, registerEmbeddingHook } from "./vector/embedding-hook.js";
 export type { VectorIndexOptions } from "./vector/vector-index-manager.js";
 export { VectorIndexManager } from "./vector/vector-index-manager.js";
-export type { EmbeddingProvider, EmbeddingHookOptions } from "./vector/embedding-hook.js";
-export { createEmbeddingHook, registerEmbeddingHook } from "./vector/embedding-hook.js";
 export type { NearestToResult } from "./vector/vector-specifications.js";
-export { similarTo, nearestTo } from "./vector/vector-specifications.js";
-
-export type { TemporalOptions } from "./decorators/temporal.js";
-export { Temporal, getTemporalMetadata, isTemporalEntity } from "./decorators/temporal.js";
-
-export { TemporalQueryBuilder } from "./temporal/temporal-query.js";
-export { generateTemporalDdl } from "./temporal/temporal-ddl.js";
-
-export type { AuditedOptions } from "./decorators/audited.js";
-export { Audited, getAuditedMetadata, isAuditedEntity } from "./decorators/audited.js";
-
-export type { AuditUser } from "./audit/index.js";
-export type { AuditEntry, AuditFieldChange, AuditOperation } from "./audit/index.js";
-export { AuditContext, AuditLogWriter } from "./audit/index.js";
-export { getAuditLog, getAuditLogForEntity, getFieldHistory } from "./audit/index.js";
-
-export type { RoutingDataSourceOptions } from "./tenant/index.js";
-export { RoutingDataSource, TenantRoutingDataSource, RoutingError } from "./tenant/index.js";
-
-export type { LoadBalancer, ReadReplicaDataSourceOptions } from "./tenant/index.js";
-export { ReadWriteContext, ReadReplicaDataSource, RoundRobinBalancer, RandomBalancer } from "./tenant/index.js";
-
-export type { TenantSchemaManagerOptions } from "./tenant/index.js";
-export { TenantSchemaManager, TenantLimitExceededError } from "./tenant/index.js";
-
-export type { ObservabilityConfig, ObservabilityHandle } from "./observability/index.js";
-export type { N1DetectionConfig, N1DetectionEvent } from "./observability/index.js";
-export { N1Detector, N1DetectionError } from "./observability/index.js";
-export type { IndexType, IndexSuggestion, IndexAdvisorConfig } from "./observability/index.js";
-export { IndexAdvisor } from "./observability/index.js";
-
-export type { DiagnosticError, ErrorContext as DiagnosticErrorContext } from "./errors/error-diagnostics.js";
-export { enhanceError, diagnose } from "./errors/error-diagnostics.js";
-
-export type { Plugin, PluginContext, PluginHook, PluginDependency, HookType, HookContext } from "./plugin/index.js";
-export type { MiddlewareContext, MiddlewareFn } from "./plugin/index.js";
-export { PluginManager } from "./plugin/index.js";
-export { PluginDecorator, getPluginMetadata, getDiscoveredPlugins, clearDiscoveredPlugins } from "./plugin/index.js";
-export { composeMiddleware } from "./plugin/index.js";
-export { createPluginDecorator } from "./plugin/index.js";
-
-export type { GraphQLSchemaOptions, GeneratedGraphQLSchema, GraphQLPluginConfig } from "./graphql/index.js";
-export type { ResolverFn, ResolverMap, BatchLoadFn, ResolverGeneratorOptions, EntityRegistration } from "./graphql/index.js";
-export type { GraphQLPaginationAdapter } from "./graphql/index.js";
-
-export type { RestRequest, RestResponse, RestHandler, HttpMethod, RouteDefinition } from "./rest/index.js";
-export type { RouteGeneratorOptions, RestEntityRegistration, RestPluginConfig } from "./rest/index.js";
-export type { OpenApiSpec, OpenApiOperation, OpenApiParameter, OpenApiSchema, OpenApiSchemaRef, OpenApiGeneratorOptions } from "./rest/index.js";
-export type { EntityRouteConfig } from "./rest/index.js";
+export { nearestTo, similarTo } from "./vector/vector-specifications.js";
 
 // ---------------------------------------------------------------------------
 // Lazy-loaded subsystems: GraphQL, REST, and Observability.
@@ -288,14 +356,21 @@ export type { EntityRouteConfig } from "./rest/index.js";
 //   import { configureObservability } from 'espalier-data/observability'
 // ---------------------------------------------------------------------------
 
-import type { ObservabilityConfig as _ObsConfig, ObservabilityHandle as _ObsHandle } from "./observability/index.js";
 import type { DataSource as _DS } from "espalier-jdbc";
-import type { GraphQLSchemaOptions as _GQLOpts, GeneratedGraphQLSchema as _GQLSchema } from "./graphql/index.js";
-import type { ResolverGeneratorOptions as _RGOpts, EntityRegistration as _EntReg } from "./graphql/index.js";
+import type {
+  EntityRegistration as _EntReg,
+  GraphQLSchemaOptions as _GQLOpts,
+  GeneratedGraphQLSchema as _GQLSchema,
+  ResolverGeneratorOptions as _RGOpts,
+} from "./graphql/index.js";
+import type { ObservabilityConfig as _ObsConfig, ObservabilityHandle as _ObsHandle } from "./observability/index.js";
 import type { Specification as _Spec } from "./query/index.js";
-import type { RouteGeneratorOptions as _RTOpts, RestEntityRegistration as _RER } from "./rest/index.js";
-import type { RouteDefinition as _RD } from "./rest/index.js";
-import type { EntityRouteConfig as _ERC } from "./rest/index.js";
+import type {
+  EntityRouteConfig as _ERC,
+  RouteDefinition as _RD,
+  RestEntityRegistration as _RER,
+  RouteGeneratorOptions as _RTOpts,
+} from "./rest/index.js";
 
 // -- Observability (lazy) --
 let _obsMod: typeof import("./observability/index.js") | undefined;
@@ -305,10 +380,7 @@ let _obsMod: typeof import("./observability/index.js") | undefined;
  * on first call. Returns a Promise for compatibility; if you need a sync call,
  * use `import { configureObservability } from 'espalier-data/observability'`.
  */
-export async function configureObservability(
-  dataSource: _DS,
-  config?: _ObsConfig,
-): Promise<_ObsHandle> {
+export async function configureObservability(dataSource: _DS, config?: _ObsConfig): Promise<_ObsHandle> {
   if (!_obsMod) {
     _obsMod = await import("./observability/index.js");
   }
@@ -333,7 +405,7 @@ export const GraphQLSchemaGenerator: {
     if (!_graphqlMod) {
       throw new Error(
         "GraphQLSchemaGenerator not yet loaded. Call `await loadGraphQLModule()` first, " +
-        "or import directly from 'espalier-data/graphql'.",
+          "or import directly from 'espalier-data/graphql'.",
       );
     }
     return new _graphqlMod.GraphQLSchemaGenerator(...args);
@@ -348,7 +420,7 @@ export const GraphQLPlugin: {
     if (!_graphqlMod) {
       throw new Error(
         "GraphQLPlugin not yet loaded. Call `await loadGraphQLModule()` first, " +
-        "or import directly from 'espalier-data/graphql'.",
+          "or import directly from 'espalier-data/graphql'.",
       );
     }
     return new _graphqlMod.GraphQLPlugin(args[0]);
@@ -363,16 +435,14 @@ export const ResolverGenerator: {
     if (!_graphqlMod) {
       throw new Error(
         "ResolverGenerator not yet loaded. Call `await loadGraphQLModule()` first, " +
-        "or import directly from 'espalier-data/graphql'.",
+          "or import directly from 'espalier-data/graphql'.",
       );
     }
     return new _graphqlMod.ResolverGenerator(...args);
   },
 });
 
-export async function createFilterSpec<T>(
-  filter: Record<string, any>,
-): Promise<_Spec<T> | undefined> {
+export async function createFilterSpec<T>(filter: Record<string, any>): Promise<_Spec<T> | undefined> {
   const mod = await loadGraphQL();
   return mod.createFilterSpec<T>(filter);
 }
@@ -395,7 +465,7 @@ export const RouteGenerator: {
     if (!_restMod) {
       throw new Error(
         "RouteGenerator not yet loaded. Call `await loadRestModule()` first, " +
-        "or import directly from 'espalier-data/rest'.",
+          "or import directly from 'espalier-data/rest'.",
       );
     }
     return new _restMod.RouteGenerator(...args);
@@ -410,7 +480,7 @@ export const RestPlugin: {
     if (!_restMod) {
       throw new Error(
         "RestPlugin not yet loaded. Call `await loadRestModule()` first, " +
-        "or import directly from 'espalier-data/rest'.",
+          "or import directly from 'espalier-data/rest'.",
       );
     }
     return new _restMod.RestPlugin(args[0]);
@@ -419,38 +489,32 @@ export const RestPlugin: {
 
 /** Lazy proxy for OpenApiGenerator. Call `await loadRestModule()` first or import from 'espalier-data/rest'. */
 export const OpenApiGenerator: {
-  new (options?: import("./rest/index.js").OpenApiGeneratorOptions): { generate(routes: _RD[]): import("./rest/index.js").OpenApiSpec };
+  new (
+    options?: import("./rest/index.js").OpenApiGeneratorOptions,
+  ): { generate(routes: _RD[]): import("./rest/index.js").OpenApiSpec };
 } = new Proxy(class {} as any, {
   construct: (_target, args) => {
     if (!_restMod) {
       throw new Error(
         "OpenApiGenerator not yet loaded. Call `await loadRestModule()` first, " +
-        "or import directly from 'espalier-data/rest'.",
+          "or import directly from 'espalier-data/rest'.",
       );
     }
     return new _restMod.OpenApiGenerator(...args);
   },
 });
 
-export async function mountExpressRoutes(
-  router: any,
-  routes: _RD[],
-): Promise<void> {
+export async function mountExpressRoutes(router: any, routes: _RD[]): Promise<void> {
   const mod = await loadRest();
   mod.mountExpressRoutes(router, routes);
 }
 
-export async function createFastifyPlugin(
-  routes: _RD[],
-): Promise<(fastify: any) => Promise<void>> {
+export async function createFastifyPlugin(routes: _RD[]): Promise<(fastify: any) => Promise<void>> {
   const mod = await loadRest();
   return mod.createFastifyPlugin(routes);
 }
 
-export async function customizeRoutes(
-  routes: _RD[],
-  config: Record<string, _ERC>,
-): Promise<_RD[]> {
+export async function customizeRoutes(routes: _RD[], config: Record<string, _ERC>): Promise<_RD[]> {
   const mod = await loadRest();
   return mod.customizeRoutes(routes, config);
 }

@@ -1,9 +1,5 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { parseDerivedQueryMethod } from "../../query/derived-query-parser.js";
-import type {
-  DerivedQueryDescriptor,
-  QueryOperator,
-} from "../../query/derived-query-parser.js";
 
 describe("parseDerivedQueryMethod", () => {
   // ──────────────────────────────────────────────
@@ -265,9 +261,7 @@ describe("parseDerivedQueryMethod", () => {
     });
 
     it("findByNameOrderByAgeAscEmailDesc supports multiple order-by clauses", () => {
-      const result = parseDerivedQueryMethod(
-        "findByNameOrderByAgeAscEmailDesc",
-      );
+      const result = parseDerivedQueryMethod("findByNameOrderByAgeAscEmailDesc");
       expect(result.orderBy).toHaveLength(2);
       expect(result.orderBy![0]).toEqual({
         property: "age",
@@ -280,9 +274,7 @@ describe("parseDerivedQueryMethod", () => {
     });
 
     it("preserves property predicates when order-by is present", () => {
-      const result = parseDerivedQueryMethod(
-        "findByAgeGreaterThanOrderByNameDesc",
-      );
+      const result = parseDerivedQueryMethod("findByAgeGreaterThanOrderByNameDesc");
       expect(result.properties).toHaveLength(1);
       expect(result.properties[0].operator).toBe("GreaterThan");
       expect(result.orderBy).toHaveLength(1);
@@ -336,15 +328,11 @@ describe("parseDerivedQueryMethod", () => {
 
   describe("error cases", () => {
     it("throws for invalid prefix: getByName", () => {
-      expect(() => parseDerivedQueryMethod("getByName")).toThrow(
-        /must start with/,
-      );
+      expect(() => parseDerivedQueryMethod("getByName")).toThrow(/must start with/);
     });
 
     it("throws for invalid prefix: selectByName", () => {
-      expect(() => parseDerivedQueryMethod("selectByName")).toThrow(
-        /must start with/,
-      );
+      expect(() => parseDerivedQueryMethod("selectByName")).toThrow(/must start with/);
     });
 
     it("throws for missing By: findName", () => {
@@ -352,9 +340,7 @@ describe("parseDerivedQueryMethod", () => {
     });
 
     it("throws for empty property: findBy with nothing after", () => {
-      expect(() => parseDerivedQueryMethod("findBy")).toThrow(
-        /no property predicates/,
-      );
+      expect(() => parseDerivedQueryMethod("findBy")).toThrow(/no property predicates/);
     });
 
     it("throws for empty method name", () => {
@@ -384,9 +370,7 @@ describe("parseDerivedQueryMethod", () => {
     });
 
     it("returns complete descriptor with order-by and limit", () => {
-      const result = parseDerivedQueryMethod(
-        "findFirst5ByStatusAndAgeGreaterThanOrderByNameDesc",
-      );
+      const result = parseDerivedQueryMethod("findFirst5ByStatusAndAgeGreaterThanOrderByNameDesc");
       expect(result).toEqual({
         action: "find",
         distinct: false,

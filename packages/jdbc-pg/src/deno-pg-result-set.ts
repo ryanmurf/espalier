@@ -1,4 +1,4 @@
-import type { ResultSet, ColumnMetadata } from "espalier-jdbc";
+import type { ColumnMetadata, ResultSet } from "espalier-jdbc";
 
 /**
  * Minimal interface for a Deno postgres query result.
@@ -17,9 +17,7 @@ export class DenoPgResultSet implements ResultSet {
 
   constructor(result: DenoPgQueryResult) {
     this.rows = result.rows;
-    this.columnNames =
-      result.columns ??
-      (result.rows.length > 0 ? Object.keys(result.rows[0]) : []);
+    this.columnNames = result.columns ?? (result.rows.length > 0 ? Object.keys(result.rows[0]) : []);
   }
 
   async next(): Promise<boolean> {

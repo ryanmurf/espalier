@@ -5,10 +5,7 @@ const cacheableMetadata = new WeakMap<object, Map<string, { ttlMs?: number }>>()
  * @param ttlMs Optional TTL in milliseconds. Uses the query cache default if not specified.
  */
 export function Cacheable(ttlMs?: number) {
-  return function <T extends (...args: any[]) => any>(
-    _target: T,
-    context: ClassMethodDecoratorContext,
-  ): void {
+  return <T extends (...args: any[]) => any>(_target: T, context: ClassMethodDecoratorContext): void => {
     const methodName = String(context.name);
     context.addInitializer(function () {
       const constructor = (this as Record<string, any>).constructor as object;
@@ -23,10 +20,7 @@ export function Cacheable(ttlMs?: number) {
 /**
  * Retrieves @Cacheable metadata for a specific method on a class.
  */
-export function getCacheableMetadata(
-  target: object,
-  methodName: string,
-): { ttlMs?: number } | undefined {
+export function getCacheableMetadata(target: object, methodName: string): { ttlMs?: number } | undefined {
   const map = cacheableMetadata.get(target);
   return map?.get(methodName);
 }
@@ -35,11 +29,7 @@ export function getCacheableMetadata(
  * Programmatic registration of cacheable metadata for a method.
  * Useful for repository interfaces that cannot use decorators directly.
  */
-export function registerCacheable(
-  target: object,
-  methodName: string,
-  ttlMs?: number,
-): void {
+export function registerCacheable(target: object, methodName: string, ttlMs?: number): void {
   if (!cacheableMetadata.has(target)) {
     cacheableMetadata.set(target, new Map());
   }

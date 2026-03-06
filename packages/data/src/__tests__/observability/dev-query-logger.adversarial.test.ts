@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { DevQueryLogger, createDevLogger } from "../../observability/dev-query-logger.js";
 import { LogLevel } from "espalier-jdbc";
+import { describe, expect, it, vi } from "vitest";
+import { createDevLogger } from "../../observability/dev-query-logger.js";
 
 // ==========================================================================
 // Helpers
@@ -31,8 +31,8 @@ const YELLOW = "\x1b[33m";
 const RED = "\x1b[31m";
 const MAGENTA = "\x1b[35m";
 const WHITE = "\x1b[37m";
-const RESET = "\x1b[0m";
-const DIM = "\x1b[2m";
+const _RESET = "\x1b[0m";
+const _DIM = "\x1b[2m";
 
 // ==========================================================================
 // Query type coloring

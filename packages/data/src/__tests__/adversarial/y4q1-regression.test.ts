@@ -1,7 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { DataSource, Connection, PreparedStatement, ResultSet } from "espalier-jdbc";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import type { Connection, DataSource, PreparedStatement, ResultSet } from "espalier-jdbc";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // ═══════════════════════════════════════════════════════════════
 // Y4 Q1 Adversarial Regression Tests
@@ -13,7 +13,7 @@ const PKG_ROOT = path.resolve(import.meta.dirname, "../../../");
 
 // ── Mock Helpers ──
 
-let lastPreparedSql: string;
+let _lastPreparedSql: string;
 let allPreparedSqls: string[];
 
 function createMockPreparedStatement(rs: ResultSet): PreparedStatement {
@@ -30,7 +30,7 @@ function createSequentialMockConnection(stmts: PreparedStatement[]): Connection 
   return {
     createStatement: vi.fn() as any,
     prepareStatement: vi.fn((sql: string) => {
-      lastPreparedSql = sql;
+      _lastPreparedSql = sql;
       allPreparedSqls.push(sql);
       const stmt = stmts[callIdx] ?? stmts[stmts.length - 1];
       callIdx++;
@@ -85,9 +85,7 @@ describe("Y4Q1: subpath export consistency regression", () => {
       const root = await import("../../index.js");
 
       // Get all non-type exports from core
-      const coreKeys = Object.keys(core).filter(
-        (k) => typeof (core as any)[k] !== "undefined",
-      );
+      const coreKeys = Object.keys(core).filter((k) => typeof (core as any)[k] !== "undefined");
 
       const missing: string[] = [];
       for (const key of coreKeys) {
@@ -96,10 +94,7 @@ describe("Y4Q1: subpath export consistency regression", () => {
         }
       }
 
-      expect(
-        missing,
-        `Root index.ts is missing these exports from core.ts: ${missing.join(", ")}`,
-      ).toHaveLength(0);
+      expect(missing, `Root index.ts is missing these exports from core.ts: ${missing.join(", ")}`).toHaveLength(0);
     });
   });
 
@@ -116,10 +111,9 @@ describe("Y4Q1: subpath export consistency regression", () => {
         }
       }
 
-      expect(
-        missing,
-        `Root index.ts is missing these exports from relations.ts: ${missing.join(", ")}`,
-      ).toHaveLength(0);
+      expect(missing, `Root index.ts is missing these exports from relations.ts: ${missing.join(", ")}`).toHaveLength(
+        0,
+      );
     });
   });
 
@@ -160,7 +154,7 @@ describe("Y4Q1: subpath export consistency regression", () => {
       }
 
       new CrossParent();
-      const child = new CrossChild();
+      const _child = new CrossChild();
 
       expect(getTableName(CrossChild)).toBe("cross_children");
       expect(getIdField(CrossChild)).toBe("id");
@@ -178,9 +172,7 @@ describe("Y4Q1: subpath export consistency regression", () => {
       if (!fs.existsSync(distDir)) return; // skip if not built
 
       const distFiles = fs.readdirSync(distDir);
-      const jsFiles = distFiles.filter(
-        (f) => f.endsWith(".js") && !f.endsWith(".d.ts"),
-      );
+      const jsFiles = distFiles.filter((f) => f.endsWith(".js") && !f.endsWith(".d.ts"));
 
       for (const jsFile of jsFiles) {
         const content = fs.readFileSync(path.join(distDir, jsFile), "utf8");
@@ -199,9 +191,7 @@ describe("Y4Q1: subpath export consistency regression", () => {
     });
 
     it("no orphan subpath entry points in dist that are not in package.json", () => {
-      const pkg = JSON.parse(
-        fs.readFileSync(path.join(PKG_ROOT, "package.json"), "utf8"),
-      );
+      const pkg = JSON.parse(fs.readFileSync(path.join(PKG_ROOT, "package.json"), "utf8"));
       const declaredFiles = new Set<string>();
       for (const conditions of Object.values(pkg.exports as Record<string, any>)) {
         const c = conditions as any;
@@ -226,10 +216,9 @@ describe("Y4Q1: subpath export consistency regression", () => {
       );
 
       for (const entry of entryLike) {
-        expect(
-          declaredFiles.has(entry),
-          `Dist file ${entry} exists but is not declared in package.json exports`,
-        ).toBe(true);
+        expect(declaredFiles.has(entry), `Dist file ${entry} exists but is not declared in package.json exports`).toBe(
+          true,
+        );
       }
     });
   });
@@ -261,9 +250,7 @@ describe("Y4Q1: lazy module loading regression", () => {
   describe("lazy loaders do not double-initialize", () => {
     it("loadGraphQLModule called 100 times concurrently does not leak", async () => {
       const mod = await import("../../index.js");
-      const promises = Array.from({ length: 100 }, () =>
-        mod.loadGraphQLModule(),
-      );
+      const promises = Array.from({ length: 100 }, () => mod.loadGraphQLModule());
       await Promise.all(promises);
 
       // Module should be usable after massive concurrent load storm
@@ -273,9 +260,7 @@ describe("Y4Q1: lazy module loading regression", () => {
 
     it("loadRestModule called 100 times concurrently does not leak", async () => {
       const mod = await import("../../index.js");
-      const promises = Array.from({ length: 100 }, () =>
-        mod.loadRestModule(),
-      );
+      const promises = Array.from({ length: 100 }, () => mod.loadRestModule());
       await Promise.all(promises);
 
       const gen = new mod.RouteGenerator();
@@ -321,7 +306,7 @@ describe("Y4Q1: lazy module loading regression", () => {
 
 describe("Y4Q1: findTopN interaction with existing queries", () => {
   beforeEach(() => {
-    lastPreparedSql = "";
+    _lastPreparedSql = "";
     allPreparedSqls = [];
   });
 
@@ -413,14 +398,13 @@ describe("Y4Q1: findTopN interaction with existing queries", () => {
 
 describe("Y4Q1: findAll validation regression", () => {
   beforeEach(() => {
-    lastPreparedSql = "";
+    _lastPreparedSql = "";
     allPreparedSqls = [];
   });
 
   describe("adversarial Pageable-like objects", () => {
     it("object with page, size, AND extra unrelated properties is still valid Pageable", async () => {
-      const { TestResultSet, Table, Column, Id, Repository, createAutoRepository } =
-        await getTestUtils();
+      const { TestResultSet, Table, Column, Id, Repository, createAutoRepository } = await getTestUtils();
       @Table("fa_items")
       class FaItem {
         @Id @Column() id: number = 0;
@@ -445,7 +429,7 @@ describe("Y4Q1: findAll validation regression", () => {
       const repo = createAutoRepository<FaItem, number>(FaItemRepo, ds);
 
       // Extra properties beyond page/size should not break detection
-      const result = await (repo as any).findAll({
+      const _result = await (repo as any).findAll({
         page: 0,
         size: 10,
         extraProp: "should not break",
@@ -458,8 +442,7 @@ describe("Y4Q1: findAll validation regression", () => {
     });
 
     it("Pageable with negative page throws", async () => {
-      const { TestResultSet, Table, Column, Id, Repository, createAutoRepository } =
-        await getTestUtils();
+      const { TestResultSet, Table, Column, Id, Repository, createAutoRepository } = await getTestUtils();
 
       @Table("neg_page_items")
       class NegPageItem {
@@ -476,14 +459,11 @@ describe("Y4Q1: findAll validation regression", () => {
       const ds = createMockDataSource(conn);
 
       const repo = createAutoRepository<NegPageItem, number>(NegPageRepo, ds);
-      await expect(
-        (repo as any).findAll({ page: -1, size: 10 }),
-      ).rejects.toThrow(/page must be >= 0/);
+      await expect((repo as any).findAll({ page: -1, size: 10 })).rejects.toThrow(/page must be >= 0/);
     });
 
     it("Pageable with boolean page throws clear error", async () => {
-      const { TestResultSet, Table, Column, Id, Repository, createAutoRepository } =
-        await getTestUtils();
+      const { TestResultSet, Table, Column, Id, Repository, createAutoRepository } = await getTestUtils();
 
       @Table("bool_page_items")
       class BoolPageItem {
@@ -501,14 +481,11 @@ describe("Y4Q1: findAll validation regression", () => {
       const repo = createAutoRepository<BoolPageItem, number>(BoolPageRepo, ds);
       // Boolean values are not strings, so they won't be coerced to numbers.
       // They should fail the "must be finite numbers" validation.
-      await expect(
-        (repo as any).findAll({ page: true, size: true }),
-      ).rejects.toThrow(/must be finite numbers/);
+      await expect((repo as any).findAll({ page: true, size: true })).rejects.toThrow(/must be finite numbers/);
     });
 
     it("array passed to findAll throws clear error", async () => {
-      const { TestResultSet, Table, Column, Id, Repository, createAutoRepository } =
-        await getTestUtils();
+      const { TestResultSet, Table, Column, Id, Repository, createAutoRepository } = await getTestUtils();
 
       @Table("arr_items")
       class ArrItem {
@@ -524,14 +501,11 @@ describe("Y4Q1: findAll validation regression", () => {
       const ds = createMockDataSource(conn);
 
       const repo = createAutoRepository<ArrItem, number>(ArrRepo, ds);
-      await expect((repo as any).findAll([1, 2, 3])).rejects.toThrow(
-        /Invalid argument to findAll/,
-      );
+      await expect((repo as any).findAll([1, 2, 3])).rejects.toThrow(/Invalid argument to findAll/);
     });
 
     it("string passed to findAll throws clear error", async () => {
-      const { TestResultSet, Table, Column, Id, Repository, createAutoRepository } =
-        await getTestUtils();
+      const { TestResultSet, Table, Column, Id, Repository, createAutoRepository } = await getTestUtils();
 
       @Table("str_items")
       class StrItem {
@@ -547,14 +521,11 @@ describe("Y4Q1: findAll validation regression", () => {
       const ds = createMockDataSource(conn);
 
       const repo = createAutoRepository<StrItem, number>(StrRepo, ds);
-      await expect((repo as any).findAll("invalid")).rejects.toThrow(
-        /Invalid argument to findAll/,
-      );
+      await expect((repo as any).findAll("invalid")).rejects.toThrow(/Invalid argument to findAll/);
     });
 
     it("number passed to findAll throws clear error", async () => {
-      const { TestResultSet, Table, Column, Id, Repository, createAutoRepository } =
-        await getTestUtils();
+      const { TestResultSet, Table, Column, Id, Repository, createAutoRepository } = await getTestUtils();
 
       @Table("num_items")
       class NumItem {
@@ -570,16 +541,13 @@ describe("Y4Q1: findAll validation regression", () => {
       const ds = createMockDataSource(conn);
 
       const repo = createAutoRepository<NumItem, number>(NumRepo, ds);
-      await expect((repo as any).findAll(42)).rejects.toThrow(
-        /Invalid argument to findAll/,
-      );
+      await expect((repo as any).findAll(42)).rejects.toThrow(/Invalid argument to findAll/);
     });
   });
 
   describe("findAll specification still works after validation changes", () => {
     it("Specification with toPredicate returning null acts as no-filter findAll", async () => {
-      const { TestResultSet, Table, Column, Id, Repository, createAutoRepository } =
-        await getTestUtils();
+      const { TestResultSet, Table, Column, Id, Repository, createAutoRepository } = await getTestUtils();
 
       @Table("spec_items")
       class SpecItem {
@@ -616,14 +584,13 @@ describe("Y4Q1: findAll validation regression", () => {
 
 describe("Y4Q1: specification + pageable interaction regression", () => {
   beforeEach(() => {
-    lastPreparedSql = "";
+    _lastPreparedSql = "";
     allPreparedSqls = [];
   });
 
   describe("Specification with real predicates still generates WHERE", () => {
     it("Specification returning ComparisonCriteria adds WHERE clause", async () => {
-      const { TestResultSet, Table, Column, Id, Repository, createAutoRepository } =
-        await getTestUtils();
+      const { TestResultSet, Table, Column, Id, Repository, createAutoRepository } = await getTestUtils();
       const { ComparisonCriteria } = await import("../../query/criteria.js");
 
       @Table("spec_where_items")
@@ -654,8 +621,7 @@ describe("Y4Q1: specification + pageable interaction regression", () => {
 
   describe("derived query + specification combo", () => {
     it("findByName with string arg still works — not confused with findAll validation", async () => {
-      const { TestResultSet, Table, Column, Id, Repository, createAutoRepository } =
-        await getTestUtils();
+      const { TestResultSet, Table, Column, Id, Repository, createAutoRepository } = await getTestUtils();
 
       @Table("dq_items")
       class DqItem {
@@ -672,7 +638,7 @@ describe("Y4Q1: specification + pageable interaction regression", () => {
       const ds = createMockDataSource(conn);
 
       const repo = createAutoRepository<DqItem, number>(DqRepo, ds);
-      const results = await (repo as any).findByName("Test");
+      const _results = await (repo as any).findByName("Test");
 
       expect(allPreparedSqls[0]).toContain("WHERE");
       expect(allPreparedSqls[0]).toContain('"name"');
@@ -686,14 +652,13 @@ describe("Y4Q1: specification + pageable interaction regression", () => {
 
 describe("Y4Q1: core CRUD regression", () => {
   beforeEach(() => {
-    lastPreparedSql = "";
+    _lastPreparedSql = "";
     allPreparedSqls = [];
   });
 
   describe("save and findById still work after refactoring", () => {
     it("save inserts new entity", async () => {
-      const { TestResultSet, Table, Column, Id, Repository, createAutoRepository } =
-        await getTestUtils();
+      const { TestResultSet, Table, Column, Id, Repository, createAutoRepository } = await getTestUtils();
 
       @Table("crud_items")
       class CrudItem {
@@ -720,8 +685,7 @@ describe("Y4Q1: core CRUD regression", () => {
     });
 
     it("findById returns entity when found", async () => {
-      const { TestResultSet, Table, Column, Id, Repository, createAutoRepository } =
-        await getTestUtils();
+      const { TestResultSet, Table, Column, Id, Repository, createAutoRepository } = await getTestUtils();
 
       @Table("find_items")
       class FindItem {
@@ -747,8 +711,7 @@ describe("Y4Q1: core CRUD regression", () => {
     });
 
     it("findById returns null when not found", async () => {
-      const { TestResultSet, Table, Column, Id, Repository, createAutoRepository } =
-        await getTestUtils();
+      const { TestResultSet, Table, Column, Id, Repository, createAutoRepository } = await getTestUtils();
 
       @Table("missing_items")
       class MissingItem {
@@ -774,8 +737,7 @@ describe("Y4Q1: core CRUD regression", () => {
 
   describe("delete still works", () => {
     it("deleteById executes DELETE query", async () => {
-      const { TestResultSet, Table, Column, Id, Repository, createAutoRepository } =
-        await getTestUtils();
+      const { TestResultSet, Table, Column, Id, Repository, createAutoRepository } = await getTestUtils();
 
       @Table("del_items")
       class DelItem {
@@ -801,8 +763,7 @@ describe("Y4Q1: core CRUD regression", () => {
 
   describe("connection cleanup on error paths", () => {
     it("findById closes connection even on DB error", async () => {
-      const { Table, Column, Id, Repository, createAutoRepository } =
-        await getTestUtils();
+      const { Table, Column, Id, Repository, createAutoRepository } = await getTestUtils();
 
       @Table("err_items")
       class ErrItem {

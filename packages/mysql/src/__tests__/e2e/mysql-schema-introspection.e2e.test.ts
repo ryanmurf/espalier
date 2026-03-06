@@ -1,12 +1,8 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import type { Connection } from "espalier-jdbc";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { MysqlDataSource } from "../../mysql-data-source.js";
 import { MysqlSchemaIntrospector } from "../../mysql-schema-introspector.js";
-import {
-  createTestDataSource,
-  isMysqlAvailable,
-  dropTestTable,
-} from "./setup.js";
+import { createTestDataSource, dropTestTable, isMysqlAvailable } from "./setup.js";
 
 const TABLE = "e2e_introspect_test";
 const canConnect = await isMysqlAvailable();

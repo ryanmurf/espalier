@@ -6,15 +6,15 @@
  * circular references, entity-with-no-columns, performance, and diff
  * cross-entity-type/ID validation.
  */
-import { describe, it, expect } from "vitest";
-import { snapshot } from "../../snapshot/entity-snapshot.js";
-import { diff, diffEntity } from "../../snapshot/entity-diff.js";
-import type { Snapshot } from "../../snapshot/entity-snapshot.js";
-import { Table } from "../../decorators/table.js";
+import { describe, expect, it } from "vitest";
 import { Column } from "../../decorators/column.js";
 import { Id } from "../../decorators/id.js";
+import { Table } from "../../decorators/table.js";
 import { EntityChangeTracker } from "../../mapping/change-tracker.js";
 import type { EntityMetadata } from "../../mapping/entity-metadata.js";
+import { diff, diffEntity } from "../../snapshot/entity-diff.js";
+import type { Snapshot } from "../../snapshot/entity-snapshot.js";
+import { snapshot } from "../../snapshot/entity-snapshot.js";
 
 // ──────────────────────────────────────────────────────
 // Test entities
@@ -53,10 +53,7 @@ class NoColumnsEntity {
 // Helper to build minimal EntityMetadata
 // ──────────────────────────────────────────────────────
 
-function makeMetadata(
-  tableName: string,
-  fields: { fieldName: string; columnName: string }[],
-): EntityMetadata {
+function makeMetadata(tableName: string, fields: { fieldName: string; columnName: string }[]): EntityMetadata {
   return {
     tableName,
     idField: "id",
@@ -708,7 +705,7 @@ describe("entity-diff deepEqual edge cases", () => {
       // BUG CONFIRMED: deepEqual treats {a:1,b:undefined} as equal to {a:1}
       console.warn(
         "BUG: entity-diff deepEqual uses JSON.stringify which drops undefined values. " +
-        "{a:1, b:undefined} is considered equal to {a:1}.",
+          "{a:1, b:undefined} is considered equal to {a:1}.",
       );
     }
     // The test passes either way — we're documenting the behavior
@@ -755,9 +752,7 @@ describe("entity-diff deepEqual edge cases", () => {
       expect(snap1.fields.data).toBe(snap2.fields.data);
     } else {
       // BUG: Different references with same structure would fail
-      console.warn(
-        "BUG: entity-diff deepEqual cannot compare circular structures via JSON.stringify.",
-      );
+      console.warn("BUG: entity-diff deepEqual cannot compare circular structures via JSON.stringify.");
     }
   });
 
@@ -806,8 +801,8 @@ describe("entity-diff deepEqual edge cases", () => {
     if (!dataChange) {
       console.warn(
         "BUG: entity-diff deepEqual treats nested NaN as null " +
-        "because JSON.stringify(NaN) === 'null'. " +
-        "{val: NaN} and {val: null} are considered equal.",
+          "because JSON.stringify(NaN) === 'null'. " +
+          "{val: NaN} and {val: null} are considered equal.",
       );
     }
     // Document the bug either way
@@ -833,8 +828,7 @@ describe("entity-diff deepEqual edge cases", () => {
 
     if (!dataChange) {
       console.warn(
-        "BUG: entity-diff deepEqual treats nested Infinity as null " +
-        "because JSON.stringify(Infinity) === 'null'.",
+        "BUG: entity-diff deepEqual treats nested Infinity as null " + "because JSON.stringify(Infinity) === 'null'.",
       );
     }
     expect(true).toBe(true);

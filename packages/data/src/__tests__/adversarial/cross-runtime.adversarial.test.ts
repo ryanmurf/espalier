@@ -8,9 +8,10 @@
  * - Change tracker works with Uint8Array (not Buffer)
  * - Package.json exports are correct for all consumers
  */
-import { describe, it, expect } from "vitest";
+
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { describe, expect, it } from "vitest";
 
 // -- Helper: walk directory --------------------------------------------------
 
@@ -30,9 +31,7 @@ function walkDir(dir: string): string[] {
 function getSrcFiles(pkgDir: string): string[] {
   const srcDir = path.join(pkgDir, "src");
   if (!fs.existsSync(srcDir)) return [];
-  return walkDir(srcDir).filter(
-    (f) => f.endsWith(".ts") && !f.includes("__tests__") && !f.includes(".test."),
-  );
+  return walkDir(srcDir).filter((f) => f.endsWith(".ts") && !f.includes("__tests__") && !f.includes(".test."));
 }
 
 const ROOT = path.resolve(__dirname, "../../../../..");
@@ -58,15 +57,14 @@ describe("no Node-specific APIs in espalier-data", () => {
       const lines = content.split("\n");
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
-        const match = line.match(/from\s+["'](node:[^"']+)["']/) ||
-                      line.match(/require\(["'](node:[^"']+)["']\)/);
+        const match = line.match(/from\s+["'](node:[^"']+)["']/) || line.match(/require\(["'](node:[^"']+)["']\)/);
         if (match && !allowedNodeImports.has(match[1])) {
           violations.push({ file: path.relative(ROOT, file), line: i + 1, text: line.trim() });
         }
       }
     }
     if (violations.length > 0) {
-      const msg = violations.map(v => `  ${v.file}:${v.line} -- ${v.text}`).join("\n");
+      const msg = violations.map((v) => `  ${v.file}:${v.line} -- ${v.text}`).join("\n");
       expect.unreachable(`Found disallowed node:* imports in espalier-data:\n${msg}`);
     }
   });
@@ -75,7 +73,13 @@ describe("no Node-specific APIs in espalier-data", () => {
     // AsyncLocalStorage is used in tenant context, N1 detection, filter context, and audit context
     const nonAllowedViolations: string[] = [];
     for (const file of srcFiles) {
-      if (file.includes("/tenant/") || file.includes("/observability/") || file.includes("/filter/") || file.includes("/audit/")) continue;
+      if (
+        file.includes("/tenant/") ||
+        file.includes("/observability/") ||
+        file.includes("/filter/") ||
+        file.includes("/audit/")
+      )
+        continue;
       const content = fs.readFileSync(file, "utf-8");
       if (/from\s+["']node:async_hooks["']/.test(content)) {
         nonAllowedViolations.push(path.relative(ROOT, file));
@@ -97,7 +101,7 @@ describe("no Node-specific APIs in espalier-data", () => {
       }
     }
     if (violations.length > 0) {
-      const msg = violations.map(v => `  ${v.file}:${v.line} -- ${v.text}`).join("\n");
+      const msg = violations.map((v) => `  ${v.file}:${v.line} -- ${v.text}`).join("\n");
       expect.unreachable(`Found Buffer usage in espalier-data:\n${msg}`);
     }
   });
@@ -115,7 +119,7 @@ describe("no Node-specific APIs in espalier-data", () => {
       }
     }
     if (violations.length > 0) {
-      const msg = violations.map(v => `  ${v.file}:${v.line} -- ${v.text}`).join("\n");
+      const msg = violations.map((v) => `  ${v.file}:${v.line} -- ${v.text}`).join("\n");
       expect.unreachable(`Found __dirname/__filename in espalier-data:\n${msg}`);
     }
   });
@@ -128,14 +132,17 @@ describe("no Node-specific APIs in espalier-data", () => {
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
         // Allow process.env references (used for config) but flag process.exit, process.cwd, etc.
-        if (/\bprocess\.(exit|cwd|argv|pid|platform|arch|hrtime|stdout|stderr|stdin)\b/.test(line)
-            && !line.trim().startsWith("//") && !line.trim().startsWith("*")) {
+        if (
+          /\bprocess\.(exit|cwd|argv|pid|platform|arch|hrtime|stdout|stderr|stdin)\b/.test(line) &&
+          !line.trim().startsWith("//") &&
+          !line.trim().startsWith("*")
+        ) {
           violations.push({ file: path.relative(ROOT, file), line: i + 1, text: line.trim() });
         }
       }
     }
     if (violations.length > 0) {
-      const msg = violations.map(v => `  ${v.file}:${v.line} -- ${v.text}`).join("\n");
+      const msg = violations.map((v) => `  ${v.file}:${v.line} -- ${v.text}`).join("\n");
       expect.unreachable(`Found process.* usage in espalier-data:\n${msg}`);
     }
   });
@@ -163,7 +170,7 @@ describe("import resolution in data package", () => {
       }
     }
     if (violations.length > 0) {
-      const msg = violations.map(v => `  ${v.file}:${v.line} -- ${v.text}`).join("\n");
+      const msg = violations.map((v) => `  ${v.file}:${v.line} -- ${v.text}`).join("\n");
       expect.unreachable(`Found imports without .js extension:\n${msg}`);
     }
   });
@@ -186,7 +193,7 @@ describe("decorator metadata portability", () => {
   it("decorator metadata files use WeakMap (not Map for class keys)", () => {
     // Scan decorator files specifically for WeakMap usage
     const decoratorFiles = getSrcFiles(DATA_PKG).filter(
-      f => f.includes("/decorators/") || f.includes("entity-metadata"),
+      (f) => f.includes("/decorators/") || f.includes("entity-metadata"),
     );
     expect(decoratorFiles.length).toBeGreaterThan(0);
 
@@ -287,9 +294,7 @@ describe("data package.json exports", () => {
 
 describe("QueryBuilder portability", () => {
   it("query builder files have no runtime-detection imports", () => {
-    const queryFiles = getSrcFiles(DATA_PKG).filter(
-      f => f.includes("query-builder") || f.includes("derived-query"),
-    );
+    const queryFiles = getSrcFiles(DATA_PKG).filter((f) => f.includes("query-builder") || f.includes("derived-query"));
     for (const file of queryFiles) {
       const content = fs.readFileSync(file, "utf-8");
       // QueryBuilder should NOT import detectRuntime or check runtime
@@ -313,7 +318,7 @@ describe("no runtime-specific fallbacks in data core", () => {
       }
     }
     if (violations.length > 0) {
-      const msg = violations.map(v => `  ${v.file}: ${v.text}`).join("\n");
+      const msg = violations.map((v) => `  ${v.file}: ${v.text}`).join("\n");
       expect.unreachable(`Found runtime-specific checks in espalier-data:\n${msg}`);
     }
   });
@@ -332,15 +337,17 @@ describe("portable API usage", () => {
         const line = lines[i];
         // Match actual require() calls, not method names like "static require()"
         // Pattern: require( preceded by = or ( or space at start, not preceded by . or static/function keywords
-        if (/(?:^|[=(,;])\s*require\s*\(["']/.test(line)
-            && !line.trim().startsWith("//")
-            && !line.trim().startsWith("*")) {
+        if (
+          /(?:^|[=(,;])\s*require\s*\(["']/.test(line) &&
+          !line.trim().startsWith("//") &&
+          !line.trim().startsWith("*")
+        ) {
           violations.push({ file: path.relative(ROOT, file), line: i + 1, text: line.trim() });
         }
       }
     }
     if (violations.length > 0) {
-      const msg = violations.map(v => `  ${v.file}:${v.line} -- ${v.text}`).join("\n");
+      const msg = violations.map((v) => `  ${v.file}:${v.line} -- ${v.text}`).join("\n");
       expect.unreachable(`Found require() in espalier-data ESM source:\n${msg}`);
     }
   });
@@ -358,9 +365,7 @@ describe("portable API usage", () => {
 
 describe("type converter portability", () => {
   it("type converter imports come from espalier-jdbc (not node:*)", () => {
-    const converterFiles = getSrcFiles(DATA_PKG).filter(
-      f => f.includes("converter") || f.includes("type-map"),
-    );
+    const converterFiles = getSrcFiles(DATA_PKG).filter((f) => f.includes("converter") || f.includes("type-map"));
     for (const file of converterFiles) {
       const content = fs.readFileSync(file, "utf-8");
       expect(content).not.toContain("node:");

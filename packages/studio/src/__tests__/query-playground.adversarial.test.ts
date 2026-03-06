@@ -16,14 +16,15 @@
  * - Parameterized queries
  * - Write mode allows mutations
  */
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { Hono } from "hono";
+
+import { Column, Id, Table } from "espalier-data";
 import { PgDataSource } from "espalier-jdbc-pg";
-import { Table, Column, Id } from "espalier-data";
+import { Hono } from "hono";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { extractSchema } from "../schema/index.js";
-import { createApiRoutes } from "../server/api-routes.js";
-import type { ApiRouteContext } from "../server/api-routes.js";
 import type { SchemaModel } from "../schema/schema-model.js";
+import type { ApiRouteContext } from "../server/api-routes.js";
+import { createApiRoutes } from "../server/api-routes.js";
 
 // =============================================================================
 // Postgres connectivity check
@@ -39,7 +40,11 @@ async function isPostgresAvailable(): Promise<boolean> {
     await ds.close();
     return true;
   } catch {
-    try { await ds.close(); } catch { /* ignore */ }
+    try {
+      await ds.close();
+    } catch {
+      /* ignore */
+    }
     return false;
   }
 }
@@ -79,10 +84,7 @@ function createTestApp(schema: SchemaModel, ds: PgDataSource, readOnly = true): 
   return app;
 }
 
-async function queryReq(
-  app: Hono,
-  body: unknown,
-): Promise<Response> {
+async function queryReq(app: Hono, body: unknown): Promise<Response> {
   return app.request("http://localhost/api/query", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -122,9 +124,7 @@ describe.skipIf(!canConnect)("query playground — adversarial (E2E)", () => {
       )
     `);
     for (let i = 1; i <= 15; i++) {
-      await stmt.executeUpdate(
-        `INSERT INTO ${TEST_TABLE} (name, value) VALUES ('Item ${i}', ${i * 100})`,
-      );
+      await stmt.executeUpdate(`INSERT INTO ${TEST_TABLE} (name, value) VALUES ('Item ${i}', ${i * 100})`);
     }
     await stmt.close();
     await conn.close();
@@ -258,7 +258,7 @@ describe.skipIf(!canConnect)("query playground — adversarial (E2E)", () => {
       await conn.close();
 
       // Attempt to drop the sacrificial table via multi-statement injection
-      const res = await queryReq(readOnlyApp, {
+      const _res = await queryReq(readOnlyApp, {
         sql: `SELECT 1; DROP TABLE ${sacrificial};`,
       });
 

@@ -15,7 +15,7 @@ export class EnumConverter<T extends string> implements TypeConverter<T | null, 
     if (!this.allowedValues.has(value)) {
       throw new Error(
         `Invalid enum value "${value}" for converter "${this.name}". ` +
-        `Allowed values: ${[...this.allowedValues].join(", ")}`,
+          `Allowed values: ${[...this.allowedValues].join(", ")}`,
       );
     }
     return value;
@@ -26,7 +26,7 @@ export class EnumConverter<T extends string> implements TypeConverter<T | null, 
     if (!this.allowedValues.has(value)) {
       throw new Error(
         `Invalid enum value "${value}" from database for converter "${this.name}". ` +
-        `Allowed values: ${[...this.allowedValues].join(", ")}`,
+          `Allowed values: ${[...this.allowedValues].join(", ")}`,
       );
     }
     return value as T;

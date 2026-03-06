@@ -1,7 +1,7 @@
 import type { Connection, DataSource, TypeConverterRegistry } from "espalier-jdbc";
 import { ConnectionError, DatabaseErrorCode, getGlobalLogger } from "espalier-jdbc";
-import type { BunSqliteDatabase } from "./bun-sqlite-statement.js";
 import { BunSqliteConnection } from "./bun-sqlite-connection.js";
+import type { BunSqliteDatabase } from "./bun-sqlite-statement.js";
 
 export interface BunSqliteDataSourceConfig {
   /** Path to the SQLite database file, or ":memory:" for in-memory database. */
@@ -64,9 +64,7 @@ export class BunSqliteDataSource implements DataSource {
 
     // Dynamic import of bun:sqlite is not needed — we use the global Bun API
     // bun:sqlite Database constructor: new Database(filename, options?)
-    const BunDatabase = (globalThis as any).Bun
-      ? require("bun:sqlite").Database
-      : undefined;
+    const BunDatabase = (globalThis as any).Bun ? require("bun:sqlite").Database : undefined;
 
     if (!BunDatabase) {
       throw new ConnectionError(
@@ -90,7 +88,11 @@ export class BunSqliteDataSource implements DataSource {
     } catch (err) {
       // Close the DB handle if it was opened but PRAGMA setup failed
       if (db) {
-        try { db.close(); } catch { /* best effort */ }
+        try {
+          db.close();
+        } catch {
+          /* best effort */
+        }
       }
       if (err instanceof ConnectionError) throw err;
       throw new ConnectionError(
@@ -105,11 +107,7 @@ export class BunSqliteDataSource implements DataSource {
 
   async getConnection(): Promise<Connection> {
     if (this.closed) {
-      throw new ConnectionError(
-        "DataSource is closed",
-        undefined,
-        DatabaseErrorCode.CONNECTION_CLOSED,
-      );
+      throw new ConnectionError("DataSource is closed", undefined, DatabaseErrorCode.CONNECTION_CLOSED);
     }
     return new BunSqliteConnection(this.db, this.typeConverters);
   }

@@ -1,7 +1,7 @@
-import { extractSchema } from "../schema/index.js";
-import { generateDiagram } from "../diagram/index.js";
-import type { DiagramFormat } from "../diagram/diagram-generator.js";
 import { writeFileSync } from "node:fs";
+import type { DiagramFormat } from "../diagram/diagram-generator.js";
+import { generateDiagram } from "../diagram/index.js";
+import { extractSchema } from "../schema/index.js";
 
 export interface DiagramCommandOptions {
   format?: DiagramFormat;

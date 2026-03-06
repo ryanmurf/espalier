@@ -1,22 +1,19 @@
-import type { StreamingResultSet, ColumnMetadata } from "espalier-jdbc";
 import type Database from "better-sqlite3";
+import type { ColumnMetadata, StreamingResultSet } from "espalier-jdbc";
 
 export class SqliteCursorResultSet implements StreamingResultSet {
   private readonly iterator: IterableIterator<Record<string, unknown>>;
   private readonly columnDefs: Database.ColumnDefinition[];
   private currentRow: Record<string, unknown> | null = null;
   private done = false;
-  private _cursorSize = 100;
 
-  constructor(
-    iterator: IterableIterator<Record<string, unknown>>,
-    columns: Database.ColumnDefinition[],
-  ) {
+  constructor(iterator: IterableIterator<Record<string, unknown>>, columns: Database.ColumnDefinition[]) {
     this.iterator = iterator;
     this.columnDefs = columns;
   }
 
   private paused = false;
+  private _cursorSize = 100;
 
   setCursorSize(size: number): void {
     this._cursorSize = size;

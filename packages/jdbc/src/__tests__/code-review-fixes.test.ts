@@ -5,18 +5,12 @@
  * #54: setGlobalTracerProvider rejects null/undefined
  * #56: QueryStatisticsCollector unbounded memory growth (LRU eviction + duration cap)
  */
-import { describe, it, expect, vi, afterEach } from "vitest";
-import {
-  ConnectivityHealthCheck,
-} from "../health.js";
-import {
-  setGlobalTracerProvider,
-  getGlobalTracerProvider,
-  NoopTracerProvider,
-} from "../tracing.js";
-import type { TracerProvider } from "../tracing.js";
-import type { DataSource, Connection, Statement, ResultSet } from "../index.js";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { ConnectivityHealthCheck } from "../health.js";
+import type { Connection, DataSource, ResultSet, Statement } from "../index.js";
 import { QueryStatisticsCollector } from "../query-statistics.js";
+import type { TracerProvider } from "../tracing.js";
+import { getGlobalTracerProvider, NoopTracerProvider, setGlobalTracerProvider } from "../tracing.js";
 
 // ══════════════════════════════════════════════════
 // Mock factories
@@ -53,7 +47,7 @@ function mockConnection(stmt?: Statement): Connection {
   } as unknown as Connection;
 }
 
-function mockDataSource(conn?: Connection): DataSource {
+function _mockDataSource(conn?: Connection): DataSource {
   return {
     getConnection: vi.fn().mockResolvedValue(conn ?? mockConnection()),
     close: vi.fn().mockResolvedValue(undefined),
@@ -86,14 +80,16 @@ describe("#53: ConnectivityHealthCheck connection leak on timeout", () => {
     expect(result.details.error).toBe("Connection timed out");
     // The key assertion: connection was released despite the timeout
     // Give a tick for the async close to fire
-    await new Promise(r => setTimeout(r, 10));
+    await new Promise((r) => setTimeout(r, 10));
     expect(conn.close).toHaveBeenCalled();
   });
 
   it("connection.close() is called when getConnection is slow and times out mid-flight", async () => {
     const conn = mockConnection();
     let resolveGetConn: (c: Connection) => void;
-    const getConnPromise = new Promise<Connection>((r) => { resolveGetConn = r; });
+    const getConnPromise = new Promise<Connection>((r) => {
+      resolveGetConn = r;
+    });
 
     const ds = {
       getConnection: vi.fn().mockReturnValue(getConnPromise),
@@ -104,7 +100,7 @@ describe("#53: ConnectivityHealthCheck connection leak on timeout", () => {
     const resultPromise = check.check();
 
     // Resolve getConnection AFTER timeout fires
-    await new Promise(r => setTimeout(r, 80));
+    await new Promise((r) => setTimeout(r, 80));
     resolveGetConn!(conn);
 
     const result = await resultPromise;
@@ -112,7 +108,7 @@ describe("#53: ConnectivityHealthCheck connection leak on timeout", () => {
     expect(result.details.error).toBe("Connection timed out");
 
     // Connection should still be cleaned up even though it arrived late
-    await new Promise(r => setTimeout(r, 10));
+    await new Promise((r) => setTimeout(r, 10));
     expect(conn.close).toHaveBeenCalled();
   });
 
@@ -164,7 +160,9 @@ describe("#53: ConnectivityHealthCheck connection leak on timeout", () => {
         executeQuery: vi.fn().mockReturnValue(new Promise(() => {})),
         close: vi.fn().mockResolvedValue(undefined),
       });
-      (conn as any).close = vi.fn().mockImplementation(async () => { activeConnections--; });
+      (conn as any).close = vi.fn().mockImplementation(async () => {
+        activeConnections--;
+      });
       return conn;
     };
 
@@ -181,7 +179,7 @@ describe("#53: ConnectivityHealthCheck connection leak on timeout", () => {
     }
 
     // Give time for async closes
-    await new Promise(r => setTimeout(r, 50));
+    await new Promise((r) => setTimeout(r, 50));
 
     // All connections should have been released
     expect(activeConnections).toBe(0);
@@ -206,31 +204,46 @@ describe("#54: setGlobalTracerProvider rejects null/undefined", () => {
   });
 
   it("error message is descriptive", () => {
-    expect(() => setGlobalTracerProvider(null as unknown as TracerProvider))
-      .toThrow(/null|undefined/i);
+    expect(() => setGlobalTracerProvider(null as unknown as TracerProvider)).toThrow(/null|undefined/i);
   });
 
   it("does NOT change the global provider when null is passed", () => {
     const before = getGlobalTracerProvider();
-    try { setGlobalTracerProvider(null as unknown as TracerProvider); } catch (_e) {}
+    try {
+      setGlobalTracerProvider(null as unknown as TracerProvider);
+    } catch (_e) {}
     expect(getGlobalTracerProvider()).toBe(before);
   });
 
   it("does NOT change the global provider when undefined is passed", () => {
     const before = getGlobalTracerProvider();
-    try { setGlobalTracerProvider(undefined as unknown as TracerProvider); } catch (_e) {}
+    try {
+      setGlobalTracerProvider(undefined as unknown as TracerProvider);
+    } catch (_e) {}
     expect(getGlobalTracerProvider()).toBe(before);
   });
 
   it("accepts a valid TracerProvider after rejecting null", () => {
-    try { setGlobalTracerProvider(null as unknown as TracerProvider); } catch (_e) {}
+    try {
+      setGlobalTracerProvider(null as unknown as TracerProvider);
+    } catch (_e) {}
     const valid = new NoopTracerProvider();
     setGlobalTracerProvider(valid);
     expect(getGlobalTracerProvider()).toBe(valid);
   });
 
   it("accepts an object that implements TracerProvider interface (duck typing)", () => {
-    const duck = { getTracer: () => ({ startSpan: () => ({ spanName: "x", setAttribute: () => {}, addEvent: () => {}, setStatus: () => {}, end: () => {} }) }) };
+    const duck = {
+      getTracer: () => ({
+        startSpan: () => ({
+          spanName: "x",
+          setAttribute: () => {},
+          addEvent: () => {},
+          setStatus: () => {},
+          end: () => {},
+        }),
+      }),
+    };
     // Should not throw — it has getTracer method
     expect(() => setGlobalTracerProvider(duck as unknown as TracerProvider)).not.toThrow();
   });
@@ -264,7 +277,7 @@ describe("#56: QueryStatisticsCollector bounded memory", () => {
 
       const stats = collector.getStatistics();
       expect(stats).toHaveLength(3);
-      const patterns = stats.map(s => s.pattern);
+      const patterns = stats.map((s) => s.pattern);
       expect(patterns).toContain("SELECT * FROM d");
     });
 
@@ -272,20 +285,20 @@ describe("#56: QueryStatisticsCollector bounded memory", () => {
       const collector = new QueryStatisticsCollector(3);
       collector.record("SELECT * FROM a", 10);
       // Small delay to ensure different timestamps
-      await new Promise(r => setTimeout(r, 5));
+      await new Promise((r) => setTimeout(r, 5));
       collector.record("SELECT * FROM b", 20);
-      await new Promise(r => setTimeout(r, 5));
+      await new Promise((r) => setTimeout(r, 5));
       collector.record("SELECT * FROM c", 30);
 
       // Touch "a" again to refresh it
-      await new Promise(r => setTimeout(r, 5));
+      await new Promise((r) => setTimeout(r, 5));
       collector.record("SELECT * FROM a", 15);
 
       // Now add "d" — should evict "b" (oldest untouched), not "a"
       collector.record("SELECT * FROM d", 40);
 
       const stats = collector.getStatistics();
-      const patterns = stats.map(s => s.pattern);
+      const patterns = stats.map((s) => s.pattern);
       expect(patterns).not.toContain("SELECT * FROM b");
       expect(patterns).toContain("SELECT * FROM a");
       expect(patterns).toContain("SELECT * FROM d");
@@ -300,7 +313,7 @@ describe("#56: QueryStatisticsCollector bounded memory", () => {
       // Evict a by adding c
       collector.record("SELECT * FROM c", 40);
 
-      const bStat = collector.getStatistics().find(s => s.pattern.includes("b"));
+      const bStat = collector.getStatistics().find((s) => s.pattern.includes("b"));
       expect(bStat).toBeDefined();
       expect(bStat!.count).toBe(2);
       expect(bStat!.totalTime).toBe(50);
@@ -309,7 +322,7 @@ describe("#56: QueryStatisticsCollector bounded memory", () => {
     it("maxPatterns of 1 keeps only the most recent pattern", async () => {
       const collector = new QueryStatisticsCollector(1);
       collector.record("SELECT * FROM a", 10);
-      await new Promise(r => setTimeout(r, 5));
+      await new Promise((r) => setTimeout(r, 5));
       collector.record("SELECT * FROM b", 20);
 
       const stats = collector.getStatistics();
@@ -359,12 +372,12 @@ describe("#56: QueryStatisticsCollector bounded memory", () => {
     it("min and max remain accurate even when durations are capped", () => {
       const collector = new QueryStatisticsCollector(1000, 5);
       // Record: 1, 100, 50, 50, 50, 50, 50, 50, 50, 200
-      collector.record("SELECT 1", 1);    // min
+      collector.record("SELECT 1", 1); // min
       collector.record("SELECT 1", 100);
       for (let i = 0; i < 7; i++) {
         collector.record("SELECT 1", 50);
       }
-      collector.record("SELECT 1", 200);  // max
+      collector.record("SELECT 1", 200); // max
 
       const stats = collector.getStatistics();
       expect(stats[0].minTime).toBe(1);
@@ -423,7 +436,7 @@ describe("#56: QueryStatisticsCollector bounded memory", () => {
       collector.record("SELECT * FROM c", 35);
 
       expect(collector.getStatistics()).toHaveLength(3);
-      const aStat = collector.getStatistics().find(s => s.pattern.includes("a"));
+      const aStat = collector.getStatistics().find((s) => s.pattern.includes("a"));
       expect(aStat!.count).toBe(2);
     });
 

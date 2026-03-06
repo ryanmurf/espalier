@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
 import { DatabaseErrorCode } from "espalier-jdbc";
+import { describe, expect, it } from "vitest";
 import { mapSqliteErrorCode } from "../error-codes.js";
 
 describe("mapSqliteErrorCode", () => {
@@ -79,8 +79,6 @@ describe("mapSqliteErrorCode", () => {
   });
 
   it("maps errors without code to QUERY_FAILED", () => {
-    expect(mapSqliteErrorCode(new Error("generic"))).toBe(
-      DatabaseErrorCode.QUERY_FAILED,
-    );
+    expect(mapSqliteErrorCode(new Error("generic"))).toBe(DatabaseErrorCode.QUERY_FAILED);
   });
 });

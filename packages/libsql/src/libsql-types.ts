@@ -3,9 +3,7 @@
  * Avoids tight coupling to specific @libsql/client versions.
  */
 
-export interface LibSqlValue {
-  // LibSQL values can be string, number, bigint, ArrayBuffer, null, or boolean
-}
+export type LibSqlValue = {};
 
 export interface LibSqlRow {
   [key: string]: unknown;

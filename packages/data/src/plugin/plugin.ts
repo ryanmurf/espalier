@@ -45,7 +45,9 @@ export interface HookContext {
   /** The hook type being executed. */
   hookType: HookType;
   /** Entity class involved, if applicable. */
-  entityClass?: new (...args: any[]) => any;
+  entityClass?: new (
+    ...args: any[]
+  ) => any;
   /** Entity instance(s) involved, if applicable. */
   entities?: unknown[];
   /** Query SQL, if applicable (beforeQuery/afterQuery). */

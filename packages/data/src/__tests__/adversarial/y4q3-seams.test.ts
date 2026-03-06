@@ -11,31 +11,33 @@
  * 6. Query compilation + DerivedQueryHandler (cache, thread safety)
  * 7. Relay cursor + GraphQL resolver generator
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import type { SqlValue, QueryPlan, PlanNode, Connection, PreparedStatement, StatementCacheStats } from "espalier-jdbc";
-import { quoteIdentifier, PlanAdvisor } from "espalier-jdbc";
-import { SelectBuilder } from "../../query/query-builder.js";
+
+import type { Connection, PlanNode, PreparedStatement, QueryPlan, SqlValue } from "espalier-jdbc";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  KeysetPaginationAdapter,
+  OffsetPaginationAdapter,
+  RelayCursorPaginationAdapter,
+} from "../../graphql/pagination-adapter.js";
+import type { EntityMetadata, FieldMapping } from "../../mapping/entity-metadata.js";
+import { IndexAdvisor } from "../../observability/index-advisor.js";
+import type { N1DetectionEvent } from "../../observability/n1-detector.js";
+import { N1DetectionError, N1Detector } from "../../observability/n1-detector.js";
+import { configureObservability } from "../../observability/observability-config.js";
+import type { CursorPayload } from "../../pagination/cursor-encoding.js";
+import { decodeCursor, encodeCursor } from "../../pagination/cursor-encoding.js";
+import { KeysetPaginationStrategy } from "../../pagination/keyset-strategy.js";
 import { OffsetPaginationStrategy } from "../../pagination/offset-strategy.js";
 import { RelayCursorStrategy } from "../../pagination/relay-cursor-strategy.js";
-import { KeysetPaginationStrategy } from "../../pagination/keyset-strategy.js";
-import { PaginationStrategyRegistry, getGlobalPaginationRegistry, setGlobalPaginationRegistry } from "../../pagination/strategy-registry.js";
-import { encodeCursor, decodeCursor } from "../../pagination/cursor-encoding.js";
-import type { CursorPayload } from "../../pagination/cursor-encoding.js";
-import type { Pageable, Page } from "../../repository/paging.js";
-import { createPage, createPageable } from "../../repository/paging.js";
-import { N1Detector, N1DetectionError } from "../../observability/n1-detector.js";
-import type { N1DetectionEvent } from "../../observability/n1-detector.js";
-import { IndexAdvisor } from "../../observability/index-advisor.js";
-import { configureObservability } from "../../observability/observability-config.js";
-import { QueryCompiler } from "../../query/query-compiler.js";
-import { bindCompiledQuery } from "../../query/compiled-query.js";
-import type { CompiledQuery } from "../../query/compiled-query.js";
+import { getGlobalPaginationRegistry, PaginationStrategyRegistry } from "../../pagination/strategy-registry.js";
+import type { CursorPage, KeysetPageable, PaginationStrategy } from "../../pagination/types.js";
 import { BulkOperationBuilder } from "../../query/bulk-operation-builder.js";
-import { PreparedStatementPool, setGlobalPreparedStatementPool } from "../../query/prepared-statement-pool.js";
-import { OffsetPaginationAdapter, RelayCursorPaginationAdapter, KeysetPaginationAdapter } from "../../graphql/pagination-adapter.js";
+import { bindCompiledQuery } from "../../query/compiled-query.js";
 import { parseDerivedQueryMethod } from "../../query/derived-query-parser.js";
-import type { EntityMetadata, FieldMapping } from "../../mapping/entity-metadata.js";
-import type { CursorPageable, CursorPage, KeysetPageable, KeysetPage, PaginationStrategy } from "../../pagination/types.js";
+import { PreparedStatementPool, setGlobalPreparedStatementPool } from "../../query/prepared-statement-pool.js";
+import { SelectBuilder } from "../../query/query-builder.js";
+import { QueryCompiler } from "../../query/query-compiler.js";
+import type { Pageable } from "../../repository/paging.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -98,7 +100,6 @@ function makeQueryPlan(rootNode: PlanNode): QueryPlan {
 // ============================================================================
 
 describe("Seam: Pagination Strategies + QueryBuilder", () => {
-
   describe("OffsetPaginationStrategy + SelectBuilder", () => {
     it("applies LIMIT and OFFSET to builder correctly", () => {
       const strategy = new OffsetPaginationStrategy();
@@ -136,25 +137,17 @@ describe("Seam: Pagination Strategies + QueryBuilder", () => {
 
     it("page 0, size 0 should throw in buildResult (invalid page size)", () => {
       const strategy = new OffsetPaginationStrategy();
-      expect(() =>
-        strategy.buildResult([], { page: 0, size: 0 }, 100),
-      ).toThrow();
+      expect(() => strategy.buildResult([], { page: 0, size: 0 }, 100)).toThrow();
     });
 
     it("handles negative page gracefully in buildResult", () => {
       const strategy = new OffsetPaginationStrategy();
-      expect(() =>
-        strategy.buildResult([], { page: -1, size: 10 }, 100),
-      ).toThrow();
+      expect(() => strategy.buildResult([], { page: -1, size: 10 }, 100)).toThrow();
     });
 
     it("buildResult computes totalPages and hasNext correctly at boundary", () => {
       const strategy = new OffsetPaginationStrategy();
-      const result = strategy.buildResult(
-        [{ id: 1 }],
-        { page: 9, size: 10 },
-        100,
-      );
+      const result = strategy.buildResult([{ id: 1 }], { page: 9, size: 10 }, 100);
       // 100 / 10 = 10 pages, page 9 is last (0-indexed)
       expect(result.hasNext).toBe(false);
       expect(result.hasPrevious).toBe(true);
@@ -212,11 +205,15 @@ describe("Seam: Pagination Strategies + QueryBuilder", () => {
     it("buildResult strips extra row and sets hasNext=true", () => {
       const strategy = new KeysetPaginationStrategy({ idColumn: "id" });
       const rows = Array.from({ length: 11 }, (_, i) => ({ id: i + 1, name: `User${i}` }));
-      const result = strategy.buildResult(rows, {
-        size: 10,
-        sortColumn: "name",
-        sortDirection: "ASC",
-      }, 0);
+      const result = strategy.buildResult(
+        rows,
+        {
+          size: 10,
+          sortColumn: "name",
+          sortDirection: "ASC",
+        },
+        0,
+      );
 
       expect(result.content).toHaveLength(10);
       expect(result.hasNext).toBe(true);
@@ -226,11 +223,15 @@ describe("Seam: Pagination Strategies + QueryBuilder", () => {
     it("buildResult with exact rows sets hasNext=false", () => {
       const strategy = new KeysetPaginationStrategy({ idColumn: "id" });
       const rows = Array.from({ length: 10 }, (_, i) => ({ id: i + 1, name: `User${i}` }));
-      const result = strategy.buildResult(rows, {
-        size: 10,
-        sortColumn: "name",
-        sortDirection: "ASC",
-      }, 0);
+      const result = strategy.buildResult(
+        rows,
+        {
+          size: 10,
+          sortColumn: "name",
+          sortDirection: "ASC",
+        },
+        0,
+      );
 
       expect(result.content).toHaveLength(10);
       expect(result.hasNext).toBe(false);
@@ -342,7 +343,7 @@ describe("Seam: Pagination Strategies + QueryBuilder", () => {
       const custom: PaginationStrategy = {
         name: "offset",
         applyToQuery: vi.fn(),
-        buildResult: vi.fn(() => ({} as any)),
+        buildResult: vi.fn(() => ({}) as any),
       };
       registry.register(custom);
       expect(registry.get("offset")).toBe(custom);
@@ -360,7 +361,6 @@ describe("Seam: Pagination Strategies + QueryBuilder", () => {
 // ============================================================================
 
 describe("Seam: BulkOperationBuilder edge cases", () => {
-
   it("empty rows returns empty array", () => {
     const builder = new BulkOperationBuilder();
     expect(builder.buildBulkInsert("users", ["id", "name"], [])).toEqual([]);
@@ -368,16 +368,14 @@ describe("Seam: BulkOperationBuilder edge cases", () => {
 
   it("column/row mismatch throws", () => {
     const builder = new BulkOperationBuilder();
-    expect(() =>
-      builder.buildBulkInsert("users", ["id", "name"], [[1] as any]),
-    ).toThrow(/Row 0 has 1 values but 2 columns/);
+    expect(() => builder.buildBulkInsert("users", ["id", "name"], [[1] as any])).toThrow(
+      /Row 0 has 1 values but 2 columns/,
+    );
   });
 
   it("empty columns throws", () => {
     const builder = new BulkOperationBuilder();
-    expect(() =>
-      builder.buildBulkInsert("users", [], [[1]]),
-    ).toThrow(/columns must not be empty/);
+    expect(() => builder.buildBulkInsert("users", [], [[1]])).toThrow(/columns must not be empty/);
   });
 
   it("invalid chunkSize throws at construction", () => {
@@ -389,7 +387,11 @@ describe("Seam: BulkOperationBuilder edge cases", () => {
 
   it("chunks correctly when rows exceed chunkSize", () => {
     const builder = new BulkOperationBuilder({ chunkSize: 2 });
-    const rows: SqlValue[][] = [[1, "a"], [2, "b"], [3, "c"]];
+    const rows: SqlValue[][] = [
+      [1, "a"],
+      [2, "b"],
+      [3, "c"],
+    ];
     const queries = builder.buildBulkInsert("users", ["id", "name"], rows);
 
     expect(queries).toHaveLength(2); // chunk of 2 + chunk of 1
@@ -399,9 +401,7 @@ describe("Seam: BulkOperationBuilder edge cases", () => {
 
   it("undefined values are coerced to null in INSERT", () => {
     const builder = new BulkOperationBuilder();
-    const queries = builder.buildBulkInsert("users", ["id", "name"], [
-      [1, undefined as any],
-    ]);
+    const queries = builder.buildBulkInsert("users", ["id", "name"], [[1, undefined as any]]);
     expect(queries[0].params).toContain(null);
   });
 
@@ -432,24 +432,27 @@ describe("Seam: BulkOperationBuilder edge cases", () => {
 
   it("bulk UPDATE with mismatched row length throws", () => {
     const builder = new BulkOperationBuilder();
-    expect(() =>
-      builder.buildBulkUpdate("t", "id", ["name"], [[1]]), // needs [id, name]
+    expect(
+      () => builder.buildBulkUpdate("t", "id", ["name"], [[1]]), // needs [id, name]
     ).toThrow(/Row 0 has 1 values but expected 2/);
   });
 
   it("bulk UPDATE empty updateColumns throws", () => {
     const builder = new BulkOperationBuilder();
-    expect(() =>
-      builder.buildBulkUpdate("t", "id", [], [[1]]),
-    ).toThrow(/updateColumns must not be empty/);
+    expect(() => builder.buildBulkUpdate("t", "id", [], [[1]])).toThrow(/updateColumns must not be empty/);
   });
 
   it("bulk UPDATE generates CASE expressions with correct params", () => {
     const builder = new BulkOperationBuilder();
-    const queries = builder.buildBulkUpdate("t", "id", ["name", "age"], [
-      [1, "Alice", 30],
-      [2, "Bob", 25],
-    ]);
+    const queries = builder.buildBulkUpdate(
+      "t",
+      "id",
+      ["name", "age"],
+      [
+        [1, "Alice", 30],
+        [2, "Bob", 25],
+      ],
+    );
     expect(queries).toHaveLength(1);
     expect(queries[0].sql).toContain("CASE");
     expect(queries[0].sql).toContain("WHEN");
@@ -464,7 +467,6 @@ describe("Seam: BulkOperationBuilder edge cases", () => {
 // ============================================================================
 
 describe("Seam: N+1 Detector + Observability", () => {
-
   it("disabled detector is a no-op for record()", () => {
     const detector = new N1Detector({ enabled: false });
     // Should not throw
@@ -642,15 +644,16 @@ describe("Seam: N+1 Detector + Observability", () => {
 // ============================================================================
 
 describe("Seam: IndexAdvisor + PlanAdvisor", () => {
-
   it("suggests B-tree index for Seq Scan with filter on large table", () => {
     const advisor = new IndexAdvisor({ minRowsForSuggestion: 100 });
-    const plan = makeQueryPlan(makePlanNode({
-      nodeType: "Seq Scan",
-      relation: "orders",
-      filter: "user_id = $1",
-      estimatedRows: 5000,
-    }));
+    const plan = makeQueryPlan(
+      makePlanNode({
+        nodeType: "Seq Scan",
+        relation: "orders",
+        filter: "user_id = $1",
+        estimatedRows: 5000,
+      }),
+    );
 
     const suggestions = advisor.analyze(plan);
     expect(suggestions.length).toBeGreaterThan(0);
@@ -661,12 +664,14 @@ describe("Seam: IndexAdvisor + PlanAdvisor", () => {
 
   it("does not suggest index for small table", () => {
     const advisor = new IndexAdvisor({ minRowsForSuggestion: 1000 });
-    const plan = makeQueryPlan(makePlanNode({
-      nodeType: "Seq Scan",
-      relation: "config",
-      filter: "key = $1",
-      estimatedRows: 10,
-    }));
+    const plan = makeQueryPlan(
+      makePlanNode({
+        nodeType: "Seq Scan",
+        relation: "config",
+        filter: "key = $1",
+        estimatedRows: 10,
+      }),
+    );
 
     const suggestions = advisor.analyze(plan);
     expect(suggestions).toHaveLength(0);
@@ -678,12 +683,14 @@ describe("Seam: IndexAdvisor + PlanAdvisor", () => {
       minRowsForSuggestion: 100,
       existingIndexes: existing,
     });
-    const plan = makeQueryPlan(makePlanNode({
-      nodeType: "Seq Scan",
-      relation: "orders",
-      filter: "user_id = $1",
-      estimatedRows: 5000,
-    }));
+    const plan = makeQueryPlan(
+      makePlanNode({
+        nodeType: "Seq Scan",
+        relation: "orders",
+        filter: "user_id = $1",
+        estimatedRows: 5000,
+      }),
+    );
 
     const suggestions = advisor.analyze(plan);
     expect(suggestions).toHaveLength(0);
@@ -691,12 +698,14 @@ describe("Seam: IndexAdvisor + PlanAdvisor", () => {
 
   it("deduplicates across multiple analyze() calls", () => {
     const advisor = new IndexAdvisor({ minRowsForSuggestion: 100 });
-    const plan = makeQueryPlan(makePlanNode({
-      nodeType: "Seq Scan",
-      relation: "orders",
-      filter: "user_id = $1",
-      estimatedRows: 5000,
-    }));
+    const plan = makeQueryPlan(
+      makePlanNode({
+        nodeType: "Seq Scan",
+        relation: "orders",
+        filter: "user_id = $1",
+        estimatedRows: 5000,
+      }),
+    );
 
     const first = advisor.analyze(plan);
     const second = advisor.analyze(plan);
@@ -708,12 +717,14 @@ describe("Seam: IndexAdvisor + PlanAdvisor", () => {
 
   it("clearSuggestions resets cache", () => {
     const advisor = new IndexAdvisor({ minRowsForSuggestion: 100 });
-    const plan = makeQueryPlan(makePlanNode({
-      nodeType: "Seq Scan",
-      relation: "t",
-      filter: "x = $1",
-      estimatedRows: 5000,
-    }));
+    const plan = makeQueryPlan(
+      makePlanNode({
+        nodeType: "Seq Scan",
+        relation: "t",
+        filter: "x = $1",
+        estimatedRows: 5000,
+      }),
+    );
 
     advisor.analyze(plan);
     expect(advisor.getSuggestions().length).toBeGreaterThan(0);
@@ -724,16 +735,20 @@ describe("Seam: IndexAdvisor + PlanAdvisor", () => {
 
   it("suggests index for Sort node without index", () => {
     const advisor = new IndexAdvisor({ minRowsForSuggestion: 100 });
-    const plan = makeQueryPlan(makePlanNode({
-      nodeType: "Sort",
-      sortKey: ["created_at DESC"],
-      estimatedRows: 10000,
-      children: [makePlanNode({
-        nodeType: "Seq Scan",
-        relation: "events",
+    const plan = makeQueryPlan(
+      makePlanNode({
+        nodeType: "Sort",
+        sortKey: ["created_at DESC"],
         estimatedRows: 10000,
-      })],
-    }));
+        children: [
+          makePlanNode({
+            nodeType: "Seq Scan",
+            relation: "events",
+            estimatedRows: 10000,
+          }),
+        ],
+      }),
+    );
 
     const suggestions = advisor.analyze(plan);
     expect(suggestions.some((s) => s.columns.includes("created_at"))).toBe(true);
@@ -741,19 +756,21 @@ describe("Seam: IndexAdvisor + PlanAdvisor", () => {
 
   it("suggests index for Nested Loop with inner Seq Scan", () => {
     const advisor = new IndexAdvisor({ minRowsForSuggestion: 100 });
-    const plan = makeQueryPlan(makePlanNode({
-      nodeType: "Nested Loop",
-      estimatedRows: 5000,
-      children: [
-        makePlanNode({ nodeType: "Index Scan", estimatedRows: 100 }),
-        makePlanNode({
-          nodeType: "Seq Scan",
-          relation: "items",
-          filter: "order_id = $1",
-          estimatedRows: 500,
-        }),
-      ],
-    }));
+    const plan = makeQueryPlan(
+      makePlanNode({
+        nodeType: "Nested Loop",
+        estimatedRows: 5000,
+        children: [
+          makePlanNode({ nodeType: "Index Scan", estimatedRows: 100 }),
+          makePlanNode({
+            nodeType: "Seq Scan",
+            relation: "items",
+            filter: "order_id = $1",
+            estimatedRows: 500,
+          }),
+        ],
+      }),
+    );
 
     const suggestions = advisor.analyze(plan);
     expect(suggestions.some((s) => s.table === "items")).toBe(true);
@@ -761,12 +778,14 @@ describe("Seam: IndexAdvisor + PlanAdvisor", () => {
 
   it("analyzeWithWarnings returns both warnings and suggestions", () => {
     const advisor = new IndexAdvisor({ minRowsForSuggestion: 100 });
-    const plan = makeQueryPlan(makePlanNode({
-      nodeType: "Seq Scan",
-      relation: "big_table",
-      filter: "status = $1",
-      estimatedRows: 50000,
-    }));
+    const plan = makeQueryPlan(
+      makePlanNode({
+        nodeType: "Seq Scan",
+        relation: "big_table",
+        filter: "status = $1",
+        estimatedRows: 50000,
+      }),
+    );
 
     const result = advisor.analyzeWithWarnings(plan);
     expect(result).toHaveProperty("warnings");
@@ -779,12 +798,14 @@ describe("Seam: IndexAdvisor + PlanAdvisor", () => {
     const advisor = new IndexAdvisor({ minRowsForSuggestion: 100 });
     advisor.addExistingIndex("t", ["col"]);
 
-    const plan = makeQueryPlan(makePlanNode({
-      nodeType: "Seq Scan",
-      relation: "t",
-      filter: "col = $1",
-      estimatedRows: 5000,
-    }));
+    const plan = makeQueryPlan(
+      makePlanNode({
+        nodeType: "Seq Scan",
+        relation: "t",
+        filter: "col = $1",
+        estimatedRows: 5000,
+      }),
+    );
 
     const suggestions = advisor.analyze(plan);
     expect(suggestions).toHaveLength(0);
@@ -796,7 +817,6 @@ describe("Seam: IndexAdvisor + PlanAdvisor", () => {
 // ============================================================================
 
 describe("Seam: PreparedStatementPool + Connection lifecycle", () => {
-
   afterEach(() => {
     setGlobalPreparedStatementPool(undefined);
   });
@@ -827,7 +847,7 @@ describe("Seam: PreparedStatementPool + Connection lifecycle", () => {
 
     const s1 = pool.acquire(conn, "SQL1");
     const s2 = pool.acquire(conn, "SQL2");
-    const s3 = pool.acquire(conn, "SQL3"); // should evict SQL1
+    const _s3 = pool.acquire(conn, "SQL3"); // should evict SQL1
 
     expect(s1.close).toHaveBeenCalledTimes(1);
     expect(s2.close).not.toHaveBeenCalled();
@@ -928,10 +948,8 @@ describe("Seam: PreparedStatementPool + Connection lifecycle", () => {
   });
 
   it("invalid maxStatementsPerConnection throws at construction", () => {
-    expect(() => new PreparedStatementPool({ maxStatementsPerConnection: 0 }))
-      .toThrow(/must be >= 1/);
-    expect(() => new PreparedStatementPool({ maxStatementsPerConnection: -1 }))
-      .toThrow(/must be >= 1/);
+    expect(() => new PreparedStatementPool({ maxStatementsPerConnection: 0 })).toThrow(/must be >= 1/);
+    expect(() => new PreparedStatementPool({ maxStatementsPerConnection: -1 })).toThrow(/must be >= 1/);
   });
 });
 
@@ -1052,7 +1070,6 @@ describe("Seam: QueryCompiler + DerivedQueryHandler", () => {
 // ============================================================================
 
 describe("Seam: GraphQL Pagination Adapters + SDL generation", () => {
-
   describe("OffsetPaginationAdapter", () => {
     const adapter = new OffsetPaginationAdapter();
 

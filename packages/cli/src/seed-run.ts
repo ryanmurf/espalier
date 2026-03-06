@@ -1,6 +1,6 @@
 import type { DataSource } from "espalier-jdbc";
-import type { EspalierConfig } from "./config.js";
 import { createAdapter } from "./adapter-factory.js";
+import type { EspalierConfig } from "./config.js";
 
 export interface SeedRunOptions {
   config: EspalierConfig;
@@ -22,7 +22,10 @@ export interface SeedStatusEntry {
 }
 
 async function loadSeedingModule(): Promise<{
-  SeedRunner: new (ds: DataSource, env?: string) => {
+  SeedRunner: new (
+    ds: DataSource,
+    env?: string,
+  ) => {
     run(seeds?: Map<string, unknown>): Promise<SeedRunResult>;
     reset(): Promise<void>;
     status(seeds?: Map<string, unknown>): Promise<SeedStatusEntry[]>;
@@ -31,16 +34,14 @@ async function loadSeedingModule(): Promise<{
   clearSeedRegistry(): void;
 }> {
   try {
-    const mod = await import("espalier-testing") as Record<string, unknown>;
+    const mod = (await import("espalier-testing")) as Record<string, unknown>;
     return {
       SeedRunner: mod.SeedRunner as any,
       getRegisteredSeeds: mod.getRegisteredSeeds as any,
       clearSeedRegistry: mod.clearSeedRegistry as any,
     };
   } catch {
-    throw new Error(
-      `Cannot load seeding module. Install "espalier-testing" to use the seed command.`,
-    );
+    throw new Error(`Cannot load seeding module. Install "espalier-testing" to use the seed command.`);
   }
 }
 
@@ -60,9 +61,7 @@ async function discoverSeedFiles(seedsDir: string): Promise<void> {
   }
 
   // Only include .ts files if a TypeScript loader is active
-  const hasTsLoader =
-    !!(process as any)[Symbol.for("ts-node.register.instance")] ||
-    !!(globalThis as any).__tsx;
+  const hasTsLoader = !!(process as any)[Symbol.for("ts-node.register.instance")] || !!(globalThis as any).__tsx;
 
   const files = readdirSync(canonicalSeedsDir)
     .filter((f: string) => {

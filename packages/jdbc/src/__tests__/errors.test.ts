@@ -1,14 +1,14 @@
-import { describe, it, expect } from "vitest";
-import {
-  DatabaseError,
-  ConnectionError,
-  QueryError,
-  TransactionError,
-  MigrationError,
-  SchemaError,
-  DatabaseErrorCode,
-} from "../errors.js";
+import { describe, expect, it } from "vitest";
 import { ErrorCode } from "../error-codes.js";
+import {
+  ConnectionError,
+  DatabaseError,
+  DatabaseErrorCode,
+  MigrationError,
+  QueryError,
+  SchemaError,
+  TransactionError,
+} from "../errors.js";
 
 // ── Basic construction (backward-compatible) ────────────────────────────────
 
@@ -228,14 +228,10 @@ describe("Factory methods", () => {
 
   it("DatabaseError.queryFailed()", () => {
     const pgErr = new Error("syntax error at or near SELECT");
-    const err = DatabaseError.queryFailed(
-      "SELECT * FROM users WHERE id = $1",
-      1,
-      {
-        cause: pgErr,
-        errorCode: ErrorCode.CONSTRAINT_VIOLATION,
-      },
-    );
+    const err = DatabaseError.queryFailed("SELECT * FROM users WHERE id = $1", 1, {
+      cause: pgErr,
+      errorCode: ErrorCode.CONSTRAINT_VIOLATION,
+    });
     expect(err).toBeInstanceOf(QueryError);
     expect(err.sql).toBe("SELECT * FROM users WHERE id = $1");
     expect(err.parameterCount).toBe(1);
@@ -321,10 +317,7 @@ describe("toJSON()", () => {
   });
 
   it("does not include parameter values — only count", () => {
-    const err = DatabaseError.queryFailed(
-      "INSERT INTO users (email, name) VALUES ($1, $2)",
-      2,
-    );
+    const err = DatabaseError.queryFailed("INSERT INTO users (email, name) VALUES ($1, $2)", 2);
     const json = err.toJSON();
     const jsonStr = JSON.stringify(json);
     // Should not contain any actual parameter values

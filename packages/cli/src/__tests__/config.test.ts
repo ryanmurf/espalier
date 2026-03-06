@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdirSync, writeFileSync, rmSync } from "node:fs";
-import { join } from "node:path";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { loadConfig, getMigrationsDir } from "../config.js";
+import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { getMigrationsDir, loadConfig } from "../config.js";
 
 describe("loadConfig", () => {
   let tempDir: string;
@@ -52,26 +52,17 @@ describe("loadConfig", () => {
   });
 
   it("throws for invalid adapter", () => {
-    writeFileSync(
-      join(tempDir, "espalier.config.json"),
-      JSON.stringify({ adapter: "oracle", connection: {} }),
-    );
+    writeFileSync(join(tempDir, "espalier.config.json"), JSON.stringify({ adapter: "oracle", connection: {} }));
     expect(() => loadConfig(tempDir)).toThrow('"adapter" must be "pg", "mysql", or "sqlite"');
   });
 
   it("throws for missing adapter", () => {
-    writeFileSync(
-      join(tempDir, "espalier.config.json"),
-      JSON.stringify({ connection: {} }),
-    );
+    writeFileSync(join(tempDir, "espalier.config.json"), JSON.stringify({ connection: {} }));
     expect(() => loadConfig(tempDir)).toThrow('"adapter" must be "pg", "mysql", or "sqlite"');
   });
 
   it("throws for missing connection", () => {
-    writeFileSync(
-      join(tempDir, "espalier.config.json"),
-      JSON.stringify({ adapter: "pg" }),
-    );
+    writeFileSync(join(tempDir, "espalier.config.json"), JSON.stringify({ adapter: "pg" }));
     expect(() => loadConfig(tempDir)).toThrow('"connection" must be an object');
   });
 

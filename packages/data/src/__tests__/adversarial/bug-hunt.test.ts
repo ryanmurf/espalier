@@ -2,23 +2,30 @@
  * Adversarial tests targeting potential bugs and edge cases found by
  * code review of Y2 Q1/Q2 features.
  */
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { EntityCache } from "../../cache/entity-cache.js";
-import { QueryCache } from "../../cache/query-cache.js";
 import type { QueryCacheKey } from "../../cache/query-cache.js";
-import { parseDerivedQueryMethod } from "../../query/derived-query-parser.js";
-import { buildDerivedQuery } from "../../query/derived-query-executor.js";
+import { QueryCache } from "../../cache/query-cache.js";
 import type { EntityMetadata } from "../../mapping/entity-metadata.js";
-import { Specifications, equal, like, isIn, isNull, between } from "../../query/specification.js";
-import { SelectBuilder } from "../../query/query-builder.js";
 import { InCriteria } from "../../query/criteria.js";
+import { buildDerivedQuery } from "../../query/derived-query-executor.js";
+import { parseDerivedQueryMethod } from "../../query/derived-query-parser.js";
+import { SelectBuilder } from "../../query/query-builder.js";
+import { between, equal, isIn, like, Specifications } from "../../query/specification.js";
 
 class User {
-  constructor(public id: number, public name: string, public age?: number) {}
+  constructor(
+    public id: number,
+    public name: string,
+    public age?: number,
+  ) {}
 }
 
 class Product {
-  constructor(public id: number, public title: string) {}
+  constructor(
+    public id: number,
+    public title: string,
+  ) {}
 }
 
 const userMetadata: EntityMetadata = {
@@ -215,11 +222,7 @@ describe("EntityCache adversarial tests", () => {
 describe("QueryCache adversarial tests", () => {
   it("maxSize=0 puts and immediately evicts", () => {
     const cache = new QueryCache({ maxSize: 0 });
-    cache.put(
-      { sql: "SELECT 1", params: [] },
-      [1],
-      User,
-    );
+    cache.put({ sql: "SELECT 1", params: [] }, [1], User);
     // Entry added then tail evicted -- but it's the same entry
     expect(cache.size()).toBeLessThanOrEqual(1);
   });

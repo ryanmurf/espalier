@@ -1,11 +1,11 @@
-import type { EntityMetadata, FieldMapping } from "./entity-metadata.js";
 import { getGlobalLogger, LogLevel } from "espalier-jdbc";
-import { getFieldValue } from "./field-access.js";
 import { getIdField } from "../decorators/id.js";
-import type { Snapshot } from "../snapshot/entity-snapshot.js";
 import type { DiffResult } from "../snapshot/entity-diff.js";
-import { snapshot as createSnapshot } from "../snapshot/entity-snapshot.js";
 import { diff as diffSnapshots } from "../snapshot/entity-diff.js";
+import type { Snapshot } from "../snapshot/entity-snapshot.js";
+import { snapshot as createSnapshot } from "../snapshot/entity-snapshot.js";
+import type { EntityMetadata } from "./entity-metadata.js";
+import { getFieldValue } from "./field-access.js";
 
 export interface FieldChange {
   field: string | symbol;
@@ -127,7 +127,15 @@ export class EntityChangeTracker<T> {
   }
 
   /** Extract FK value (related entity's ID) for an owning @OneToOne relation. */
-  private getRelationFkValue(entity: T, relation: { fieldName: string | symbol; target: () => new (...args: any[]) => any; joinColumn?: string; isOwning: boolean }): unknown {
+  private getRelationFkValue(
+    entity: T,
+    relation: {
+      fieldName: string | symbol;
+      target: () => new (...args: any[]) => any;
+      joinColumn?: string;
+      isOwning: boolean;
+    },
+  ): unknown {
     if (!relation.isOwning || !relation.joinColumn) return undefined;
     const related = (entity as Record<string | symbol, unknown>)[relation.fieldName];
     if (related == null) return null;
@@ -145,9 +153,7 @@ export class EntityChangeTracker<T> {
   snapshot(entity: T): void {
     const snap: Record<string | symbol, unknown> = {};
     for (const field of this.metadata.fields) {
-      snap[field.fieldName] = cloneValue(
-        getFieldValue(entity as Record<string | symbol, unknown>, field.fieldName),
-      );
+      snap[field.fieldName] = cloneValue(getFieldValue(entity as Record<string | symbol, unknown>, field.fieldName));
     }
     // Snapshot FK values for owning @OneToOne relations
     for (const relation of this.metadata.oneToOneRelations) {

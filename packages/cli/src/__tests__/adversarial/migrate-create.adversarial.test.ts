@@ -1,30 +1,14 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import {
-  mkdirSync,
-  writeFileSync,
-  readFileSync,
-  existsSync,
-  rmSync,
-  readdirSync,
-  chmodSync,
-} from "node:fs";
-import { join, resolve } from "node:path";
-import { tmpdir, platform } from "node:os";
-import {
-  createMigration,
-  _generateVersion,
-  _generateMigrationTemplate,
-  _toSnakeCase,
-} from "../../migrate-create.js";
+import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { platform, tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { _generateMigrationTemplate, _generateVersion, _toSnakeCase, createMigration } from "../../migrate-create.js";
 
 describe("createMigration adversarial", () => {
   let tempDir: string;
 
   beforeEach(() => {
-    tempDir = join(
-      tmpdir(),
-      `espalier-adv-migrate-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-    );
+    tempDir = join(tmpdir(), `espalier-adv-migrate-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   });
 
   afterEach(() => {
@@ -35,167 +19,119 @@ describe("createMigration adversarial", () => {
 
   describe("name validation - special characters", () => {
     it("rejects name with slashes", () => {
-      expect(() =>
-        createMigration({ name: "add/users", migrationsDir: tempDir }),
-      ).toThrow("Invalid migration name");
+      expect(() => createMigration({ name: "add/users", migrationsDir: tempDir })).toThrow("Invalid migration name");
     });
 
     it("rejects name with backslashes", () => {
-      expect(() =>
-        createMigration({ name: "add\\users", migrationsDir: tempDir }),
-      ).toThrow("Invalid migration name");
+      expect(() => createMigration({ name: "add\\users", migrationsDir: tempDir })).toThrow("Invalid migration name");
     });
 
     it("rejects name with dots", () => {
-      expect(() =>
-        createMigration({ name: "add.users", migrationsDir: tempDir }),
-      ).toThrow("Invalid migration name");
+      expect(() => createMigration({ name: "add.users", migrationsDir: tempDir })).toThrow("Invalid migration name");
     });
 
     it("rejects name with dots for path traversal", () => {
-      expect(() =>
-        createMigration({ name: "../../../etc/passwd", migrationsDir: tempDir }),
-      ).toThrow("Invalid migration name");
+      expect(() => createMigration({ name: "../../../etc/passwd", migrationsDir: tempDir })).toThrow(
+        "Invalid migration name",
+      );
     });
 
     it("rejects name with semicolons (SQL injection)", () => {
-      expect(() =>
-        createMigration({ name: "add; DROP TABLE users;--", migrationsDir: tempDir }),
-      ).toThrow("Invalid migration name");
+      expect(() => createMigration({ name: "add; DROP TABLE users;--", migrationsDir: tempDir })).toThrow(
+        "Invalid migration name",
+      );
     });
 
     it("rejects name with parentheses", () => {
-      expect(() =>
-        createMigration({ name: "add(users)", migrationsDir: tempDir }),
-      ).toThrow("Invalid migration name");
+      expect(() => createMigration({ name: "add(users)", migrationsDir: tempDir })).toThrow("Invalid migration name");
     });
 
     it("rejects name with single quotes (SQL injection)", () => {
-      expect(() =>
-        createMigration({ name: "add'users", migrationsDir: tempDir }),
-      ).toThrow("Invalid migration name");
+      expect(() => createMigration({ name: "add'users", migrationsDir: tempDir })).toThrow("Invalid migration name");
     });
 
     it("rejects name with double quotes", () => {
-      expect(() =>
-        createMigration({ name: 'add"users', migrationsDir: tempDir }),
-      ).toThrow("Invalid migration name");
+      expect(() => createMigration({ name: 'add"users', migrationsDir: tempDir })).toThrow("Invalid migration name");
     });
 
     it("rejects name with backticks", () => {
-      expect(() =>
-        createMigration({ name: "`whoami`", migrationsDir: tempDir }),
-      ).toThrow("Invalid migration name");
+      expect(() => createMigration({ name: "`whoami`", migrationsDir: tempDir })).toThrow("Invalid migration name");
     });
 
     it("rejects name with shell metacharacters", () => {
-      expect(() =>
-        createMigration({ name: "$(rm -rf /)", migrationsDir: tempDir }),
-      ).toThrow("Invalid migration name");
+      expect(() => createMigration({ name: "$(rm -rf /)", migrationsDir: tempDir })).toThrow("Invalid migration name");
     });
 
     it("rejects name with pipe", () => {
-      expect(() =>
-        createMigration({ name: "add|users", migrationsDir: tempDir }),
-      ).toThrow("Invalid migration name");
+      expect(() => createMigration({ name: "add|users", migrationsDir: tempDir })).toThrow("Invalid migration name");
     });
 
     it("rejects name with angle brackets", () => {
-      expect(() =>
-        createMigration({ name: "<script>", migrationsDir: tempDir }),
-      ).toThrow("Invalid migration name");
+      expect(() => createMigration({ name: "<script>", migrationsDir: tempDir })).toThrow("Invalid migration name");
     });
 
     it("rejects name with at sign", () => {
-      expect(() =>
-        createMigration({ name: "add@users", migrationsDir: tempDir }),
-      ).toThrow("Invalid migration name");
+      expect(() => createMigration({ name: "add@users", migrationsDir: tempDir })).toThrow("Invalid migration name");
     });
 
     it("rejects name with hash", () => {
-      expect(() =>
-        createMigration({ name: "add#users", migrationsDir: tempDir }),
-      ).toThrow("Invalid migration name");
+      expect(() => createMigration({ name: "add#users", migrationsDir: tempDir })).toThrow("Invalid migration name");
     });
 
     it("rejects name with percent", () => {
-      expect(() =>
-        createMigration({ name: "add%users", migrationsDir: tempDir }),
-      ).toThrow("Invalid migration name");
+      expect(() => createMigration({ name: "add%users", migrationsDir: tempDir })).toThrow("Invalid migration name");
     });
 
     it("rejects name with null bytes", () => {
-      expect(() =>
-        createMigration({ name: "add\x00users", migrationsDir: tempDir }),
-      ).toThrow("Invalid migration name");
+      expect(() => createMigration({ name: "add\x00users", migrationsDir: tempDir })).toThrow("Invalid migration name");
     });
 
     it("rejects name with newlines", () => {
-      expect(() =>
-        createMigration({ name: "add\nusers", migrationsDir: tempDir }),
-      ).toThrow("Invalid migration name");
+      expect(() => createMigration({ name: "add\nusers", migrationsDir: tempDir })).toThrow("Invalid migration name");
     });
 
     it("rejects name with tabs", () => {
-      expect(() =>
-        createMigration({ name: "add\tusers", migrationsDir: tempDir }),
-      ).toThrow("Invalid migration name");
+      expect(() => createMigration({ name: "add\tusers", migrationsDir: tempDir })).toThrow("Invalid migration name");
     });
 
     it("rejects name with unicode", () => {
-      expect(() =>
-        createMigration({ name: "\u79FB\u884C", migrationsDir: tempDir }),
-      ).toThrow("Invalid migration name");
+      expect(() => createMigration({ name: "\u79FB\u884C", migrationsDir: tempDir })).toThrow("Invalid migration name");
     });
 
     it("rejects name with emoji", () => {
-      expect(() =>
-        createMigration({ name: "add\u{1F680}users", migrationsDir: tempDir }),
-      ).toThrow("Invalid migration name");
+      expect(() => createMigration({ name: "add\u{1F680}users", migrationsDir: tempDir })).toThrow(
+        "Invalid migration name",
+      );
     });
   });
 
   describe("name validation - edge cases", () => {
     it("rejects empty string name", () => {
-      expect(() =>
-        createMigration({ name: "", migrationsDir: tempDir }),
-      ).toThrow("Migration name is required");
+      expect(() => createMigration({ name: "", migrationsDir: tempDir })).toThrow("Migration name is required");
     });
 
     it("rejects whitespace-only name", () => {
-      expect(() =>
-        createMigration({ name: "   ", migrationsDir: tempDir }),
-      ).toThrow("Migration name is required");
+      expect(() => createMigration({ name: "   ", migrationsDir: tempDir })).toThrow("Migration name is required");
     });
 
     it("rejects tab-only name", () => {
-      expect(() =>
-        createMigration({ name: "\t\t\t", migrationsDir: tempDir }),
-      ).toThrow();
+      expect(() => createMigration({ name: "\t\t\t", migrationsDir: tempDir })).toThrow();
     });
 
     it("rejects name starting with digit", () => {
-      expect(() =>
-        createMigration({ name: "1addUsers", migrationsDir: tempDir }),
-      ).toThrow("Invalid migration name");
+      expect(() => createMigration({ name: "1addUsers", migrationsDir: tempDir })).toThrow("Invalid migration name");
     });
 
     it("rejects name starting with underscore", () => {
-      expect(() =>
-        createMigration({ name: "_addUsers", migrationsDir: tempDir }),
-      ).toThrow("Invalid migration name");
+      expect(() => createMigration({ name: "_addUsers", migrationsDir: tempDir })).toThrow("Invalid migration name");
     });
 
     it("rejects name starting with hyphen", () => {
-      expect(() =>
-        createMigration({ name: "-addUsers", migrationsDir: tempDir }),
-      ).toThrow("Invalid migration name");
+      expect(() => createMigration({ name: "-addUsers", migrationsDir: tempDir })).toThrow("Invalid migration name");
     });
 
     it("rejects name starting with space", () => {
-      expect(() =>
-        createMigration({ name: " addUsers", migrationsDir: tempDir }),
-      ).toThrow("Invalid migration name");
+      expect(() => createMigration({ name: " addUsers", migrationsDir: tempDir })).toThrow("Invalid migration name");
     });
 
     it("accepts single character name", () => {
@@ -231,9 +167,7 @@ describe("createMigration adversarial", () => {
       // The generated filename is: 14-digit timestamp + _ + description + .ts
       // That's about 272 chars, which exceeds the 255-byte filename limit on macOS/Linux.
       // BUG: createMigration does not validate name length before trying to write the file.
-      expect(() =>
-        createMigration({ name: longName, migrationsDir: tempDir }),
-      ).toThrow(); // throws ENAMETOOLONG
+      expect(() => createMigration({ name: longName, migrationsDir: tempDir })).toThrow(); // throws ENAMETOOLONG
     });
 
     it("handles extremely long name (1000 chars)", () => {
@@ -280,20 +214,15 @@ describe("createMigration adversarial", () => {
     });
 
     // Permission test - only works on non-Windows
-    it.skipIf(platform() === "win32")(
-      "throws when directory is not writable",
-      () => {
-        mkdirSync(tempDir, { recursive: true });
-        chmodSync(tempDir, 0o555); // read + execute only
-        try {
-          expect(() =>
-            createMigration({ name: "init", migrationsDir: join(tempDir, "sub") }),
-          ).toThrow();
-        } finally {
-          chmodSync(tempDir, 0o755); // restore for cleanup
-        }
-      },
-    );
+    it.skipIf(platform() === "win32")("throws when directory is not writable", () => {
+      mkdirSync(tempDir, { recursive: true });
+      chmodSync(tempDir, 0o555); // read + execute only
+      try {
+        expect(() => createMigration({ name: "init", migrationsDir: join(tempDir, "sub") })).toThrow();
+      } finally {
+        chmodSync(tempDir, 0o755); // restore for cleanup
+      }
+    });
   });
 
   describe("duplicate migration names", () => {
@@ -328,12 +257,12 @@ describe("createMigration adversarial", () => {
       expect(result.version).toMatch(/^\d{14}$/);
 
       // Verify it's a plausible date
-      const year = parseInt(result.version.slice(0, 4));
-      const month = parseInt(result.version.slice(4, 6));
-      const day = parseInt(result.version.slice(6, 8));
-      const hour = parseInt(result.version.slice(8, 10));
-      const minute = parseInt(result.version.slice(10, 12));
-      const second = parseInt(result.version.slice(12, 14));
+      const year = parseInt(result.version.slice(0, 4), 10);
+      const month = parseInt(result.version.slice(4, 6), 10);
+      const day = parseInt(result.version.slice(6, 8), 10);
+      const hour = parseInt(result.version.slice(8, 10), 10);
+      const minute = parseInt(result.version.slice(10, 12), 10);
+      const second = parseInt(result.version.slice(12, 14), 10);
 
       expect(year).toBeGreaterThanOrEqual(2020);
       expect(year).toBeLessThanOrEqual(2100);
@@ -369,7 +298,7 @@ describe("createMigration adversarial", () => {
     });
 
     it("filename matches pattern: timestamp_description.ts", () => {
-      const result = createMigration({ name: "addUsers", migrationsDir: tempDir });
+      const _result = createMigration({ name: "addUsers", migrationsDir: tempDir });
       const files = readdirSync(tempDir);
       expect(files.length).toBe(1);
       expect(files[0]).toMatch(/^\d{14}_add_users\.ts$/);

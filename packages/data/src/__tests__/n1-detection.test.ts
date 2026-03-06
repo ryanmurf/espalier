@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { N1Detector, N1DetectionError } from "../observability/n1-detector.js";
+import { describe, expect, it } from "vitest";
 import type { N1DetectionConfig, N1DetectionEvent } from "../observability/n1-detector.js";
+import { N1DetectionError, N1Detector } from "../observability/n1-detector.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -14,8 +14,8 @@ function createDetector(overrides?: Partial<N1DetectionConfig>) {
   });
 }
 
-const SAMPLE_SQL = 'SELECT "id", "name" FROM "orders" WHERE "user_id" = $1';
-const SAMPLE_SQL_2 = 'SELECT "id", "title" FROM "posts" WHERE "author_id" = $1';
+const _SAMPLE_SQL = 'SELECT "id", "name" FROM "orders" WHERE "user_id" = $1';
+const _SAMPLE_SQL_2 = 'SELECT "id", "title" FROM "posts" WHERE "author_id" = $1';
 
 // ===========================================================================
 // 1. Classic N+1: repeated query pattern hits threshold
@@ -460,9 +460,9 @@ describe("N1Detector — SQL normalization", () => {
     const detector = createDetector({ threshold: 3, callback: (e) => events.push(e) });
 
     await detector.withScope("test", async () => {
-      detector.record("SELECT * FROM \"users\" WHERE \"email\" = 'alice@test.com'");
-      detector.record("SELECT * FROM \"users\" WHERE \"email\" = 'bob@test.com'");
-      detector.record("SELECT * FROM \"users\" WHERE \"email\" = 'charlie@test.com'");
+      detector.record('SELECT * FROM "users" WHERE "email" = \'alice@test.com\'');
+      detector.record('SELECT * FROM "users" WHERE "email" = \'bob@test.com\'');
+      detector.record('SELECT * FROM "users" WHERE "email" = \'charlie@test.com\'');
     });
 
     expect(events).toHaveLength(1);
@@ -547,8 +547,10 @@ describe("N1Detector — suggestion messages", () => {
 
     const suggestion = events[0].suggestion;
     expect(
-      suggestion.includes("eager") || suggestion.includes("EAGER") ||
-      suggestion.includes("batch") || suggestion.includes("BATCH"),
+      suggestion.includes("eager") ||
+        suggestion.includes("EAGER") ||
+        suggestion.includes("batch") ||
+        suggestion.includes("BATCH"),
     ).toBe(true);
   });
 
@@ -782,8 +784,8 @@ describe("N1Detector — edge cases", () => {
     const detector = createDetector({ threshold: 2, callback: (e) => events.push(e) });
 
     await detector.withScope("test", async () => {
-      detector.record("SELECT *\n\tFROM \"orders\"\n\tWHERE \"user_id\" = 1");
-      detector.record("SELECT * FROM \"orders\" WHERE \"user_id\" = 2");
+      detector.record('SELECT *\n\tFROM "orders"\n\tWHERE "user_id" = 1');
+      detector.record('SELECT * FROM "orders" WHERE "user_id" = 2');
     });
 
     expect(events).toHaveLength(1);

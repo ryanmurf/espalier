@@ -1,13 +1,16 @@
+import type { Connection, SqlValue } from "espalier-jdbc";
 import { quoteIdentifier } from "espalier-jdbc";
-import type { SqlValue, Connection } from "espalier-jdbc";
+import type {
+  ManyToManyRelation,
+  ManyToOneRelation,
+  OneToManyRelation,
+  OneToOneRelation,
+} from "../decorators/relations.js";
 import type { EntityMetadata, FieldMapping } from "../mapping/entity-metadata.js";
 import { getEntityMetadata } from "../mapping/entity-metadata.js";
-import { SelectBuilder } from "../query/query-builder.js";
-import { ComparisonCriteria, InCriteria, RawInCriteria } from "../query/criteria.js";
-import type { ManyToOneRelation, OneToOneRelation, OneToManyRelation, ManyToManyRelation } from "../decorators/relations.js";
 import { createRowMapper } from "../mapping/row-mapper.js";
-import { getIdField } from "../decorators/id.js";
-import { getColumnMappings } from "../decorators/column.js";
+import { InCriteria, RawInCriteria } from "../query/criteria.js";
+import { SelectBuilder } from "../query/query-builder.js";
 
 /**
  * Separator used in column aliases to disambiguate joined table columns.
@@ -60,11 +63,7 @@ export function getJoinFetchSpecs(metadata: EntityMetadata): JoinSpec[] {
  * Parent columns: "parent_table"."col" AS "parent_table__col"
  * Joined columns: "alias"."col" AS "alias__col"
  */
-export function buildJoinColumns(
-  parentTable: string,
-  parentFields: FieldMapping[],
-  joinSpecs: JoinSpec[],
-): string[] {
+export function buildJoinColumns(parentTable: string, parentFields: FieldMapping[], joinSpecs: JoinSpec[]): string[] {
   const cols: string[] = [];
 
   // Parent entity columns
@@ -89,11 +88,7 @@ export function buildJoinColumns(
 /**
  * Adds LEFT JOINs to a SelectBuilder for single-valued relations.
  */
-export function addJoins(
-  builder: SelectBuilder,
-  parentTable: string,
-  joinSpecs: JoinSpec[],
-): void {
+export function addJoins(builder: SelectBuilder, parentTable: string, joinSpecs: JoinSpec[]): void {
   for (const spec of joinSpecs) {
     const relation = spec.relation;
     let joinColumn: string;
@@ -103,16 +98,13 @@ export function addJoins(
       // ManyToOne or OneToOne owner-side: FK is on parent table
       joinColumn = relation.joinColumn;
       const targetIdField = spec.targetMetadata.idField;
-      const idMapping = spec.targetMetadata.fields.find(
-        (f) => f.fieldName === targetIdField,
-      );
+      const idMapping = spec.targetMetadata.fields.find((f) => f.fieldName === targetIdField);
       targetPkColumn = idMapping ? idMapping.columnName : String(targetIdField);
     } else {
       continue;
     }
 
-    const onClause =
-      `${quoteIdentifier(parentTable)}.${quoteIdentifier(joinColumn)} = ${quoteIdentifier(spec.alias)}.${quoteIdentifier(targetPkColumn)}`;
+    const onClause = `${quoteIdentifier(parentTable)}.${quoteIdentifier(joinColumn)} = ${quoteIdentifier(spec.alias)}.${quoteIdentifier(targetPkColumn)}`;
 
     builder.join("LEFT", spec.targetMetadata.tableName, onClause, spec.alias);
   }
@@ -138,14 +130,9 @@ export function extractParentRow(
  * Extracts a related entity's data from a JOIN result row.
  * Returns null if the PK column is null (LEFT JOIN produced no match).
  */
-export function extractRelatedRow(
-  row: Record<string, unknown>,
-  spec: JoinSpec,
-): Record<string, unknown> | null {
+export function extractRelatedRow(row: Record<string, unknown>, spec: JoinSpec): Record<string, unknown> | null {
   const idField = spec.targetMetadata.idField;
-  const idMapping = spec.targetMetadata.fields.find(
-    (f) => f.fieldName === idField,
-  );
+  const idMapping = spec.targetMetadata.fields.find((f) => f.fieldName === idField);
   const idColumnName = idMapping ? idMapping.columnName : String(idField);
   const pkValue = row[spec.alias + ALIAS_SEP + idColumnName];
 
@@ -177,9 +164,7 @@ export async function batchLoadOneToMany(
 
   // Find the FK column on the target entity that references the parent
   const targetManyToOnes = targetMetadata.manyToOneRelations;
-  const owningRelation = targetManyToOnes.find(
-    (r) => String(r.fieldName) === relation.mappedBy,
-  );
+  const owningRelation = targetManyToOnes.find((r) => String(r.fieldName) === relation.mappedBy);
   if (!owningRelation) return result;
   const fkColumn = owningRelation.joinColumn;
 
@@ -191,8 +176,7 @@ export async function batchLoadOneToMany(
     if (!fieldColumns.includes(fkColumn)) {
       fieldColumns.push(fkColumn);
     }
-    const builder = new SelectBuilder(targetMetadata.tableName)
-      .columns(...fieldColumns);
+    const builder = new SelectBuilder(targetMetadata.tableName).columns(...fieldColumns);
     builder.where(new InCriteria(fkColumn, batch));
 
     const query = builder.build();
@@ -243,9 +227,7 @@ export async function batchLoadManyToMany(
     // INNER JOIN join_table "jt" ON target.pk = "jt".inverse_col
     // WHERE "jt"."join_col" IN (...)
     const tbl = targetMetadata.tableName;
-    const cols = targetMetadata.fields.map(
-      (f) => `${quoteIdentifier(tbl)}.${quoteIdentifier(f.columnName)}`,
-    );
+    const cols = targetMetadata.fields.map((f) => `${quoteIdentifier(tbl)}.${quoteIdentifier(f.columnName)}`);
     cols.push(`${quoteIdentifier("jt")}.${quoteIdentifier(jt.joinColumn)} AS ${quoteIdentifier("__jt_fk")}`);
 
     const builder = new SelectBuilder(tbl);
@@ -283,7 +265,9 @@ export async function batchLoadManyToMany(
           getMetadata: () => [],
           close: async () => {},
           [Symbol.asyncIterator]: () => ({
-            async next() { return { value: undefined as any, done: true as const }; },
+            async next() {
+              return { value: undefined as any, done: true as const };
+            },
           }),
         };
         const entity = targetMapper.mapRow(mockRs);
@@ -298,4 +282,4 @@ export async function batchLoadManyToMany(
   return result;
 }
 
-export { type JoinSpec };
+export type { JoinSpec };

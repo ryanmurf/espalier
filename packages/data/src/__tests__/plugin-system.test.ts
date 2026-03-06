@@ -4,13 +4,13 @@
  * Tests Plugin interface, PluginManager, hooks, middleware,
  * custom decorators, and edge cases.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { PluginManager } from "../plugin/plugin-manager.js";
-import { composeMiddleware } from "../plugin/middleware.js";
-import { createPluginDecorator } from "../plugin/custom-decorator.js";
+import { describe, expect, it, vi } from "vitest";
 import { EventBus } from "../events/event-bus.js";
-import type { Plugin, PluginContext, HookType, HookContext } from "../plugin/plugin.js";
-import type { MiddlewareFn, MiddlewareContext } from "../plugin/middleware.js";
+import { createPluginDecorator } from "../plugin/custom-decorator.js";
+import type { MiddlewareContext, MiddlewareFn } from "../plugin/middleware.js";
+import { composeMiddleware } from "../plugin/middleware.js";
+import type { HookContext, Plugin } from "../plugin/plugin.js";
+import { PluginManager } from "../plugin/plugin-manager.js";
 
 // ══════════════════════════════════════════════════
 // Helpers
@@ -42,8 +42,7 @@ describe("PluginManager registration", () => {
   it("rejects duplicate plugin name", () => {
     const mgr = createManager();
     mgr.register(createPlugin({ name: "test", version: "1.0.0" }));
-    expect(() => mgr.register(createPlugin({ name: "test", version: "2.0.0" })))
-      .toThrow(/already registered/);
+    expect(() => mgr.register(createPlugin({ name: "test", version: "2.0.0" }))).toThrow(/already registered/);
   });
 
   it("rejects registration after init", async () => {
@@ -51,8 +50,7 @@ describe("PluginManager registration", () => {
     mgr.register(createPlugin({ name: "a", version: "1.0.0" }));
     await mgr.init();
 
-    expect(() => mgr.register(createPlugin({ name: "b", version: "1.0.0" })))
-      .toThrow(/after initialization/);
+    expect(() => mgr.register(createPlugin({ name: "b", version: "1.0.0" }))).toThrow(/after initialization/);
   });
 
   it("getPlugin returns undefined for unregistered name", () => {
@@ -106,13 +104,17 @@ describe("PluginManager lifecycle", () => {
       name: "first",
       version: "1.0.0",
       init: vi.fn(),
-      destroy: () => { order.push("first"); },
+      destroy: () => {
+        order.push("first");
+      },
     });
     mgr.register({
       name: "second",
       version: "1.0.0",
       init: vi.fn(),
-      destroy: () => { order.push("second"); },
+      destroy: () => {
+        order.push("second");
+      },
     });
 
     await mgr.init();
@@ -145,7 +147,9 @@ describe("PluginManager lifecycle", () => {
     mgr.register({
       name: "broken",
       version: "1.0.0",
-      init: () => { throw new Error("init failed"); },
+      init: () => {
+        throw new Error("init failed");
+      },
     });
 
     await expect(mgr.init()).rejects.toThrow("init failed");
@@ -156,7 +160,9 @@ describe("PluginManager lifecycle", () => {
     mgr.register({
       name: "broken",
       version: "1.0.0",
-      init: async () => { throw new Error("async init failed"); },
+      init: async () => {
+        throw new Error("async init failed");
+      },
     });
 
     await expect(mgr.init()).rejects.toThrow("async init failed");
@@ -175,13 +181,17 @@ describe("PluginManager dependency resolution", () => {
     mgr.register({
       name: "base",
       version: "1.0.0",
-      init: () => { order.push("base"); },
+      init: () => {
+        order.push("base");
+      },
     });
     mgr.register({
       name: "dependent",
       version: "1.0.0",
       dependencies: [{ name: "base" }],
-      init: () => { order.push("dependent"); },
+      init: () => {
+        order.push("dependent");
+      },
     });
 
     await mgr.init();
@@ -197,18 +207,24 @@ describe("PluginManager dependency resolution", () => {
       name: "top",
       version: "1.0.0",
       dependencies: [{ name: "mid" }],
-      init: () => { order.push("top"); },
+      init: () => {
+        order.push("top");
+      },
     });
     mgr.register({
       name: "mid",
       version: "1.0.0",
       dependencies: [{ name: "base" }],
-      init: () => { order.push("mid"); },
+      init: () => {
+        order.push("mid");
+      },
     });
     mgr.register({
       name: "base",
       version: "1.0.0",
-      init: () => { order.push("base"); },
+      init: () => {
+        order.push("base");
+      },
     });
 
     await mgr.init();
@@ -305,14 +321,24 @@ describe("PluginManager hooks", () => {
       name: "first",
       version: "1.0.0",
       init: (ctx) => {
-        ctx.addHook({ type: "beforeSave", handler: () => { order.push(1); } });
+        ctx.addHook({
+          type: "beforeSave",
+          handler: () => {
+            order.push(1);
+          },
+        });
       },
     });
     mgr.register({
       name: "second",
       version: "1.0.0",
       init: (ctx) => {
-        ctx.addHook({ type: "beforeSave", handler: () => { order.push(2); } });
+        ctx.addHook({
+          type: "beforeSave",
+          handler: () => {
+            order.push(2);
+          },
+        });
       },
     });
 
@@ -332,7 +358,9 @@ describe("PluginManager hooks", () => {
       init: (ctx) => {
         ctx.addHook({
           type: "afterQuery",
-          handler: (hc) => { capturedContext = hc; },
+          handler: (hc) => {
+            capturedContext = hc;
+          },
         });
       },
     });
@@ -353,7 +381,9 @@ describe("PluginManager hooks", () => {
       init: (ctx) => {
         ctx.addHook({
           type: "beforeSave",
-          handler: (hc) => { hc.metadata.set("flag", true); },
+          handler: (hc) => {
+            hc.metadata.set("flag", true);
+          },
         });
       },
     });
@@ -363,7 +393,9 @@ describe("PluginManager hooks", () => {
       init: (ctx) => {
         ctx.addHook({
           type: "beforeSave",
-          handler: (hc) => { expect(hc.metadata.get("flag")).toBe(true); },
+          handler: (hc) => {
+            expect(hc.metadata.get("flag")).toBe(true);
+          },
         });
       },
     });
@@ -409,7 +441,9 @@ describe("PluginManager hooks", () => {
       init: (ctx) => {
         ctx.addHook({
           type: "beforeSave",
-          handler: () => { throw new Error("hook boom"); },
+          handler: () => {
+            throw new Error("hook boom");
+          },
         });
       },
     });
@@ -427,7 +461,9 @@ describe("PluginManager hooks", () => {
       init: (ctx) => {
         ctx.addHook({
           type: "afterSave",
-          handler: async () => { throw new Error("async hook boom"); },
+          handler: async () => {
+            throw new Error("async hook boom");
+          },
         });
       },
     });
@@ -522,8 +558,7 @@ describe("composeMiddleware", () => {
       await next(); // should throw
     };
 
-    await expect(composeMiddleware([doubleNext], op, makeContext()))
-      .rejects.toThrow(/next\(\) called multiple times/);
+    await expect(composeMiddleware([doubleNext], op, makeContext())).rejects.toThrow(/next\(\) called multiple times/);
   });
 
   it("middleware can modify result", async () => {
@@ -543,8 +578,7 @@ describe("composeMiddleware", () => {
     };
 
     const op = vi.fn().mockResolvedValue("result");
-    await expect(composeMiddleware([bomb], op, makeContext()))
-      .rejects.toThrow("middleware boom");
+    await expect(composeMiddleware([bomb], op, makeContext())).rejects.toThrow("middleware boom");
   });
 
   it("middleware can access context metadata", async () => {
@@ -626,7 +660,10 @@ describe("PluginManager middleware integration", () => {
     const middlewares = mgr.getMiddlewares() as MiddlewareFn[];
     await composeMiddleware(
       [...middlewares],
-      async () => { order.push("op"); return null; },
+      async () => {
+        order.push("op");
+        return null;
+      },
       { operation: "save", entityClass: class {}, args: [], metadata: new Map() },
     );
 
@@ -722,7 +759,9 @@ describe("adversarial edge cases", () => {
       name: "listener",
       version: "1.0.0",
       init: (ctx) => {
-        ctx.eventBus.on("test", () => { received = true; });
+        ctx.eventBus.on("test", () => {
+          received = true;
+        });
       },
     });
 

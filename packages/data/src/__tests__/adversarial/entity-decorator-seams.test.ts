@@ -11,34 +11,35 @@
  * require an instance to be constructed first. getEntityMetadata() does this
  * internally.
  */
-import { describe, it, expect } from "vitest";
+
+import type { ColumnMetadata, ResultSet } from "espalier-jdbc";
+import { describe, expect, it } from "vitest";
 import {
-  Table,
-  getTableName,
   Column,
-  getColumnMappings,
-  Id,
-  getIdField,
-  Version,
-  getVersionField,
-  ManyToOne,
-  getManyToOneRelations,
-  OneToMany,
-  getOneToManyRelations,
-  OneToOne,
-  getOneToOneRelations,
   CreatedDate,
-  getCreatedDateField,
-  LastModifiedDate,
-  getLastModifiedDateField,
+  createRowMapper,
   Embeddable,
-  isEmbeddable,
   Embedded,
+  getColumnMappings,
+  getCreatedDateField,
   getEmbeddedFields,
   getEntityMetadata,
-  createRowMapper,
+  getIdField,
+  getLastModifiedDateField,
+  getManyToOneRelations,
+  getOneToManyRelations,
+  getOneToOneRelations,
+  getTableName,
+  getVersionField,
+  Id,
+  isEmbeddable,
+  LastModifiedDate,
+  ManyToOne,
+  OneToMany,
+  OneToOne,
+  Table,
+  Version,
 } from "../../index.js";
-import type { ResultSet, ColumnMetadata } from "espalier-jdbc";
 
 // -- Test entities (using correct decorator signatures) --
 
@@ -103,7 +104,9 @@ class Company {
 // Helper: create a mock ResultSet from a row object
 function createMockResultSet(row: Record<string, unknown>): ResultSet {
   return {
-    async next() { return true; },
+    async next() {
+      return true;
+    },
     getString(col: string | number) {
       if (typeof col === "number") {
         return String(Object.values(row)[col]);
@@ -134,7 +137,9 @@ function createMockResultSet(row: Record<string, unknown>): ResultSet {
     async close() {},
     [Symbol.asyncIterator]() {
       return {
-        async next() { return { value: undefined, done: true }; },
+        async next() {
+          return { value: undefined, done: true };
+        },
       };
     },
   } as ResultSet;
@@ -302,9 +307,7 @@ describe("entity decorator seam tests", () => {
       const meta = getEntityMetadata(Company);
       expect(meta.tableName).toBe("companies");
       // Embedded Address fields should be flattened with prefix
-      const addrFields = meta.fields.filter(
-        (f) => String(f.columnName).startsWith("addr_"),
-      );
+      const addrFields = meta.fields.filter((f) => String(f.columnName).startsWith("addr_"));
       expect(addrFields.length).toBeGreaterThan(0);
     });
   });

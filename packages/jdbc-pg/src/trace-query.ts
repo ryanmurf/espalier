@@ -1,10 +1,5 @@
-import type { Span, SlowQueryDetector, QueryStatisticsCollector } from "espalier-jdbc";
-import {
-  getGlobalTracerProvider,
-  SpanKind,
-  SpanStatusCode,
-  DbAttributes,
-} from "espalier-jdbc";
+import type { QueryStatisticsCollector, SlowQueryDetector, Span } from "espalier-jdbc";
+import { DbAttributes, getGlobalTracerProvider, SpanKind, SpanStatusCode } from "espalier-jdbc";
 
 const TRACER_NAME = "espalier-jdbc-pg";
 
@@ -43,23 +38,23 @@ function parseOperation(sql: string): string {
  */
 function redactSensitive(sql: string): string {
   // First strip SQL comments which could hide sensitive values
-  let cleaned = sql
-    .replace(/--[^\n]*/g, "-- [REDACTED]")
-    .replace(/\/\*[\s\S]*?\*\//g, "/* [REDACTED] */");
+  const cleaned = sql.replace(/--[^\n]*/g, "-- [REDACTED]").replace(/\/\*[\s\S]*?\*\//g, "/* [REDACTED] */");
 
-  return cleaned
-    // PASSWORD with single/double quotes (handles escaped quotes)
-    .replace(/PASSWORD\s*[=:]?\s*'(?:[^'\\]|\\.)*'/gi, "PASSWORD '[REDACTED]'")
-    .replace(/PASSWORD\s*[=:]?\s*"(?:[^"\\]|\\.)*"/gi, 'PASSWORD "[REDACTED]"')
-    // PASSWORD without quotes (connection string style)
-    .replace(/PASSWORD\s*=\s*\S+/gi, "PASSWORD=[REDACTED]")
-    // password=xxx in connection strings
-    .replace(/password\s*=\s*\S+/gi, "password=[REDACTED]")
-    // token/secret/key/auth patterns with quotes (handles escaped quotes)
-    .replace(/((?:token|secret|api_?key|auth|credential|bearer)\s*[=:]\s*)'(?:[^'\\]|\\.)*'/gi, "$1'[REDACTED]'")
-    .replace(/((?:token|secret|api_?key|auth|credential|bearer)\s*[=:]\s*)"(?:[^"\\]|\\.)*"/gi, '$1"[REDACTED]"')
-    // token/secret/key/auth patterns without quotes
-    .replace(/((?:token|secret|api_?key|auth|credential|bearer)\s*[=:]\s*)\S+/gi, "$1[REDACTED]");
+  return (
+    cleaned
+      // PASSWORD with single/double quotes (handles escaped quotes)
+      .replace(/PASSWORD\s*[=:]?\s*'(?:[^'\\]|\\.)*'/gi, "PASSWORD '[REDACTED]'")
+      .replace(/PASSWORD\s*[=:]?\s*"(?:[^"\\]|\\.)*"/gi, 'PASSWORD "[REDACTED]"')
+      // PASSWORD without quotes (connection string style)
+      .replace(/PASSWORD\s*=\s*\S+/gi, "PASSWORD=[REDACTED]")
+      // password=xxx in connection strings
+      .replace(/password\s*=\s*\S+/gi, "password=[REDACTED]")
+      // token/secret/key/auth patterns with quotes (handles escaped quotes)
+      .replace(/((?:token|secret|api_?key|auth|credential|bearer)\s*[=:]\s*)'(?:[^'\\]|\\.)*'/gi, "$1'[REDACTED]'")
+      .replace(/((?:token|secret|api_?key|auth|credential|bearer)\s*[=:]\s*)"(?:[^"\\]|\\.)*"/gi, '$1"[REDACTED]"')
+      // token/secret/key/auth patterns without quotes
+      .replace(/((?:token|secret|api_?key|auth|credential|bearer)\s*[=:]\s*)\S+/gi, "$1[REDACTED]")
+  );
 }
 
 function truncate(sql: string, maxLen = 200): string {
@@ -72,11 +67,7 @@ function truncate(sql: string, maxLen = 200): string {
  * When tracing is disabled (NoopTracerProvider), this adds negligible overhead.
  * Also records to slow query detector and statistics collector if configured.
  */
-export async function traceQuery<T>(
-  spanName: string,
-  sql: string,
-  fn: (span: Span) => Promise<T>,
-): Promise<T> {
+export async function traceQuery<T>(spanName: string, sql: string, fn: (span: Span) => Promise<T>): Promise<T> {
   const tracer = getGlobalTracerProvider().getTracer(TRACER_NAME);
   const span = tracer.startSpan(spanName, {
     kind: SpanKind.CLIENT,

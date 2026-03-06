@@ -7,36 +7,36 @@
  * These are unit tests that mock DataSource/Connection to isolate the
  * seam logic under test.
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import type { DataSource, Connection, PreparedStatement, ResultSet, SqlValue } from "espalier-jdbc";
-import { Table } from "../../decorators/table.js";
-import { Column } from "../../decorators/column.js";
-import { Id } from "../../decorators/id.js";
-import { Version } from "../../decorators/version.js";
-import { TenantId } from "../../decorators/tenant.js";
-import { PrePersist, PostPersist, PreRemove, PostRemove } from "../../decorators/lifecycle.js";
-import { SoftDelete, getSoftDeleteMetadata, isSoftDeleteEntity } from "../../decorators/soft-delete.js";
-import { Audited, isAuditedEntity, getAuditedMetadata } from "../../decorators/audited.js";
-import { Filter, getFilters, registerFilter, resolveActiveFilters } from "../../filter/filter-registry.js";
-import type { FilterRegistration } from "../../filter/filter-registry.js";
-import { FilterContext } from "../../filter/filter-context.js";
+
+import type { Connection, DataSource, PreparedStatement, ResultSet, SqlValue } from "espalier-jdbc";
+import { describe, expect, it, vi } from "vitest";
 import { AuditContext } from "../../audit/audit-context.js";
 import { AuditLogWriter } from "../../audit/audit-log.js";
-import type { AuditFieldChange } from "../../audit/audit-log.js";
-import { TenantContext, NoTenantException } from "../../tenant/tenant-context.js";
 import { EntityCache } from "../../cache/entity-cache.js";
 import { QueryCache } from "../../cache/query-cache.js";
+import { Audited, getAuditedMetadata, isAuditedEntity } from "../../decorators/audited.js";
+import { Column } from "../../decorators/column.js";
+import { Id } from "../../decorators/id.js";
+import { PostPersist, PostRemove, PrePersist, PreRemove } from "../../decorators/lifecycle.js";
+import { getSoftDeleteMetadata, isSoftDeleteEntity, SoftDelete } from "../../decorators/soft-delete.js";
+import { Table } from "../../decorators/table.js";
+import { TenantId } from "../../decorators/tenant.js";
+import { Version } from "../../decorators/version.js";
+import { FilterContext } from "../../filter/filter-context.js";
+import type { FilterRegistration } from "../../filter/filter-registry.js";
+import { Filter, getFilters, resolveActiveFilters } from "../../filter/filter-registry.js";
 import { EntityChangeTracker } from "../../mapping/change-tracker.js";
-import { EntityPersister } from "../../repository/entity-persister.js";
-import type { EntityPersisterDeps } from "../../repository/entity-persister.js";
-import { CascadeManager } from "../../repository/cascade-manager.js";
+import type { FieldMapping } from "../../mapping/entity-metadata.js";
 import { getEntityMetadata } from "../../mapping/entity-metadata.js";
-import type { EntityMetadata, FieldMapping } from "../../mapping/entity-metadata.js";
 import { createRowMapper } from "../../mapping/row-mapper.js";
+import { ComparisonCriteria } from "../../query/criteria.js";
+import { CascadeManager } from "../../repository/cascade-manager.js";
 import { createDerivedRepository } from "../../repository/derived-repository.js";
-import { snapshot } from "../../snapshot/entity-snapshot.js";
+import type { EntityPersisterDeps } from "../../repository/entity-persister.js";
+import { EntityPersister } from "../../repository/entity-persister.js";
 import { diff, diffEntity } from "../../snapshot/entity-diff.js";
-import { ComparisonCriteria, NullCriteria } from "../../query/criteria.js";
+import { snapshot } from "../../snapshot/entity-snapshot.js";
+import { NoTenantException, TenantContext } from "../../tenant/tenant-context.js";
 import { TestResultSet } from "../test-utils/test-result-set.js";
 
 // ═══════════════════════════════════════════════════════
@@ -55,9 +55,8 @@ function createMockStatement(rs?: ResultSet, updateCount = 1): PreparedStatement
 }
 
 function createMockConnection(stmtOrFactory?: PreparedStatement | (() => PreparedStatement)): Connection {
-  const stmtFactory = typeof stmtOrFactory === "function"
-    ? stmtOrFactory
-    : () => stmtOrFactory ?? createMockStatement();
+  const stmtFactory =
+    typeof stmtOrFactory === "function" ? stmtOrFactory : () => stmtOrFactory ?? createMockStatement();
   return {
     createStatement: vi.fn() as any,
     prepareStatement: vi.fn(() => stmtFactory()),
@@ -103,10 +102,18 @@ class Article {
   preRemoveCalled = false;
   postRemoveCalled = false;
 
-  @PrePersist onPrePersist() { this.prePersistCalled = true; }
-  @PostPersist onPostPersist() { this.postPersistCalled = true; }
-  @PreRemove onPreRemove() { this.preRemoveCalled = true; }
-  @PostRemove onPostRemove() { this.postRemoveCalled = true; }
+  @PrePersist onPrePersist() {
+    this.prePersistCalled = true;
+  }
+  @PostPersist onPostPersist() {
+    this.postPersistCalled = true;
+  }
+  @PreRemove onPreRemove() {
+    this.preRemoveCalled = true;
+  }
+  @PostRemove onPostRemove() {
+    this.postRemoveCalled = true;
+  }
 }
 
 // --- Entity with @SoftDelete + @Audited ---
@@ -121,8 +128,12 @@ class AuditArticle {
   preRemoveCalled = false;
   postRemoveCalled = false;
 
-  @PreRemove onPreRemove() { this.preRemoveCalled = true; }
-  @PostRemove onPostRemove() { this.postRemoveCalled = true; }
+  @PreRemove onPreRemove() {
+    this.preRemoveCalled = true;
+  }
+  @PostRemove onPostRemove() {
+    this.postRemoveCalled = true;
+  }
 }
 
 // --- Entity with @Audited + lifecycle callbacks ---
@@ -136,8 +147,12 @@ class AuditedPost {
   prePersistCalled = false;
   postPersistCalled = false;
 
-  @PrePersist onPrePersist() { this.prePersistCalled = true; }
-  @PostPersist onPostPersist() { this.postPersistCalled = true; }
+  @PrePersist onPrePersist() {
+    this.prePersistCalled = true;
+  }
+  @PostPersist onPostPersist() {
+    this.postPersistCalled = true;
+  }
 }
 
 // --- Entity with @SoftDelete + @TenantId ---
@@ -173,7 +188,12 @@ class PlainItem {
 function buildPersisterDeps<T>(
   entityClass: new (...args: any[]) => T,
   overrides?: Partial<EntityPersisterDeps<T>>,
-): { persister: EntityPersister<T>; entityCache: EntityCache; queryCache: QueryCache; changeTracker: EntityChangeTracker<T> } {
+): {
+  persister: EntityPersister<T>;
+  entityCache: EntityCache;
+  queryCache: QueryCache;
+  changeTracker: EntityChangeTracker<T>;
+} {
   const metadata = getEntityMetadata(entityClass);
   const rowMapper = createRowMapper(entityClass, metadata);
   const entityCache = new EntityCache();
@@ -242,8 +262,7 @@ describe("SEAM 1: @SoftDelete + CrudRepository (delete/findAll/findById)", () =>
     await persister.deleteWithConnection(article, conn);
 
     // Should have called UPDATE (via softDeleteWithConnection), not DELETE
-    const sql: string = (conn.prepareStatement as ReturnType<typeof vi.fn>).mock.results[0].value
-      ? "" : "";
+    const _sql: string = (conn.prepareStatement as ReturnType<typeof vi.fn>).mock.results[0].value ? "" : "";
     // Verify the statement was called with executeUpdate (not executeQuery for DELETE)
     expect(stmt.executeUpdate).toHaveBeenCalled();
     // The entity's deletedAt should be set
@@ -338,8 +357,7 @@ describe("SEAM 2: @SoftDelete + @Version", () => {
 
     const { persister } = buildPersisterDeps(Article);
 
-    await expect(persister.softDeleteWithConnection(article, conn))
-      .rejects.toThrow(/optimistic lock/i);
+    await expect(persister.softDeleteWithConnection(article, conn)).rejects.toThrow(/optimistic lock/i);
   });
 
   it("soft-delete SQL includes both version check AND deleted_at SET", async () => {
@@ -411,7 +429,7 @@ describe("SEAM 3: @SoftDelete + ChangeTracker", () => {
     article.version = 2;
 
     const dirty = changeTracker.getDirtyFields(article);
-    const dirtyNames = dirty.map(d => String(d.field));
+    const dirtyNames = dirty.map((d) => String(d.field));
     expect(dirtyNames).toContain("deletedAt");
     expect(dirtyNames).toContain("version");
   });
@@ -507,7 +525,7 @@ describe("SEAM 5: @Audited + lifecycle callbacks (@PrePersist/@PostPersist)", ()
       auditLogWriter: new AuditLogWriter(),
     });
 
-    const saved = await persister.saveWithConnection(post, conn);
+    const _saved = await persister.saveWithConnection(post, conn);
 
     // Lifecycle callbacks should have been called on the original entity
     expect(post.prePersistCalled).toBe(true);
@@ -565,9 +583,7 @@ describe("SEAM 5: @Audited + lifecycle callbacks (@PrePersist/@PostPersist)", ()
       "AuditArticle",
       "51",
       "DELETE",
-      expect.arrayContaining([
-        expect.objectContaining({ field: "deletedAt" }),
-      ]),
+      expect.arrayContaining([expect.objectContaining({ field: "deletedAt" })]),
     );
   });
 });
@@ -644,15 +660,13 @@ describe("SEAM 7: @Filter + derived queries (findByXxx)", () => {
     const repo = createDerivedRepository<Article, number>(Article, ds) as any;
 
     // "findByTitle" is a derived query method
-    const results = await repo.findByTitle("active");
+    const _results = await repo.findByTitle("active");
 
     // The SQL should include the soft-delete filter
     const calls = (conn.prepareStatement as ReturnType<typeof vi.fn>).mock.calls;
     const sqls = calls.map((c: any[]) => c[0] as string);
     // At least one SQL should contain both title condition and IS NULL
-    const queryWithBoth = sqls.find(
-      (s: string) => s.includes("title") && s.includes("IS NULL"),
-    );
+    const queryWithBoth = sqls.find((s: string) => s.includes("title") && s.includes("IS NULL"));
     expect(queryWithBoth).toBeDefined();
   });
 
@@ -667,7 +681,7 @@ describe("SEAM 7: @Filter + derived queries (findByXxx)", () => {
 
     const repo = createDerivedRepository<Article, number>(Article, ds) as any;
 
-    const results = await FilterContext.withoutFilters(async () => {
+    const _results = await FilterContext.withoutFilters(async () => {
       return repo.findByTitle("any");
     });
 
@@ -787,7 +801,7 @@ describe("SEAM 9: snapshot() + ChangeTracker", () => {
     // Diff between the two snapshots
     const d = diff(snap1, snap2);
     expect(d.changes.length).toBeGreaterThan(0);
-    const titleChange = d.changes.find(c => c.field === "title");
+    const titleChange = d.changes.find((c) => c.field === "title");
     expect(titleChange).toBeDefined();
     expect(titleChange!.oldValue).toBe("tracked-snap");
     expect(titleChange!.newValue).toBe("changed");
@@ -806,7 +820,7 @@ describe("SEAM 9: snapshot() + ChangeTracker", () => {
 
     const d = diffEntity(article, snap);
     expect(d.changes.length).toBe(2);
-    const fields = d.changes.map(c => c.field);
+    const fields = d.changes.map((c) => c.field);
     expect(fields).toContain("title");
     expect(fields).toContain("version");
   });
@@ -832,7 +846,7 @@ describe("SEAM 9: snapshot() + ChangeTracker", () => {
     const d = tracker.diffFromSnapshot(article);
     expect(d).toBeDefined();
     expect(d!.changes.length).toBeGreaterThanOrEqual(1);
-    expect(d!.changes.find(c => c.field === "title")?.newValue).toBe("mutated");
+    expect(d!.changes.find((c) => c.field === "title")?.newValue).toBe("mutated");
   });
 
   it("snapshot() captures deletedAt field for @SoftDelete entities", () => {
@@ -853,7 +867,7 @@ describe("SEAM 9: snapshot() + ChangeTracker", () => {
     expect(snap2.fields["deletedAt"]).toEqual(now);
 
     const d = diff(snap1, snap2);
-    const deletedChange = d.changes.find(c => c.field === "deletedAt");
+    const deletedChange = d.changes.find((c) => c.field === "deletedAt");
     expect(deletedChange).toBeDefined();
     expect(deletedChange!.oldValue).toBeNull();
     expect(deletedChange!.newValue).toEqual(now);
@@ -885,7 +899,7 @@ describe("SEAM 10: @SoftDelete + cascade", () => {
      */
     // Verify the bug exists by checking that CascadeManager doesn't
     // import or check for @SoftDelete metadata
-    const cascadeSource = CascadeManager.toString();
+    const _cascadeSource = CascadeManager.toString();
     // The class uses DeleteBuilder unconditionally — no soft-delete awareness
     expect(isSoftDeleteEntity(Article)).toBe(true);
 
@@ -1036,7 +1050,7 @@ describe("Cross-cutting seam: filter resolver edge cases", () => {
 
     const filters = getFilters(MultiFilter);
     expect(filters.length).toBe(2);
-    const names = filters.map(f => f.name);
+    const names = filters.map((f) => f.name);
     expect(names).toContain("activeOnly");
     expect(names).toContain("publishedOnly");
 

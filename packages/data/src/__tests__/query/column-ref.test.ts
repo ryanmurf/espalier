@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { col, ColumnRef } from "../../query/column-ref.js";
+import { describe, expect, it } from "vitest";
+import { ColumnRef, col } from "../../query/column-ref.js";
 
 describe("ColumnRef", () => {
   it("creates a reference with the given name", () => {

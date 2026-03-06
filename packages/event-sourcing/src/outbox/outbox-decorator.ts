@@ -12,10 +12,7 @@ const outboxMetadata = new WeakMap<object, OutboxDecoratorOptions>();
  * within the same transaction.
  */
 export function Outbox(options?: OutboxDecoratorOptions) {
-  return function <T extends new (...args: any[]) => any>(
-    target: T,
-    _context: ClassDecoratorContext,
-  ): T {
+  return <T extends new (...args: any[]) => any>(target: T, _context: ClassDecoratorContext): T => {
     outboxMetadata.set(target, options ?? {});
     return target;
   };
@@ -24,9 +21,7 @@ export function Outbox(options?: OutboxDecoratorOptions) {
 /**
  * Retrieve the outbox decorator options for a given class constructor.
  */
-export function getOutboxMetadata(
-  target: object,
-): OutboxDecoratorOptions | undefined {
+export function getOutboxMetadata(target: object): OutboxDecoratorOptions | undefined {
   const meta = outboxMetadata.get(target);
   if (!meta) return undefined;
   return { ...meta, events: meta.events ? [...meta.events] : undefined };

@@ -1,12 +1,12 @@
+import { isAuditedEntity } from "../decorators/audited.js";
+import { getCreatedDateField, getLastModifiedDateField } from "../decorators/auditing.js";
+import { getColumnTypeMappings } from "../decorators/column.js";
+import { getIdField } from "../decorators/id.js";
+import { getSoftDeleteMetadata } from "../decorators/soft-delete.js";
+import { getVectorFields } from "../decorators/vector.js";
+import { getVersionField } from "../decorators/version.js";
 import type { EntityMetadata } from "../mapping/entity-metadata.js";
 import { getEntityMetadata } from "../mapping/entity-metadata.js";
-import { getIdField } from "../decorators/id.js";
-import { getColumnTypeMappings } from "../decorators/column.js";
-import { getCreatedDateField, getLastModifiedDateField } from "../decorators/auditing.js";
-import { getVersionField } from "../decorators/version.js";
-import { getSoftDeleteMetadata } from "../decorators/soft-delete.js";
-import { isAuditedEntity } from "../decorators/audited.js";
-import { getVectorFields } from "../decorators/vector.js";
 import type { GraphQLPaginationAdapter } from "./pagination-adapter.js";
 import { OffsetPaginationAdapter } from "./pagination-adapter.js";
 
@@ -25,7 +25,13 @@ function toGraphQLType(sqlType: string | undefined, fieldName: string): string {
   if (normalized.includes("INT") || normalized === "SERIAL" || normalized === "BIGSERIAL") {
     return fieldName === "id" ? "ID" : "Int";
   }
-  if (normalized.includes("FLOAT") || normalized.includes("DOUBLE") || normalized.includes("DECIMAL") || normalized.includes("NUMERIC") || normalized.includes("REAL")) {
+  if (
+    normalized.includes("FLOAT") ||
+    normalized.includes("DOUBLE") ||
+    normalized.includes("DECIMAL") ||
+    normalized.includes("NUMERIC") ||
+    normalized.includes("REAL")
+  ) {
     return "Float";
   }
   if (normalized.includes("BOOL") || normalized === "BIT") {
@@ -183,7 +189,9 @@ export class GraphQLSchemaGenerator {
       // Vector similarity queries
       const vectorFields = getVectorFields(entityClass);
       if (vectorFields.size > 0) {
-        queryFields.push(`  ${camelCase(typeName)}SimilarTo(field: String!, vector: [Float!]!, limit: Int, maxDistance: Float, metric: String): [${typeName}!]!`);
+        queryFields.push(
+          `  ${camelCase(typeName)}SimilarTo(field: String!, vector: [Float!]!, limit: Int, maxDistance: Float, metric: String): [${typeName}!]!`,
+        );
       }
 
       // Generate mutation fields
@@ -202,7 +210,15 @@ export class GraphQLSchemaGenerator {
     }
 
     const typeNames = entityClasses.map((ec) => this.options.typeNameMapper(ec));
-    const sdl = this.assembleSdl(types, inputTypes, queryFields, mutationFields, typeNames, entityAdapters, needsAuditEntryType);
+    const sdl = this.assembleSdl(
+      types,
+      inputTypes,
+      queryFields,
+      mutationFields,
+      typeNames,
+      entityAdapters,
+      needsAuditEntryType,
+    );
 
     return { sdl, types, inputTypes, queryFields, mutationFields };
   }
@@ -265,9 +281,7 @@ export class GraphQLSchemaGenerator {
     const versionField = getVersionField(entityClass);
 
     const exclude = new Set<string | symbol>(
-      [idField, createdDateField, lastModifiedDateField, versionField].filter(
-        (v): v is string | symbol => v != null,
-      ),
+      [idField, createdDateField, lastModifiedDateField, versionField].filter((v): v is string | symbol => v != null),
     );
     for (const e of this.options.excludeFromInput) {
       exclude.add(e);
@@ -302,9 +316,7 @@ export class GraphQLSchemaGenerator {
     const versionField = getVersionField(entityClass);
 
     const exclude = new Set<string | symbol>(
-      [idField, createdDateField, lastModifiedDateField, versionField].filter(
-        (v): v is string | symbol => v != null,
-      ),
+      [idField, createdDateField, lastModifiedDateField, versionField].filter((v): v is string | symbol => v != null),
     );
     for (const e of this.options.excludeFromInput) {
       exclude.add(e);

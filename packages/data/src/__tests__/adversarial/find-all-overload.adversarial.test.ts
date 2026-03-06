@@ -1,12 +1,12 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { DataSource, Connection, PreparedStatement, ResultSet } from "espalier-jdbc";
-import { Repository } from "../../decorators/repository.js";
-import { Table } from "../../decorators/table.js";
+import type { Connection, DataSource, PreparedStatement, ResultSet } from "espalier-jdbc";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Column } from "../../decorators/column.js";
 import { Id } from "../../decorators/id.js";
+import { Repository } from "../../decorators/repository.js";
+import { Table } from "../../decorators/table.js";
 import { createAutoRepository } from "../../repository/auto-repository.js";
 import type { CrudRepository } from "../../repository/crud-repository.js";
-import type { Pageable, Page } from "../../repository/paging.js";
+import type { Page, Pageable } from "../../repository/paging.js";
 import { TestResultSet } from "../test-utils/test-result-set.js";
 
 // ── Test Entity ──
@@ -152,7 +152,7 @@ describe("findAll overload adversarial tests", () => {
       const ds = createMockDataSource(conn);
 
       const repo = createAutoRepository<Widget, number>(WidgetRepository, ds);
-      const page = await repo.findAll({ page: 0, size: 10 }) as Page<Widget>;
+      const page = (await repo.findAll({ page: 0, size: 10 })) as Page<Widget>;
 
       expect(page.content).toHaveLength(10);
       expect(page.totalElements).toBe(25);
@@ -189,7 +189,7 @@ describe("findAll overload adversarial tests", () => {
       const ds = createMockDataSource(conn);
 
       const repo = createAutoRepository<Widget, number>(WidgetRepository, ds);
-      const page = await repo.findAll({ page: 1, size: 5 }) as Page<Widget>;
+      const page = (await repo.findAll({ page: 1, size: 5 })) as Page<Widget>;
 
       expect(page.hasPrevious).toBe(true);
       expect(page.hasNext).toBe(true); // 20/5 = 4 pages, page 1 < 3
@@ -204,7 +204,7 @@ describe("findAll overload adversarial tests", () => {
       const ds = createMockDataSource(conn);
 
       const repo = createAutoRepository<Widget, number>(WidgetRepository, ds);
-      const page = await repo.findAll({ page: 1, size: 5 }) as Page<Widget>;
+      const page = (await repo.findAll({ page: 1, size: 5 })) as Page<Widget>;
 
       // totalPages = ceil(10/5) = 2, page 1 = last page
       expect(page.hasNext).toBe(false);
@@ -258,7 +258,7 @@ describe("findAll overload adversarial tests", () => {
       const ds = createMockDataSource(conn);
 
       const repo = createAutoRepository<Widget, number>(WidgetRepository, ds);
-      const page = await repo.findAll({ page: 0, size: 10 }) as Page<Widget>;
+      const page = (await repo.findAll({ page: 0, size: 10 })) as Page<Widget>;
 
       expect(page.content).toHaveLength(0);
       expect(page.totalElements).toBe(0);
@@ -329,7 +329,7 @@ describe("findAll overload adversarial tests", () => {
       const ds = createMockDataSource(conn);
 
       const repo = createAutoRepository<Widget, number>(WidgetRepository, ds);
-      const page = await (repo as any).findAll({ page: "0", size: "10" }) as Page<Widget>;
+      const page = (await (repo as any).findAll({ page: "0", size: "10" })) as Page<Widget>;
 
       // Coerced to valid Pageable — COUNT query issued
       expect(preparedSqls.length).toBe(2);
@@ -351,7 +351,7 @@ describe("findAll overload adversarial tests", () => {
         toPredicate: () => null, // Has toPredicate → treated as Specification
       };
       // This should be detected as a Specification, not Pageable
-      const results = await (repo as any).findAll(hybridObj);
+      const _results = await (repo as any).findAll(hybridObj);
 
       // One query only (no COUNT)
       expect(preparedSqls.length).toBe(1);
@@ -365,9 +365,7 @@ describe("findAll overload adversarial tests", () => {
       const ds = createMockDataSource(conn);
 
       const repo = createAutoRepository<Widget, number>(WidgetRepository, ds);
-      await expect((repo as any).findAll({ page: 0 })).rejects.toThrow(
-        /Invalid argument to findAll/,
-      );
+      await expect((repo as any).findAll({ page: 0 })).rejects.toThrow(/Invalid argument to findAll/);
     });
 
     it("empty object {} throws clear validation error", async () => {
@@ -377,9 +375,7 @@ describe("findAll overload adversarial tests", () => {
       const ds = createMockDataSource(conn);
 
       const repo = createAutoRepository<Widget, number>(WidgetRepository, ds);
-      await expect((repo as any).findAll({})).rejects.toThrow(
-        /Invalid argument to findAll/,
-      );
+      await expect((repo as any).findAll({})).rejects.toThrow(/Invalid argument to findAll/);
     });
 
     it("Pageable with page=NaN throws validation error", async () => {
@@ -389,9 +385,7 @@ describe("findAll overload adversarial tests", () => {
       const ds = createMockDataSource(conn);
 
       const repo = createAutoRepository<Widget, number>(WidgetRepository, ds);
-      await expect(repo.findAll({ page: NaN, size: 10 } as Pageable)).rejects.toThrow(
-        /must be finite numbers/,
-      );
+      await expect(repo.findAll({ page: NaN, size: 10 } as Pageable)).rejects.toThrow(/must be finite numbers/);
     });
 
     it("Pageable with page=Infinity throws validation error", async () => {
@@ -401,9 +395,7 @@ describe("findAll overload adversarial tests", () => {
       const ds = createMockDataSource(conn);
 
       const repo = createAutoRepository<Widget, number>(WidgetRepository, ds);
-      await expect(repo.findAll({ page: Infinity, size: 10 } as Pageable)).rejects.toThrow(
-        /must be finite numbers/,
-      );
+      await expect(repo.findAll({ page: Infinity, size: 10 } as Pageable)).rejects.toThrow(/must be finite numbers/);
     });
   });
 
@@ -421,7 +413,7 @@ describe("findAll overload adversarial tests", () => {
       const ds = createMockDataSource(conn);
 
       const repo = createAutoRepository<Widget, number>(WidgetRepository, ds);
-      const page = await repo.findAll({ page: 0, size: 1 }) as Page<Widget>;
+      const page = (await repo.findAll({ page: 0, size: 1 })) as Page<Widget>;
 
       expect(page.totalPages).toBe(5);
       expect(page.content).toHaveLength(1);
@@ -437,7 +429,7 @@ describe("findAll overload adversarial tests", () => {
       const ds = createMockDataSource(conn);
 
       const repo = createAutoRepository<Widget, number>(WidgetRepository, ds);
-      const page = await repo.findAll({ page: 100, size: 5 }) as Page<Widget>;
+      const page = (await repo.findAll({ page: 100, size: 5 })) as Page<Widget>;
 
       expect(page.content).toHaveLength(0);
       expect(page.totalElements).toBe(5);
@@ -452,9 +444,7 @@ describe("findAll overload adversarial tests", () => {
       const ds = createMockDataSource(conn);
 
       const repo = createAutoRepository<Widget, number>(WidgetRepository, ds);
-      await expect(repo.findAll({ page: 0, size: 0 })).rejects.toThrow(
-        /size must be > 0/,
-      );
+      await expect(repo.findAll({ page: 0, size: 0 })).rejects.toThrow(/size must be > 0/);
     });
 
     it("negative size throws validation error", async () => {
@@ -464,9 +454,7 @@ describe("findAll overload adversarial tests", () => {
       const ds = createMockDataSource(conn);
 
       const repo = createAutoRepository<Widget, number>(WidgetRepository, ds);
-      await expect(repo.findAll({ page: 0, size: -1 })).rejects.toThrow(
-        /size must be > 0/,
-      );
+      await expect(repo.findAll({ page: 0, size: -1 })).rejects.toThrow(/size must be > 0/);
     });
   });
 
@@ -506,7 +494,9 @@ describe("findAll overload adversarial tests", () => {
       const countStmt = createMockPreparedStatement(countRs);
       const failStmt: PreparedStatement = {
         setParameter: vi.fn(),
-        executeQuery: vi.fn(async () => { throw new Error("DB down"); }),
+        executeQuery: vi.fn(async () => {
+          throw new Error("DB down");
+        }),
         executeUpdate: vi.fn(async () => 0),
         close: vi.fn(async () => {}),
       };
@@ -521,7 +511,9 @@ describe("findAll overload adversarial tests", () => {
     it("findAll() closes connection even when query throws", async () => {
       const failStmt: PreparedStatement = {
         setParameter: vi.fn(),
-        executeQuery: vi.fn(async () => { throw new Error("Connection lost"); }),
+        executeQuery: vi.fn(async () => {
+          throw new Error("Connection lost");
+        }),
         executeUpdate: vi.fn(async () => 0),
         close: vi.fn(async () => {}),
       };
@@ -558,7 +550,7 @@ describe("findAll overload adversarial tests", () => {
       const conn2 = createSequentialMockConnection([countStmt, stmt2]);
       const ds2 = createMockDataSource(conn2);
       const repo2 = createAutoRepository<Widget, number>(WidgetRepository, ds2);
-      const page = await repo2.findAll({ page: 0, size: 100 }) as Page<Widget>;
+      const page = (await repo2.findAll({ page: 0, size: 100 })) as Page<Widget>;
 
       // Same entities
       expect(allResults).toHaveLength(page.content.length);
@@ -586,7 +578,7 @@ describe("findAll overload adversarial tests", () => {
       const ds = createMockDataSource(conn);
 
       const repo = createAutoRepository<Widget, number>(WidgetRepository, ds);
-      const page = await repo.findAll({ page: 0, size: pageSize }) as Page<Widget>;
+      const page = (await repo.findAll({ page: 0, size: pageSize })) as Page<Widget>;
 
       expect(page.totalPages).toBe(10);
       expect(page.totalElements).toBe(100);
@@ -602,7 +594,7 @@ describe("findAll overload adversarial tests", () => {
       const ds = createMockDataSource(conn);
 
       const repo = createAutoRepository<Widget, number>(WidgetRepository, ds);
-      const page = await repo.findAll({ page: 2, size: 10 }) as Page<Widget>;
+      const page = (await repo.findAll({ page: 2, size: 10 })) as Page<Widget>;
 
       // ceil(23/10) = 3
       expect(page.totalPages).toBe(3);

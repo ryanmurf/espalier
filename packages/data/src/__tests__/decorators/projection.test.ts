@@ -1,8 +1,8 @@
-import { describe, it, expect } from "vitest";
-import { Projection, getProjectionMetadata } from "../../decorators/projection.js";
+import { describe, expect, it } from "vitest";
 import { Column, getColumnMappings } from "../../decorators/column.js";
-import { Table } from "../../decorators/table.js";
 import { Id } from "../../decorators/id.js";
+import { getProjectionMetadata, Projection } from "../../decorators/projection.js";
+import { Table } from "../../decorators/table.js";
 
 @Table("users")
 class User {

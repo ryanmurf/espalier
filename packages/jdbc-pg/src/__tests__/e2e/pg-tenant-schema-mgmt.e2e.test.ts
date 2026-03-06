@@ -4,16 +4,11 @@
  * Tests against live Postgres. Provisions, lists, and deprovisions
  * tenant schemas with real tables.
  */
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { createTestDataSource, isPostgresAvailable } from "./setup.js";
-import {
-  Table,
-  Column,
-  Id,
-  TenantId,
-  TenantSchemaManager,
-} from "espalier-data";
+
+import { Column, Id, Table, TenantId, TenantSchemaManager } from "espalier-data";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { PgDataSource } from "../../pg-data-source.js";
+import { createTestDataSource, isPostgresAvailable } from "./setup.js";
 
 const canConnect = await isPostgresAvailable();
 
@@ -126,9 +121,7 @@ describe.skipIf(!canConnect)("TenantSchemaManager — E2E", () => {
         await stmt.executeUpdate(
           `INSERT INTO ${PREFIX}alpha.mgmt_products (tenant_id, name) VALUES ('alpha', 'test-product')`,
         );
-        const rs = await stmt.executeQuery(
-          `SELECT name FROM ${PREFIX}alpha.mgmt_products WHERE tenant_id = 'alpha'`,
-        );
+        const rs = await stmt.executeQuery(`SELECT name FROM ${PREFIX}alpha.mgmt_products WHERE tenant_id = 'alpha'`);
         expect(await rs.next()).toBe(true);
         expect(rs.getString("name")).toBe("test-product");
       } finally {
@@ -214,15 +207,11 @@ describe.skipIf(!canConnect)("TenantSchemaManager — E2E", () => {
 
   describe("schema name validation", () => {
     it("rejects SQL injection in tenant ID", async () => {
-      await expect(
-        mgr.provisionTenant(ds, "'; DROP TABLE --", [MgmtProduct]),
-      ).rejects.toThrow(/Invalid schema/);
+      await expect(mgr.provisionTenant(ds, "'; DROP TABLE --", [MgmtProduct])).rejects.toThrow(/Invalid schema/);
     });
 
     it("rejects spaces in schema name", async () => {
-      await expect(
-        mgr.provisionTenant(ds, "my schema", [MgmtProduct]),
-      ).rejects.toThrow(/Invalid schema/);
+      await expect(mgr.provisionTenant(ds, "my schema", [MgmtProduct])).rejects.toThrow(/Invalid schema/);
     });
   });
 
@@ -273,9 +262,7 @@ describe.skipIf(!canConnect)("TenantSchemaManager — E2E", () => {
     it("createTenantSchema rejects invalid name", async () => {
       const conn = await ds.getConnection();
       try {
-        await expect(
-          mgr.createTenantSchema(conn, "invalid;name"),
-        ).rejects.toThrow(/Invalid schema/);
+        await expect(mgr.createTenantSchema(conn, "invalid;name")).rejects.toThrow(/Invalid schema/);
       } finally {
         await conn.close();
       }

@@ -1,5 +1,5 @@
-import type { EntityMetadata, FieldMapping } from "./entity-metadata.js";
 import { getColumnMappings } from "../decorators/column.js";
+import type { EntityMetadata, FieldMapping } from "./entity-metadata.js";
 
 export interface ProjectionMapper<T> {
   columns: string[];

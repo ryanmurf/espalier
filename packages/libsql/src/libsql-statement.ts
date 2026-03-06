@@ -1,12 +1,7 @@
-import type {
-  Statement,
-  PreparedStatement,
-  ResultSet,
-  SqlValue,
-} from "espalier-jdbc";
-import { QueryError, getGlobalLogger, LogLevel } from "espalier-jdbc";
-import type { LibSqlClient, LibSqlTransaction } from "./libsql-types.js";
+import type { PreparedStatement, ResultSet, SqlValue, Statement } from "espalier-jdbc";
+import { getGlobalLogger, LogLevel, QueryError } from "espalier-jdbc";
 import { LibSqlJdbcResultSet } from "./libsql-result-set.js";
+import type { LibSqlClient, LibSqlTransaction } from "./libsql-types.js";
 
 function truncateSql(sql: string): string {
   return sql.length > 200 ? sql.slice(0, 200) + "..." : sql;
@@ -20,10 +15,7 @@ function convertPositionalParams(sql: string): { sql: string; indices: number[] 
   const converted = sql.replace(/\$(\d+)/g, (_match, num) => {
     const parsed = parseInt(num, 10);
     if (!Number.isSafeInteger(parsed) || parsed < 1 || parsed > 65535) {
-      throw new QueryError(
-        `Invalid parameter index $${num}: must be between 1 and 65535`,
-        sql,
-      );
+      throw new QueryError(`Invalid parameter index $${num}: must be between 1 and 65535`, sql);
     }
     indices.push(parsed);
     return "?";
@@ -53,12 +45,12 @@ export class LibSqlStatementImpl implements Statement {
       return new LibSqlJdbcResultSet(result);
     } catch (err) {
       if (err instanceof QueryError) throw err;
-      logger.error("query failed", { sql: truncateSql(sql), duration: Date.now() - startTime, error: (err as Error).message });
-      throw new QueryError(
-        `Failed to execute query: ${(err as Error).message}`,
-        sql,
-        err as Error,
-      );
+      logger.error("query failed", {
+        sql: truncateSql(sql),
+        duration: Date.now() - startTime,
+        error: (err as Error).message,
+      });
+      throw new QueryError(`Failed to execute query: ${(err as Error).message}`, sql, err as Error);
     }
   }
 
@@ -73,12 +65,12 @@ export class LibSqlStatementImpl implements Statement {
       return result.rowsAffected;
     } catch (err) {
       if (err instanceof QueryError) throw err;
-      logger.error("update failed", { sql: truncateSql(sql), duration: Date.now() - startTime, error: (err as Error).message });
-      throw new QueryError(
-        `Failed to execute update: ${(err as Error).message}`,
-        sql,
-        err as Error,
-      );
+      logger.error("update failed", {
+        sql: truncateSql(sql),
+        duration: Date.now() - startTime,
+        error: (err as Error).message,
+      });
+      throw new QueryError(`Failed to execute update: ${(err as Error).message}`, sql, err as Error);
     }
   }
 
@@ -111,17 +103,22 @@ export class LibSqlPreparedStatementImpl extends LibSqlStatementImpl implements 
     try {
       const result = await this.executor.execute({ sql: queryText, args: params });
       if (logger.isEnabled(LogLevel.DEBUG)) {
-        logger.debug("prepared query executed", { sql: truncateSql(queryText), paramCount: params.length, duration: Date.now() - startTime });
+        logger.debug("prepared query executed", {
+          sql: truncateSql(queryText),
+          paramCount: params.length,
+          duration: Date.now() - startTime,
+        });
       }
       return new LibSqlJdbcResultSet(result);
     } catch (err) {
       if (err instanceof QueryError) throw err;
-      logger.error("prepared query failed", { sql: truncateSql(queryText), paramCount: params.length, duration: Date.now() - startTime, error: (err as Error).message });
-      throw new QueryError(
-        `Failed to execute prepared query: ${(err as Error).message}`,
-        rawSql,
-        err as Error,
-      );
+      logger.error("prepared query failed", {
+        sql: truncateSql(queryText),
+        paramCount: params.length,
+        duration: Date.now() - startTime,
+        error: (err as Error).message,
+      });
+      throw new QueryError(`Failed to execute prepared query: ${(err as Error).message}`, rawSql, err as Error);
     }
   }
 
@@ -135,17 +132,22 @@ export class LibSqlPreparedStatementImpl extends LibSqlStatementImpl implements 
     try {
       const result = await this.executor.execute({ sql: queryText, args: params });
       if (logger.isEnabled(LogLevel.DEBUG)) {
-        logger.debug("prepared update executed", { sql: truncateSql(queryText), paramCount: params.length, duration: Date.now() - startTime });
+        logger.debug("prepared update executed", {
+          sql: truncateSql(queryText),
+          paramCount: params.length,
+          duration: Date.now() - startTime,
+        });
       }
       return result.rowsAffected;
     } catch (err) {
       if (err instanceof QueryError) throw err;
-      logger.error("prepared update failed", { sql: truncateSql(queryText), paramCount: params.length, duration: Date.now() - startTime, error: (err as Error).message });
-      throw new QueryError(
-        `Failed to execute prepared update: ${(err as Error).message}`,
-        rawSql,
-        err as Error,
-      );
+      logger.error("prepared update failed", {
+        sql: truncateSql(queryText),
+        paramCount: params.length,
+        duration: Date.now() - startTime,
+        error: (err as Error).message,
+      });
+      throw new QueryError(`Failed to execute prepared update: ${(err as Error).message}`, rawSql, err as Error);
     }
   }
 

@@ -1,6 +1,6 @@
-import type { PreparedStatement } from "./statement.js";
-import { getGlobalLogger, LogLevel } from "./logger.js";
 import type { Logger } from "./logger.js";
+import { getGlobalLogger, LogLevel } from "./logger.js";
+import type { PreparedStatement } from "./statement.js";
 
 export interface StatementCacheConfig {
   enabled?: boolean;

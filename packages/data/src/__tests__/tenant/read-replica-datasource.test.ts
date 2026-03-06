@@ -4,15 +4,11 @@
  * Uses mock DataSources to test read/write routing, load balancers,
  * fallback behavior, context propagation, and edge cases.
  */
-import { describe, it, expect, vi } from "vitest";
-import {
-  ReadWriteContext,
-  ReadReplicaDataSource,
-  RoundRobinBalancer,
-  RandomBalancer,
-} from "../../index.js";
-import type { DataSource, Connection } from "espalier-jdbc";
+
+import type { Connection, DataSource } from "espalier-jdbc";
+import { describe, expect, it, vi } from "vitest";
 import type { LoadBalancer } from "../../index.js";
+import { RandomBalancer, ReadReplicaDataSource, ReadWriteContext, RoundRobinBalancer } from "../../index.js";
 
 // ══════════════════════════════════════════════════
 // Mock DataSource factory
@@ -21,7 +17,7 @@ import type { LoadBalancer } from "../../index.js";
 function mockDataSource(label: string): DataSource & { label: string } {
   return {
     label,
-    getConnection: vi.fn(async () => ({ label } as unknown as Connection)),
+    getConnection: vi.fn(async () => ({ label }) as unknown as Connection),
     close: vi.fn(async () => {}),
   };
 }
@@ -178,11 +174,7 @@ describe("ReadReplicaDataSource — routing", () => {
 
 describe("RoundRobinBalancer", () => {
   it("cycles through replicas in order", () => {
-    const replicas = [
-      mockDataSource("R0"),
-      mockDataSource("R1"),
-      mockDataSource("R2"),
-    ];
+    const replicas = [mockDataSource("R0"), mockDataSource("R1"), mockDataSource("R2")];
     const balancer = new RoundRobinBalancer();
 
     expect((balancer.pick(replicas) as any).label).toBe("R0");
@@ -192,11 +184,7 @@ describe("RoundRobinBalancer", () => {
   });
 
   it("100 picks across 3 replicas — even distribution", () => {
-    const replicas = [
-      mockDataSource("R0"),
-      mockDataSource("R1"),
-      mockDataSource("R2"),
-    ];
+    const replicas = [mockDataSource("R0"), mockDataSource("R1"), mockDataSource("R2")];
     const balancer = new RoundRobinBalancer();
     const counts = new Map<string, number>();
 
@@ -213,11 +201,7 @@ describe("RoundRobinBalancer", () => {
 
 describe("RandomBalancer", () => {
   it("picks from replicas (statistical test — at least 2 distinct in 50 picks)", () => {
-    const replicas = [
-      mockDataSource("R0"),
-      mockDataSource("R1"),
-      mockDataSource("R2"),
-    ];
+    const replicas = [mockDataSource("R0"), mockDataSource("R1"), mockDataSource("R2")];
     const balancer = new RandomBalancer();
     const seen = new Set<string>();
 

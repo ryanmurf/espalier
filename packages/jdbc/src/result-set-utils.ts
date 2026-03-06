@@ -12,10 +12,7 @@ export async function toArray(rs: ResultSet): Promise<Record<string, unknown>[]>
   }
 }
 
-export async function* mapResultSet<T>(
-  rs: ResultSet,
-  fn: (row: Record<string, unknown>) => T,
-): AsyncIterable<T> {
+export async function* mapResultSet<T>(rs: ResultSet, fn: (row: Record<string, unknown>) => T): AsyncIterable<T> {
   try {
     while (await rs.next()) {
       yield fn(rs.getRow());

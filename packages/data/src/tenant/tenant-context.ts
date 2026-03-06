@@ -45,10 +45,7 @@ export class TenantContext {
   /**
    * Executes `fn` with the given TenantIdentifier (including metadata) bound.
    */
-  static runWith<T>(
-    identifier: TenantIdentifier,
-    fn: () => T | Promise<T>,
-  ): Promise<T> {
+  static runWith<T>(identifier: TenantIdentifier, fn: () => T | Promise<T>): Promise<T> {
     return storage.run(identifier, async () => fn());
   }
 

@@ -1,6 +1,6 @@
+import type { DataSource } from "espalier-jdbc";
 import { extractSchema } from "../schema/index.js";
 import { createStudioServer } from "../server/index.js";
-import type { DataSource } from "espalier-jdbc";
 
 export interface StudioCommandOptions {
   port?: number;
@@ -15,9 +15,7 @@ export async function startStudio(options: StudioCommandOptions): Promise<void> 
   // Validate that all entities are constructor functions
   for (const entity of options.entities) {
     if (typeof entity !== "function") {
-      throw new Error(
-        `Invalid entity configuration: expected a constructor function, got ${typeof entity}`,
-      );
+      throw new Error(`Invalid entity configuration: expected a constructor function, got ${typeof entity}`);
     }
   }
 

@@ -2,6 +2,17 @@
   "name": "espalier-proxy",
   "version": "2.0.0",
   "description": "Serverless connection proxy for espalier-jdbc — connection reuse across Lambda/edge invocations",
+  "license": "Apache-2.0",
+  "author": "Ryan Murphy",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ryanmurf/espalier.git",
+    "directory": "packages/proxy"
+  },
+  "bugs": {
+    "url": "https://github.com/ryanmurf/espalier/issues"
+  },
+  "homepage": "https://github.com/ryanmurf/espalier#readme",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",

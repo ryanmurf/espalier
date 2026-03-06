@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { Connection, PreparedStatement, ResultSet, Statement } from "espalier-jdbc";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MysqlSchemaIntrospector } from "../mysql-schema-introspector.js";
 
 function createMockResultSet(rows: Record<string, unknown>[]): ResultSet {
@@ -51,9 +51,7 @@ function createMockResultSet(rows: Record<string, unknown>[]): ResultSet {
   };
 }
 
-function createMockPreparedStatement(
-  rs: ResultSet,
-): PreparedStatement {
+function createMockPreparedStatement(rs: ResultSet): PreparedStatement {
   return {
     setParameter: vi.fn(),
     executeQuery: vi.fn(async () => rs),
@@ -70,17 +68,12 @@ function createMockStatement(rs?: ResultSet): Statement {
   } as unknown as Statement;
 }
 
-function createMockConnection(opts: {
-  psFactory?: () => PreparedStatement;
-  statement?: Statement;
-}): Connection {
+function createMockConnection(opts: { psFactory?: () => PreparedStatement; statement?: Statement }): Connection {
   return {
     prepareStatement: vi.fn((_sql: string) =>
       opts.psFactory ? opts.psFactory() : createMockPreparedStatement(createMockResultSet([])),
     ),
-    createStatement: vi.fn(() =>
-      opts.statement ?? createMockStatement(),
-    ),
+    createStatement: vi.fn(() => opts.statement ?? createMockStatement()),
     beginTransaction: vi.fn(),
     close: vi.fn(async () => {}),
     isClosed: vi.fn(() => false),
@@ -113,9 +106,7 @@ describe("MysqlSchemaIntrospector", () => {
       const dbStmt = createMockStatement(dbRs);
 
       // Second call: getTables query
-      const tablesRs = createMockResultSet([
-        { table_name: "items", table_schema: "test_db" },
-      ]);
+      const tablesRs = createMockResultSet([{ table_name: "items", table_schema: "test_db" }]);
       const tablesPs = createMockPreparedStatement(tablesRs);
 
       const conn = createMockConnection({
@@ -126,9 +117,7 @@ describe("MysqlSchemaIntrospector", () => {
 
       const tables = await introspector.getTables();
 
-      expect(tables).toEqual([
-        { tableName: "items", schema: "test_db" },
-      ]);
+      expect(tables).toEqual([{ tableName: "items", schema: "test_db" }]);
       expect(tablesPs.setParameter).toHaveBeenCalledWith(1, "test_db");
     });
 
@@ -150,12 +139,8 @@ describe("MysqlSchemaIntrospector", () => {
 
       await introspector.getTables("test");
 
-      expect(conn.prepareStatement).toHaveBeenCalledWith(
-        expect.stringContaining("information_schema.tables"),
-      );
-      expect(conn.prepareStatement).toHaveBeenCalledWith(
-        expect.stringContaining("BASE TABLE"),
-      );
+      expect(conn.prepareStatement).toHaveBeenCalledWith(expect.stringContaining("information_schema.tables"));
+      expect(conn.prepareStatement).toHaveBeenCalledWith(expect.stringContaining("BASE TABLE"));
     });
   });
 
@@ -168,10 +153,7 @@ describe("MysqlSchemaIntrospector", () => {
       psList = [];
     });
 
-    function setupMultiQueryConn(
-      resultSets: ResultSet[],
-      dbRs?: ResultSet,
-    ): Connection {
+    function setupMultiQueryConn(resultSets: ResultSet[], dbRs?: ResultSet): Connection {
       const statements = resultSets.map((rs) => createMockPreparedStatement(rs));
       psList = statements;
       const dbStmt = createMockStatement(dbRs);
@@ -297,10 +279,7 @@ describe("MysqlSchemaIntrospector", () => {
     });
 
     it("returns multiple keys for composite primary key", async () => {
-      const rs = createMockResultSet([
-        { column_name: "user_id" },
-        { column_name: "role_id" },
-      ]);
+      const rs = createMockResultSet([{ column_name: "user_id" }, { column_name: "role_id" }]);
       const ps = createMockPreparedStatement(rs);
       const conn = createMockConnection({ psFactory: () => ps });
       const introspector = new MysqlSchemaIntrospector(conn);
@@ -327,15 +306,9 @@ describe("MysqlSchemaIntrospector", () => {
 
       await introspector.getPrimaryKeys("users", "test_db");
 
-      expect(conn.prepareStatement).toHaveBeenCalledWith(
-        expect.stringContaining("table_constraints"),
-      );
-      expect(conn.prepareStatement).toHaveBeenCalledWith(
-        expect.stringContaining("key_column_usage"),
-      );
-      expect(conn.prepareStatement).toHaveBeenCalledWith(
-        expect.stringContaining("PRIMARY KEY"),
-      );
+      expect(conn.prepareStatement).toHaveBeenCalledWith(expect.stringContaining("table_constraints"));
+      expect(conn.prepareStatement).toHaveBeenCalledWith(expect.stringContaining("key_column_usage"));
+      expect(conn.prepareStatement).toHaveBeenCalledWith(expect.stringContaining("PRIMARY KEY"));
     });
   });
 
@@ -371,9 +344,7 @@ describe("MysqlSchemaIntrospector", () => {
 
       await introspector.tableExists("users", "test_db");
 
-      expect(conn.prepareStatement).toHaveBeenCalledWith(
-        expect.stringContaining("information_schema.tables"),
-      );
+      expect(conn.prepareStatement).toHaveBeenCalledWith(expect.stringContaining("information_schema.tables"));
     });
   });
 });

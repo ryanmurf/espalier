@@ -1,5 +1,4 @@
-import type { DataSource, HealthCheck, HealthCheckResult, HealthStatus } from "espalier-jdbc";
-import type { Connection } from "espalier-jdbc";
+import type { Connection, DataSource, HealthCheck, HealthCheckResult, HealthStatus } from "espalier-jdbc";
 
 export interface ReplicaLagConfig {
   /** Lag threshold for DEGRADED status (seconds). Default: 10. */
@@ -135,9 +134,7 @@ export class TenantSchemaHealthCheck implements HealthCheck {
       const stmt = conn.createStatement();
       let existingSchemas: Set<string>;
       try {
-        const rs = await stmt.executeQuery(
-          "SELECT schema_name FROM information_schema.schemata",
-        );
+        const rs = await stmt.executeQuery("SELECT schema_name FROM information_schema.schemata");
         existingSchemas = new Set<string>();
         while (await rs.next()) {
           const val = Object.values(rs.getRow())[0];

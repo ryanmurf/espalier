@@ -1,7 +1,7 @@
 import { quoteIdentifier } from "espalier-jdbc";
-import { getTableName } from "../decorators/table.js";
 import { getColumnMappings, getColumnMetadataEntries } from "../decorators/column.js";
 import { getDeprecatedFields } from "../decorators/deprecated.js";
+import { getTableName } from "../decorators/table.js";
 
 export interface ExpandContractMigration {
   /** Phase 1: Add new column, copy data, add constraints */
@@ -10,9 +10,7 @@ export interface ExpandContractMigration {
   contract: string[];
 }
 
-export function generateExpandContractMigration(
-  entityClass: new (...args: any[]) => any,
-): ExpandContractMigration {
+export function generateExpandContractMigration(entityClass: new (...args: any[]) => any): ExpandContractMigration {
   // Instantiate to trigger decorator initializers
   new entityClass();
 
@@ -44,31 +42,20 @@ export function generateExpandContractMigration(
           const quotedNew = quoteIdentifier(replacementColumnName);
           const quotedOld = quoteIdentifier(oldColumnName);
 
-          expand.push(
-            `ALTER TABLE ${quotedTable} ADD COLUMN ${quotedNew} ${sqlType}`,
-          );
-          expand.push(
-            `UPDATE ${quotedTable} SET ${quotedNew} = ${quotedOld}`,
-          );
-          contract.push(
-            `ALTER TABLE ${quotedTable} DROP COLUMN ${quotedOld}`,
-          );
+          expand.push(`ALTER TABLE ${quotedTable} ADD COLUMN ${quotedNew} ${sqlType}`);
+          expand.push(`UPDATE ${quotedTable} SET ${quotedNew} = ${quotedOld}`);
+          contract.push(`ALTER TABLE ${quotedTable} DROP COLUMN ${quotedOld}`);
         }
       }
     } else {
-      contract.push(
-        `ALTER TABLE ${quotedTable} DROP COLUMN ${quoteIdentifier(oldColumnName)}`,
-      );
+      contract.push(`ALTER TABLE ${quotedTable} DROP COLUMN ${quoteIdentifier(oldColumnName)}`);
     }
   }
 
   return { expand, contract };
 }
 
-function findFieldByName(
-  columnMappings: Map<string | symbol, string>,
-  fieldName: string,
-): string | symbol | undefined {
+function findFieldByName(columnMappings: Map<string | symbol, string>, fieldName: string): string | symbol | undefined {
   for (const [field] of columnMappings) {
     if (String(field) === fieldName) return field;
   }

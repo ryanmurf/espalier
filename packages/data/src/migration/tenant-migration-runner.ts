@@ -34,20 +34,14 @@ export class TenantAwareMigrationRunner {
   /**
    * Run migrations across all tenant schemas.
    */
-  async runAll(
-    migrations: Migration[],
-    options?: TenantMigrationOptions,
-  ): Promise<TenantMigrationProgress[]> {
-    return this.executeAcrossTenants(
-      async (runner) => {
-        await runner.initialize();
-        const before = await runner.getAppliedMigrations();
-        await runner.run(migrations);
-        const after = await runner.getAppliedMigrations();
-        return after.length - before.length;
-      },
-      options,
-    );
+  async runAll(migrations: Migration[], options?: TenantMigrationOptions): Promise<TenantMigrationProgress[]> {
+    return this.executeAcrossTenants(async (runner) => {
+      await runner.initialize();
+      const before = await runner.getAppliedMigrations();
+      await runner.run(migrations);
+      const after = await runner.getAppliedMigrations();
+      return after.length - before.length;
+    }, options);
   }
 
   /**
@@ -58,24 +52,19 @@ export class TenantAwareMigrationRunner {
     steps?: number,
     options?: TenantMigrationOptions,
   ): Promise<TenantMigrationProgress[]> {
-    return this.executeAcrossTenants(
-      async (runner) => {
-        await runner.initialize();
-        const before = await runner.getAppliedMigrations();
-        await runner.rollback(migrations, steps);
-        const after = await runner.getAppliedMigrations();
-        return before.length - after.length;
-      },
-      options,
-    );
+    return this.executeAcrossTenants(async (runner) => {
+      await runner.initialize();
+      const before = await runner.getAppliedMigrations();
+      await runner.rollback(migrations, steps);
+      const after = await runner.getAppliedMigrations();
+      return before.length - after.length;
+    }, options);
   }
 
   /**
    * Get pending migrations per tenant.
    */
-  async pendingAll(
-    migrations: Migration[],
-  ): Promise<Map<string, Migration[]>> {
+  async pendingAll(migrations: Migration[]): Promise<Map<string, Migration[]>> {
     const result = new Map<string, Migration[]>();
     for (const schema of this.tenantSchemas) {
       const runner = this.runnerFactory(schema);

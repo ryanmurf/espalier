@@ -13,14 +13,14 @@
  * - DeleteResolver always returns true
  * - Update with non-existent entity throws
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { ResolverGenerator, createFilterSpec } from "../graphql/resolver-generator.js";
-import type { CrudRepository } from "../repository/crud-repository.js";
-import type { Page, Pageable } from "../repository/paging.js";
-import { Table as TableDec } from "../decorators/table.js";
+import { describe, expect, it, vi } from "vitest";
 import { Column as ColumnDec } from "../decorators/column.js";
 import { Id as IdDec } from "../decorators/id.js";
+import { Table as TableDec } from "../decorators/table.js";
 import { TenantId as TenantIdDec } from "../decorators/tenant.js";
+import { createFilterSpec, ResolverGenerator } from "../graphql/resolver-generator.js";
+import type { CrudRepository } from "../repository/crud-repository.js";
+import type { Page, Pageable } from "../repository/paging.js";
 import { TenantContext } from "../tenant/tenant-context.js";
 
 // ══════════════════════════════════════════════════
@@ -58,7 +58,9 @@ class TenantRecord {
 // Mock repository factory
 // ══════════════════════════════════════════════════
 
-function createMockRepo<T, ID>(data: T[] = []): CrudRepository<T, ID> & {
+function createMockRepo<T, ID>(
+  data: T[] = [],
+): CrudRepository<T, ID> & {
   _data: T[];
   _savedEntities: T[];
   _deletedIds: ID[];
@@ -117,9 +119,7 @@ function createMockRepo<T, ID>(data: T[] = []): CrudRepository<T, ID> & {
 
 describe("ResolverGenerator — query resolvers", () => {
   it("generates findById resolver with camelCase name", () => {
-    const repo = createMockRepo<Item, number>([
-      { id: 1, name: "A", value: 10 },
-    ]);
+    const repo = createMockRepo<Item, number>([{ id: 1, name: "A", value: 10 }]);
     const gen = new ResolverGenerator();
     const resolvers = gen.generate([{ entityClass: Item, repository: repo }]);
     expect(resolvers.Query).toHaveProperty("item");
@@ -171,9 +171,7 @@ describe("ResolverGenerator — query resolvers", () => {
     const gen = new ResolverGenerator();
     const resolvers = gen.generate([{ entityClass: Item, repository: repo }]);
     await resolvers.Query.items(null, {}, {}, {});
-    expect(repo.findAll).toHaveBeenCalledWith(
-      expect.objectContaining({ page: 0, size: 20 }),
-    );
+    expect(repo.findAll).toHaveBeenCalledWith(expect.objectContaining({ page: 0, size: 20 }));
   });
 
   it("count resolver returns number", async () => {
@@ -240,9 +238,9 @@ describe("ResolverGenerator — mutation resolvers", () => {
     const repo = createMockRepo<Item, number>([]);
     const gen = new ResolverGenerator();
     const resolvers = gen.generate([{ entityClass: Item, repository: repo }]);
-    await expect(
-      resolvers.Mutation.updateItem(null, { id: 999, input: { name: "X" } }, {}, {}),
-    ).rejects.toThrow(/Entity not found/);
+    await expect(resolvers.Mutation.updateItem(null, { id: 999, input: { name: "X" } }, {}, {})).rejects.toThrow(
+      /Entity not found/,
+    );
   });
 
   it("delete mutation calls deleteById and returns true", async () => {
@@ -397,12 +395,7 @@ describe("ResolverGenerator — tenant awareness", () => {
     });
     const resolvers = gen.generate([{ entityClass: TenantRecord, repository: repo }]);
     const context = { tenantId: "globex" };
-    await resolvers.Mutation.createTenantRecord(
-      null,
-      { input: { data: "test" } },
-      context,
-      {},
-    );
+    await resolvers.Mutation.createTenantRecord(null, { input: { data: "test" } }, context, {});
     expect(capturedTenantId).toBe("globex");
   });
 
@@ -537,9 +530,7 @@ describe("ResolverGenerator — error handling", () => {
     const repo = createMockRepo<Item, number>([]);
     const gen = new ResolverGenerator();
     const resolvers = gen.generate([{ entityClass: Item, repository: repo }]);
-    await expect(
-      resolvers.Mutation.deleteItem(null, { id: 999 }, {}, {}),
-    ).resolves.toBe(false);
+    await expect(resolvers.Mutation.deleteItem(null, { id: 999 }, {}, {})).resolves.toBe(false);
   });
 
   it("findById does not throw for non-existent id (returns null)", async () => {
@@ -572,9 +563,7 @@ describe("ResolverGenerator — tenant isolation edge cases", () => {
     });
     const resolvers = gen.generate([{ entityClass: TenantRecord, repository: repo }]);
     // Passing null context should not throw
-    await expect(
-      resolvers.Query.tenantRecord(null, { id: "abc" }, null, {}),
-    ).resolves.toBeNull();
+    await expect(resolvers.Query.tenantRecord(null, { id: "abc" }, null, {})).resolves.toBeNull();
   });
 
   it("undefined context does not crash tenant check", async () => {
@@ -583,9 +572,7 @@ describe("ResolverGenerator — tenant isolation edge cases", () => {
       getTenantId: (ctx: any) => ctx?.tenantId,
     });
     const resolvers = gen.generate([{ entityClass: TenantRecord, repository: repo }]);
-    await expect(
-      resolvers.Query.tenantRecord(null, { id: "abc" }, undefined, {}),
-    ).resolves.toBeNull();
+    await expect(resolvers.Query.tenantRecord(null, { id: "abc" }, undefined, {})).resolves.toBeNull();
   });
 
   it("tenant ID of 0 is still set (falsy but valid)", async () => {

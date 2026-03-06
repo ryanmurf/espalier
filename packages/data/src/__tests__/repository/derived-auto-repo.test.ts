@@ -1,9 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { DataSource, Connection, PreparedStatement, ResultSet } from "espalier-jdbc";
-import { Repository } from "../../decorators/repository.js";
-import { Table } from "../../decorators/table.js";
+import type { Connection, DataSource, PreparedStatement, ResultSet } from "espalier-jdbc";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Column } from "../../decorators/column.js";
 import { Id } from "../../decorators/id.js";
+import { Repository } from "../../decorators/repository.js";
+import { Table } from "../../decorators/table.js";
 import { createAutoRepository } from "../../repository/auto-repository.js";
 import type { CrudRepository } from "../../repository/crud-repository.js";
 import { TestResultSet } from "../test-utils/test-result-set.js";
@@ -274,7 +274,7 @@ describe("Derived query methods on auto-generated repositories", () => {
       const repo = createAutoRepository<User, number>(UserRepository, ds);
       await (repo as any).findByNameLike("%Al%");
 
-      expect(lastPreparedSql).toContain('LIKE $1');
+      expect(lastPreparedSql).toContain("LIKE $1");
       expect(lastSetParams).toEqual([{ index: 1, value: "%Al%" }]);
     });
 
@@ -729,9 +729,7 @@ describe("Derived query methods on auto-generated repositories", () => {
 
   describe("custom column name mapping", () => {
     it("findByCustomerName maps to snake_case column", async () => {
-      const rs = new TestResultSet([
-        { id: 1, customer_name: "Alice", total_amount: 99.99, status: "shipped" },
-      ]);
+      const rs = new TestResultSet([{ id: 1, customer_name: "Alice", total_amount: 99.99, status: "shipped" }]);
       const stmt = createMockPreparedStatement(rs);
       const conn = createMockConnection(() => stmt);
       const ds = createMockDataSource(conn);
@@ -831,9 +829,7 @@ describe("Derived query methods on auto-generated repositories", () => {
 
       const repo = createAutoRepository<User, number>(UserRepository, ds);
 
-      expect(() => (repo as any).findByUnknownField("value")).toThrow(
-        /Unknown property "unknownField"/,
-      );
+      expect(() => (repo as any).findByUnknownField("value")).toThrow(/Unknown property "unknownField"/);
     });
 
     it("throws for invalid method name prefix", () => {
@@ -844,9 +840,7 @@ describe("Derived query methods on auto-generated repositories", () => {
 
       const repo = createAutoRepository<User, number>(UserRepository, ds);
 
-      expect(() => (repo as any).getByName("Alice")).toThrow(
-        /Invalid derived query method name/,
-      );
+      expect(() => (repo as any).getByName("Alice")).toThrow(/Invalid derived query method name/);
     });
 
     it("throws for findDistinct without By", () => {
@@ -857,9 +851,7 @@ describe("Derived query methods on auto-generated repositories", () => {
 
       const repo = createAutoRepository<User, number>(UserRepository, ds);
 
-      expect(() => (repo as any).findDistinctName("Alice")).toThrow(
-        /expected "By" after "findDistinct"/,
-      );
+      expect(() => (repo as any).findDistinctName("Alice")).toThrow(/expected "By" after "findDistinct"/);
     });
 
     it("throws for method with no predicates after By", () => {
@@ -871,9 +863,7 @@ describe("Derived query methods on auto-generated repositories", () => {
       const repo = createAutoRepository<User, number>(UserRepository, ds);
 
       // parseDerivedQueryMethod("findBy") should throw because rest is empty
-      expect(() => (repo as any).findBy()).toThrow(
-        /no property predicates found after "By"/,
-      );
+      expect(() => (repo as any).findBy()).toThrow(/no property predicates found after "By"/);
     });
 
     it("accessing non-method properties does not throw", () => {
@@ -947,7 +937,14 @@ describe("Derived query methods on auto-generated repositories", () => {
       const makeRs = () => {
         callCount++;
         return new TestResultSet([
-          { id: callCount, name: "User" + callCount, email: `u${callCount}@t.com`, age: 20, status: "active", active: true },
+          {
+            id: callCount,
+            name: "User" + callCount,
+            email: `u${callCount}@t.com`,
+            age: 20,
+            status: "active",
+            active: true,
+          },
         ]);
       };
       const conn = createMockConnection(() => createMockPreparedStatement(makeRs()));

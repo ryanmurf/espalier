@@ -1,4 +1,4 @@
-import type { RouteDefinition, RestRequest } from "./handler.js";
+import type { RestRequest, RouteDefinition } from "./handler.js";
 
 /**
  * Minimal Fastify-compatible types to avoid hard dependency.
@@ -52,7 +52,7 @@ export function createFastifyPlugin(routes: RouteDefinition[]): (fastify: Fastif
           } else {
             reply.status(result.status).send();
           }
-        } catch (err) {
+        } catch (_err) {
           reply.status(500).send({ error: "Internal Server Error" });
         }
       });

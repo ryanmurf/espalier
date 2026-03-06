@@ -1,7 +1,6 @@
+import type { NamedPreparedStatement, ParsedNamedQuery, ResultSet, SqlValue } from "espalier-jdbc";
+import { DatabaseErrorCode, parseNamedParams, QueryError } from "espalier-jdbc";
 import type { PoolClient } from "pg";
-import type { NamedPreparedStatement, ResultSet, SqlValue } from "espalier-jdbc";
-import { QueryError, DatabaseErrorCode, parseNamedParams } from "espalier-jdbc";
-import type { ParsedNamedQuery } from "espalier-jdbc";
 import { PgResultSet } from "./pg-result-set.js";
 import { traceQuery } from "./trace-query.js";
 
@@ -81,8 +80,6 @@ export class PgNamedPreparedStatement implements NamedPreparedStatement {
   }
 
   private collectParameters(): SqlValue[] {
-    return this.parsed.paramOrder.map(
-      (name) => this.namedParams.get(name) ?? null,
-    );
+    return this.parsed.paramOrder.map((name) => this.namedParams.get(name) ?? null);
   }
 }

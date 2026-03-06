@@ -1,9 +1,9 @@
-import { describe, it, expect } from "vitest";
-import { QueryCompiler } from "../../query/query-compiler.js";
-import { bindCompiledQuery } from "../../query/compiled-query.js";
-import { parseDerivedQueryMethod } from "../../query/derived-query-parser.js";
-import { buildDerivedQuery } from "../../query/derived-query-executor.js";
+import { describe, expect, it } from "vitest";
 import type { EntityMetadata } from "../../mapping/entity-metadata.js";
+import { bindCompiledQuery } from "../../query/compiled-query.js";
+import { buildDerivedQuery } from "../../query/derived-query-executor.js";
+import { parseDerivedQueryMethod } from "../../query/derived-query-parser.js";
+import { QueryCompiler } from "../../query/query-compiler.js";
 
 const metadata: EntityMetadata = {
   tableName: "users",

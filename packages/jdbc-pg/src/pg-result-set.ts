@@ -1,5 +1,5 @@
+import type { ColumnMetadata, ResultSet } from "espalier-jdbc";
 import type { QueryResult } from "pg";
-import type { ResultSet, ColumnMetadata } from "espalier-jdbc";
 
 export class PgResultSet implements ResultSet {
   private currentRow = -1;

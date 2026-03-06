@@ -1,7 +1,7 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import type { DataSource, Connection, PreparedStatement, ResultSet } from "espalier-jdbc";
-import { ProxyDataSource } from "../proxy-data-source.js";
+import type { Connection, DataSource, PreparedStatement, ResultSet } from "espalier-jdbc";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { detectEnvironment, getEnvironmentDefaults, isColdStart, resetColdStart } from "../environment.js";
+import { ProxyDataSource } from "../proxy-data-source.js";
 
 // ═══════════════════════════════════════════════════════════════
 // Adversarial tests for serverless connection proxy
@@ -16,21 +16,22 @@ function createMockConnection(opts?: {
 }): Connection {
   let closed = false;
 
-  const isClosedFn = typeof opts?.isClosed === "function"
-    ? opts.isClosed
-    : () => (opts?.isClosed ?? closed);
+  const isClosedFn = typeof opts?.isClosed === "function" ? opts.isClosed : () => opts?.isClosed ?? closed;
 
   return {
     createStatement: vi.fn() as any,
-    prepareStatement: vi.fn((_sql: string) => ({
-      setParameter: vi.fn(),
-      executeQuery: vi.fn(async () => {
-        if (opts?.validateFails) throw new Error("Validation failed");
-        return { next: vi.fn(async () => false), close: vi.fn(async () => {}) } as unknown as ResultSet;
-      }),
-      executeUpdate: vi.fn(async () => 1),
-      close: vi.fn(async () => {}),
-    } as PreparedStatement)),
+    prepareStatement: vi.fn(
+      (_sql: string) =>
+        ({
+          setParameter: vi.fn(),
+          executeQuery: vi.fn(async () => {
+            if (opts?.validateFails) throw new Error("Validation failed");
+            return { next: vi.fn(async () => false), close: vi.fn(async () => {}) } as unknown as ResultSet;
+          }),
+          executeUpdate: vi.fn(async () => 1),
+          close: vi.fn(async () => {}),
+        }) as PreparedStatement,
+    ),
     beginTransaction: vi.fn() as any,
     close: vi.fn(async () => {
       closed = true;
@@ -628,7 +629,9 @@ describe("ProxyDataSource adversarial tests", () => {
 
     it("inner getConnection() failure propagates to caller", async () => {
       const ds: DataSource = {
-        getConnection: vi.fn(async () => { throw new Error("DB unreachable"); }),
+        getConnection: vi.fn(async () => {
+          throw new Error("DB unreachable");
+        }),
         close: vi.fn(async () => {}),
       };
 

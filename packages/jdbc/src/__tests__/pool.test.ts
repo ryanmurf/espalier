@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import type { PoolConfig, PoolStats, PooledDataSource } from "../index.js";
+import { describe, expect, it } from "vitest";
+import type { PoolConfig, PoolStats } from "../index.js";
 
 describe("PoolConfig interface", () => {
   it("accepts all optional pool configuration fields", () => {

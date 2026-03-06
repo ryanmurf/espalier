@@ -1,9 +1,5 @@
-import { describe, it, expect, vi } from "vitest";
-import {
-  DefaultTypeConverterRegistry,
-  JsonConverter,
-  BooleanConverter,
-} from "espalier-jdbc";
+import { BooleanConverter, DefaultTypeConverterRegistry, JsonConverter } from "espalier-jdbc";
+import { describe, expect, it, vi } from "vitest";
 
 // Mock pg module
 vi.mock("pg", () => {
@@ -22,8 +18,8 @@ vi.mock("pg", () => {
   };
 });
 
-import { PgDataSource } from "../pg-data-source.js";
 import { PgConnection } from "../pg-connection.js";
+import { PgDataSource } from "../pg-data-source.js";
 
 describe("PgDataSource + TypeConverterRegistry integration", () => {
   it("PgDataSource created with a registry passes it to PgConnection", async () => {

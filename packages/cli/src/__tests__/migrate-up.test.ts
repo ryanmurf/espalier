@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { Migration, MigrationRecord, MigrationRunner } from "espalier-data";
 import type { DataSource } from "espalier-jdbc";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock the adapter-factory and migrate-loader modules
 vi.mock("../adapter-factory.js", () => ({
@@ -11,9 +11,9 @@ vi.mock("../migrate-loader.js", () => ({
   loadMigrations: vi.fn(),
 }));
 
-import { migrateUp } from "../migrate-up.js";
 import { createAdapter } from "../adapter-factory.js";
 import { loadMigrations } from "../migrate-loader.js";
+import { migrateUp } from "../migrate-up.js";
 
 function makeMigration(version: string, description: string): Migration {
   return {
@@ -32,7 +32,7 @@ function createMockRunner(appliedVersions: string[] = []): MigrationRunner {
     checksum: `checksum_${v}`,
   }));
 
-  let currentApplied = [...applied];
+  const currentApplied = [...applied];
 
   return {
     initialize: vi.fn().mockResolvedValue(undefined),
@@ -59,9 +59,7 @@ function createMockRunner(appliedVersions: string[] = []): MigrationRunner {
     rollbackTo: vi.fn(),
     pending: vi.fn(async (migrations: Migration[]) => {
       const appliedSet = new Set(currentApplied.map((r) => r.version));
-      return migrations
-        .filter((m) => !appliedSet.has(m.version))
-        .sort((a, b) => a.version.localeCompare(b.version));
+      return migrations.filter((m) => !appliedSet.has(m.version)).sort((a, b) => a.version.localeCompare(b.version));
     }),
   };
 }
@@ -185,9 +183,7 @@ describe("migrateUp", () => {
     vi.mocked(createAdapter).mockResolvedValue({ dataSource: ds, runner });
     vi.mocked(loadMigrations).mockRejectedValue(new Error("load failed"));
 
-    await expect(
-      migrateUp({ config: baseConfig, migrationsDir: "/tmp/migrations" }),
-    ).rejects.toThrow("load failed");
+    await expect(migrateUp({ config: baseConfig, migrationsDir: "/tmp/migrations" })).rejects.toThrow("load failed");
 
     expect(ds.close).toHaveBeenCalled();
   });
@@ -196,8 +192,13 @@ describe("migrateUp", () => {
     const runner = createMockRunner();
     const ds = createMockDataSource();
     const callOrder: string[] = [];
-    vi.mocked(runner.initialize).mockImplementation(async () => { callOrder.push("initialize"); });
-    vi.mocked(runner.pending).mockImplementation(async () => { callOrder.push("pending"); return []; });
+    vi.mocked(runner.initialize).mockImplementation(async () => {
+      callOrder.push("initialize");
+    });
+    vi.mocked(runner.pending).mockImplementation(async () => {
+      callOrder.push("pending");
+      return [];
+    });
     vi.mocked(createAdapter).mockResolvedValue({ dataSource: ds, runner });
     vi.mocked(loadMigrations).mockResolvedValue([]);
 

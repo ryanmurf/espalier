@@ -205,11 +205,12 @@ export class DevQueryLogger implements Logger {
 
     let durationLabel = "";
     if (this.showDuration && durationMs !== undefined) {
-      const formatted = durationMs < 1
-        ? `${(durationMs * 1000).toFixed(0)}us`
-        : durationMs < 1000
-          ? `${durationMs.toFixed(1)}ms`
-          : `${(durationMs / 1000).toFixed(2)}s`;
+      const formatted =
+        durationMs < 1
+          ? `${(durationMs * 1000).toFixed(0)}us`
+          : durationMs < 1000
+            ? `${durationMs.toFixed(1)}ms`
+            : `${(durationMs / 1000).toFixed(2)}s`;
       durationLabel = ` ${dim}(${formatted})${reset}`;
     }
 

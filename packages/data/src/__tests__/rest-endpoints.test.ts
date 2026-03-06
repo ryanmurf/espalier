@@ -14,20 +14,20 @@
  * - RestPlugin lifecycle
  * - Security: error messages don't leak SQL, internal errors caught
  */
-import { describe, it, expect, vi } from "vitest";
-import { Table as TableDec } from "../decorators/table.js";
+import { describe, expect, it, vi } from "vitest";
 import { Column as ColumnDec } from "../decorators/column.js";
 import { Id as IdDec } from "../decorators/id.js";
+import { Table as TableDec } from "../decorators/table.js";
 import { TenantId as TenantIdDec } from "../decorators/tenant.js";
-import { RouteGenerator } from "../rest/route-generator.js";
-import type { RestRequest } from "../rest/handler.js";
+import type { CrudRepository } from "../repository/crud-repository.js";
+import { EntityNotFoundException } from "../repository/entity-not-found.js";
+import { OptimisticLockException } from "../repository/optimistic-lock.js";
+import type { Page, Pageable } from "../repository/paging.js";
 import { mountExpressRoutes } from "../rest/express-adapter.js";
 import { createFastifyPlugin } from "../rest/fastify-adapter.js";
+import type { RestRequest } from "../rest/handler.js";
 import { RestPlugin } from "../rest/rest-plugin.js";
-import { OptimisticLockException } from "../repository/optimistic-lock.js";
-import { EntityNotFoundException } from "../repository/entity-not-found.js";
-import type { CrudRepository } from "../repository/crud-repository.js";
-import type { Page, Pageable } from "../repository/paging.js";
+import { RouteGenerator } from "../rest/route-generator.js";
 import { TenantContext } from "../tenant/tenant-context.js";
 
 // ══════════════════════════════════════════════════
@@ -237,9 +237,7 @@ describe("RouteGenerator — findAll handler", () => {
     const routes = gen.generate([{ entityClass: Widget, repository: repo }]);
     const findAll = routes.find((r) => r.operationId === "findAllWidget")!;
     await findAll.handler(makeReq({ query: { page: "2", size: "5" } }));
-    expect(repo.findAll).toHaveBeenCalledWith(
-      expect.objectContaining({ page: 2, size: 5 }),
-    );
+    expect(repo.findAll).toHaveBeenCalledWith(expect.objectContaining({ page: 2, size: 5 }));
   });
 
   it("defaults to page=0, size=20", async () => {
@@ -248,9 +246,7 @@ describe("RouteGenerator — findAll handler", () => {
     const routes = gen.generate([{ entityClass: Widget, repository: repo }]);
     const findAll = routes.find((r) => r.operationId === "findAllWidget")!;
     await findAll.handler(makeReq());
-    expect(repo.findAll).toHaveBeenCalledWith(
-      expect.objectContaining({ page: 0, size: 20 }),
-    );
+    expect(repo.findAll).toHaveBeenCalledWith(expect.objectContaining({ page: 0, size: 20 }));
   });
 
   it("caps size at 1000", async () => {
@@ -259,9 +255,7 @@ describe("RouteGenerator — findAll handler", () => {
     const routes = gen.generate([{ entityClass: Widget, repository: repo }]);
     const findAll = routes.find((r) => r.operationId === "findAllWidget")!;
     await findAll.handler(makeReq({ query: { size: "9999" } }));
-    expect(repo.findAll).toHaveBeenCalledWith(
-      expect.objectContaining({ size: 1000 }),
-    );
+    expect(repo.findAll).toHaveBeenCalledWith(expect.objectContaining({ size: 1000 }));
   });
 
   it("negative page defaults to 0", async () => {
@@ -270,9 +264,7 @@ describe("RouteGenerator — findAll handler", () => {
     const routes = gen.generate([{ entityClass: Widget, repository: repo }]);
     const findAll = routes.find((r) => r.operationId === "findAllWidget")!;
     await findAll.handler(makeReq({ query: { page: "-5" } }));
-    expect(repo.findAll).toHaveBeenCalledWith(
-      expect.objectContaining({ page: 0 }),
-    );
+    expect(repo.findAll).toHaveBeenCalledWith(expect.objectContaining({ page: 0 }));
   });
 
   it("negative size defaults to 20", async () => {
@@ -281,9 +273,7 @@ describe("RouteGenerator — findAll handler", () => {
     const routes = gen.generate([{ entityClass: Widget, repository: repo }]);
     const findAll = routes.find((r) => r.operationId === "findAllWidget")!;
     await findAll.handler(makeReq({ query: { size: "-1" } }));
-    expect(repo.findAll).toHaveBeenCalledWith(
-      expect.objectContaining({ size: 20 }),
-    );
+    expect(repo.findAll).toHaveBeenCalledWith(expect.objectContaining({ size: 20 }));
   });
 
   it("non-numeric page defaults to 0", async () => {
@@ -292,9 +282,7 @@ describe("RouteGenerator — findAll handler", () => {
     const routes = gen.generate([{ entityClass: Widget, repository: repo }]);
     const findAll = routes.find((r) => r.operationId === "findAllWidget")!;
     await findAll.handler(makeReq({ query: { page: "abc" } }));
-    expect(repo.findAll).toHaveBeenCalledWith(
-      expect.objectContaining({ page: 0 }),
-    );
+    expect(repo.findAll).toHaveBeenCalledWith(expect.objectContaining({ page: 0 }));
   });
 
   it("parses sort from query param", async () => {
@@ -449,9 +437,7 @@ describe("RouteGenerator — update handler", () => {
     const gen = new RouteGenerator();
     const routes = gen.generate([{ entityClass: Widget, repository: repo }]);
     const update = routes.find((r) => r.operationId === "updateWidget")!;
-    const res = await update.handler(
-      makeReq({ params: { id: "1" }, body: { name: "Updated" } }),
-    );
+    const res = await update.handler(makeReq({ params: { id: "1" }, body: { name: "Updated" } }));
     expect(res.status).toBe(200);
   });
 
@@ -460,9 +446,7 @@ describe("RouteGenerator — update handler", () => {
     const gen = new RouteGenerator();
     const routes = gen.generate([{ entityClass: Widget, repository: repo }]);
     const update = routes.find((r) => r.operationId === "updateWidget")!;
-    const res = await update.handler(
-      makeReq({ params: { id: "999" }, body: { name: "X" } }),
-    );
+    const res = await update.handler(makeReq({ params: { id: "999" }, body: { name: "X" } }));
     expect(res.status).toBe(404);
   });
 
@@ -478,30 +462,22 @@ describe("RouteGenerator — update handler", () => {
   it("returns 409 on optimistic lock conflict", async () => {
     const existing = { id: 1, name: "Old", price: 10 };
     const repo = mockRepo<Widget, number>([existing]);
-    (repo.save as any).mockRejectedValue(
-      new OptimisticLockException("Widget", 1, 1, 2),
-    );
+    (repo.save as any).mockRejectedValue(new OptimisticLockException("Widget", 1, 1, 2));
     const gen = new RouteGenerator();
     const routes = gen.generate([{ entityClass: Widget, repository: repo }]);
     const update = routes.find((r) => r.operationId === "updateWidget")!;
-    const res = await update.handler(
-      makeReq({ params: { id: "1" }, body: { name: "X" } }),
-    );
+    const res = await update.handler(makeReq({ params: { id: "1" }, body: { name: "X" } }));
     expect(res.status).toBe(409);
   });
 
   it("returns 404 when EntityNotFoundException thrown during save", async () => {
     const existing = { id: 1, name: "Old", price: 10 };
     const repo = mockRepo<Widget, number>([existing]);
-    (repo.save as any).mockRejectedValue(
-      new EntityNotFoundException("Widget", 1),
-    );
+    (repo.save as any).mockRejectedValue(new EntityNotFoundException("Widget", 1));
     const gen = new RouteGenerator();
     const routes = gen.generate([{ entityClass: Widget, repository: repo }]);
     const update = routes.find((r) => r.operationId === "updateWidget")!;
-    const res = await update.handler(
-      makeReq({ params: { id: "1" }, body: { name: "X" } }),
-    );
+    const res = await update.handler(makeReq({ params: { id: "1" }, body: { name: "X" } }));
     expect(res.status).toBe(404);
   });
 
@@ -512,9 +488,9 @@ describe("RouteGenerator — update handler", () => {
     const gen = new RouteGenerator();
     const routes = gen.generate([{ entityClass: Widget, repository: repo }]);
     const update = routes.find((r) => r.operationId === "updateWidget")!;
-    await expect(
-      update.handler(makeReq({ params: { id: "1" }, body: { name: "X" } })),
-    ).rejects.toThrow("DB connection lost");
+    await expect(update.handler(makeReq({ params: { id: "1" }, body: { name: "X" } }))).rejects.toThrow(
+      "DB connection lost",
+    );
   });
 });
 
@@ -548,9 +524,7 @@ describe("RouteGenerator — delete handler", () => {
     const gen = new RouteGenerator();
     const routes = gen.generate([{ entityClass: Widget, repository: repo }]);
     const del = routes.find((r) => r.operationId === "deleteWidget")!;
-    await expect(
-      del.handler(makeReq({ params: { id: "1" } })),
-    ).rejects.toThrow("FK constraint");
+    await expect(del.handler(makeReq({ params: { id: "1" } }))).rejects.toThrow("FK constraint");
   });
 });
 
@@ -731,9 +705,7 @@ describe("mountExpressRoutes", () => {
     const res = { status: vi.fn().mockReturnThis(), json: vi.fn(), send: vi.fn() };
     await handler({ params: {}, query: {}, body: undefined, headers: {} }, res);
     expect(res.status).toHaveBeenCalledWith(500);
-    expect(res.json).toHaveBeenCalledWith(
-      expect.objectContaining({ error: "Internal Server Error" }),
-    );
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ error: "Internal Server Error" }));
   });
 });
 
@@ -743,17 +715,13 @@ describe("mountExpressRoutes", () => {
 
 describe("createFastifyPlugin", () => {
   it("returns an async plugin function", () => {
-    const routes = new RouteGenerator().generate([
-      { entityClass: Widget, repository: mockRepo() },
-    ]);
+    const routes = new RouteGenerator().generate([{ entityClass: Widget, repository: mockRepo() }]);
     const plugin = createFastifyPlugin(routes);
     expect(typeof plugin).toBe("function");
   });
 
   it("registers all routes on fastify instance", async () => {
-    const routes = new RouteGenerator().generate([
-      { entityClass: Widget, repository: mockRepo() },
-    ]);
+    const routes = new RouteGenerator().generate([{ entityClass: Widget, repository: mockRepo() }]);
     const fastify: Record<string, any> = {
       get: vi.fn(),
       post: vi.fn(),
@@ -841,15 +809,11 @@ describe("RouteGenerator — security", () => {
   it("OptimisticLockException error uses safe message (no info leak)", async () => {
     const existing = { id: 1, name: "X", price: 1 };
     const repo = mockRepo<Widget, number>([existing]);
-    (repo.save as any).mockRejectedValue(
-      new OptimisticLockException("Widget", 1, 1, 3),
-    );
+    (repo.save as any).mockRejectedValue(new OptimisticLockException("Widget", 1, 1, 3));
     const gen = new RouteGenerator();
     const routes = gen.generate([{ entityClass: Widget, repository: repo }]);
     const update = routes.find((r) => r.operationId === "updateWidget")!;
-    const res = await update.handler(
-      makeReq({ params: { id: "1" }, body: { name: "Y" } }),
-    );
+    const res = await update.handler(makeReq({ params: { id: "1" }, body: { name: "Y" } }));
     expect(res.status).toBe(409);
     const errorBody = JSON.stringify(res.body);
     // Should use toSafeString() — no entity name, id, or version in response
@@ -860,15 +824,11 @@ describe("RouteGenerator — security", () => {
   it("EntityNotFoundException error uses generic message (no info leak)", async () => {
     const existing = { id: 1, name: "X", price: 1 };
     const repo = mockRepo<Widget, number>([existing]);
-    (repo.save as any).mockRejectedValue(
-      new EntityNotFoundException("Widget", 1),
-    );
+    (repo.save as any).mockRejectedValue(new EntityNotFoundException("Widget", 1));
     const gen = new RouteGenerator();
     const routes = gen.generate([{ entityClass: Widget, repository: repo }]);
     const update = routes.find((r) => r.operationId === "updateWidget")!;
-    const res = await update.handler(
-      makeReq({ params: { id: "1" }, body: { name: "Y" } }),
-    );
+    const res = await update.handler(makeReq({ params: { id: "1" }, body: { name: "Y" } }));
     expect(res.status).toBe(404);
     const errorBody = JSON.stringify(res.body);
     // Should not include entity name or id in response

@@ -8,24 +8,24 @@
  * - Full CRUD lifecycle with all features together
  * - Concurrent multi-tenant operations with complete isolation
  */
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { createTestDataSource, isPostgresAvailable } from "./setup.js";
+
 import {
-  Table,
   Column,
+  createDerivedRepository,
   Id,
-  TenantId,
-  TenantContext,
-  TenantAwareDataSource,
-  TenantRoutingDataSource,
+  NoTenantException,
   ReadReplicaDataSource,
   ReadWriteContext,
+  Table,
+  TenantAwareDataSource,
+  TenantContext,
+  TenantId,
+  TenantRoutingDataSource,
   TenantSchemaManager,
-  NoTenantException,
-  createDerivedRepository,
 } from "espalier-data";
-import type { CrudRepository } from "espalier-data";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { PgDataSource } from "../../pg-data-source.js";
+import { createTestDataSource, isPostgresAvailable } from "./setup.js";
 
 const canConnect = await isPostgresAvailable();
 
@@ -78,9 +78,7 @@ describe.skipIf(!canConnect)("Multi-Tenancy Integration — E2E", () => {
         await stmt.executeUpdate(
           `CREATE TABLE ${schema}.${SHARED_TABLE} (id SERIAL PRIMARY KEY, tenant_id TEXT NOT NULL, name TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'active')`,
         );
-        await stmt.executeUpdate(
-          `CREATE TABLE ${schema}.${PLAIN_TABLE} (id SERIAL PRIMARY KEY, value TEXT NOT NULL)`,
-        );
+        await stmt.executeUpdate(`CREATE TABLE ${schema}.${PLAIN_TABLE} (id SERIAL PRIMARY KEY, value TEXT NOT NULL)`);
       }
 
       // Shared discriminator table in public
@@ -89,12 +87,8 @@ describe.skipIf(!canConnect)("Multi-Tenancy Integration — E2E", () => {
       await stmt.executeUpdate(
         `CREATE TABLE ${SHARED_TABLE} (id SERIAL PRIMARY KEY, tenant_id TEXT NOT NULL, name TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'active')`,
       );
-      await stmt.executeUpdate(
-        `CREATE INDEX idx_intg_items_tenant ON ${SHARED_TABLE} (tenant_id)`,
-      );
-      await stmt.executeUpdate(
-        `CREATE TABLE ${PLAIN_TABLE} (id SERIAL PRIMARY KEY, value TEXT NOT NULL)`,
-      );
+      await stmt.executeUpdate(`CREATE INDEX idx_intg_items_tenant ON ${SHARED_TABLE} (tenant_id)`);
+      await stmt.executeUpdate(`CREATE TABLE ${PLAIN_TABLE} (id SERIAL PRIMARY KEY, value TEXT NOT NULL)`);
     } finally {
       await stmt.close();
       await conn.close();
@@ -368,9 +362,7 @@ describe.skipIf(!canConnect)("Multi-Tenancy Integration — E2E", () => {
           await stmt3.executeUpdate(
             `INSERT INTO ${SHARED_TABLE} (tenant_id, name, status) VALUES ('dynamic', 'dynamic-item', 'active')`,
           );
-          const rs = await stmt3.executeQuery(
-            `SELECT name FROM ${SHARED_TABLE} WHERE tenant_id = 'dynamic'`,
-          );
+          const rs = await stmt3.executeQuery(`SELECT name FROM ${SHARED_TABLE} WHERE tenant_id = 'dynamic'`);
           expect(await rs.next()).toBe(true);
           expect(rs.getString("name")).toBe("dynamic-item");
         } finally {

@@ -1,21 +1,17 @@
 import { quoteIdentifier } from "espalier-jdbc";
 import type { EntityMetadata, FieldMapping } from "../mapping/entity-metadata.js";
-import type { DerivedQueryDescriptor, PropertyExpression } from "./derived-query-parser.js";
 import type { CompiledQuery, ParamBinding, QueryMetadata } from "./compiled-query.js";
+import type { DerivedQueryDescriptor, PropertyExpression } from "./derived-query-parser.js";
 
 /**
  * Resolves a property name to its column name using entity metadata.
  */
 function resolveColumn(property: string, metadata: EntityMetadata): string {
-  const field = metadata.fields.find(
-    (f: FieldMapping) => String(f.fieldName) === property,
-  );
+  const field = metadata.fields.find((f: FieldMapping) => String(f.fieldName) === property);
   if (field) return field.columnName;
 
   if (String(metadata.idField) === property) {
-    const idMapping = metadata.fields.find(
-      (f: FieldMapping) => f.fieldName === metadata.idField,
-    );
+    const idMapping = metadata.fields.find((f: FieldMapping) => f.fieldName === metadata.idField);
     if (idMapping) return idMapping.columnName;
   }
 
@@ -37,25 +33,75 @@ function operatorToSql(
 
   switch (operator) {
     case "Equals":
-      return { sql: `${col} = $${paramIdx}`, bindings: [{ argIndex: -1, transform: "identity" }], argCount: 1, paramCount: 1 };
+      return {
+        sql: `${col} = $${paramIdx}`,
+        bindings: [{ argIndex: -1, transform: "identity" }],
+        argCount: 1,
+        paramCount: 1,
+      };
     case "Not":
-      return { sql: `${col} <> $${paramIdx}`, bindings: [{ argIndex: -1, transform: "identity" }], argCount: 1, paramCount: 1 };
+      return {
+        sql: `${col} <> $${paramIdx}`,
+        bindings: [{ argIndex: -1, transform: "identity" }],
+        argCount: 1,
+        paramCount: 1,
+      };
     case "Like":
-      return { sql: `${col} LIKE $${paramIdx}`, bindings: [{ argIndex: -1, transform: "identity" }], argCount: 1, paramCount: 1 };
+      return {
+        sql: `${col} LIKE $${paramIdx}`,
+        bindings: [{ argIndex: -1, transform: "identity" }],
+        argCount: 1,
+        paramCount: 1,
+      };
     case "StartingWith":
-      return { sql: `${col} LIKE $${paramIdx}`, bindings: [{ argIndex: -1, transform: "suffix-wildcard" }], argCount: 1, paramCount: 1 };
+      return {
+        sql: `${col} LIKE $${paramIdx}`,
+        bindings: [{ argIndex: -1, transform: "suffix-wildcard" }],
+        argCount: 1,
+        paramCount: 1,
+      };
     case "EndingWith":
-      return { sql: `${col} LIKE $${paramIdx}`, bindings: [{ argIndex: -1, transform: "prefix-wildcard" }], argCount: 1, paramCount: 1 };
+      return {
+        sql: `${col} LIKE $${paramIdx}`,
+        bindings: [{ argIndex: -1, transform: "prefix-wildcard" }],
+        argCount: 1,
+        paramCount: 1,
+      };
     case "Containing":
-      return { sql: `${col} LIKE $${paramIdx}`, bindings: [{ argIndex: -1, transform: "wrap-wildcard" }], argCount: 1, paramCount: 1 };
+      return {
+        sql: `${col} LIKE $${paramIdx}`,
+        bindings: [{ argIndex: -1, transform: "wrap-wildcard" }],
+        argCount: 1,
+        paramCount: 1,
+      };
     case "GreaterThan":
-      return { sql: `${col} > $${paramIdx}`, bindings: [{ argIndex: -1, transform: "identity" }], argCount: 1, paramCount: 1 };
+      return {
+        sql: `${col} > $${paramIdx}`,
+        bindings: [{ argIndex: -1, transform: "identity" }],
+        argCount: 1,
+        paramCount: 1,
+      };
     case "GreaterThanEqual":
-      return { sql: `${col} >= $${paramIdx}`, bindings: [{ argIndex: -1, transform: "identity" }], argCount: 1, paramCount: 1 };
+      return {
+        sql: `${col} >= $${paramIdx}`,
+        bindings: [{ argIndex: -1, transform: "identity" }],
+        argCount: 1,
+        paramCount: 1,
+      };
     case "LessThan":
-      return { sql: `${col} < $${paramIdx}`, bindings: [{ argIndex: -1, transform: "identity" }], argCount: 1, paramCount: 1 };
+      return {
+        sql: `${col} < $${paramIdx}`,
+        bindings: [{ argIndex: -1, transform: "identity" }],
+        argCount: 1,
+        paramCount: 1,
+      };
     case "LessThanEqual":
-      return { sql: `${col} <= $${paramIdx}`, bindings: [{ argIndex: -1, transform: "identity" }], argCount: 1, paramCount: 1 };
+      return {
+        sql: `${col} <= $${paramIdx}`,
+        bindings: [{ argIndex: -1, transform: "identity" }],
+        argCount: 1,
+        paramCount: 1,
+      };
     case "Between":
       return {
         sql: `${col} BETWEEN $${paramIdx} AND $${paramIdx + 1}`,
@@ -67,9 +113,19 @@ function operatorToSql(
         paramCount: 2,
       };
     case "In":
-      return { sql: `${col} IN ($${paramIdx})`, bindings: [{ argIndex: -1, transform: "spread" }], argCount: 1, paramCount: 1 };
+      return {
+        sql: `${col} IN ($${paramIdx})`,
+        bindings: [{ argIndex: -1, transform: "spread" }],
+        argCount: 1,
+        paramCount: 1,
+      };
     case "NotIn":
-      return { sql: `NOT (${col} IN ($${paramIdx}))`, bindings: [{ argIndex: -1, transform: "spread" }], argCount: 1, paramCount: 1 };
+      return {
+        sql: `NOT (${col} IN ($${paramIdx}))`,
+        bindings: [{ argIndex: -1, transform: "spread" }],
+        argCount: 1,
+        paramCount: 1,
+      };
     case "IsNull":
       return { sql: `${col} IS NULL`, bindings: [], argCount: 0, paramCount: 0 };
     case "IsNotNull":
@@ -90,10 +146,7 @@ function operatorToSql(
  * CompiledQuery that can be executed with just parameter binding.
  */
 export class QueryCompiler {
-  compile(
-    descriptor: DerivedQueryDescriptor,
-    metadata: EntityMetadata,
-  ): CompiledQuery {
+  compile(descriptor: DerivedQueryDescriptor, metadata: EntityMetadata): CompiledQuery {
     const bindings: ParamBinding[] = [];
     const whereParts: string[] = [];
     let paramIdx = 1;

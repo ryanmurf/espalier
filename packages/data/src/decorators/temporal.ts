@@ -33,10 +33,10 @@ interface ResolvedTemporalMetadata {
 const temporalMetadata = new WeakMap<object, ResolvedTemporalMetadata>();
 
 export function Temporal(options?: TemporalOptions) {
-  return function <TClass extends new (...args: any[]) => any>(
+  return <TClass extends new (...args: any[]) => any>(
     target: TClass,
     _context: ClassDecoratorContext<TClass>,
-  ): TClass {
+  ): TClass => {
     const historyTable = options?.historyTable ?? "";
     const validFromColumn = options?.validFromColumn ?? "valid_from";
     const validToColumn = options?.validToColumn ?? "valid_to";

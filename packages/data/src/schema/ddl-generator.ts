@@ -1,21 +1,20 @@
 import { quoteIdentifier, validateIdentifier } from "espalier-jdbc";
-import { getEntityMetadata } from "../mapping/entity-metadata.js";
-import { getColumnMetadataEntries } from "../decorators/column.js";
-import type { ColumnMetadataEntry } from "../decorators/column.js";
 import { getCreatedDateField } from "../decorators/auditing.js";
-import { getTableName } from "../decorators/table.js";
+import type { ColumnMetadataEntry } from "../decorators/column.js";
+import { getColumnMappings, getColumnMetadataEntries } from "../decorators/column.js";
 import { getIdField } from "../decorators/id.js";
-import { getColumnMappings } from "../decorators/column.js";
 import { getSearchableFields } from "../decorators/searchable.js";
-import { getViewMetadata, getMaterializedViewMetadata } from "../decorators/view.js";
-import type { ViewOptions, MaterializedViewOptions } from "../decorators/view.js";
+import { getTableName } from "../decorators/table.js";
 import { getTreeMetadata } from "../decorators/tree.js";
+import { getMaterializedViewMetadata, getViewMetadata } from "../decorators/view.js";
+import { getEntityMetadata } from "../mapping/entity-metadata.js";
 
 /**
  * Validates that a DEFAULT value expression is a safe SQL literal or known function.
  * Rejects arbitrary SQL fragments that could lead to DDL injection.
  */
-const SAFE_DEFAULT_PATTERN = /^(?:-?\d+(?:\.\d+)?|'(?:[^'\\]|\\.)*'|NULL|TRUE|FALSE|NOW\(\)|CURRENT_TIMESTAMP|CURRENT_DATE|CURRENT_TIME|uuid_generate_v4\(\)|gen_random_uuid\(\)|datetime\('now'\))$/i;
+const SAFE_DEFAULT_PATTERN =
+  /^(?:-?\d+(?:\.\d+)?|'(?:[^'\\]|\\.)*'|NULL|TRUE|FALSE|NOW\(\)|CURRENT_TIMESTAMP|CURRENT_DATE|CURRENT_TIME|uuid_generate_v4\(\)|gen_random_uuid\(\)|datetime\('now'\))$/i;
 
 function validateDefaultValue(val: string): string {
   if (SAFE_DEFAULT_PATTERN.test(val)) {
@@ -23,9 +22,9 @@ function validateDefaultValue(val: string): string {
   }
   throw new Error(
     `Unsafe defaultValue: "${val}". ` +
-    `Only literals (numbers, quoted strings, NULL, TRUE, FALSE) and known functions ` +
-    `(NOW(), CURRENT_TIMESTAMP, CURRENT_DATE, CURRENT_TIME, uuid_generate_v4(), ` +
-    `gen_random_uuid(), datetime('now')) are allowed.`,
+      `Only literals (numbers, quoted strings, NULL, TRUE, FALSE) and known functions ` +
+      `(NOW(), CURRENT_TIMESTAMP, CURRENT_DATE, CURRENT_TIME, uuid_generate_v4(), ` +
+      `gen_random_uuid(), datetime('now')) are allowed.`,
   );
 }
 
@@ -52,10 +51,7 @@ function qualifyTableName(tableName: string, schema?: string): string {
   return `${quoteIdentifier(schema)}.${quoteIdentifier(tableName)}`;
 }
 
-function resolveColumnType(
-  entry: ColumnMetadataEntry,
-  defaultValue: unknown,
-): string {
+function resolveColumnType(entry: ColumnMetadataEntry, defaultValue: unknown): string {
   // Explicit type from @Column({ type: "..." }) takes highest priority
   if (entry.type) {
     return entry.type;
@@ -80,10 +76,7 @@ function resolveColumnType(
 }
 
 export class DdlGenerator {
-  generateCreateTable(
-    entityClass: new (...args: any[]) => any,
-    options?: DdlOptions,
-  ): string {
+  generateCreateTable(entityClass: new (...args: any[]) => any, options?: DdlOptions): string {
     const metadata = getEntityMetadata(entityClass);
     const entries = getColumnMetadataEntries(entityClass);
     const createdDateField = getCreatedDateField(entityClass);
@@ -114,12 +107,11 @@ export class DdlGenerator {
 
     const ifNotExists = options?.ifNotExists ? "IF NOT EXISTS " : "";
     const columns = metadata.fields.map((field) => {
-      const entry = entries.get(field.fieldName)
-        ?? embeddedColumnEntries.get(field.fieldName)
-        ?? { columnName: field.columnName };
+      const entry = entries.get(field.fieldName) ??
+        embeddedColumnEntries.get(field.fieldName) ?? { columnName: field.columnName };
       const fieldStr = typeof field.fieldName === "string" ? field.fieldName : String(field.fieldName);
       const defaultValue = fieldStr.includes(".")
-        ? undefined  // embedded fields don't use parent instance defaults
+        ? undefined // embedded fields don't use parent instance defaults
         : instance[fieldStr];
       const sqlType = resolveColumnType(entry, defaultValue);
       const isPk = field.fieldName === metadata.idField;
@@ -200,10 +192,7 @@ export class DdlGenerator {
     return `CREATE TABLE ${ifNotExists}${qualifiedTable} (\n${columns.join(",\n")}\n)`;
   }
 
-  generateJoinTables(
-    entityClasses: (new (...args: any[]) => any)[],
-    options?: DdlOptions,
-  ): string[] {
+  generateJoinTables(entityClasses: (new (...args: any[]) => any)[], options?: DdlOptions): string[] {
     const ifNotExists = options?.ifNotExists ? "IF NOT EXISTS " : "";
     const results: string[] = [];
     const seen = new Set<string>();
@@ -235,9 +224,7 @@ export class DdlGenerator {
           `  PRIMARY KEY (${quoteIdentifier(jt.joinColumn)}, ${quoteIdentifier(jt.inverseJoinColumn)})`,
         ];
 
-        results.push(
-          `CREATE TABLE ${ifNotExists}${quoteIdentifier(jt.name)} (\n${columns.join(",\n")}\n)`,
-        );
+        results.push(`CREATE TABLE ${ifNotExists}${quoteIdentifier(jt.name)} (\n${columns.join(",\n")}\n)`);
       }
     }
 
@@ -248,14 +235,11 @@ export class DdlGenerator {
    * Generates a CREATE INDEX statement for the @TenantId column, if present.
    * Returns undefined if the entity has no @TenantId field.
    */
-  generateTenantIndex(
-    entityClass: new (...args: any[]) => any,
-    options?: DdlOptions,
-  ): string | undefined {
+  generateTenantIndex(entityClass: new (...args: any[]) => any, options?: DdlOptions): string | undefined {
     const metadata = getEntityMetadata(entityClass);
     if (!metadata.tenantIdField) return undefined;
 
-    const field = metadata.fields.find(f => f.fieldName === metadata.tenantIdField);
+    const field = metadata.fields.find((f) => f.fieldName === metadata.tenantIdField);
     if (!field) return undefined;
 
     const ifNotExists = options?.ifNotExists ? "IF NOT EXISTS " : "";
@@ -268,10 +252,7 @@ export class DdlGenerator {
    * Generates CREATE TABLE for the entity plus any @ManyToMany join tables
    * owned by the entity. Returns an array of DDL statements.
    */
-  generateCreateTableWithJoinTables(
-    entityClass: new (...args: any[]) => any,
-    options?: DdlOptions,
-  ): string[] {
+  generateCreateTableWithJoinTables(entityClass: new (...args: any[]) => any, options?: DdlOptions): string[] {
     const statements = [this.generateCreateTable(entityClass, options)];
     const joinTableStatements = this.generateJoinTables([entityClass], options);
     statements.push(...joinTableStatements);
@@ -282,10 +263,7 @@ export class DdlGenerator {
    * Generates all DDL for a set of entity classes: CREATE TABLE for each entity,
    * plus all @ManyToMany join tables. Join tables are deduplicated.
    */
-  generateAllDdl(
-    entityClasses: (new (...args: any[]) => any)[],
-    options?: DdlOptions,
-  ): string[] {
+  generateAllDdl(entityClasses: (new (...args: any[]) => any)[], options?: DdlOptions): string[] {
     const statements: string[] = [];
     for (const entityClass of entityClasses) {
       const viewMeta = getViewMetadata(entityClass);
@@ -306,9 +284,7 @@ export class DdlGenerator {
       }
     }
     // Filter out view entities — they don't have join tables or search indexes
-    const tableEntities = entityClasses.filter(
-      (ec) => !getViewMetadata(ec) && !getMaterializedViewMetadata(ec),
-    );
+    const tableEntities = entityClasses.filter((ec) => !getViewMetadata(ec) && !getMaterializedViewMetadata(ec));
     const joinTableStatements = this.generateJoinTables(tableEntities, options);
     statements.push(...joinTableStatements);
     for (const entityClass of tableEntities) {
@@ -321,14 +297,15 @@ export class DdlGenerator {
    * Generates CREATE INDEX statements for @Searchable fields using GIN tsvector indexes.
    * Returns an array of DDL statements (one per searchable field).
    */
-  generateSearchIndexes(
-    entityClass: new (...args: any[]) => any,
-    options?: DdlOptions,
-  ): string[] {
+  generateSearchIndexes(entityClass: new (...args: any[]) => any, options?: DdlOptions): string[] {
     const metadata = getEntityMetadata(entityClass);
 
     // Trigger decorator initializers to populate searchable metadata
-    try { new entityClass(); } catch { /* ignore */ }
+    try {
+      new entityClass();
+    } catch {
+      /* ignore */
+    }
 
     const searchableFields = getSearchableFields(entityClass);
     if (searchableFields.size === 0) return [];
@@ -357,10 +334,7 @@ export class DdlGenerator {
     return statements;
   }
 
-  generateDropTable(
-    entityClass: new (...args: any[]) => any,
-    options?: DropTableOptions,
-  ): string {
+  generateDropTable(entityClass: new (...args: any[]) => any, options?: DropTableOptions): string {
     const metadata = getEntityMetadata(entityClass);
     const ifExists = options?.ifExists ? "IF EXISTS " : "";
     const cascade = options?.cascade ? " CASCADE" : "";
@@ -371,10 +345,7 @@ export class DdlGenerator {
   /**
    * Generates CREATE OR REPLACE VIEW DDL for a @View entity.
    */
-  generateViewDdl(
-    entityClass: new (...args: any[]) => any,
-    options?: DdlOptions,
-  ): string {
+  generateViewDdl(entityClass: new (...args: any[]) => any, options?: DdlOptions): string {
     const meta = getViewMetadata(entityClass);
     if (!meta) {
       throw new Error("Entity is not decorated with @View.");
@@ -390,10 +361,7 @@ export class DdlGenerator {
   /**
    * Generates CREATE MATERIALIZED VIEW DDL for a @MaterializedView entity.
    */
-  generateMaterializedViewDdl(
-    entityClass: new (...args: any[]) => any,
-    options?: DdlOptions,
-  ): string {
+  generateMaterializedViewDdl(entityClass: new (...args: any[]) => any, options?: DdlOptions): string {
     const meta = getMaterializedViewMetadata(entityClass);
     if (!meta) {
       throw new Error("Entity is not decorated with @MaterializedView.");
@@ -423,10 +391,7 @@ export class DdlGenerator {
   /**
    * Generates CREATE TABLE + indexes for a closure table used by @Tree entities.
    */
-  generateClosureTableDdl(
-    entityClass: new (...args: any[]) => any,
-    options?: DdlOptions,
-  ): string[] {
+  generateClosureTableDdl(entityClass: new (...args: any[]) => any, options?: DdlOptions): string[] {
     const treeMeta = getTreeMetadata(entityClass);
     if (!treeMeta || treeMeta.strategy !== "closure-table") {
       throw new Error("Entity is not decorated with @Tree({ strategy: 'closure-table' }).");
@@ -443,18 +408,18 @@ export class DdlGenerator {
     const idEntry = entries.get(metadata.idField);
     const idType = idEntry?.type ?? "INTEGER";
 
-    const idCol = metadata.fields.find(f => f.fieldName === metadata.idField);
+    const idCol = metadata.fields.find((f) => f.fieldName === metadata.idField);
     const idColumnName = idCol ? idCol.columnName : String(metadata.idField);
 
     const statements: string[] = [];
 
     statements.push(
       `CREATE TABLE ${ifNotExists}${qualifiedClosure} (\n` +
-      `  "ancestor_id" ${idType} NOT NULL REFERENCES ${qualifiedEntity}(${quoteIdentifier(idColumnName)}),\n` +
-      `  "descendant_id" ${idType} NOT NULL REFERENCES ${qualifiedEntity}(${quoteIdentifier(idColumnName)}),\n` +
-      `  "depth" INTEGER NOT NULL DEFAULT 0,\n` +
-      `  PRIMARY KEY ("ancestor_id", "descendant_id")\n` +
-      `)`,
+        `  "ancestor_id" ${idType} NOT NULL REFERENCES ${qualifiedEntity}(${quoteIdentifier(idColumnName)}),\n` +
+        `  "descendant_id" ${idType} NOT NULL REFERENCES ${qualifiedEntity}(${quoteIdentifier(idColumnName)}),\n` +
+        `  "depth" INTEGER NOT NULL DEFAULT 0,\n` +
+        `  PRIMARY KEY ("ancestor_id", "descendant_id")\n` +
+        `)`,
     );
 
     // Index on descendant for efficient ancestor lookups
@@ -465,9 +430,7 @@ export class DdlGenerator {
 
     // Index on depth for depth-limited queries
     const idxDepth = `idx_${closureTable}_depth`;
-    statements.push(
-      `CREATE INDEX ${ifNotExists}${quoteIdentifier(idxDepth)} ON ${qualifiedClosure} ("depth")`,
-    );
+    statements.push(`CREATE INDEX ${ifNotExists}${quoteIdentifier(idxDepth)} ON ${qualifiedClosure} ("depth")`);
 
     return statements;
   }

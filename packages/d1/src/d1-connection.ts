@@ -1,15 +1,15 @@
-import type { Connection, TypeAwareConnection, PreparedStatement, Statement, TypeConverterRegistry } from "espalier-jdbc";
+import type { PreparedStatement, Statement, TypeAwareConnection, TypeConverterRegistry } from "espalier-jdbc";
 import {
-  type Transaction,
-  type IsolationLevel,
   ConnectionError,
-  TransactionError,
   DatabaseErrorCode,
   getGlobalLogger,
+  type IsolationLevel,
   LogLevel,
+  type Transaction,
+  TransactionError,
 } from "espalier-jdbc";
+import { D1PreparedStatementImpl, D1StatementImpl } from "./d1-statement.js";
 import type { D1Database } from "./d1-types.js";
-import { D1StatementImpl, D1PreparedStatementImpl } from "./d1-statement.js";
 
 /**
  * Connection implementation for Cloudflare D1.
@@ -63,11 +63,7 @@ export class D1Connection implements TypeAwareConnection {
     return {
       async commit(): Promise<void> {
         if (completed) {
-          throw new TransactionError(
-            "Transaction already completed",
-            undefined,
-            DatabaseErrorCode.TX_COMMIT_FAILED,
-          );
+          throw new TransactionError("Transaction already completed", undefined, DatabaseErrorCode.TX_COMMIT_FAILED);
         }
         completed = true;
         if (txLogger.isEnabled(LogLevel.DEBUG)) {
@@ -77,35 +73,23 @@ export class D1Connection implements TypeAwareConnection {
 
       async rollback(): Promise<void> {
         if (completed) {
-          throw new TransactionError(
-            "Transaction already completed",
-            undefined,
-            DatabaseErrorCode.TX_ROLLBACK_FAILED,
-          );
+          throw new TransactionError("Transaction already completed", undefined, DatabaseErrorCode.TX_ROLLBACK_FAILED);
         }
         completed = true;
         throw new TransactionError(
           "D1 does not support rollback — statements execute immediately and cannot be undone. " +
-          "Use D1DataSource.batch() for atomic operations.",
+            "Use D1DataSource.batch() for atomic operations.",
           undefined,
           DatabaseErrorCode.TX_ROLLBACK_FAILED,
         );
       },
 
       async setSavepoint(_name: string): Promise<void> {
-        throw new TransactionError(
-          "D1 does not support savepoints",
-          undefined,
-          DatabaseErrorCode.TX_SAVEPOINT_FAILED,
-        );
+        throw new TransactionError("D1 does not support savepoints", undefined, DatabaseErrorCode.TX_SAVEPOINT_FAILED);
       },
 
       async rollbackTo(_name: string): Promise<void> {
-        throw new TransactionError(
-          "D1 does not support savepoints",
-          undefined,
-          DatabaseErrorCode.TX_ROLLBACK_FAILED,
-        );
+        throw new TransactionError("D1 does not support savepoints", undefined, DatabaseErrorCode.TX_ROLLBACK_FAILED);
       },
     };
   }
@@ -120,11 +104,7 @@ export class D1Connection implements TypeAwareConnection {
 
   private ensureOpen(): void {
     if (this.closed) {
-      throw new ConnectionError(
-        "Connection is closed",
-        undefined,
-        DatabaseErrorCode.CONNECTION_CLOSED,
-      );
+      throw new ConnectionError("Connection is closed", undefined, DatabaseErrorCode.CONNECTION_CLOSED);
     }
   }
 }

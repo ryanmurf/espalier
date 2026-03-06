@@ -1,5 +1,5 @@
-import type { Criteria } from "../query/criteria.js";
 import type { EntityMetadata } from "../mapping/entity-metadata.js";
+import type { Criteria } from "../query/criteria.js";
 
 /**
  * A filter definition produces a Criteria to be AND-ed into every query
@@ -30,15 +30,11 @@ const filterMetadata = new WeakMap<object, FilterRegistration[]>();
  * @param filter — function producing Criteria (or undefined to skip)
  * @param options.enabledByDefault — whether filter is active by default (default: true)
  */
-export function Filter(
-  name: string,
-  filter: FilterDefinition,
-  options?: { enabledByDefault?: boolean },
-) {
-  return function <TClass extends new (...args: any[]) => any>(
+export function Filter(name: string, filter: FilterDefinition, options?: { enabledByDefault?: boolean }) {
+  return <TClass extends new (...args: any[]) => any>(
     target: TClass,
     _context: ClassDecoratorContext<TClass>,
-  ): TClass {
+  ): TClass => {
     const registration: FilterRegistration = {
       name,
       filter,
@@ -51,7 +47,7 @@ export function Filter(
     const existing = filterMetadata.get(target)!;
 
     // Prevent duplicate filter names
-    if (existing.some(r => r.name === name)) {
+    if (existing.some((r) => r.name === name)) {
       throw new Error(
         `Duplicate @Filter name "${name}" on entity ${target.name}. Filter names must be unique per entity.`,
       );
@@ -85,7 +81,7 @@ export function registerFilter(
     filterMetadata.set(entityClass, []);
   }
   const existing = filterMetadata.get(entityClass)!;
-  if (existing.some(r => r.name === name)) {
+  if (existing.some((r) => r.name === name)) {
     throw new Error(
       `Duplicate filter name "${name}" on entity ${entityClass.name}. Filter names must be unique per entity.`,
     );
@@ -100,13 +96,10 @@ export function registerFilter(
 /**
  * Removes a previously registered filter by name.
  */
-export function unregisterFilter(
-  entityClass: new (...args: any[]) => any,
-  name: string,
-): boolean {
+export function unregisterFilter(entityClass: new (...args: any[]) => any, name: string): boolean {
   const filters = filterMetadata.get(entityClass);
   if (!filters) return false;
-  const idx = filters.findIndex(r => r.name === name);
+  const idx = filters.findIndex((r) => r.name === name);
   if (idx === -1) return false;
   filters.splice(idx, 1);
   return true;
@@ -138,7 +131,7 @@ export function resolveActiveFilters(
   const disableSet = options?.disableFilters ? new Set(options.disableFilters) : undefined;
   const enableSet = options?.enableFilters ? new Set(options.enableFilters) : undefined;
 
-  return registrations.filter(reg => {
+  return registrations.filter((reg) => {
     // Explicitly disabled takes precedence
     if (disableSet?.has(reg.name)) return false;
     // Explicitly enabled overrides enabledByDefault=false

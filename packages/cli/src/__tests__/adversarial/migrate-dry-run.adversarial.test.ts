@@ -1,6 +1,6 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, expect, it } from "vitest";
+import type { DryRunStatement, MigrateDryRunResult } from "../../migrate-dry-run.js";
 import { formatDryRunOutput } from "../../migrate-dry-run.js";
-import type { MigrateDryRunResult, DryRunStatement } from "../../migrate-dry-run.js";
 
 // ==========================================================================
 // formatDryRunOutput — unit tests
@@ -49,9 +49,7 @@ describe("formatDryRunOutput — basic", () => {
   it("SQL statements are included verbatim", () => {
     const sql = "ALTER TABLE users ADD COLUMN email TEXT NOT NULL DEFAULT ''";
     const result: MigrateDryRunResult = {
-      pending: [
-        { version: "20240101120000", description: "add email", statements: [sql] },
-      ],
+      pending: [{ version: "20240101120000", description: "add email", statements: [sql] }],
     };
     const output = formatDryRunOutput(result);
     expect(output).toContain(sql);
@@ -59,9 +57,7 @@ describe("formatDryRunOutput — basic", () => {
 
   it("statements without trailing semicolons get one appended", () => {
     const result: MigrateDryRunResult = {
-      pending: [
-        { version: "20240101120000", description: "test", statements: ["SELECT 1"] },
-      ],
+      pending: [{ version: "20240101120000", description: "test", statements: ["SELECT 1"] }],
     };
     const output = formatDryRunOutput(result);
     expect(output).toContain(";");
@@ -69,9 +65,7 @@ describe("formatDryRunOutput — basic", () => {
 
   it("statements with trailing semicolons do NOT get doubled", () => {
     const result: MigrateDryRunResult = {
-      pending: [
-        { version: "20240101120000", description: "test", statements: ["SELECT 1;"] },
-      ],
+      pending: [{ version: "20240101120000", description: "test", statements: ["SELECT 1;"] }],
     };
     const output = formatDryRunOutput(result);
     expect(output).not.toContain(";;");
@@ -83,11 +77,7 @@ describe("formatDryRunOutput — basic", () => {
         {
           version: "20240101120000",
           description: "multi-statement",
-          statements: [
-            "CREATE TABLE a (id INT)",
-            "CREATE TABLE b (id INT)",
-            "CREATE INDEX idx_a ON a (id)",
-          ],
+          statements: ["CREATE TABLE a (id INT)", "CREATE TABLE b (id INT)", "CREATE INDEX idx_a ON a (id)"],
         },
       ],
     };
@@ -105,9 +95,7 @@ describe("formatDryRunOutput — basic", () => {
 describe("formatDryRunOutput — edge cases", () => {
   it("empty statements array shows version header only", () => {
     const result: MigrateDryRunResult = {
-      pending: [
-        { version: "20240101120000", description: "empty", statements: [] },
-      ],
+      pending: [{ version: "20240101120000", description: "empty", statements: [] }],
     };
     const output = formatDryRunOutput(result);
     expect(output).toContain("20240101120000");
@@ -117,9 +105,7 @@ describe("formatDryRunOutput — edge cases", () => {
   it("very long SQL preserved without truncation", () => {
     const longSql = "SELECT " + "a".repeat(20000) + " FROM t";
     const result: MigrateDryRunResult = {
-      pending: [
-        { version: "20240101120000", description: "long", statements: [longSql] },
-      ],
+      pending: [{ version: "20240101120000", description: "long", statements: [longSql] }],
     };
     const output = formatDryRunOutput(result);
     expect(output.length).toBeGreaterThan(20000);
@@ -127,9 +113,7 @@ describe("formatDryRunOutput — edge cases", () => {
 
   it("statement with only whitespace is trimmed", () => {
     const result: MigrateDryRunResult = {
-      pending: [
-        { version: "20240101120000", description: "whitespace", statements: ["  \n  "] },
-      ],
+      pending: [{ version: "20240101120000", description: "whitespace", statements: ["  \n  "] }],
     };
     const output = formatDryRunOutput(result);
     // Should still contain version header
@@ -143,9 +127,7 @@ describe("formatDryRunOutput — edge cases", () => {
   email TEXT UNIQUE
 )`;
     const result: MigrateDryRunResult = {
-      pending: [
-        { version: "20240101120000", description: "multiline", statements: [sql] },
-      ],
+      pending: [{ version: "20240101120000", description: "multiline", statements: [sql] }],
     };
     const output = formatDryRunOutput(result);
     expect(output).toContain("id UUID PRIMARY KEY");
@@ -155,9 +137,7 @@ describe("formatDryRunOutput — edge cases", () => {
   it("SQL with syntax errors is shown (dry-run doesn't validate)", () => {
     const badSql = "CREAT TABL users (id INT)";
     const result: MigrateDryRunResult = {
-      pending: [
-        { version: "20240101120000", description: "bad sql", statements: [badSql] },
-      ],
+      pending: [{ version: "20240101120000", description: "bad sql", statements: [badSql] }],
     };
     const output = formatDryRunOutput(result);
     expect(output).toContain("CREAT TABL");
@@ -179,9 +159,7 @@ describe("formatDryRunOutput — edge cases", () => {
 
   it("special characters in description are preserved", () => {
     const result: MigrateDryRunResult = {
-      pending: [
-        { version: "20240101120000", description: "add user's email & address", statements: ["SELECT 1"] },
-      ],
+      pending: [{ version: "20240101120000", description: "add user's email & address", statements: ["SELECT 1"] }],
     };
     const output = formatDryRunOutput(result);
     expect(output).toContain("add user's email & address");
@@ -189,9 +167,7 @@ describe("formatDryRunOutput — edge cases", () => {
 
   it("output contains SQL comments for readability", () => {
     const result: MigrateDryRunResult = {
-      pending: [
-        { version: "20240101120000", description: "test", statements: ["SELECT 1"] },
-      ],
+      pending: [{ version: "20240101120000", description: "test", statements: ["SELECT 1"] }],
     };
     const output = formatDryRunOutput(result);
     // Should contain SQL comments (-- prefix)

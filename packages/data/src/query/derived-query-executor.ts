@@ -1,43 +1,27 @@
-import { type SqlValue, quoteIdentifier } from "espalier-jdbc";
-import { toVectorLiteral } from "../vector/vector-utils.js";
+import { quoteIdentifier, type SqlValue } from "espalier-jdbc";
 import type { EntityMetadata, FieldMapping } from "../mapping/entity-metadata.js";
+import { toVectorLiteral } from "../vector/vector-utils.js";
+import type { Criteria, VectorMetric } from "./criteria.js";
+import { BetweenCriteria, ComparisonCriteria, InCriteria, LogicalCriteria, NullCriteria } from "./criteria.js";
 import type { DerivedQueryDescriptor, PropertyExpression } from "./derived-query-parser.js";
 import type { BuiltQuery } from "./query-builder.js";
-import type { Criteria, VectorMetric } from "./criteria.js";
-import {
-  ComparisonCriteria,
-  InCriteria,
-  BetweenCriteria,
-  NullCriteria,
-  LogicalCriteria,
-} from "./criteria.js";
-import { SelectBuilder, DeleteBuilder } from "./query-builder.js";
+import { DeleteBuilder, SelectBuilder } from "./query-builder.js";
 
 /**
  * Escape LIKE metacharacters in a user-supplied value.
  * Prevents wildcard injection by escaping %, _, and \.
  */
 function escapeLikeValue(value: unknown): string {
-  return String(value)
-    .replace(/\\/g, "\\\\")
-    .replace(/%/g, "\\%")
-    .replace(/_/g, "\\_");
+  return String(value).replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
 }
 
-function resolveColumn(
-  property: string,
-  metadata: EntityMetadata,
-): string {
-  const field = metadata.fields.find(
-    (f: FieldMapping) => String(f.fieldName) === property,
-  );
+function resolveColumn(property: string, metadata: EntityMetadata): string {
+  const field = metadata.fields.find((f: FieldMapping) => String(f.fieldName) === property);
   if (field) return field.columnName;
 
   // Also check if the property matches the id field
   if (String(metadata.idField) === property) {
-    const idMapping = metadata.fields.find(
-      (f: FieldMapping) => f.fieldName === metadata.idField,
-    );
+    const idMapping = metadata.fields.find((f: FieldMapping) => f.fieldName === metadata.idField);
     if (idMapping) return idMapping.columnName;
   }
 
@@ -80,11 +64,7 @@ function buildCriteriaForExpression(
           `Between operator requires 2 arguments for "${columnName}", but only ${args.length - argOffset} provided`,
         );
       }
-      return new BetweenCriteria(
-        columnName,
-        args[argOffset] as SqlValue,
-        args[argOffset + 1] as SqlValue,
-      );
+      return new BetweenCriteria(columnName, args[argOffset] as SqlValue, args[argOffset + 1] as SqlValue);
     case "In":
       return new InCriteria(columnName, args[argOffset] as SqlValue[]);
     case "NotIn": {
@@ -114,10 +94,7 @@ function buildCriteriaForExpression(
   }
 }
 
-function combineCriteria(
-  criteriaList: Criteria[],
-  connector: "And" | "Or",
-): Criteria {
+function combineCriteria(criteriaList: Criteria[], connector: "And" | "Or"): Criteria {
   if (criteriaList.length === 1) return criteriaList[0];
 
   const logicalType = connector === "And" ? "and" : "or";
@@ -180,16 +157,13 @@ export function buildDerivedQuery(
   }
 
   if (descriptor.action === "count") {
-    const builder = new SelectBuilder(metadata.tableName)
-      .rawColumns("COUNT(*)");
+    const builder = new SelectBuilder(metadata.tableName).rawColumns("COUNT(*)");
     if (where) builder.where(where);
     return builder.build();
   }
 
   if (descriptor.action === "exists") {
-    const builder = new SelectBuilder(metadata.tableName)
-      .rawColumns("1")
-      .limit(1);
+    const builder = new SelectBuilder(metadata.tableName).rawColumns("1").limit(1);
     if (where) builder.where(where);
     return builder.build();
   }
@@ -197,8 +171,7 @@ export function buildDerivedQuery(
   // find action
   const columns = metadata.fields.map((f: FieldMapping) => f.columnName);
 
-  const builder = new SelectBuilder(metadata.tableName)
-    .columns(...columns);
+  const builder = new SelectBuilder(metadata.tableName).columns(...columns);
 
   if (where) builder.where(where);
 

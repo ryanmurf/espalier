@@ -1,12 +1,8 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import type { Migration } from "espalier-data";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { MysqlDataSource } from "../../mysql-data-source.js";
 import { MysqlMigrationRunner } from "../../mysql-migration-runner.js";
-import {
-  createTestDataSource,
-  isMysqlAvailable,
-  dropTestTable,
-} from "./setup.js";
+import { createTestDataSource, dropTestTable, isMysqlAvailable } from "./setup.js";
 
 const MIGRATION_TABLE = "e2e_migration_tracking";
 const canConnect = await isMysqlAvailable();

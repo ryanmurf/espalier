@@ -1,12 +1,7 @@
-import type { DataSource, Connection } from "espalier-jdbc";
-import { validateIdentifier, quoteIdentifier, sha256 } from "espalier-jdbc";
-import type {
-  Migration,
-  MigrationRecord,
-  MigrationRunner,
-  MigrationRunnerConfig,
-} from "espalier-data";
+import type { Migration, MigrationRecord, MigrationRunner, MigrationRunnerConfig } from "espalier-data";
 import { DEFAULT_MIGRATION_TABLE } from "espalier-data";
+import type { Connection, DataSource } from "espalier-jdbc";
+import { quoteIdentifier, sha256, validateIdentifier } from "espalier-jdbc";
 
 export class MysqlMigrationRunner implements MigrationRunner {
   private readonly dataSource: DataSource;
@@ -25,11 +20,11 @@ export class MysqlMigrationRunner implements MigrationRunner {
       const stmt = conn.createStatement();
       await stmt.executeUpdate(
         `CREATE TABLE IF NOT EXISTS ${this.quotedTableName} (\n` +
-        `  version VARCHAR(255) PRIMARY KEY,\n` +
-        `  description TEXT NOT NULL,\n` +
-        `  applied_at DATETIME NOT NULL DEFAULT NOW(),\n` +
-        `  checksum VARCHAR(64) NOT NULL\n` +
-        `)`,
+          `  version VARCHAR(255) PRIMARY KEY,\n` +
+          `  description TEXT NOT NULL,\n` +
+          `  applied_at DATETIME NOT NULL DEFAULT NOW(),\n` +
+          `  checksum VARCHAR(64) NOT NULL\n` +
+          `)`,
       );
       await stmt.close();
     } finally {
@@ -64,9 +59,7 @@ export class MysqlMigrationRunner implements MigrationRunner {
   async getCurrentVersion(): Promise<string | null> {
     const conn = await this.dataSource.getConnection();
     try {
-      const ps = conn.prepareStatement(
-        `SELECT version FROM ${this.quotedTableName} ORDER BY version DESC LIMIT 1`,
-      );
+      const ps = conn.prepareStatement(`SELECT version FROM ${this.quotedTableName} ORDER BY version DESC LIMIT 1`);
       const rs = await ps.executeQuery();
       let version: string | null = null;
       if (await rs.next()) {
@@ -95,8 +88,8 @@ export class MysqlMigrationRunner implements MigrationRunner {
         if (record.checksum !== currentChecksum) {
           throw new Error(
             `Migration "${migration.version}" checksum mismatch: ` +
-            `expected ${record.checksum} but got ${currentChecksum}. ` +
-            `Applied migrations must not be modified.`,
+              `expected ${record.checksum} but got ${currentChecksum}. ` +
+              `Applied migrations must not be modified.`,
           );
         }
       }
@@ -138,7 +131,7 @@ export class MysqlMigrationRunner implements MigrationRunner {
         if (!migration) {
           throw new Error(
             `Cannot rollback migration "${record.version}": ` +
-            `no matching migration definition found with a down() method.`,
+              `no matching migration definition found with a down() method.`,
           );
         }
         await this.revertMigration(conn, migration);
@@ -151,9 +144,7 @@ export class MysqlMigrationRunner implements MigrationRunner {
   async rollbackTo(migrations: Migration[], version: string): Promise<void> {
     const applied = await this.getAppliedMigrations();
     // Find migrations applied after the target version
-    const toRollback = applied
-      .filter((r) => r.version > version)
-      .reverse();
+    const toRollback = applied.filter((r) => r.version > version).reverse();
 
     if (toRollback.length === 0) return;
 
@@ -169,7 +160,7 @@ export class MysqlMigrationRunner implements MigrationRunner {
         if (!migration) {
           throw new Error(
             `Cannot rollback migration "${record.version}": ` +
-            `no matching migration definition found with a down() method.`,
+              `no matching migration definition found with a down() method.`,
           );
         }
         await this.revertMigration(conn, migration);
@@ -182,9 +173,7 @@ export class MysqlMigrationRunner implements MigrationRunner {
   async pending(migrations: Migration[]): Promise<Migration[]> {
     const applied = await this.getAppliedMigrations();
     const appliedVersions = new Set(applied.map((r) => r.version));
-    return migrations
-      .filter((m) => !appliedVersions.has(m.version))
-      .sort((a, b) => a.version.localeCompare(b.version));
+    return migrations.filter((m) => !appliedVersions.has(m.version)).sort((a, b) => a.version.localeCompare(b.version));
   }
 
   private async revertMigration(conn: Connection, migration: Migration): Promise<void> {
@@ -205,9 +194,7 @@ export class MysqlMigrationRunner implements MigrationRunner {
 
     const tx = await conn.beginTransaction();
     try {
-      const ps = conn.prepareStatement(
-        `DELETE FROM ${this.quotedTableName} WHERE version = $1`,
-      );
+      const ps = conn.prepareStatement(`DELETE FROM ${this.quotedTableName} WHERE version = $1`);
       ps.setParameter(1, migration.version);
       await ps.executeUpdate();
       await ps.close();

@@ -1,7 +1,7 @@
 import type { SqlValue } from "espalier-jdbc";
 import { quoteIdentifier } from "espalier-jdbc";
 import type { SelectBuilder } from "../query/query-builder.js";
-import type { KeysetPageable, KeysetPage, PaginationStrategy } from "./types.js";
+import type { KeysetPage, KeysetPageable, PaginationStrategy } from "./types.js";
 
 /**
  * Options for configuring the keyset pagination strategy.
@@ -36,9 +36,7 @@ export interface KeysetStrategyOptions {
  * Uses expanded AND/OR form for dialect portability:
  *   WHERE sort_col > :val OR (sort_col = :val AND id > :id)
  */
-export class KeysetPaginationStrategy
-  implements PaginationStrategy<KeysetPageable, KeysetPage<unknown>>
-{
+export class KeysetPaginationStrategy implements PaginationStrategy<KeysetPageable, KeysetPage<unknown>> {
   readonly name = "keyset";
 
   private readonly idColumn: string;
@@ -59,13 +57,7 @@ export class KeysetPaginationStrategy
     const sortDir = request.sortDirection;
 
     if (request.afterValue != null && request.afterId != null) {
-      this.applyCursorCondition(
-        builder,
-        sortCol,
-        sortDir,
-        request.afterValue as SqlValue,
-        request.afterId as SqlValue,
-      );
+      this.applyCursorCondition(builder, sortCol, sortDir, request.afterValue as SqlValue, request.afterId as SqlValue);
     }
 
     // Apply ordering: sort column first, then id for tie-breaking
@@ -99,12 +91,8 @@ export class KeysetPaginationStrategy
     }
 
     const lastRow = rows.length > 0 ? rows[rows.length - 1] : null;
-    const lastValue = lastRow
-      ? this.extractField(lastRow, request.sortColumn)
-      : null;
-    const lastId = lastRow
-      ? this.extractField(lastRow, this.idField, this.idColumn)
-      : null;
+    const lastValue = lastRow ? this.extractField(lastRow, request.sortColumn) : null;
+    const lastId = lastRow ? this.extractField(lastRow, this.idField, this.idColumn) : null;
 
     return {
       content: rows,

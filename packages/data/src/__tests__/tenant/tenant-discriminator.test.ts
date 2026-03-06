@@ -4,18 +4,11 @@
  * Tests: decorator metadata storage/retrieval, getTenantIdField, entity-metadata
  * integration, tenantFilter specification, getTenantColumn, DDL index generation.
  */
-import { describe, it, expect } from "vitest";
-import {
-  Table,
-  Column,
-  Id,
-  TenantId,
-  getTenantIdField,
-  tenantFilter,
-} from "../../index.js";
+import { describe, expect, it } from "vitest";
+import { Column, getTenantIdField, Id, Table, TenantId, tenantFilter } from "../../index.js";
 import { getEntityMetadata } from "../../mapping/entity-metadata.js";
-import { getTenantColumn } from "../../tenant/tenant-filter.js";
 import { DdlGenerator } from "../../schema/ddl-generator.js";
+import { getTenantColumn } from "../../tenant/tenant-filter.js";
 
 // ══════════════════════════════════════════════════
 // Section 1: @TenantId decorator metadata

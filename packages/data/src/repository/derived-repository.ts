@@ -1,64 +1,69 @@
-import type { DataSource, Connection, SqlValue } from "espalier-jdbc";
-import { getGlobalLogger, LogLevel, quoteIdentifier, getGlobalTracerProvider, SpanKind, SpanStatusCode } from "espalier-jdbc";
-import type { CrudRepository } from "./crud-repository.js";
-import type { Pageable, Page } from "./paging.js";
-import { createPage } from "./paging.js";
-import type { EntityMetadata, FieldMapping } from "../mapping/entity-metadata.js";
-import { getEntityMetadata } from "../mapping/entity-metadata.js";
-import { createRowMapper } from "../mapping/row-mapper.js";
-import type { ProjectionMapper } from "../mapping/projection-mapper.js";
-import { getProjectionMetadata } from "../decorators/projection.js";
-import { SelectBuilder, DeleteBuilder, InsertBuilder, UpdateBuilder } from "../query/query-builder.js";
-import { BulkOperationBuilder } from "../query/bulk-operation-builder.js";
-import { ComparisonCriteria, RawComparisonCriteria, LogicalCriteria, VectorDistanceCriteria } from "../query/criteria.js";
-import type { Criteria, VectorMetric } from "../query/criteria.js";
-import { getVectorFields } from "../decorators/vector.js";
-import type { VectorMetadataEntry } from "../decorators/vector.js";
-import { toVectorLiteral } from "../vector/vector-utils.js";
-import type { Specification } from "../query/specification.js";
-import { EntityNotFoundException } from "./entity-not-found.js";
-import { EntityCache } from "../cache/entity-cache.js";
+import type { Connection, DataSource, SqlValue } from "espalier-jdbc";
+import {
+  getGlobalLogger,
+  getGlobalTracerProvider,
+  LogLevel,
+  quoteIdentifier,
+  SpanKind,
+  SpanStatusCode,
+} from "espalier-jdbc";
+import { AuditLogWriter } from "../audit/audit-log.js";
 import type { EntityCacheConfig } from "../cache/entity-cache.js";
-import { QueryCache } from "../cache/query-cache.js";
+import { EntityCache } from "../cache/entity-cache.js";
 import type { QueryCacheConfig } from "../cache/query-cache.js";
+import { QueryCache } from "../cache/query-cache.js";
+import { isAuditedEntity } from "../decorators/audited.js";
+import { getColumnMappings, getColumnTypeMappings } from "../decorators/column.js";
 import type { LifecycleEvent } from "../decorators/lifecycle.js";
-import { EntityChangeTracker } from "../mapping/change-tracker.js";
-import type { StreamOptions } from "./streaming.js";
-import type { EventBus } from "../events/event-bus.js";
+import { getProjectionMetadata } from "../decorators/projection.js";
+import type { OneToOneRelation } from "../decorators/relations.js";
+import { getSoftDeleteMetadata } from "../decorators/soft-delete.js";
+import type { VectorMetadataEntry } from "../decorators/vector.js";
+import { getVectorFields } from "../decorators/vector.js";
+import { isMaterializedViewEntity, isViewEntity } from "../decorators/view.js";
 import type { EntityLoadedEvent, EntityPersistedEvent } from "../events/entity-events.js";
 import { ENTITY_EVENTS } from "../events/entity-events.js";
-import type { OneToOneRelation } from "../decorators/relations.js";
-import { getTableName } from "../decorators/table.js";
-import { getColumnMappings, getColumnTypeMappings } from "../decorators/column.js";
+import type { EventBus } from "../events/event-bus.js";
+import { FilterContext } from "../filter/filter-context.js";
+import type { FilterRegistration } from "../filter/filter-registry.js";
+import { getFilters, resolveActiveFilters } from "../filter/filter-registry.js";
+import { EntityChangeTracker } from "../mapping/change-tracker.js";
+import type { EntityMetadata, FieldMapping } from "../mapping/entity-metadata.js";
+import { getEntityMetadata } from "../mapping/entity-metadata.js";
 import { getFieldValue, setFieldValue } from "../mapping/field-access.js";
+import { createRowMapper } from "../mapping/row-mapper.js";
+import { BulkOperationBuilder } from "../query/bulk-operation-builder.js";
+import type { Criteria, VectorMetric } from "../query/criteria.js";
 import {
-  getJoinFetchSpecs,
-  buildJoinColumns,
+  ComparisonCriteria,
+  LogicalCriteria,
+  NullCriteria,
+  RawComparisonCriteria,
+  VectorDistanceCriteria,
+} from "../query/criteria.js";
+import { DeleteBuilder, SelectBuilder, UpdateBuilder } from "../query/query-builder.js";
+import type { Specification } from "../query/specification.js";
+import { NoTenantException, TenantContext } from "../tenant/tenant-context.js";
+import { getTenantColumn } from "../tenant/tenant-filter.js";
+import { toVectorLiteral } from "../vector/vector-utils.js";
+import { CascadeManager } from "./cascade-manager.js";
+import type { CrudRepository } from "./crud-repository.js";
+import { DerivedQueryHandler } from "./derived-query-handler.js";
+import { EntityNotFoundException } from "./entity-not-found.js";
+import { EntityPersister } from "./entity-persister.js";
+import { createLazyCollectionProxy, createLazySingleProxy, isLazyProxy } from "./lazy-proxy.js";
+import type { Pageable } from "./paging.js";
+import { createPage } from "./paging.js";
+import {
   addJoins,
+  batchLoadManyToMany,
+  batchLoadOneToMany,
+  buildJoinColumns,
   extractParentRow,
   extractRelatedRow,
-  batchLoadOneToMany,
-  batchLoadManyToMany,
+  getJoinFetchSpecs,
 } from "./relation-loader.js";
-import type { JoinSpec } from "./relation-loader.js";
-import {
-  createLazySingleProxy,
-  createLazyCollectionProxy,
-  isLazyProxy,
-} from "./lazy-proxy.js";
-import { TenantContext, NoTenantException } from "../tenant/tenant-context.js";
-import { getTenantColumn } from "../tenant/tenant-filter.js";
-import { EntityPersister } from "./entity-persister.js";
-import { CascadeManager } from "./cascade-manager.js";
-import { DerivedQueryHandler } from "./derived-query-handler.js";
-import { getFilters, resolveActiveFilters } from "../filter/filter-registry.js";
-import type { FilterRegistration } from "../filter/filter-registry.js";
-import { FilterContext } from "../filter/filter-context.js";
-import { getSoftDeleteMetadata } from "../decorators/soft-delete.js";
-import { NullCriteria } from "../query/criteria.js";
-import { isAuditedEntity } from "../decorators/audited.js";
-import { AuditLogWriter } from "../audit/audit-log.js";
-import { isViewEntity, isMaterializedViewEntity } from "../decorators/view.js";
+import type { StreamOptions } from "./streaming.js";
 
 function isProjectionClass(arg: unknown): arg is new (...args: any[]) => any {
   return typeof arg === "function" && getProjectionMetadata(arg) !== undefined;
@@ -93,7 +98,13 @@ export function createDerivedRepository<T, ID>(
   let queryCacheConfig: QueryCacheConfig | undefined;
   let eventBus: EventBus | undefined;
   let bulkDialect: import("../query/bulk-operation-builder.js").BulkDialect = "postgres";
-  if (cacheConfig && ("entityCache" in cacheConfig || "queryCache" in cacheConfig || "eventBus" in cacheConfig || "dialect" in cacheConfig)) {
+  if (
+    cacheConfig &&
+    ("entityCache" in cacheConfig ||
+      "queryCache" in cacheConfig ||
+      "eventBus" in cacheConfig ||
+      "dialect" in cacheConfig)
+  ) {
     const opts = cacheConfig as DerivedRepositoryOptions;
     entityCacheConfig = opts.entityCache;
     queryCacheConfig = opts.queryCache;
@@ -250,9 +261,7 @@ export function createDerivedRepository<T, ID>(
   }
 
   function getIdColumn(): string {
-    const field = metadata.fields.find(
-      (f: FieldMapping) => f.fieldName === metadata.idField,
-    );
+    const field = metadata.fields.find((f: FieldMapping) => f.fieldName === metadata.idField);
     return field ? field.columnName : String(metadata.idField);
   }
 
@@ -262,9 +271,7 @@ export function createDerivedRepository<T, ID>(
 
   function getVersionColumn(): string | undefined {
     if (!metadata.versionField) return undefined;
-    const field = metadata.fields.find(
-      (f: FieldMapping) => f.fieldName === metadata.versionField,
-    );
+    const field = metadata.fields.find((f: FieldMapping) => f.fieldName === metadata.versionField);
     return field ? field.columnName : undefined;
   }
 
@@ -377,7 +384,9 @@ export function createDerivedRepository<T, ID>(
       getMetadata: () => [],
       close: async () => {},
       [Symbol.asyncIterator]: () => ({
-        async next() { return { value: undefined as any, done: true as const }; },
+        async next() {
+          return { value: undefined as any, done: true as const };
+        },
       }),
     };
     const entity = rowMapper.mapRow(mockRs);
@@ -397,7 +406,9 @@ export function createDerivedRepository<T, ID>(
           getMetadata: () => [],
           close: async () => {},
           [Symbol.asyncIterator]: () => ({
-            async next() { return { value: undefined as any, done: true as const }; },
+            async next() {
+              return { value: undefined as any, done: true as const };
+            },
           }),
         };
         (entity as Record<string | symbol, unknown>)[spec.relation.fieldName] = targetMapper.mapRow(relMockRs);
@@ -441,7 +452,7 @@ export function createDerivedRepository<T, ID>(
               const targetPkColumn = targetColumnMappings.get(targetIdField) ?? String(targetIdField);
 
               const relQuery = new SelectBuilder(targetMetadata.tableName)
-                .columns(...targetMetadata.fields.map(f => f.columnName))
+                .columns(...targetMetadata.fields.map((f) => f.columnName))
                 .where(new ComparisonCriteria("eq", targetPkColumn, fkValue))
                 .limit(1)
                 .build();
@@ -465,13 +476,13 @@ export function createDerivedRepository<T, ID>(
         }
       } else if (relation.mappedBy) {
         const owningRelation = targetMetadata.oneToOneRelations.find(
-          r => r.isOwning && String(r.fieldName) === relation.mappedBy,
+          (r) => r.isOwning && String(r.fieldName) === relation.mappedBy,
         );
         if (!owningRelation || !owningRelation.joinColumn) continue;
 
         const entityId = getEntityId(entity) as SqlValue;
         const relQuery = new SelectBuilder(targetMetadata.tableName)
-          .columns(...targetMetadata.fields.map(f => f.columnName))
+          .columns(...targetMetadata.fields.map((f) => f.columnName))
           .where(new ComparisonCriteria("eq", owningRelation.joinColumn, entityId))
           .limit(1)
           .build();
@@ -527,7 +538,7 @@ export function createDerivedRepository<T, ID>(
                 const targetPkCol = targetColumnMappings.get(targetIdField) ?? String(targetIdField);
 
                 const relQuery = new SelectBuilder(targetMeta.tableName)
-                  .columns(...targetMeta.fields.map(f => f.columnName))
+                  .columns(...targetMeta.fields.map((f) => f.columnName))
                   .where(new ComparisonCriteria("eq", targetPkCol, fkValue))
                   .limit(1)
                   .build();
@@ -586,7 +597,7 @@ export function createDerivedRepository<T, ID>(
                   const targetPkCol = targetColumnMappings.get(targetIdField) ?? String(targetIdField);
 
                   const relQuery = new SelectBuilder(targetMeta.tableName)
-                    .columns(...targetMeta.fields.map(f => f.columnName))
+                    .columns(...targetMeta.fields.map((f) => f.columnName))
                     .where(new ComparisonCriteria("eq", targetPkCol, fkValue))
                     .limit(1)
                     .build();
@@ -609,12 +620,12 @@ export function createDerivedRepository<T, ID>(
             }
           } else if (relation.mappedBy) {
             const owningRelation = targetMeta.oneToOneRelations.find(
-              r => r.isOwning && String(r.fieldName) === relation.mappedBy,
+              (r) => r.isOwning && String(r.fieldName) === relation.mappedBy,
             );
             if (!owningRelation || !owningRelation.joinColumn) return null;
 
             const relQuery = new SelectBuilder(targetMeta.tableName)
-              .columns(...targetMeta.fields.map(f => f.columnName))
+              .columns(...targetMeta.fields.map((f) => f.columnName))
               .where(new ComparisonCriteria("eq", owningRelation.joinColumn, entityId))
               .limit(1)
               .build();
@@ -685,9 +696,7 @@ export function createDerivedRepository<T, ID>(
   }
 
   async function loadRelationsAndPostLoad(entity: T, conn: Connection, id: unknown): Promise<void> {
-    const selectOneToOnes = metadata.oneToOneRelations.filter(
-      (r) => r.fetchStrategy !== "JOIN",
-    );
+    const selectOneToOnes = metadata.oneToOneRelations.filter((r) => r.fetchStrategy !== "JOIN");
     if (selectOneToOnes.length > 0) {
       await loadOneToOneRelations(entity, conn);
     }
@@ -695,14 +704,12 @@ export function createDerivedRepository<T, ID>(
     for (const relation of metadata.oneToManyRelations) {
       if (relation.fetchStrategy !== "BATCH" || relation.lazy) continue;
       const childMap = await batchLoadOneToMany(conn, singleId, relation, metadata);
-      (entity as Record<string | symbol, unknown>)[relation.fieldName] =
-        childMap.get(id) ?? [];
+      (entity as Record<string | symbol, unknown>)[relation.fieldName] = childMap.get(id) ?? [];
     }
     for (const relation of metadata.manyToManyRelations) {
       if (relation.fetchStrategy !== "BATCH" || relation.lazy) continue;
       const childMap = await batchLoadManyToMany(conn, singleId, relation);
-      (entity as Record<string | symbol, unknown>)[relation.fieldName] =
-        childMap.get(id) ?? [];
+      (entity as Record<string | symbol, unknown>)[relation.fieldName] = childMap.get(id) ?? [];
     }
     await postLoadEntity(entity, id);
   }
@@ -715,8 +722,7 @@ export function createDerivedRepository<T, ID>(
       const childMap = await batchLoadOneToMany(conn, parentIds, relation, metadata);
       for (const entity of results) {
         const id = getEntityId(entity);
-        (entity as Record<string | symbol, unknown>)[relation.fieldName] =
-          childMap.get(id) ?? [];
+        (entity as Record<string | symbol, unknown>)[relation.fieldName] = childMap.get(id) ?? [];
       }
     }
     for (const relation of metadata.manyToManyRelations) {
@@ -724,8 +730,7 @@ export function createDerivedRepository<T, ID>(
       const childMap = await batchLoadManyToMany(conn, parentIds, relation);
       for (const entity of results) {
         const id = getEntityId(entity);
-        (entity as Record<string | symbol, unknown>)[relation.fieldName] =
-          childMap.get(id) ?? [];
+        (entity as Record<string | symbol, unknown>)[relation.fieldName] = childMap.get(id) ?? [];
       }
     }
   }
@@ -806,18 +811,14 @@ export function createDerivedRepository<T, ID>(
     // Post-persist lifecycle and events
     for (const entity of results) {
       await persister.invokeLifecycleCallbacks(entity, "PostPersist");
-      await persister.emitEntityEvent(
-        ENTITY_EVENTS.PERSISTED,
-        `${ENTITY_EVENTS.PERSISTED}:${entityName}`,
-        {
-          type: "persisted",
-          entityClass,
-          entityName,
-          entity,
-          id: getEntityId(entity),
-          timestamp: new Date(),
-        } satisfies EntityPersistedEvent<T>,
-      );
+      await persister.emitEntityEvent(ENTITY_EVENTS.PERSISTED, `${ENTITY_EVENTS.PERSISTED}:${entityName}`, {
+        type: "persisted",
+        entityClass,
+        entityName,
+        entity,
+        id: getEntityId(entity),
+        timestamp: new Date(),
+      } satisfies EntityPersistedEvent<T>);
     }
 
     entityCache.clear();
@@ -894,9 +895,7 @@ export function createDerivedRepository<T, ID>(
           }
           const rs = await stmt.executeQuery();
           if (await rs.next()) {
-            const result = joinFetchSpecs.length > 0
-              ? mapJoinRow(rs.getRow())
-              : rowMapper.mapRow(rs);
+            const result = joinFetchSpecs.length > 0 ? mapJoinRow(rs.getRow()) : rowMapper.mapRow(rs);
             await loadRelationsAndPostLoad(result, conn, id);
             return result;
           }
@@ -942,7 +941,9 @@ export function createDerivedRepository<T, ID>(
       }
     },
 
-    async findAll(specOrProjectionOrPageable?: Specification<T> | (new (...args: any[]) => any) | Pageable): Promise<any> {
+    async findAll(
+      specOrProjectionOrPageable?: Specification<T> | (new (...args: any[]) => any) | Pageable,
+    ): Promise<any> {
       if (repoLogger.isEnabled(LogLevel.DEBUG)) {
         repoLogger.debug("findAll", { operation: "findAll", entityType: entityName });
       }
@@ -960,8 +961,7 @@ export function createDerivedRepository<T, ID>(
         const page = typeof rawPage === "string" ? Number(rawPage) : rawPage;
         const size = typeof rawSize === "string" ? Number(rawSize) : rawSize;
 
-        if (typeof page !== "number" || typeof size !== "number" ||
-            !Number.isFinite(page) || !Number.isFinite(size)) {
+        if (typeof page !== "number" || typeof size !== "number" || !Number.isFinite(page) || !Number.isFinite(size)) {
           throw new Error(
             `Invalid Pageable: page and size must be finite numbers. Got page=${rawPage}, size=${rawSize}.`,
           );
@@ -1049,12 +1049,8 @@ export function createDerivedRepository<T, ID>(
             const rs = await stmt.executeQuery();
             const results: T[] = [];
             while (await rs.next()) {
-              const entity = useJoinFetch
-                ? mapJoinRow(rs.getRow())
-                : rowMapper.mapRow(rs);
-              const selectOneToOnes = metadata.oneToOneRelations.filter(
-                (r) => r.fetchStrategy !== "JOIN",
-              );
+              const entity = useJoinFetch ? mapJoinRow(rs.getRow()) : rowMapper.mapRow(rs);
+              const selectOneToOnes = metadata.oneToOneRelations.filter((r) => r.fetchStrategy !== "JOIN");
               if (selectOneToOnes.length > 0) {
                 await loadOneToOneRelations(entity, conn);
               }
@@ -1076,9 +1072,12 @@ export function createDerivedRepository<T, ID>(
       }
 
       if (specOrProjectionOrPageable && isProjectionClass(specOrProjectionOrPageable as any)) {
-        const projMapper = derivedQueryHandler.getCachedProjectionMapper(specOrProjectionOrPageable as new (...args: any[]) => any);
-        const builder = new SelectBuilder(metadata.tableName)
-          .columns(...projMapper.columns);
+        const projMapper = derivedQueryHandler.getCachedProjectionMapper(
+          specOrProjectionOrPageable as new (
+            ...args: any[]
+          ) => any,
+        );
+        const builder = new SelectBuilder(metadata.tableName).columns(...projMapper.columns);
         applyAllFilters(builder);
 
         const query = builder.build();
@@ -1112,8 +1111,8 @@ export function createDerivedRepository<T, ID>(
         } else {
           throw new Error(
             `Invalid argument to findAll(): expected Specification (with toPredicate method), ` +
-            `Pageable (with page and size), or a projection class. ` +
-            `Got ${typeof specOrProjectionOrPageable}: ${JSON.stringify(specOrProjectionOrPageable)}`,
+              `Pageable (with page and size), or a projection class. ` +
+              `Got ${typeof specOrProjectionOrPageable}: ${JSON.stringify(specOrProjectionOrPageable)}`,
           );
         }
       }
@@ -1155,12 +1154,8 @@ export function createDerivedRepository<T, ID>(
           const rs = await stmt.executeQuery();
           const results: T[] = [];
           while (await rs.next()) {
-            const entity = useJoinFetch
-              ? mapJoinRow(rs.getRow())
-              : rowMapper.mapRow(rs);
-            const selectOneToOnes = metadata.oneToOneRelations.filter(
-              (r) => r.fetchStrategy !== "JOIN",
-            );
+            const entity = useJoinFetch ? mapJoinRow(rs.getRow()) : rowMapper.mapRow(rs);
+            const selectOneToOnes = metadata.oneToOneRelations.filter((r) => r.fetchStrategy !== "JOIN");
             if (selectOneToOnes.length > 0) {
               await loadOneToOneRelations(entity, conn);
             }
@@ -1191,10 +1186,10 @@ export function createDerivedRepository<T, ID>(
       }
       // Wrap in transaction when cascade relations exist for atomicity
       const hasCascade =
-        metadata.oneToManyRelations.some(r => r.cascade.size > 0) ||
-        metadata.manyToManyRelations.some(r => r.cascade.size > 0) ||
-        metadata.oneToOneRelations.some(r => r.cascade.size > 0) ||
-        metadata.manyToOneRelations.some(r => r.cascade.size > 0);
+        metadata.oneToManyRelations.some((r) => r.cascade.size > 0) ||
+        metadata.manyToManyRelations.some((r) => r.cascade.size > 0) ||
+        metadata.oneToOneRelations.some((r) => r.cascade.size > 0) ||
+        metadata.manyToOneRelations.some((r) => r.cascade.size > 0);
       const conn = await dataSource.getConnection();
       if (hasCascade) {
         const tx = await conn.beginTransaction();
@@ -1301,13 +1296,7 @@ export function createDerivedRepository<T, ID>(
       // Update all columns except the ID on conflict
       const updateColumns = columns.filter((c) => c !== idCol);
 
-      const queries = bulkBuilder.buildBulkUpsert(
-        metadata.tableName,
-        columns,
-        rows,
-        [idCol],
-        updateColumns,
-      );
+      const queries = bulkBuilder.buildBulkUpsert(metadata.tableName, columns, rows, [idCol], updateColumns);
 
       const conn = await dataSource.getConnection();
       const tx = await conn.beginTransaction();
@@ -1410,8 +1399,9 @@ export function createDerivedRepository<T, ID>(
           await conn.close();
         }
       } else {
-        const builder = new DeleteBuilder(metadata.tableName)
-          .where(new ComparisonCriteria("eq", idCol, id as SqlValue));
+        const builder = new DeleteBuilder(metadata.tableName).where(
+          new ComparisonCriteria("eq", idCol, id as SqlValue),
+        );
         applyAllFilters(builder);
 
         const query = builder.build();
@@ -1435,8 +1425,9 @@ export function createDerivedRepository<T, ID>(
     },
 
     findAllStream(options?: StreamOptions<T>): AsyncIterable<T> {
-      const builder = new SelectBuilder(metadata.tableName)
-        .columns(...metadata.fields.map((f: FieldMapping) => f.columnName));
+      const builder = new SelectBuilder(metadata.tableName).columns(
+        ...metadata.fields.map((f: FieldMapping) => f.columnName),
+      );
 
       if (options?.where) {
         builder.where(options.where.toPredicate(metadata));
@@ -1555,13 +1546,9 @@ export function createDerivedRepository<T, ID>(
             throw new EntityNotFoundException(entityClass.name, String(id));
           }
 
-          const freshEntity = joinFetchSpecs.length > 0
-            ? mapJoinRow(rs.getRow())
-            : rowMapper.mapRow(rs);
+          const freshEntity = joinFetchSpecs.length > 0 ? mapJoinRow(rs.getRow()) : rowMapper.mapRow(rs);
 
-          const selectOneToOnes = metadata.oneToOneRelations.filter(
-            (r) => r.fetchStrategy !== "JOIN",
-          );
+          const selectOneToOnes = metadata.oneToOneRelations.filter((r) => r.fetchStrategy !== "JOIN");
           if (selectOneToOnes.length > 0) {
             await loadOneToOneRelations(freshEntity, conn);
           }
@@ -1570,14 +1557,12 @@ export function createDerivedRepository<T, ID>(
           for (const relation of metadata.oneToManyRelations) {
             if (relation.fetchStrategy !== "BATCH" || relation.lazy) continue;
             const childMap = await batchLoadOneToMany(conn, singleId, relation, metadata);
-            (freshEntity as Record<string | symbol, unknown>)[relation.fieldName] =
-              childMap.get(id) ?? [];
+            (freshEntity as Record<string | symbol, unknown>)[relation.fieldName] = childMap.get(id) ?? [];
           }
           for (const relation of metadata.manyToManyRelations) {
             if (relation.fetchStrategy !== "BATCH" || relation.lazy) continue;
             const childMap = await batchLoadManyToMany(conn, singleId, relation);
-            (freshEntity as Record<string | symbol, unknown>)[relation.fieldName] =
-              childMap.get(id) ?? [];
+            (freshEntity as Record<string | symbol, unknown>)[relation.fieldName] = childMap.get(id) ?? [];
           }
 
           attachLazyProxies(freshEntity);
@@ -1649,20 +1634,24 @@ export function createDerivedRepository<T, ID>(
             );
           }
           for (const relation of metadata.manyToOneRelations) {
-            (entity as Record<string | symbol, unknown>)[relation.fieldName] =
-              (freshEntity as Record<string | symbol, unknown>)[relation.fieldName];
+            (entity as Record<string | symbol, unknown>)[relation.fieldName] = (
+              freshEntity as Record<string | symbol, unknown>
+            )[relation.fieldName];
           }
           for (const relation of metadata.oneToOneRelations) {
-            (entity as Record<string | symbol, unknown>)[relation.fieldName] =
-              (freshEntity as Record<string | symbol, unknown>)[relation.fieldName];
+            (entity as Record<string | symbol, unknown>)[relation.fieldName] = (
+              freshEntity as Record<string | symbol, unknown>
+            )[relation.fieldName];
           }
           for (const relation of metadata.oneToManyRelations) {
-            (entity as Record<string | symbol, unknown>)[relation.fieldName] =
-              (freshEntity as Record<string | symbol, unknown>)[relation.fieldName];
+            (entity as Record<string | symbol, unknown>)[relation.fieldName] = (
+              freshEntity as Record<string | symbol, unknown>
+            )[relation.fieldName];
           }
           for (const relation of metadata.manyToManyRelations) {
-            (entity as Record<string | symbol, unknown>)[relation.fieldName] =
-              (freshEntity as Record<string | symbol, unknown>)[relation.fieldName];
+            (entity as Record<string | symbol, unknown>)[relation.fieldName] = (
+              freshEntity as Record<string | symbol, unknown>
+            )[relation.fieldName];
           }
 
           await persister.invokeLifecycleCallbacks(entity, "PostLoad");
@@ -1824,17 +1813,12 @@ export function createDerivedRepository<T, ID>(
     const distOp = vectorOperators[metric];
     const vectorLiteral = toVectorLiteral(vector);
 
-    const builder = new SelectBuilder(metadata.tableName)
-      .columns(...metadata.fields.map((f: FieldMapping) => f.columnName));
+    const builder = new SelectBuilder(metadata.tableName).columns(
+      ...metadata.fields.map((f: FieldMapping) => f.columnName),
+    );
 
     if (maxDistance !== undefined) {
-      builder.where(new VectorDistanceCriteria(
-        vecMeta.columnName,
-        vector,
-        metric,
-        "lte",
-        maxDistance,
-      ));
+      builder.where(new VectorDistanceCriteria(vecMeta.columnName, vector, metric, "lte", maxDistance));
     }
 
     applyAllFilters(builder);
@@ -1903,21 +1887,14 @@ export function createDerivedRepository<T, ID>(
     const vectorLiteral = toVectorLiteral(vector);
 
     // Use rawColumns for the SELECT list so we can include the distance expression
-    const entityCols = metadata.fields.map((f: FieldMapping) =>
-      `${quoteIdentifier(metadata.tableName)}.${quoteIdentifier(f.columnName)}`
+    const entityCols = metadata.fields.map(
+      (f: FieldMapping) => `${quoteIdentifier(metadata.tableName)}.${quoteIdentifier(f.columnName)}`,
     );
 
-    const builder = new SelectBuilder(metadata.tableName)
-      .rawColumns(...entityCols);
+    const builder = new SelectBuilder(metadata.tableName).rawColumns(...entityCols);
 
     if (maxDistance !== undefined) {
-      builder.where(new VectorDistanceCriteria(
-        vecMeta.columnName,
-        vector,
-        metric,
-        "lte",
-        maxDistance,
-      ));
+      builder.where(new VectorDistanceCriteria(vecMeta.columnName, vector, metric, "lte", maxDistance));
     }
 
     applyAllFilters(builder);
@@ -1963,7 +1940,7 @@ export function createDerivedRepository<T, ID>(
 
         // Post-load processing
         if (results.length > 0) {
-          const entities = results.map(r => r.entity);
+          const entities = results.map((r) => r.entity);
           await batchLoadCollections(entities, conn);
           for (const entity of entities) {
             const id = getEntityId(entity);
@@ -2011,10 +1988,23 @@ export function createDerivedRepository<T, ID>(
   ]);
 
   const tracedMethods = new Set<string>([
-    "findById", "existsById", "findAll", "save", "saveAll", "upsertAll",
-    "delete", "deleteAll", "deleteById", "refresh", "count",
-    "restore", "findIncludingDeleted", "findOnlyDeleted", "softDelete",
-    "findBySimilarity", "findBySimilarityWithDistance",
+    "findById",
+    "existsById",
+    "findAll",
+    "save",
+    "saveAll",
+    "upsertAll",
+    "delete",
+    "deleteAll",
+    "deleteById",
+    "refresh",
+    "count",
+    "restore",
+    "findIncludingDeleted",
+    "findOnlyDeleted",
+    "softDelete",
+    "findBySimilarity",
+    "findBySimilarityWithDistance",
   ]);
 
   (crudMethods as any).getEntityCache = () => entityCache;
@@ -2061,8 +2051,19 @@ export function createDerivedRepository<T, ID>(
             const result = (method as Function).apply(target, args);
             if (result && typeof result === "object" && typeof result.then === "function") {
               return result.then(
-                (val: any) => { span.setStatus({ code: SpanStatusCode.OK }); span.end(); return val; },
-                (err: any) => { span.setStatus({ code: SpanStatusCode.ERROR, message: err instanceof Error ? err.message : String(err) }); span.end(); throw err; },
+                (val: any) => {
+                  span.setStatus({ code: SpanStatusCode.OK });
+                  span.end();
+                  return val;
+                },
+                (err: any) => {
+                  span.setStatus({
+                    code: SpanStatusCode.ERROR,
+                    message: err instanceof Error ? err.message : String(err),
+                  });
+                  span.end();
+                  throw err;
+                },
               );
             }
             span.setStatus({ code: SpanStatusCode.OK });

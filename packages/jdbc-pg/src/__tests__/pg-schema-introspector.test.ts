@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { Connection, PreparedStatement, ResultSet } from "espalier-jdbc";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PgSchemaIntrospector } from "../pg-schema-introspector.js";
 
 function createMockResultSet(rows: Record<string, unknown>[]): ResultSet {
@@ -51,9 +51,7 @@ function createMockResultSet(rows: Record<string, unknown>[]): ResultSet {
   };
 }
 
-function createMockPreparedStatement(
-  rs: ResultSet,
-): PreparedStatement {
+function createMockPreparedStatement(rs: ResultSet): PreparedStatement {
   return {
     setParameter: vi.fn(),
     executeQuery: vi.fn(async () => rs),
@@ -93,18 +91,14 @@ describe("PgSchemaIntrospector", () => {
     });
 
     it("accepts a custom schema", async () => {
-      const rs = createMockResultSet([
-        { table_name: "items", table_schema: "inventory" },
-      ]);
+      const rs = createMockResultSet([{ table_name: "items", table_schema: "inventory" }]);
       const ps = createMockPreparedStatement(rs);
       const conn = createMockConnection(() => ps);
       const introspector = new PgSchemaIntrospector(conn);
 
       const tables = await introspector.getTables("inventory");
 
-      expect(tables).toEqual([
-        { tableName: "items", schema: "inventory" },
-      ]);
+      expect(tables).toEqual([{ tableName: "items", schema: "inventory" }]);
       expect(ps.setParameter).toHaveBeenCalledWith(1, "inventory");
     });
 
@@ -126,12 +120,8 @@ describe("PgSchemaIntrospector", () => {
 
       await introspector.getTables();
 
-      expect(conn.prepareStatement).toHaveBeenCalledWith(
-        expect.stringContaining("information_schema.tables"),
-      );
-      expect(conn.prepareStatement).toHaveBeenCalledWith(
-        expect.stringContaining("BASE TABLE"),
-      );
+      expect(conn.prepareStatement).toHaveBeenCalledWith(expect.stringContaining("information_schema.tables"));
+      expect(conn.prepareStatement).toHaveBeenCalledWith(expect.stringContaining("BASE TABLE"));
     });
   });
 
@@ -250,9 +240,7 @@ describe("PgSchemaIntrospector", () => {
 
   describe("getPrimaryKeys()", () => {
     it("returns primary key column names", async () => {
-      const rs = createMockResultSet([
-        { column_name: "id" },
-      ]);
+      const rs = createMockResultSet([{ column_name: "id" }]);
       const ps = createMockPreparedStatement(rs);
       const conn = createMockConnection(() => ps);
       const introspector = new PgSchemaIntrospector(conn);
@@ -265,10 +253,7 @@ describe("PgSchemaIntrospector", () => {
     });
 
     it("returns multiple keys for composite primary key", async () => {
-      const rs = createMockResultSet([
-        { column_name: "user_id" },
-        { column_name: "role_id" },
-      ]);
+      const rs = createMockResultSet([{ column_name: "user_id" }, { column_name: "role_id" }]);
       const ps = createMockPreparedStatement(rs);
       const conn = createMockConnection(() => ps);
       const introspector = new PgSchemaIntrospector(conn);
@@ -295,15 +280,9 @@ describe("PgSchemaIntrospector", () => {
 
       await introspector.getPrimaryKeys("users");
 
-      expect(conn.prepareStatement).toHaveBeenCalledWith(
-        expect.stringContaining("table_constraints"),
-      );
-      expect(conn.prepareStatement).toHaveBeenCalledWith(
-        expect.stringContaining("key_column_usage"),
-      );
-      expect(conn.prepareStatement).toHaveBeenCalledWith(
-        expect.stringContaining("PRIMARY KEY"),
-      );
+      expect(conn.prepareStatement).toHaveBeenCalledWith(expect.stringContaining("table_constraints"));
+      expect(conn.prepareStatement).toHaveBeenCalledWith(expect.stringContaining("key_column_usage"));
+      expect(conn.prepareStatement).toHaveBeenCalledWith(expect.stringContaining("PRIMARY KEY"));
     });
   });
 
@@ -351,9 +330,7 @@ describe("PgSchemaIntrospector", () => {
 
       await introspector.tableExists("users");
 
-      expect(conn.prepareStatement).toHaveBeenCalledWith(
-        expect.stringContaining("information_schema.tables"),
-      );
+      expect(conn.prepareStatement).toHaveBeenCalledWith(expect.stringContaining("information_schema.tables"));
     });
   });
 });

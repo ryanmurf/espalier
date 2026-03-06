@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync, existsSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 export interface CreateMigrationOptions {
@@ -67,15 +67,11 @@ export function createMigration(options: CreateMigrationOptions): CreateMigratio
   }
 
   if (!/^[a-zA-Z][a-zA-Z0-9_ -]*$/.test(name)) {
-    throw new Error(
-      `Invalid migration name: "${name}". Use only letters, digits, spaces, hyphens, and underscores.`,
-    );
+    throw new Error(`Invalid migration name: "${name}". Use only letters, digits, spaces, hyphens, and underscores.`);
   }
 
   if (name.length > 200) {
-    throw new Error(
-      `Migration name is too long (${name.length} chars). Maximum is 200 characters.`,
-    );
+    throw new Error(`Migration name is too long (${name.length} chars). Maximum is 200 characters.`);
   }
 
   const description = toSnakeCase(name);
@@ -94,4 +90,8 @@ export function createMigration(options: CreateMigrationOptions): CreateMigratio
 }
 
 // Exported for testing
-export { generateVersion as _generateVersion, generateMigrationTemplate as _generateMigrationTemplate, toSnakeCase as _toSnakeCase };
+export {
+  generateVersion as _generateVersion,
+  generateMigrationTemplate as _generateMigrationTemplate,
+  toSnakeCase as _toSnakeCase,
+};

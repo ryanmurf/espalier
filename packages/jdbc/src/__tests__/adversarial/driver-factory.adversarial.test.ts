@@ -12,17 +12,17 @@
  * - Registry isolation (clearDataSourceFactories)
  * - Idempotency, override behavior, type safety
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import {
-  createDataSource,
-  registerDataSourceFactory,
-  hasDataSourceFactory,
-  clearDataSourceFactories,
-} from "../../driver-factory.js";
-import type { DataSourceConfig, DataSourceFactory, Dialect } from "../../driver-factory.js";
-import type { DataSource } from "../../data-source.js";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Connection } from "../../connection.js";
+import type { DataSource } from "../../data-source.js";
 import type { RuntimeInfo } from "../../driver-adapter.js";
+import type { DataSourceConfig, Dialect } from "../../driver-factory.js";
+import {
+  clearDataSourceFactories,
+  createDataSource,
+  hasDataSourceFactory,
+  registerDataSourceFactory,
+} from "../../driver-factory.js";
 
 // -- Mock DataSource for testing ---------------------------------------------
 
@@ -78,9 +78,7 @@ describe("registerDataSourceFactory and createDataSource", () => {
   });
 
   it("throws error for unregistered dialect", () => {
-    expect(() => createDataSource("postgres", {})).toThrow(
-      /No DataSource factory registered/,
-    );
+    expect(() => createDataSource("postgres", {})).toThrow(/No DataSource factory registered/);
   });
 
   it("error message includes dialect and runtime", () => {
@@ -318,9 +316,7 @@ describe("factory error handling", () => {
     registerDataSourceFactory("postgres", () => {
       throw new Error("connection pool initialization failed");
     });
-    expect(() => createDataSource("postgres", {})).toThrow(
-      "connection pool initialization failed",
-    );
+    expect(() => createDataSource("postgres", {})).toThrow("connection pool initialization failed");
   });
 
   it("factory that returns undefined is still returned (no validation)", () => {
@@ -331,9 +327,9 @@ describe("factory error handling", () => {
 
   it("registering with no factory function (only dialect and runtime) throws", () => {
     // registerDataSourceFactory with runtime but no factory -- factory param is undefined
-    expect(() =>
-      registerDataSourceFactory("postgres", "bun", undefined as any),
-    ).toThrow(/Factory function is required/);
+    expect(() => registerDataSourceFactory("postgres", "bun", undefined as any)).toThrow(
+      /Factory function is required/,
+    );
     // Nothing should be registered
     expect(hasDataSourceFactory("postgres", "bun")).toBe(false);
   });
@@ -370,13 +366,11 @@ describe("concurrent access", () => {
       return createMockDataSource(`pg-${count}`);
     });
 
-    const promises = Array.from({ length: 50 }, () =>
-      Promise.resolve(createDataSource("postgres", {})),
-    );
+    const promises = Array.from({ length: 50 }, () => Promise.resolve(createDataSource("postgres", {})));
     const results = await Promise.all(promises);
     expect(results).toHaveLength(50);
     // Each call should get its own instance
-    const labels = new Set(results.map(ds => (ds as any)._label));
+    const labels = new Set(results.map((ds) => (ds as any)._label));
     expect(labels.size).toBe(50);
   });
 

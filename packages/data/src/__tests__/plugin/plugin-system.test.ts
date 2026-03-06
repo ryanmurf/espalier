@@ -1,10 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { PluginManager } from "../../plugin/plugin-manager.js";
-import { composeMiddleware } from "../../plugin/middleware.js";
-import { PluginDecorator, getPluginMetadata, getDiscoveredPlugins } from "../../plugin/plugin-decorator.js";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { EventBus } from "../../events/event-bus.js";
-import type { Plugin, PluginContext, HookContext } from "../../plugin/plugin.js";
 import type { MiddlewareContext, MiddlewareFn } from "../../plugin/middleware.js";
+import { composeMiddleware } from "../../plugin/middleware.js";
+import type { HookContext, Plugin, PluginContext } from "../../plugin/plugin.js";
+import { getDiscoveredPlugins, getPluginMetadata, PluginDecorator } from "../../plugin/plugin-decorator.js";
+import { PluginManager } from "../../plugin/plugin-manager.js";
 
 function createPlugin(overrides: Partial<Plugin> & { name: string }): Plugin {
   return {
@@ -32,14 +32,12 @@ describe("PluginManager", () => {
 
     it("throws on duplicate registration", () => {
       manager.register(createPlugin({ name: "test" }));
-      expect(() => manager.register(createPlugin({ name: "test" })))
-        .toThrow('Plugin "test" is already registered');
+      expect(() => manager.register(createPlugin({ name: "test" }))).toThrow('Plugin "test" is already registered');
     });
 
     it("throws on registration after init", async () => {
       await manager.init();
-      expect(() => manager.register(createPlugin({ name: "late" })))
-        .toThrow("Cannot register plugin");
+      expect(() => manager.register(createPlugin({ name: "late" }))).toThrow("Cannot register plugin");
     });
 
     it("getPluginNames returns all registered names", () => {
@@ -67,10 +65,14 @@ describe("PluginManager", () => {
 
     it("passes PluginContext to init", async () => {
       let capturedContext: PluginContext | undefined;
-      manager.register(createPlugin({
-        name: "test",
-        init: (ctx) => { capturedContext = ctx; },
-      }));
+      manager.register(
+        createPlugin({
+          name: "test",
+          init: (ctx) => {
+            capturedContext = ctx;
+          },
+        }),
+      );
 
       await manager.init();
       expect(capturedContext).toBeDefined();
@@ -95,63 +97,93 @@ describe("PluginManager", () => {
   describe("dependency resolution", () => {
     it("initializes dependencies before dependents", async () => {
       const order: string[] = [];
-      manager.register(createPlugin({
-        name: "child",
-        dependencies: [{ name: "parent" }],
-        init: () => { order.push("child"); },
-      }));
-      manager.register(createPlugin({
-        name: "parent",
-        init: () => { order.push("parent"); },
-      }));
+      manager.register(
+        createPlugin({
+          name: "child",
+          dependencies: [{ name: "parent" }],
+          init: () => {
+            order.push("child");
+          },
+        }),
+      );
+      manager.register(
+        createPlugin({
+          name: "parent",
+          init: () => {
+            order.push("parent");
+          },
+        }),
+      );
 
       await manager.init();
       expect(order).toEqual(["parent", "child"]);
     });
 
     it("throws on missing dependency", async () => {
-      manager.register(createPlugin({
-        name: "orphan",
-        dependencies: [{ name: "nonexistent" }],
-      }));
+      manager.register(
+        createPlugin({
+          name: "orphan",
+          dependencies: [{ name: "nonexistent" }],
+        }),
+      );
 
       await expect(manager.init()).rejects.toThrow('depends on "nonexistent"');
     });
 
     it("throws on circular dependency", async () => {
-      manager.register(createPlugin({
-        name: "a",
-        dependencies: [{ name: "b" }],
-      }));
-      manager.register(createPlugin({
-        name: "b",
-        dependencies: [{ name: "a" }],
-      }));
+      manager.register(
+        createPlugin({
+          name: "a",
+          dependencies: [{ name: "b" }],
+        }),
+      );
+      manager.register(
+        createPlugin({
+          name: "b",
+          dependencies: [{ name: "a" }],
+        }),
+      );
 
       await expect(manager.init()).rejects.toThrow("Circular plugin dependency");
     });
 
     it("handles diamond dependencies", async () => {
       const order: string[] = [];
-      manager.register(createPlugin({
-        name: "top",
-        dependencies: [{ name: "left" }, { name: "right" }],
-        init: () => { order.push("top"); },
-      }));
-      manager.register(createPlugin({
-        name: "left",
-        dependencies: [{ name: "base" }],
-        init: () => { order.push("left"); },
-      }));
-      manager.register(createPlugin({
-        name: "right",
-        dependencies: [{ name: "base" }],
-        init: () => { order.push("right"); },
-      }));
-      manager.register(createPlugin({
-        name: "base",
-        init: () => { order.push("base"); },
-      }));
+      manager.register(
+        createPlugin({
+          name: "top",
+          dependencies: [{ name: "left" }, { name: "right" }],
+          init: () => {
+            order.push("top");
+          },
+        }),
+      );
+      manager.register(
+        createPlugin({
+          name: "left",
+          dependencies: [{ name: "base" }],
+          init: () => {
+            order.push("left");
+          },
+        }),
+      );
+      manager.register(
+        createPlugin({
+          name: "right",
+          dependencies: [{ name: "base" }],
+          init: () => {
+            order.push("right");
+          },
+        }),
+      );
+      manager.register(
+        createPlugin({
+          name: "base",
+          init: () => {
+            order.push("base");
+          },
+        }),
+      );
 
       await manager.init();
       expect(order.indexOf("base")).toBeLessThan(order.indexOf("left"));
@@ -164,16 +196,24 @@ describe("PluginManager", () => {
   describe("destroy", () => {
     it("calls destroy on plugins in reverse order", async () => {
       const order: string[] = [];
-      manager.register(createPlugin({
-        name: "first",
-        init: vi.fn(),
-        destroy: () => { order.push("first"); },
-      }));
-      manager.register(createPlugin({
-        name: "second",
-        init: vi.fn(),
-        destroy: () => { order.push("second"); },
-      }));
+      manager.register(
+        createPlugin({
+          name: "first",
+          init: vi.fn(),
+          destroy: () => {
+            order.push("first");
+          },
+        }),
+      );
+      manager.register(
+        createPlugin({
+          name: "second",
+          init: vi.fn(),
+          destroy: () => {
+            order.push("second");
+          },
+        }),
+      );
 
       await manager.init();
       await manager.destroy();
@@ -196,15 +236,19 @@ describe("PluginManager", () => {
   describe("hooks", () => {
     it("executes hooks registered by plugins", async () => {
       const hookCalls: string[] = [];
-      manager.register(createPlugin({
-        name: "test",
-        init: (ctx) => {
-          ctx.addHook({
-            type: "beforeSave",
-            handler: () => { hookCalls.push("beforeSave"); },
-          });
-        },
-      }));
+      manager.register(
+        createPlugin({
+          name: "test",
+          init: (ctx) => {
+            ctx.addHook({
+              type: "beforeSave",
+              handler: () => {
+                hookCalls.push("beforeSave");
+              },
+            });
+          },
+        }),
+      );
 
       await manager.init();
       await manager.executeHooks("beforeSave", {});
@@ -213,18 +257,32 @@ describe("PluginManager", () => {
 
     it("hooks run in registration order", async () => {
       const order: string[] = [];
-      manager.register(createPlugin({
-        name: "a",
-        init: (ctx) => {
-          ctx.addHook({ type: "beforeQuery", handler: () => { order.push("a"); } });
-        },
-      }));
-      manager.register(createPlugin({
-        name: "b",
-        init: (ctx) => {
-          ctx.addHook({ type: "beforeQuery", handler: () => { order.push("b"); } });
-        },
-      }));
+      manager.register(
+        createPlugin({
+          name: "a",
+          init: (ctx) => {
+            ctx.addHook({
+              type: "beforeQuery",
+              handler: () => {
+                order.push("a");
+              },
+            });
+          },
+        }),
+      );
+      manager.register(
+        createPlugin({
+          name: "b",
+          init: (ctx) => {
+            ctx.addHook({
+              type: "beforeQuery",
+              handler: () => {
+                order.push("b");
+              },
+            });
+          },
+        }),
+      );
 
       await manager.init();
       await manager.executeHooks("beforeQuery", {});
@@ -233,18 +291,20 @@ describe("PluginManager", () => {
 
     it("hook context includes metadata map", async () => {
       let capturedCtx: HookContext | undefined;
-      manager.register(createPlugin({
-        name: "test",
-        init: (ctx) => {
-          ctx.addHook({
-            type: "afterSave",
-            handler: (hookCtx) => {
-              capturedCtx = hookCtx;
-              hookCtx.metadata.set("key", "value");
-            },
-          });
-        },
-      }));
+      manager.register(
+        createPlugin({
+          name: "test",
+          init: (ctx) => {
+            ctx.addHook({
+              type: "afterSave",
+              handler: (hookCtx) => {
+                capturedCtx = hookCtx;
+                hookCtx.metadata.set("key", "value");
+              },
+            });
+          },
+        }),
+      );
 
       await manager.init();
       const result = await manager.executeHooks("afterSave", {});
@@ -262,22 +322,28 @@ describe("PluginManager", () => {
   describe("middleware", () => {
     it("middleware registered by plugin is accessible", async () => {
       const mw: MiddlewareFn = async (_ctx, next) => next();
-      manager.register(createPlugin({
-        name: "test",
-        init: (ctx) => { ctx.addMiddleware(mw); },
-      }));
+      manager.register(
+        createPlugin({
+          name: "test",
+          init: (ctx) => {
+            ctx.addMiddleware(mw);
+          },
+        }),
+      );
 
       await manager.init();
       expect(manager.getMiddlewares()).toContain(mw);
     });
 
     it("middleware cleared on destroy", async () => {
-      manager.register(createPlugin({
-        name: "test",
-        init: (ctx) => {
-          ctx.addMiddleware(async (_ctx, next) => next());
-        },
-      }));
+      manager.register(
+        createPlugin({
+          name: "test",
+          init: (ctx) => {
+            ctx.addMiddleware(async (_ctx, next) => next());
+          },
+        }),
+      );
 
       await manager.init();
       await manager.destroy();
@@ -365,8 +431,9 @@ describe("composeMiddleware", () => {
       return next(); // second call should fail
     };
 
-    await expect(composeMiddleware([mw], async () => "ok", makeContext()))
-      .rejects.toThrow("next() called multiple times");
+    await expect(composeMiddleware([mw], async () => "ok", makeContext())).rejects.toThrow(
+      "next() called multiple times",
+    );
   });
 });
 

@@ -10,12 +10,9 @@
  * - runWith (metadata variant)
  * - Deep async chains (setTimeout, Promise.all, queueMicrotask)
  */
-import { describe, it, expect } from "vitest";
-import {
-  TenantContext,
-  NoTenantException,
-} from "../../index.js";
+import { describe, expect, it } from "vitest";
 import type { TenantIdentifier } from "../../index.js";
+import { NoTenantException, TenantContext } from "../../index.js";
 
 // ══════════════════════════════════════════════════
 // Section 1: Happy-path basics
@@ -255,7 +252,7 @@ describe("TenantContext — edge-case tenant IDs", () => {
   it("handles special characters in tenant ID", async () => {
     const specials = [
       "tenant'with'quotes",
-      "tenant\"double\"quotes",
+      'tenant"double"quotes',
       "tenant;drop table;",
       "tenant\nwith\nnewlines",
       "tenant\twith\ttabs",
@@ -307,37 +304,28 @@ describe("TenantContext — runWith (metadata)", () => {
   });
 
   it("runWith nested overwrites metadata", async () => {
-    await TenantContext.runWith(
-      { tenantId: "outer", metadata: { x: 1 } },
-      async () => {
-        await TenantContext.runWith(
-          { tenantId: "inner", metadata: { y: 2 } },
-          async () => {
-            expect(TenantContext.currentIdentifier()?.metadata).toEqual({
-              y: 2,
-            });
-          },
-        );
-        expect(TenantContext.currentIdentifier()?.metadata).toEqual({ x: 1 });
-      },
-    );
+    await TenantContext.runWith({ tenantId: "outer", metadata: { x: 1 } }, async () => {
+      await TenantContext.runWith({ tenantId: "inner", metadata: { y: 2 } }, async () => {
+        expect(TenantContext.currentIdentifier()?.metadata).toEqual({
+          y: 2,
+        });
+      });
+      expect(TenantContext.currentIdentifier()?.metadata).toEqual({ x: 1 });
+    });
   });
 
   it("run() inside runWith() overrides metadata to undefined", async () => {
-    await TenantContext.runWith(
-      { tenantId: "meta", metadata: { key: "val" } },
-      async () => {
-        await TenantContext.run("plain", async () => {
-          // run() creates a TenantIdentifier with just tenantId — no metadata
-          expect(TenantContext.current()).toBe("plain");
-          expect(TenantContext.currentIdentifier()?.metadata).toBeUndefined();
-        });
-        // runWith metadata should be restored
-        expect(TenantContext.currentIdentifier()?.metadata).toEqual({
-          key: "val",
-        });
-      },
-    );
+    await TenantContext.runWith({ tenantId: "meta", metadata: { key: "val" } }, async () => {
+      await TenantContext.run("plain", async () => {
+        // run() creates a TenantIdentifier with just tenantId — no metadata
+        expect(TenantContext.current()).toBe("plain");
+        expect(TenantContext.currentIdentifier()?.metadata).toBeUndefined();
+      });
+      // runWith metadata should be restored
+      expect(TenantContext.currentIdentifier()?.metadata).toEqual({
+        key: "val",
+      });
+    });
   });
 });
 
@@ -362,11 +350,7 @@ describe("TenantContext — deep async chain propagation", () => {
         Promise.resolve().then(() => TenantContext.current()),
         Promise.resolve().then(() => TenantContext.current()),
       ]);
-      expect(results).toEqual([
-        "parallel-tenant",
-        "parallel-tenant",
-        "parallel-tenant",
-      ]);
+      expect(results).toEqual(["parallel-tenant", "parallel-tenant", "parallel-tenant"]);
     });
   });
 
@@ -381,9 +365,7 @@ describe("TenantContext — deep async chain propagation", () => {
 
   it("propagates through deeply chained promises (10 levels)", async () => {
     await TenantContext.run("deep-tenant", async () => {
-      let chain: Promise<string | undefined> = Promise.resolve(
-        TenantContext.current(),
-      );
+      let chain: Promise<string | undefined> = Promise.resolve(TenantContext.current());
       for (let i = 0; i < 10; i++) {
         chain = chain.then(async () => {
           await new Promise((r) => setTimeout(r, 1));

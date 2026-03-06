@@ -1,5 +1,5 @@
-import type { PaginationStrategy } from "./types.js";
 import { OffsetPaginationStrategy } from "./offset-strategy.js";
+import type { PaginationStrategy } from "./types.js";
 
 /**
  * Registry for pagination strategies. Pre-registered with the built-in
@@ -28,9 +28,7 @@ export class PaginationStrategyRegistry {
     const strategy = this.strategies.get(name);
     if (!strategy) {
       const available = [...this.strategies.keys()].join(", ");
-      throw new Error(
-        `Unknown pagination strategy "${name}". Available strategies: ${available || "none"}`,
-      );
+      throw new Error(`Unknown pagination strategy "${name}". Available strategies: ${available || "none"}`);
     }
     return strategy as PaginationStrategy<TReq, TRes>;
   }

@@ -1,5 +1,5 @@
-import { describe, it, expect, afterAll } from "vitest";
 import type { PooledDataSource } from "espalier-jdbc";
+import { afterAll, describe, expect, it } from "vitest";
 import type { MysqlDataSource } from "../../mysql-data-source.js";
 import { createTestDataSource, isMysqlAvailable } from "./setup.js";
 
@@ -27,11 +27,7 @@ describe.skipIf(!canConnect)("E2E: MySQL pool management", { timeout: 10000 }, (
 
   it("supports concurrent connections", async () => {
     ds = createTestDataSource();
-    const connections = await Promise.all([
-      ds.getConnection(),
-      ds.getConnection(),
-      ds.getConnection(),
-    ]);
+    const connections = await Promise.all([ds.getConnection(), ds.getConnection(), ds.getConnection()]);
 
     for (const conn of connections) {
       const stmt = conn.createStatement();

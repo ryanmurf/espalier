@@ -1,6 +1,6 @@
-import type { DataSource, Connection } from "espalier-jdbc";
+import type { Connection, DataSource } from "espalier-jdbc";
+import type { ServerlessEnvironment } from "./environment.js";
 import { detectEnvironment, getEnvironmentDefaults, isColdStart } from "./environment.js";
-import type { ServerlessEnvironment, EnvironmentDefaults } from "./environment.js";
 
 /**
  * Configuration for ProxyDataSource.
@@ -135,9 +135,7 @@ export class ProxyDataSource implements DataSource {
 
     this.removeShutdownHooks();
 
-    const closePromises = this.pool.map((p) =>
-      p.connection.close().catch(() => {}),
-    );
+    const closePromises = this.pool.map((p) => p.connection.close().catch(() => {}));
     this.pool.length = 0;
     await Promise.all(closePromises);
 

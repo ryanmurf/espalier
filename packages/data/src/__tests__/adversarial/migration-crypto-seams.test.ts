@@ -8,8 +8,9 @@
  * - Multi-statement migrations hash correctly
  * - Checksum validation catches tampering
  */
-import { describe, it, expect } from "vitest";
+
 import { sha256 } from "espalier-jdbc";
+import { describe, expect, it } from "vitest";
 import type { Migration } from "../../migration/migration.js";
 
 // Replicate the computeChecksum logic from sqlite-migration-runner
@@ -93,14 +94,8 @@ describe("migration checksum + Web Crypto seam tests", () => {
     const multiMigration: Migration = {
       version: "003",
       description: "multi-statement",
-      up: () => [
-        "CREATE TABLE orders (id INTEGER PRIMARY KEY)",
-        "CREATE INDEX idx_orders_id ON orders(id)",
-      ],
-      down: () => [
-        "DROP INDEX idx_orders_id",
-        "DROP TABLE orders",
-      ],
+      up: () => ["CREATE TABLE orders (id INTEGER PRIMARY KEY)", "CREATE INDEX idx_orders_id ON orders(id)"],
+      down: () => ["DROP INDEX idx_orders_id", "DROP TABLE orders"],
     };
 
     const hash = await computeChecksum(multiMigration);

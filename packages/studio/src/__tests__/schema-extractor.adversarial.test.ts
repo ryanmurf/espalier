@@ -15,30 +15,25 @@
  * - SchemaModel cardinality and accuracy validation
  * - Scaffold exports verification
  */
-import { describe, it, expect } from "vitest";
+
 import {
-  Table,
   Column,
-  Id,
-  Version,
-  ManyToOne,
-  OneToMany,
-  ManyToMany,
-  OneToOne,
   CreatedDate,
-  LastModifiedDate,
-  TenantId,
   Embeddable,
   Embedded,
+  Id,
+  LastModifiedDate,
+  ManyToMany,
+  ManyToOne,
+  OneToMany,
+  OneToOne,
+  Table,
+  TenantId,
+  Version,
 } from "espalier-data";
+import { describe, expect, it } from "vitest";
+import type { SchemaColumn, SchemaModel, SchemaRelation, SchemaTable } from "../schema/index.js";
 import { extractSchema } from "../schema/index.js";
-import type {
-  SchemaModel,
-  SchemaTable,
-  SchemaColumn,
-  SchemaRelation,
-  SchemaExtractorOptions,
-} from "../schema/index.js";
 
 // =============================================================================
 // Helper
@@ -52,14 +47,8 @@ function findColumn(table: SchemaTable, fieldName: string): SchemaColumn | undef
   return table.columns.find((c) => c.fieldName === fieldName);
 }
 
-function findRelation(
-  model: SchemaModel,
-  sourceTable: string,
-  fieldName: string,
-): SchemaRelation | undefined {
-  return model.relations.find(
-    (r) => r.sourceTable === sourceTable && r.fieldName === fieldName,
-  );
+function findRelation(model: SchemaModel, sourceTable: string, fieldName: string): SchemaRelation | undefined {
+  return model.relations.find((r) => r.sourceTable === sourceTable && r.fieldName === fieldName);
 }
 
 // =============================================================================
@@ -442,14 +431,10 @@ describe("schema extractor — adversarial", () => {
       expect(table.columns.length).toBeGreaterThanOrEqual(8);
 
       // Verify prefixed columns exist
-      const hqStreet = table.columns.find(
-        (c) => c.columnName === "hq_street" || c.fieldName.includes("street"),
-      );
+      const hqStreet = table.columns.find((c) => c.columnName === "hq_street" || c.fieldName.includes("street"));
       expect(hqStreet).toBeDefined();
 
-      const billingCity = table.columns.find(
-        (c) => c.columnName === "billing_city" || c.fieldName.includes("city"),
-      );
+      const billingCity = table.columns.find((c) => c.columnName === "billing_city" || c.fieldName.includes("city"));
       expect(billingCity).toBeDefined();
     });
   });
@@ -482,10 +467,7 @@ describe("schema extractor — adversarial", () => {
         entities: [CircleA, CircleB, CircleC],
       });
 
-      const tableRelationCount = model.tables.reduce(
-        (sum, t) => sum + t.relations.length,
-        0,
-      );
+      const tableRelationCount = model.tables.reduce((sum, t) => sum + t.relations.length, 0);
       expect(model.relations).toHaveLength(tableRelationCount);
     });
 

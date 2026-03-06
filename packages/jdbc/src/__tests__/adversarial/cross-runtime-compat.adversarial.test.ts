@@ -11,18 +11,17 @@
  * - CI workflow configuration
  * - Build output dual CJS/ESM
  */
-import { describe, it, expect } from "vitest";
+
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { describe, expect, it } from "vitest";
 
 // -- Helper: read files from a package src directory -------------------------
 
 function getSrcFiles(pkgDir: string): string[] {
   const srcDir = path.join(pkgDir, "src");
   if (!fs.existsSync(srcDir)) return [];
-  return walkDir(srcDir).filter(
-    (f) => f.endsWith(".ts") && !f.includes("__tests__") && !f.includes(".test."),
-  );
+  return walkDir(srcDir).filter((f) => f.endsWith(".ts") && !f.includes("__tests__") && !f.includes(".test."));
 }
 
 function walkDir(dir: string): string[] {
@@ -41,7 +40,7 @@ function walkDir(dir: string): string[] {
 const ROOT = path.resolve(__dirname, "../../../../..");
 const JDBC_PKG = path.join(ROOT, "packages/jdbc");
 const PG_PKG = path.join(ROOT, "packages/jdbc-pg");
-const SQLITE_PKG = path.join(ROOT, "packages/sqlite");
+const _SQLITE_PKG = path.join(ROOT, "packages/sqlite");
 const D1_PKG = path.join(ROOT, "packages/d1");
 
 // -- 1. No Node-specific APIs in core JDBC package ---------------------------
@@ -67,7 +66,7 @@ describe("no Node-specific APIs in core jdbc", () => {
       }
     }
     if (violations.length > 0) {
-      const msg = violations.map(v => `  ${v.file}:${v.line} — ${v.text}`).join("\n");
+      const msg = violations.map((v) => `  ${v.file}:${v.line} — ${v.text}`).join("\n");
       expect.unreachable(`Found node:* imports in core jdbc:\n${msg}`);
     }
   });
@@ -86,7 +85,7 @@ describe("no Node-specific APIs in core jdbc", () => {
       }
     }
     if (violations.length > 0) {
-      const msg = violations.map(v => `  ${v.file}:${v.line} — ${v.text}`).join("\n");
+      const msg = violations.map((v) => `  ${v.file}:${v.line} — ${v.text}`).join("\n");
       expect.unreachable(`Found Buffer usage in core jdbc:\n${msg}`);
     }
   });
@@ -104,7 +103,7 @@ describe("no Node-specific APIs in core jdbc", () => {
       }
     }
     if (violations.length > 0) {
-      const msg = violations.map(v => `  ${v.file}:${v.line} — ${v.text}`).join("\n");
+      const msg = violations.map((v) => `  ${v.file}:${v.line} — ${v.text}`).join("\n");
       expect.unreachable(`Found __dirname/__filename in core jdbc:\n${msg}`);
     }
   });
@@ -185,7 +184,7 @@ describe("import resolution", () => {
       }
     }
     if (violations.length > 0) {
-      const msg = violations.map(v => `  ${v.file}:${v.line} — ${v.text}`).join("\n");
+      const msg = violations.map((v) => `  ${v.file}:${v.line} — ${v.text}`).join("\n");
       expect.unreachable(`Found imports without .js extension:\n${msg}`);
     }
   });
@@ -208,7 +207,7 @@ describe("import resolution", () => {
       }
     }
     if (violations.length > 0) {
-      const msg = violations.map(v => `  ${v.file}:${v.line} — ${v.text}`).join("\n");
+      const msg = violations.map((v) => `  ${v.file}:${v.line} — ${v.text}`).join("\n");
       expect.unreachable(`Found imports without .js extension:\n${msg}`);
     }
   });
@@ -232,7 +231,7 @@ describe("import resolution", () => {
       }
     }
     if (violations.length > 0) {
-      const msg = violations.map(v => `  ${v.file}:${v.line} — ${v.text}`).join("\n");
+      const msg = violations.map((v) => `  ${v.file}:${v.line} — ${v.text}`).join("\n");
       expect.unreachable(`Found imports without .js extension:\n${msg}`);
     }
   });
@@ -371,8 +370,8 @@ describe("build output analysis", () => {
       if (!fs.existsSync(path.join(pkgDir, "package.json"))) continue;
       const pkg = JSON.parse(fs.readFileSync(path.join(pkgDir, "package.json"), "utf-8"));
       if (!pkg.name) continue;
-      const hasConfig = fs.existsSync(path.join(pkgDir, "tsup.config.ts")) ||
-                        fs.existsSync(path.join(pkgDir, "tsup.config.js"));
+      const hasConfig =
+        fs.existsSync(path.join(pkgDir, "tsup.config.ts")) || fs.existsSync(path.join(pkgDir, "tsup.config.js"));
       expect(hasConfig).toBe(true);
     }
   });
@@ -381,8 +380,8 @@ describe("build output analysis", () => {
   it("jdbc dist has both .js and .cjs files (if built)", () => {
     if (!hasBuildOutput(JDBC_PKG)) return;
     const distFiles = fs.readdirSync(path.join(JDBC_PKG, "dist"));
-    const hasJs = distFiles.some(f => f.endsWith(".js") && !f.endsWith(".d.ts"));
-    const hasCjs = distFiles.some(f => f.endsWith(".cjs"));
+    const hasJs = distFiles.some((f) => f.endsWith(".js") && !f.endsWith(".d.ts"));
+    const hasCjs = distFiles.some((f) => f.endsWith(".cjs"));
     expect(hasJs).toBe(true);
     expect(hasCjs).toBe(true);
   });
@@ -390,7 +389,7 @@ describe("build output analysis", () => {
   it("jdbc dist has .d.ts files (if built)", () => {
     if (!hasBuildOutput(JDBC_PKG)) return;
     const distFiles = fs.readdirSync(path.join(JDBC_PKG, "dist"));
-    const hasDts = distFiles.some(f => f.endsWith(".d.ts"));
+    const hasDts = distFiles.some((f) => f.endsWith(".d.ts"));
     expect(hasDts).toBe(true);
   });
 });
@@ -418,7 +417,7 @@ describe("no Node-specific APIs in D1 package", () => {
       }
     }
     if (violations.length > 0) {
-      const msg = violations.map(v => `  ${v.file}:${v.line} — ${v.text}`).join("\n");
+      const msg = violations.map((v) => `  ${v.file}:${v.line} — ${v.text}`).join("\n");
       expect.unreachable(`Found node:* imports in D1 package:\n${msg}`);
     }
   });
@@ -436,7 +435,7 @@ describe("no Node-specific APIs in D1 package", () => {
       }
     }
     if (violations.length > 0) {
-      const msg = violations.map(v => `  ${v.file}:${v.line} — ${v.text}`).join("\n");
+      const msg = violations.map((v) => `  ${v.file}:${v.line} — ${v.text}`).join("\n");
       expect.unreachable(`Found Buffer usage in D1 package:\n${msg}`);
     }
   });

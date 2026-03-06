@@ -1,8 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { QueryBatcher, QueryBatcherRegistry } from "../../query/query-batcher.js";
+import type { Connection, DataSource, PreparedStatement, ResultSet } from "espalier-jdbc";
+import { describe, expect, it } from "vitest";
 import type { EntityMetadata } from "../../mapping/entity-metadata.js";
 import type { RowMapper } from "../../mapping/row-mapper.js";
-import type { DataSource, Connection, PreparedStatement, ResultSet } from "espalier-jdbc";
+import { QueryBatcher, QueryBatcherRegistry } from "../../query/query-batcher.js";
 
 const metadata: EntityMetadata = {
   tableName: "users",
@@ -41,41 +41,65 @@ function createMockDataSource(rows: Record<string, any>[]): {
       return rows[rowIdx];
     },
     async close() {},
-    getString(col: string) { return String(rows[rowIdx][col]); },
-    getNumber(col: string) { return Number(rows[rowIdx][col]); },
-    getBoolean(col: string) { return Boolean(rows[rowIdx][col]); },
-    getDate(col: string) { return rows[rowIdx][col]; },
-    getValue(col: string) { return rows[rowIdx][col]; },
-    getColumnMetadata() { return []; },
+    getString(col: string) {
+      return String(rows[rowIdx][col]);
+    },
+    getNumber(col: string) {
+      return Number(rows[rowIdx][col]);
+    },
+    getBoolean(col: string) {
+      return Boolean(rows[rowIdx][col]);
+    },
+    getDate(col: string) {
+      return rows[rowIdx][col];
+    },
+    getValue(col: string) {
+      return rows[rowIdx][col];
+    },
+    getColumnMetadata() {
+      return [];
+    },
   } as any;
 
   const params: any[] = [];
   const stmt: PreparedStatement = {
-    setParameter(idx: number, val: any) { params[idx - 1] = val; },
+    setParameter(idx: number, val: any) {
+      params[idx - 1] = val;
+    },
     async executeQuery() {
       executedQueries.push({ sql: capturedSql, params: [...params] });
       rowIdx = -1;
       return rs;
     },
-    async executeUpdate() { return 0; },
+    async executeUpdate() {
+      return 0;
+    },
     async close() {},
   } as any;
 
   let capturedSql = "";
   const conn: Connection = {
-    createStatement() { return {} as any; },
+    createStatement() {
+      return {} as any;
+    },
     prepareStatement(sql: string) {
       capturedSql = sql;
       params.length = 0;
       return stmt;
     },
-    async beginTransaction() { return {} as any; },
+    async beginTransaction() {
+      return {} as any;
+    },
     async close() {},
-    isClosed() { return false; },
+    isClosed() {
+      return false;
+    },
   };
 
   const dataSource: DataSource = {
-    async getConnection() { return conn; },
+    async getConnection() {
+      return conn;
+    },
     async close() {},
   } as any;
 
@@ -118,9 +142,7 @@ describe("QueryBatcher", () => {
     });
 
     it("deduplicates IDs — same result shared", async () => {
-      const { dataSource, executedQueries } = createMockDataSource([
-        { id: 1, name: "Alice" },
-      ]);
+      const { dataSource, executedQueries } = createMockDataSource([{ id: 1, name: "Alice" }]);
 
       const batcher = new QueryBatcher(dataSource, metadata, rowMapper);
 
@@ -138,9 +160,7 @@ describe("QueryBatcher", () => {
     });
 
     it("returns null for not-found IDs", async () => {
-      const { dataSource } = createMockDataSource([
-        { id: 1, name: "Alice" },
-      ]);
+      const { dataSource } = createMockDataSource([{ id: 1, name: "Alice" }]);
 
       const batcher = new QueryBatcher(dataSource, metadata, rowMapper);
 
@@ -227,7 +247,10 @@ describe("QueryBatcherRegistry", () => {
     const { dataSource } = createMockDataSource([]);
     const registry = new QueryBatcherRegistry(dataSource);
 
-    class User { id = 0; name = ""; }
+    class User {
+      id = 0;
+      name = "";
+    }
 
     const b1 = registry.getBatcher(User, metadata, rowMapper);
     const b2 = registry.getBatcher(User, metadata, rowMapper);
@@ -238,8 +261,14 @@ describe("QueryBatcherRegistry", () => {
     const { dataSource } = createMockDataSource([]);
     const registry = new QueryBatcherRegistry(dataSource);
 
-    class User { id = 0; name = ""; }
-    class Product { id = 0; name = ""; }
+    class User {
+      id = 0;
+      name = "";
+    }
+    class Product {
+      id = 0;
+      name = "";
+    }
 
     const b1 = registry.getBatcher(User, metadata, rowMapper as any);
     const b2 = registry.getBatcher(Product, metadata, rowMapper as any);
@@ -250,7 +279,10 @@ describe("QueryBatcherRegistry", () => {
     const { dataSource } = createMockDataSource([]);
     const registry = new QueryBatcherRegistry(dataSource);
 
-    class User { id = 0; name = ""; }
+    class User {
+      id = 0;
+      name = "";
+    }
     const b1 = registry.getBatcher(User, metadata, rowMapper);
     registry.clear();
     const b2 = registry.getBatcher(User, metadata, rowMapper);

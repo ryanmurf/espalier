@@ -1,4 +1,4 @@
-import type { ResultSet, ColumnMetadata } from "espalier-jdbc";
+import type { ColumnMetadata, ResultSet } from "espalier-jdbc";
 
 export class BunPgResultSet implements ResultSet {
   private readonly rows: Record<string, unknown>[];

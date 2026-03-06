@@ -1,17 +1,9 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { createTestDataSource, isPostgresAvailable } from "./setup.js";
-import { PgSchemaIntrospector } from "../../pg-schema-introspector.js";
-import {
-  DdlGenerator,
-  Table,
-  Column,
-  Id,
-  ManyToOne,
-  OneToMany,
-  ManyToMany,
-} from "espalier-data";
-import type { PgDataSource } from "../../pg-data-source.js";
+import { Column, DdlGenerator, Id, ManyToMany, ManyToOne, OneToMany, Table } from "espalier-data";
 import type { Connection } from "espalier-jdbc";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import type { PgDataSource } from "../../pg-data-source.js";
+import { PgSchemaIntrospector } from "../../pg-schema-introspector.js";
+import { createTestDataSource, isPostgresAvailable } from "./setup.js";
 
 const canConnect = await isPostgresAvailable();
 
@@ -156,21 +148,15 @@ describe.skipIf(!canConnect)("Entity Relationships E2E", () => {
     it("should enforce FK constraint — valid insert succeeds", async () => {
       await clearAllData();
       const stmt = conn.createStatement();
-      await stmt.executeUpdate(
-        "INSERT INTO e2e_rel_departments (name) VALUES ('Engineering')",
-      );
+      await stmt.executeUpdate("INSERT INTO e2e_rel_departments (name) VALUES ('Engineering')");
 
-      const ps = conn.prepareStatement(
-        "SELECT id FROM e2e_rel_departments WHERE name = $1",
-      );
+      const ps = conn.prepareStatement("SELECT id FROM e2e_rel_departments WHERE name = $1");
       ps.setParameter(1, "Engineering");
       const rs = await ps.executeQuery();
       await rs.next();
       const deptId = rs.getNumber("id");
 
-      const insPs = conn.prepareStatement(
-        "INSERT INTO e2e_rel_employees (name, department_id) VALUES ($1, $2)",
-      );
+      const insPs = conn.prepareStatement("INSERT INTO e2e_rel_employees (name, department_id) VALUES ($1, $2)");
       insPs.setParameter(1, "Alice");
       insPs.setParameter(2, deptId);
       await expect(insPs.executeUpdate()).resolves.not.toThrow();
@@ -178,9 +164,7 @@ describe.skipIf(!canConnect)("Entity Relationships E2E", () => {
 
     it("should reject insert with non-existent FK value", async () => {
       await clearAllData();
-      const ps = conn.prepareStatement(
-        "INSERT INTO e2e_rel_employees (name, department_id) VALUES ($1, $2)",
-      );
+      const ps = conn.prepareStatement("INSERT INTO e2e_rel_employees (name, department_id) VALUES ($1, $2)");
       ps.setParameter(1, "Ghost");
       ps.setParameter(2, 99999);
       await expect(ps.executeUpdate()).rejects.toThrow();
@@ -206,14 +190,10 @@ describe.skipIf(!canConnect)("Entity Relationships E2E", () => {
       await clearAllData();
       const stmt = conn.createStatement();
       await expect(
-        stmt.executeUpdate(
-          "INSERT INTO e2e_rel_contractors (name) VALUES ('Freelancer')",
-        ),
+        stmt.executeUpdate("INSERT INTO e2e_rel_contractors (name) VALUES ('Freelancer')"),
       ).resolves.not.toThrow();
 
-      const ps = conn.prepareStatement(
-        "SELECT department_id FROM e2e_rel_contractors WHERE name = $1",
-      );
+      const ps = conn.prepareStatement("SELECT department_id FROM e2e_rel_contractors WHERE name = $1");
       ps.setParameter(1, "Freelancer");
       const rs = await ps.executeQuery();
       await rs.next();
@@ -224,21 +204,15 @@ describe.skipIf(!canConnect)("Entity Relationships E2E", () => {
       await clearAllData();
       // Create the department first
       const stmt = conn.createStatement();
-      await stmt.executeUpdate(
-        "INSERT INTO e2e_rel_departments (name) VALUES ('Engineering')",
-      );
+      await stmt.executeUpdate("INSERT INTO e2e_rel_departments (name) VALUES ('Engineering')");
 
-      const ps = conn.prepareStatement(
-        "SELECT id FROM e2e_rel_departments WHERE name = $1",
-      );
+      const ps = conn.prepareStatement("SELECT id FROM e2e_rel_departments WHERE name = $1");
       ps.setParameter(1, "Engineering");
       const rs = await ps.executeQuery();
       await rs.next();
       const deptId = rs.getNumber("id");
 
-      const insPs = conn.prepareStatement(
-        "INSERT INTO e2e_rel_contractors (name, department_id) VALUES ($1, $2)",
-      );
+      const insPs = conn.prepareStatement("INSERT INTO e2e_rel_contractors (name, department_id) VALUES ($1, $2)");
       insPs.setParameter(1, "ConsultantBob");
       insPs.setParameter(2, deptId);
       await expect(insPs.executeUpdate()).resolves.not.toThrow();
@@ -276,24 +250,16 @@ describe.skipIf(!canConnect)("Entity Relationships E2E", () => {
       await clearAllData();
       // Insert valid students and courses
       const stmt = conn.createStatement();
-      await stmt.executeUpdate(
-        "INSERT INTO e2e_rel_students (name) VALUES ('StudentA')",
-      );
-      await stmt.executeUpdate(
-        "INSERT INTO e2e_rel_courses (title) VALUES ('Math 101')",
-      );
+      await stmt.executeUpdate("INSERT INTO e2e_rel_students (name) VALUES ('StudentA')");
+      await stmt.executeUpdate("INSERT INTO e2e_rel_courses (title) VALUES ('Math 101')");
 
-      const studentPs = conn.prepareStatement(
-        "SELECT id FROM e2e_rel_students WHERE name = $1",
-      );
+      const studentPs = conn.prepareStatement("SELECT id FROM e2e_rel_students WHERE name = $1");
       studentPs.setParameter(1, "StudentA");
       const studentRs = await studentPs.executeQuery();
       await studentRs.next();
       const studentId = studentRs.getNumber("id");
 
-      const coursePs = conn.prepareStatement(
-        "SELECT id FROM e2e_rel_courses WHERE title = $1",
-      );
+      const coursePs = conn.prepareStatement("SELECT id FROM e2e_rel_courses WHERE title = $1");
       coursePs.setParameter(1, "Math 101");
       const courseRs = await coursePs.executeQuery();
       await courseRs.next();
@@ -312,20 +278,14 @@ describe.skipIf(!canConnect)("Entity Relationships E2E", () => {
       await clearAllData();
       // Need a valid course to test with
       const stmt = conn.createStatement();
-      await stmt.executeUpdate(
-        "INSERT INTO e2e_rel_courses (title) VALUES ('ValidCourse')",
-      );
-      const coursePs = conn.prepareStatement(
-        "SELECT id FROM e2e_rel_courses WHERE title = $1",
-      );
+      await stmt.executeUpdate("INSERT INTO e2e_rel_courses (title) VALUES ('ValidCourse')");
+      const coursePs = conn.prepareStatement("SELECT id FROM e2e_rel_courses WHERE title = $1");
       coursePs.setParameter(1, "ValidCourse");
       const courseRs = await coursePs.executeQuery();
       await courseRs.next();
       const courseId = courseRs.getNumber("id");
 
-      const ps = conn.prepareStatement(
-        "INSERT INTO e2e_rel_student_courses (student_id, course_id) VALUES ($1, $2)",
-      );
+      const ps = conn.prepareStatement("INSERT INTO e2e_rel_student_courses (student_id, course_id) VALUES ($1, $2)");
       ps.setParameter(1, 99999);
       ps.setParameter(2, courseId);
       await expect(ps.executeUpdate()).rejects.toThrow();
@@ -335,20 +295,14 @@ describe.skipIf(!canConnect)("Entity Relationships E2E", () => {
       await clearAllData();
       // Need a valid student to test with
       const stmt = conn.createStatement();
-      await stmt.executeUpdate(
-        "INSERT INTO e2e_rel_students (name) VALUES ('ValidStudent')",
-      );
-      const studentPs = conn.prepareStatement(
-        "SELECT id FROM e2e_rel_students WHERE name = $1",
-      );
+      await stmt.executeUpdate("INSERT INTO e2e_rel_students (name) VALUES ('ValidStudent')");
+      const studentPs = conn.prepareStatement("SELECT id FROM e2e_rel_students WHERE name = $1");
       studentPs.setParameter(1, "ValidStudent");
       const rs = await studentPs.executeQuery();
       await rs.next();
       const studentId = rs.getNumber("id");
 
-      const ps = conn.prepareStatement(
-        "INSERT INTO e2e_rel_student_courses (student_id, course_id) VALUES ($1, $2)",
-      );
+      const ps = conn.prepareStatement("INSERT INTO e2e_rel_student_courses (student_id, course_id) VALUES ($1, $2)");
       ps.setParameter(1, studentId);
       ps.setParameter(2, 99999);
       await expect(ps.executeUpdate()).rejects.toThrow();
@@ -358,24 +312,16 @@ describe.skipIf(!canConnect)("Entity Relationships E2E", () => {
       await clearAllData();
       // Set up student, course, and initial join entry
       const stmt = conn.createStatement();
-      await stmt.executeUpdate(
-        "INSERT INTO e2e_rel_students (name) VALUES ('StudentA')",
-      );
-      await stmt.executeUpdate(
-        "INSERT INTO e2e_rel_courses (title) VALUES ('Math 101')",
-      );
+      await stmt.executeUpdate("INSERT INTO e2e_rel_students (name) VALUES ('StudentA')");
+      await stmt.executeUpdate("INSERT INTO e2e_rel_courses (title) VALUES ('Math 101')");
 
-      const studentPs = conn.prepareStatement(
-        "SELECT id FROM e2e_rel_students WHERE name = $1",
-      );
+      const studentPs = conn.prepareStatement("SELECT id FROM e2e_rel_students WHERE name = $1");
       studentPs.setParameter(1, "StudentA");
       const studentRs = await studentPs.executeQuery();
       await studentRs.next();
       const studentId = studentRs.getNumber("id");
 
-      const coursePs = conn.prepareStatement(
-        "SELECT id FROM e2e_rel_courses WHERE title = $1",
-      );
+      const coursePs = conn.prepareStatement("SELECT id FROM e2e_rel_courses WHERE title = $1");
       coursePs.setParameter(1, "Math 101");
       const courseRs = await coursePs.executeQuery();
       await courseRs.next();
@@ -404,36 +350,24 @@ describe.skipIf(!canConnect)("Entity Relationships E2E", () => {
       await clearAllData();
       const stmt = conn.createStatement();
       // Set up students and courses from scratch
-      await stmt.executeUpdate(
-        "INSERT INTO e2e_rel_students (name) VALUES ('StudentB')",
-      );
-      await stmt.executeUpdate(
-        "INSERT INTO e2e_rel_courses (title) VALUES ('Math 101')",
-      );
-      await stmt.executeUpdate(
-        "INSERT INTO e2e_rel_courses (title) VALUES ('Physics 201')",
-      );
+      await stmt.executeUpdate("INSERT INTO e2e_rel_students (name) VALUES ('StudentB')");
+      await stmt.executeUpdate("INSERT INTO e2e_rel_courses (title) VALUES ('Math 101')");
+      await stmt.executeUpdate("INSERT INTO e2e_rel_courses (title) VALUES ('Physics 201')");
 
       // Get IDs
-      const studentBPs = conn.prepareStatement(
-        "SELECT id FROM e2e_rel_students WHERE name = $1",
-      );
+      const studentBPs = conn.prepareStatement("SELECT id FROM e2e_rel_students WHERE name = $1");
       studentBPs.setParameter(1, "StudentB");
       const sbRs = await studentBPs.executeQuery();
       await sbRs.next();
       const studentBId = sbRs.getNumber("id");
 
-      const mathPs = conn.prepareStatement(
-        "SELECT id FROM e2e_rel_courses WHERE title = $1",
-      );
+      const mathPs = conn.prepareStatement("SELECT id FROM e2e_rel_courses WHERE title = $1");
       mathPs.setParameter(1, "Math 101");
       const mathRs = await mathPs.executeQuery();
       await mathRs.next();
       const mathId = mathRs.getNumber("id");
 
-      const physPs = conn.prepareStatement(
-        "SELECT id FROM e2e_rel_courses WHERE title = $1",
-      );
+      const physPs = conn.prepareStatement("SELECT id FROM e2e_rel_courses WHERE title = $1");
       physPs.setParameter(1, "Physics 201");
       const physRs = await physPs.executeQuery();
       await physRs.next();
@@ -476,20 +410,14 @@ describe.skipIf(!canConnect)("Entity Relationships E2E", () => {
       await clearAllData();
       // Set up department and employee from scratch
       const stmt = conn.createStatement();
-      await stmt.executeUpdate(
-        "INSERT INTO e2e_rel_departments (name) VALUES ('Engineering')",
-      );
-      const deptPs = conn.prepareStatement(
-        "SELECT id FROM e2e_rel_departments WHERE name = $1",
-      );
+      await stmt.executeUpdate("INSERT INTO e2e_rel_departments (name) VALUES ('Engineering')");
+      const deptPs = conn.prepareStatement("SELECT id FROM e2e_rel_departments WHERE name = $1");
       deptPs.setParameter(1, "Engineering");
       const deptRs = await deptPs.executeQuery();
       await deptRs.next();
       const deptId = deptRs.getNumber("id");
 
-      const empPs = conn.prepareStatement(
-        "INSERT INTO e2e_rel_employees (name, department_id) VALUES ($1, $2)",
-      );
+      const empPs = conn.prepareStatement("INSERT INTO e2e_rel_employees (name, department_id) VALUES ($1, $2)");
       empPs.setParameter(1, "Alice");
       empPs.setParameter(2, deptId);
       await empPs.executeUpdate();
@@ -516,17 +444,13 @@ describe.skipIf(!canConnect)("Entity Relationships E2E", () => {
     it("should drop referenced table with CASCADE", async () => {
       // Create an isolated set of tables for this test
       const stmt = conn.createStatement();
-      await stmt.executeUpdate(
-        "CREATE TABLE e2e_rel_cascade_parent (id SERIAL PRIMARY KEY, name TEXT)",
-      );
+      await stmt.executeUpdate("CREATE TABLE e2e_rel_cascade_parent (id SERIAL PRIMARY KEY, name TEXT)");
       await stmt.executeUpdate(
         "CREATE TABLE e2e_rel_cascade_child (id SERIAL PRIMARY KEY, parent_id INTEGER REFERENCES e2e_rel_cascade_parent(id))",
       );
 
       // DROP with CASCADE should succeed
-      await expect(
-        stmt.executeUpdate("DROP TABLE e2e_rel_cascade_parent CASCADE"),
-      ).resolves.not.toThrow();
+      await expect(stmt.executeUpdate("DROP TABLE e2e_rel_cascade_parent CASCADE")).resolves.not.toThrow();
 
       // Child table should still exist but FK constraint should be gone
       const exists = await introspector.tableExists("e2e_rel_cascade_child");

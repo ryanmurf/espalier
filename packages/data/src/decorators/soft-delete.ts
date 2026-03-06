@@ -1,7 +1,6 @@
-import type { SqlValue } from "espalier-jdbc";
 import { registerFilter } from "../filter/filter-registry.js";
-import { NullCriteria } from "../query/criteria.js";
 import type { EntityMetadata, FieldMapping } from "../mapping/entity-metadata.js";
+import { NullCriteria } from "../query/criteria.js";
 
 export interface SoftDeleteOptions {
   /** The entity field name that stores the deletion timestamp. Default: "deletedAt" */
@@ -34,18 +33,16 @@ export function SoftDelete(options?: SoftDeleteOptions) {
   const fieldName = options?.field ?? "deletedAt";
   const columnName = options?.column ?? "deleted_at";
 
-  return function <TClass extends new (...args: any[]) => any>(
+  return <TClass extends new (...args: any[]) => any>(
     target: TClass,
     _context: ClassDecoratorContext<TClass>,
-  ): TClass {
+  ): TClass => {
     softDeleteMetadata.set(target, { fieldName, columnName });
 
     // Register global filter: WHERE <column> IS NULL
     registerFilter(target, "softDelete", (metadata: EntityMetadata) => {
       // Resolve the actual column name from metadata if available
-      const field = metadata.fields.find(
-        (f: FieldMapping) => String(f.fieldName) === fieldName,
-      );
+      const field = metadata.fields.find((f: FieldMapping) => String(f.fieldName) === fieldName);
       const col = field ? field.columnName : columnName;
       return new NullCriteria("isNull", col);
     });
@@ -57,9 +54,7 @@ export function SoftDelete(options?: SoftDeleteOptions) {
 /**
  * Returns soft-delete metadata for an entity class, or undefined if not soft-deletable.
  */
-export function getSoftDeleteMetadata(
-  target: object,
-): SoftDeleteMetadataEntry | undefined {
+export function getSoftDeleteMetadata(target: object): SoftDeleteMetadataEntry | undefined {
   const entry = softDeleteMetadata.get(target);
   return entry ? { ...entry } : undefined;
 }

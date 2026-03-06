@@ -4,19 +4,20 @@
  * Tests the filter-registry decorator and resolution logic. Integration tests
  * with the repository will be added once DEV-1 integration is complete.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+
+import type { SqlValue } from "espalier-jdbc";
+import { describe, expect, it } from "vitest";
+import { FilterContext } from "../../filter/filter-context.js";
+import type { FilterOptions, FilterRegistration } from "../../filter/filter-registry.js";
 import {
   Filter,
   getFilters,
   registerFilter,
-  unregisterFilter,
   resolveActiveFilters,
+  unregisterFilter,
 } from "../../filter/filter-registry.js";
-import type { FilterRegistration, FilterOptions } from "../../filter/filter-registry.js";
-import { FilterContext } from "../../filter/filter-context.js";
 import type { EntityMetadata } from "../../mapping/entity-metadata.js";
 import { ComparisonCriteria } from "../../query/criteria.js";
-import type { SqlValue } from "espalier-jdbc";
 
 // ──────────────────────────────────────────────────────
 // Helpers
@@ -68,7 +69,7 @@ describe("@Filter decorator", () => {
 
     const filters = getFilters(MultiFilter);
     expect(filters).toHaveLength(2);
-    const names = filters.map(f => f.name);
+    const names = filters.map((f) => f.name);
     expect(names).toContain("filterA");
     expect(names).toContain("filterB");
   });
@@ -185,7 +186,7 @@ describe("resolveActiveFilters", () => {
   it("can explicitly enable a disabled filter", () => {
     const active = resolveActiveFilters(allRegs, { enableFilters: ["disabled"] });
     expect(active).toHaveLength(2);
-    const names = active.map(f => f.name);
+    const names = active.map((f) => f.name);
     expect(names).toContain("enabled");
     expect(names).toContain("disabled");
   });
@@ -196,7 +197,7 @@ describe("resolveActiveFilters", () => {
       disableFilters: ["enabled"],
     });
     // "enabled" is in both lists — disable wins
-    const names = active.map(f => f.name);
+    const names = active.map((f) => f.name);
     expect(names).not.toContain("enabled");
   });
 
@@ -245,7 +246,9 @@ describe("filter functions — edge cases", () => {
   it("filter that throws is propagated (not swallowed)", () => {
     const reg: FilterRegistration = {
       name: "boom",
-      filter: () => { throw new Error("kaboom"); },
+      filter: () => {
+        throw new Error("kaboom");
+      },
       enabledByDefault: true,
     };
     const active = resolveActiveFilters([reg]);
@@ -420,7 +423,7 @@ describe("FilterContext", () => {
   it("withFilters + async: context propagates into async/await", async () => {
     const opts: FilterOptions = { disableFilters: ["x"] };
     await FilterContext.withFilters(opts, async () => {
-      await new Promise(resolve => setTimeout(resolve, 1));
+      await new Promise((resolve) => setTimeout(resolve, 1));
       expect(FilterContext.current()).toBe(opts);
     });
   });
@@ -432,11 +435,11 @@ describe("FilterContext", () => {
     const results: string[] = [];
     await Promise.all([
       FilterContext.withFilters(optsA, async () => {
-        await new Promise(resolve => setTimeout(resolve, 5));
+        await new Promise((resolve) => setTimeout(resolve, 5));
         results.push(`a:${FilterContext.current()?.disableFilters?.[0]}`);
       }),
       FilterContext.withFilters(optsB, async () => {
-        await new Promise(resolve => setTimeout(resolve, 2));
+        await new Promise((resolve) => setTimeout(resolve, 2));
         results.push(`b:${FilterContext.current()?.disableFilters?.[0]}`);
       }),
     ]);
@@ -538,11 +541,11 @@ describe("FilterContext — async boundary edge cases", () => {
   it("context survives across multiple awaits", async () => {
     const opts: FilterOptions = { disableFilters: ["slow"] };
     await FilterContext.withFilters(opts, async () => {
-      await new Promise(resolve => setTimeout(resolve, 1));
+      await new Promise((resolve) => setTimeout(resolve, 1));
       expect(FilterContext.current()).toBe(opts);
-      await new Promise(resolve => setTimeout(resolve, 1));
+      await new Promise((resolve) => setTimeout(resolve, 1));
       expect(FilterContext.current()).toBe(opts);
-      await new Promise(resolve => setTimeout(resolve, 1));
+      await new Promise((resolve) => setTimeout(resolve, 1));
       expect(FilterContext.current()).toBe(opts);
     });
   });
@@ -552,7 +555,7 @@ describe("FilterContext — async boundary edge cases", () => {
     await FilterContext.withFilters(outer, async () => {
       const inner: FilterOptions = { disableFilters: ["b"] };
       await FilterContext.withFilters(inner, async () => {
-        await new Promise(resolve => setTimeout(resolve, 5));
+        await new Promise((resolve) => setTimeout(resolve, 5));
         expect(FilterContext.current()).toBe(inner);
       });
       expect(FilterContext.current()).toBe(outer);
@@ -568,7 +571,7 @@ describe("FilterContext — async boundary edge cases", () => {
         const opts: FilterOptions = { disableFilters: [`filter_${i}`] };
         return FilterContext.withFilters(opts, async () => {
           // Random delay to interleave
-          await new Promise(resolve => setTimeout(resolve, Math.random() * 10));
+          await new Promise((resolve) => setTimeout(resolve, Math.random() * 10));
           const current = FilterContext.current();
           results.push(`${i}:${current?.disableFilters?.[0]}`);
         });
@@ -587,7 +590,7 @@ describe("FilterContext — async boundary edge cases", () => {
     await FilterContext.withFilters(outer, async () => {
       try {
         await FilterContext.withFilters({ disableAllFilters: true }, async () => {
-          await new Promise(resolve => setTimeout(resolve, 1));
+          await new Promise((resolve) => setTimeout(resolve, 1));
           throw new Error("async boom");
         });
       } catch {
@@ -624,9 +627,7 @@ describe("filter function metadata mutation", () => {
     const meta = {
       tableName: "original",
       idField: "id",
-      fields: [
-        { fieldName: "id", columnName: "id" },
-      ],
+      fields: [{ fieldName: "id", columnName: "id" }],
       manyToOneRelations: [],
       oneToManyRelations: [],
       manyToManyRelations: [],
@@ -881,7 +882,7 @@ describe("FilterContext thread safety (ALS isolation)", () => {
         FilterContext.withFilters({ disableFilters: [`f${i}`] }, async () => {
           // Yield multiple times to maximize interleaving
           for (let j = 0; j < 5; j++) {
-            await new Promise(resolve => setTimeout(resolve, 0));
+            await new Promise((resolve) => setTimeout(resolve, 0));
             const ctx = FilterContext.current();
             if (ctx?.disableFilters?.[0] !== `f${i}`) {
               errors.push(`op ${i}, iter ${j}: expected f${i} got ${ctx?.disableFilters?.[0]}`);
@@ -899,15 +900,15 @@ describe("FilterContext thread safety (ALS isolation)", () => {
     await FilterContext.withFilters(opts, async () => {
       const results = await Promise.all([
         (async () => {
-          await new Promise(resolve => setTimeout(resolve, 1));
+          await new Promise((resolve) => setTimeout(resolve, 1));
           return FilterContext.current();
         })(),
         (async () => {
-          await new Promise(resolve => setTimeout(resolve, 2));
+          await new Promise((resolve) => setTimeout(resolve, 2));
           return FilterContext.current();
         })(),
         (async () => {
-          await new Promise(resolve => setTimeout(resolve, 3));
+          await new Promise((resolve) => setTimeout(resolve, 3));
           return FilterContext.current();
         })(),
       ]);
@@ -922,7 +923,7 @@ describe("FilterContext thread safety (ALS isolation)", () => {
   it("setImmediate inside withFilters preserves context", async () => {
     const opts: FilterOptions = { disableFilters: ["imm"] };
     const result = await FilterContext.withFilters(opts, () => {
-      return new Promise<FilterOptions | undefined>(resolve => {
+      return new Promise<FilterOptions | undefined>((resolve) => {
         setImmediate(() => {
           resolve(FilterContext.current());
         });

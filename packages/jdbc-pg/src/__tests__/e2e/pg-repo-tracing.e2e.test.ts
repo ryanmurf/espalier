@@ -4,31 +4,21 @@
  * Verifies that CrudRepository methods create repository.{operation} spans
  * with correct entity type, operation, and status attributes.
  */
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
-import { createTestDataSource, isPostgresAvailable } from "./setup.js";
-import {
-  Table,
-  Column,
-  Id,
-  createRepository,
-  getEntityMetadata,
-} from "espalier-data";
-import {
-  setGlobalTracerProvider,
-  NoopTracerProvider,
-  SpanKind,
-  SpanStatusCode,
-} from "espalier-jdbc";
+
+import { Column, createRepository, getEntityMetadata, Id, Table } from "espalier-data";
 import type {
   Span,
+  SpanAttributeValue,
+  SpanEvent,
+  SpanOptions,
+  SpanStatus,
   Tracer,
   TracerProvider,
-  SpanEvent,
-  SpanAttributeValue,
-  SpanStatus,
-  SpanOptions,
 } from "espalier-jdbc";
+import { NoopTracerProvider, SpanKind, SpanStatusCode, setGlobalTracerProvider } from "espalier-jdbc";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { PgDataSource } from "../../pg-data-source.js";
+import { createTestDataSource, isPostgresAvailable } from "./setup.js";
 
 const canConnect = await isPostgresAvailable();
 
@@ -192,8 +182,7 @@ describe.skipIf(!canConnect)("E2E: Repository-level tracing spans", { timeout: 3
       item.value = 1;
       await repo.save(item);
 
-      const repoSpans = provider.getSpans("espalier-data")
-        .filter(s => s.spanName === "repository.save");
+      const repoSpans = provider.getSpans("espalier-data").filter((s) => s.spanName === "repository.save");
       expect(repoSpans.length).toBeGreaterThanOrEqual(1);
 
       const span = repoSpans[0];
@@ -214,8 +203,7 @@ describe.skipIf(!canConnect)("E2E: Repository-level tracing spans", { timeout: 3
 
       await repo.findById(saved.id);
 
-      const repoSpans = provider.getSpans("espalier-data")
-        .filter(s => s.spanName === "repository.findById");
+      const repoSpans = provider.getSpans("espalier-data").filter((s) => s.spanName === "repository.findById");
       expect(repoSpans.length).toBeGreaterThanOrEqual(1);
       expect(repoSpans[0].attributes["repository.operation"]).toBe("findById");
       expect(repoSpans[0].status.code).toBe(SpanStatusCode.OK);
@@ -232,8 +220,7 @@ describe.skipIf(!canConnect)("E2E: Repository-level tracing spans", { timeout: 3
 
       await repo.findAll();
 
-      const repoSpans = provider.getSpans("espalier-data")
-        .filter(s => s.spanName === "repository.findAll");
+      const repoSpans = provider.getSpans("espalier-data").filter((s) => s.spanName === "repository.findAll");
       expect(repoSpans.length).toBeGreaterThanOrEqual(1);
       expect(repoSpans[0].attributes["repository.entity"]).toBe("RtItem");
     });
@@ -249,8 +236,7 @@ describe.skipIf(!canConnect)("E2E: Repository-level tracing spans", { timeout: 3
 
       await repo.delete(saved);
 
-      const repoSpans = provider.getSpans("espalier-data")
-        .filter(s => s.spanName === "repository.delete");
+      const repoSpans = provider.getSpans("espalier-data").filter((s) => s.spanName === "repository.delete");
       expect(repoSpans.length).toBeGreaterThanOrEqual(1);
       expect(repoSpans[0].attributes["repository.operation"]).toBe("delete");
       expect(repoSpans[0].status.code).toBe(SpanStatusCode.OK);
@@ -261,8 +247,7 @@ describe.skipIf(!canConnect)("E2E: Repository-level tracing spans", { timeout: 3
 
       await repo.count();
 
-      const repoSpans = provider.getSpans("espalier-data")
-        .filter(s => s.spanName === "repository.count");
+      const repoSpans = provider.getSpans("espalier-data").filter((s) => s.spanName === "repository.count");
       expect(repoSpans.length).toBeGreaterThanOrEqual(1);
     });
 
@@ -277,8 +262,7 @@ describe.skipIf(!canConnect)("E2E: Repository-level tracing spans", { timeout: 3
 
       await repo.existsById(saved.id);
 
-      const repoSpans = provider.getSpans("espalier-data")
-        .filter(s => s.spanName === "repository.existsById");
+      const repoSpans = provider.getSpans("espalier-data").filter((s) => s.spanName === "repository.existsById");
       expect(repoSpans.length).toBeGreaterThanOrEqual(1);
     });
 
@@ -293,8 +277,7 @@ describe.skipIf(!canConnect)("E2E: Repository-level tracing spans", { timeout: 3
 
       await repo.deleteById(saved.id);
 
-      const repoSpans = provider.getSpans("espalier-data")
-        .filter(s => s.spanName === "repository.deleteById");
+      const repoSpans = provider.getSpans("espalier-data").filter((s) => s.spanName === "repository.deleteById");
       expect(repoSpans.length).toBeGreaterThanOrEqual(1);
     });
   });
@@ -308,8 +291,7 @@ describe.skipIf(!canConnect)("E2E: Repository-level tracing spans", { timeout: 3
       const repo = createRepository<RtItem, number>(RtItem, ds);
       await repo.findAll();
 
-      const span = provider.getSpans("espalier-data")
-        .find(s => s.spanName.startsWith("repository."));
+      const span = provider.getSpans("espalier-data").find((s) => s.spanName.startsWith("repository."));
       expect(span).toBeDefined();
       expect(span!.attributes["repository.entity"]).toBe("RtItem");
     });
@@ -318,8 +300,7 @@ describe.skipIf(!canConnect)("E2E: Repository-level tracing spans", { timeout: 3
       const repo = createRepository<RtItem, number>(RtItem, ds);
       await repo.findAll();
 
-      const span = provider.getSpans("espalier-data")
-        .find(s => s.spanName.startsWith("repository."));
+      const span = provider.getSpans("espalier-data").find((s) => s.spanName.startsWith("repository."));
       expect(span).toBeDefined();
       expect(span!.kind).toBe(SpanKind.INTERNAL);
     });
@@ -344,11 +325,10 @@ describe.skipIf(!canConnect)("E2E: Repository-level tracing spans", { timeout: 3
         // expected
       }
 
-      const repoSpans = provider.getSpans("espalier-data")
-        .filter(s => s.spanName === "repository.save");
+      const repoSpans = provider.getSpans("espalier-data").filter((s) => s.spanName === "repository.save");
       expect(repoSpans.length).toBeGreaterThanOrEqual(1);
 
-      const errorSpan = repoSpans.find(s => s.status.code === SpanStatusCode.ERROR);
+      const errorSpan = repoSpans.find((s) => s.status.code === SpanStatusCode.ERROR);
       expect(errorSpan).toBeDefined();
       expect(errorSpan!.ended).toBe(true);
       expect(errorSpan!.status.message).toBeDefined();
@@ -399,10 +379,8 @@ describe.skipIf(!canConnect)("E2E: Repository-level tracing spans", { timeout: 3
       item.value = 7;
       await repo.save(item);
 
-      const repoSpans = provider.getSpans("espalier-data")
-        .filter(s => s.spanName.startsWith("repository."));
-      const querySpans = provider.getSpans("espalier-jdbc-pg")
-        .filter(s => s.spanName === "db.query");
+      const repoSpans = provider.getSpans("espalier-data").filter((s) => s.spanName.startsWith("repository."));
+      const querySpans = provider.getSpans("espalier-jdbc-pg").filter((s) => s.spanName === "db.query");
 
       expect(repoSpans.length).toBeGreaterThanOrEqual(1);
       expect(querySpans.length).toBeGreaterThanOrEqual(1);
@@ -412,10 +390,8 @@ describe.skipIf(!canConnect)("E2E: Repository-level tracing spans", { timeout: 3
       const repo = createRepository<RtItem, number>(RtItem, ds);
       await repo.findAll();
 
-      const repoSpans = provider.getSpans("espalier-data")
-        .filter(s => s.spanName === "repository.findAll");
-      const querySpans = provider.getSpans("espalier-jdbc-pg")
-        .filter(s => s.spanName === "db.query");
+      const repoSpans = provider.getSpans("espalier-data").filter((s) => s.spanName === "repository.findAll");
+      const querySpans = provider.getSpans("espalier-jdbc-pg").filter((s) => s.spanName === "db.query");
 
       expect(repoSpans.length).toBeGreaterThanOrEqual(1);
       expect(querySpans.length).toBeGreaterThanOrEqual(1);
@@ -438,8 +414,7 @@ describe.skipIf(!canConnect)("E2E: Repository-level tracing spans", { timeout: 3
       });
       await repo.saveAll(items);
 
-      const repoSpans = provider.getSpans("espalier-data")
-        .filter(s => s.spanName === "repository.saveAll");
+      const repoSpans = provider.getSpans("espalier-data").filter((s) => s.spanName === "repository.saveAll");
       expect(repoSpans.length).toBeGreaterThanOrEqual(1);
     });
 
@@ -454,8 +429,7 @@ describe.skipIf(!canConnect)("E2E: Repository-level tracing spans", { timeout: 3
 
       await repo.deleteAll([saved]);
 
-      const repoSpans = provider.getSpans("espalier-data")
-        .filter(s => s.spanName === "repository.deleteAll");
+      const repoSpans = provider.getSpans("espalier-data").filter((s) => s.spanName === "repository.deleteAll");
       expect(repoSpans.length).toBeGreaterThanOrEqual(1);
     });
 
@@ -469,8 +443,7 @@ describe.skipIf(!canConnect)("E2E: Repository-level tracing spans", { timeout: 3
         await repo.save(it);
       }
 
-      const saveSpans = provider.getSpans("espalier-data")
-        .filter(s => s.spanName === "repository.save");
+      const saveSpans = provider.getSpans("espalier-data").filter((s) => s.spanName === "repository.save");
       expect(saveSpans.length).toBeGreaterThanOrEqual(5);
 
       // All should be ended

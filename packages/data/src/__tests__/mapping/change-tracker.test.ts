@@ -1,7 +1,7 @@
 /**
  * Unit tests for EntityChangeTracker (dirty checking).
  */
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { EntityChangeTracker } from "../../mapping/change-tracker.js";
 import type { EntityMetadata } from "../../mapping/entity-metadata.js";
 
@@ -64,13 +64,13 @@ describe("EntityChangeTracker: basic operations", () => {
     const changes = tracker.getDirtyFields(entity);
     expect(changes).toHaveLength(2);
 
-    const nameChange = changes.find(c => c.field === "name");
+    const nameChange = changes.find((c) => c.field === "name");
     expect(nameChange).toBeDefined();
     expect(nameChange!.oldValue).toBe("Alice");
     expect(nameChange!.newValue).toBe("Bob");
     expect(nameChange!.columnName).toBe("name");
 
-    const ageChange = changes.find(c => c.field === "age");
+    const ageChange = changes.find((c) => c.field === "age");
     expect(ageChange).toBeDefined();
     expect(ageChange!.oldValue).toBe(30);
     expect(ageChange!.newValue).toBe(31);
@@ -739,7 +739,7 @@ describe("EntityChangeTracker: adversarial — rapid successive snapshots", () =
     // Now dirty compared to Bob/99 snapshot, NOT the original Alice/30
     expect(tracker.isDirty(entity)).toBe(true);
     const changes = tracker.getDirtyFields(entity);
-    const nameChange = changes.find(c => c.field === "name");
+    const nameChange = changes.find((c) => c.field === "name");
     expect(nameChange!.oldValue).toBe("Bob"); // old value from re-snapshot
     expect(nameChange!.newValue).toBe("Alice");
   });

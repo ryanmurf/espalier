@@ -1,9 +1,8 @@
-import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
+import { Column, Id, Table } from "espalier-data";
+import type { Connection, DataSource, ResultSet, Transaction } from "espalier-jdbc";
 import { PgDataSource } from "espalier-jdbc-pg";
-import type { Connection, DataSource, Transaction, ResultSet } from "espalier-jdbc";
-import { Table, Column, Id } from "espalier-data";
-import { withTestTransaction, withNestedTransaction } from "../isolation/test-transaction.js";
-import type { TestTransactionContext } from "../isolation/test-transaction.js";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { withNestedTransaction, withTestTransaction } from "../isolation/test-transaction.js";
 
 // ==========================================================================
 // Helpers
@@ -87,12 +86,8 @@ describe.skipIf(!canConnect)("withTestTransaction — E2E adversarial", () => {
   it("data inserted inside withTestTransaction is visible within the callback", async () => {
     await withTestTransaction(ds, async (ctx) => {
       const stmt = ctx.connection.createStatement();
-      await stmt.executeUpdate(
-        `INSERT INTO ${TEST_TABLE} (name, value) VALUES ('visible', 1)`,
-      );
-      const rs = await stmt.executeQuery(
-        `SELECT count(*)::int AS cnt FROM ${TEST_TABLE} WHERE name = 'visible'`,
-      );
+      await stmt.executeUpdate(`INSERT INTO ${TEST_TABLE} (name, value) VALUES ('visible', 1)`);
+      const rs = await stmt.executeQuery(`SELECT count(*)::int AS cnt FROM ${TEST_TABLE} WHERE name = 'visible'`);
       const row = await firstRow(rs);
       expect(row.cnt).toBe(1);
     });
@@ -101,9 +96,7 @@ describe.skipIf(!canConnect)("withTestTransaction — E2E adversarial", () => {
   it("data inserted inside withTestTransaction is gone after rollback", async () => {
     await withTestTransaction(ds, async (ctx) => {
       const stmt = ctx.connection.createStatement();
-      await stmt.executeUpdate(
-        `INSERT INTO ${TEST_TABLE} (name, value) VALUES ('should_disappear', 99)`,
-      );
+      await stmt.executeUpdate(`INSERT INTO ${TEST_TABLE} (name, value) VALUES ('should_disappear', 99)`);
     });
 
     const conn = await ds.getConnection();
@@ -124,9 +117,7 @@ describe.skipIf(!canConnect)("withTestTransaction — E2E adversarial", () => {
     try {
       await withTestTransaction(ds, async (ctx) => {
         const stmt = ctx.connection.createStatement();
-        await stmt.executeUpdate(
-          `INSERT INTO ${TEST_TABLE} (name, value) VALUES ('error_row', 42)`,
-        );
+        await stmt.executeUpdate(`INSERT INTO ${TEST_TABLE} (name, value) VALUES ('error_row', 42)`);
         throw new Error("Test body failure");
       });
     } catch {
@@ -135,9 +126,7 @@ describe.skipIf(!canConnect)("withTestTransaction — E2E adversarial", () => {
 
     const conn = await ds.getConnection();
     const stmt = conn.createStatement();
-    const rs = await stmt.executeQuery(
-      `SELECT count(*)::int AS cnt FROM ${TEST_TABLE} WHERE name = 'error_row'`,
-    );
+    const rs = await stmt.executeQuery(`SELECT count(*)::int AS cnt FROM ${TEST_TABLE} WHERE name = 'error_row'`);
     const row = await firstRow(rs);
     expect(row.cnt).toBe(0);
     await conn.close();
@@ -186,15 +175,11 @@ describe.skipIf(!canConnect)("withTestTransaction — E2E adversarial", () => {
     await withTestTransaction(ds, async (ctx) => {
       const stmt = ctx.connection.createStatement();
 
-      await stmt.executeUpdate(
-        `INSERT INTO ${TEST_TABLE} (name, value) VALUES ('outer_row', 1)`,
-      );
+      await stmt.executeUpdate(`INSERT INTO ${TEST_TABLE} (name, value) VALUES ('outer_row', 1)`);
 
       await withNestedTransaction(ctx, async (nestedCtx) => {
         const nestedStmt = nestedCtx.connection.createStatement();
-        await nestedStmt.executeUpdate(
-          `INSERT INTO ${TEST_TABLE} (name, value) VALUES ('inner_row', 2)`,
-        );
+        await nestedStmt.executeUpdate(`INSERT INTO ${TEST_TABLE} (name, value) VALUES ('inner_row', 2)`);
 
         const rs = await nestedStmt.executeQuery(
           `SELECT count(*)::int AS cnt FROM ${TEST_TABLE} WHERE name = 'inner_row'`,
@@ -204,9 +189,7 @@ describe.skipIf(!canConnect)("withTestTransaction — E2E adversarial", () => {
       });
 
       // After nested rollback, inner_row should be gone
-      const rs = await stmt.executeQuery(
-        `SELECT count(*)::int AS cnt FROM ${TEST_TABLE} WHERE name = 'inner_row'`,
-      );
+      const rs = await stmt.executeQuery(`SELECT count(*)::int AS cnt FROM ${TEST_TABLE} WHERE name = 'inner_row'`);
       const row = await firstRow(rs);
       expect(row.cnt).toBe(0);
 
@@ -222,21 +205,15 @@ describe.skipIf(!canConnect)("withTestTransaction — E2E adversarial", () => {
   it("3 levels of nesting all roll back correctly", async () => {
     await withTestTransaction(ds, async (ctx) => {
       const stmt = ctx.connection.createStatement();
-      await stmt.executeUpdate(
-        `INSERT INTO ${TEST_TABLE} (name, value) VALUES ('level0', 0)`,
-      );
+      await stmt.executeUpdate(`INSERT INTO ${TEST_TABLE} (name, value) VALUES ('level0', 0)`);
 
       await withNestedTransaction(ctx, async (ctx1) => {
         const stmt1 = ctx1.connection.createStatement();
-        await stmt1.executeUpdate(
-          `INSERT INTO ${TEST_TABLE} (name, value) VALUES ('level1', 1)`,
-        );
+        await stmt1.executeUpdate(`INSERT INTO ${TEST_TABLE} (name, value) VALUES ('level1', 1)`);
 
         await withNestedTransaction(ctx1, async (ctx2) => {
           const stmt2 = ctx2.connection.createStatement();
-          await stmt2.executeUpdate(
-            `INSERT INTO ${TEST_TABLE} (name, value) VALUES ('level2', 2)`,
-          );
+          await stmt2.executeUpdate(`INSERT INTO ${TEST_TABLE} (name, value) VALUES ('level2', 2)`);
 
           const rs = await stmt2.executeQuery(
             `SELECT count(*)::int AS cnt FROM ${TEST_TABLE} WHERE name LIKE 'level%'`,
@@ -245,16 +222,12 @@ describe.skipIf(!canConnect)("withTestTransaction — E2E adversarial", () => {
           expect(row.cnt).toBe(3);
         });
 
-        const rs1 = await stmt1.executeQuery(
-          `SELECT count(*)::int AS cnt FROM ${TEST_TABLE} WHERE name LIKE 'level%'`,
-        );
+        const rs1 = await stmt1.executeQuery(`SELECT count(*)::int AS cnt FROM ${TEST_TABLE} WHERE name LIKE 'level%'`);
         const row1 = await firstRow(rs1);
         expect(row1.cnt).toBe(2);
       });
 
-      const rs0 = await stmt.executeQuery(
-        `SELECT count(*)::int AS cnt FROM ${TEST_TABLE} WHERE name LIKE 'level%'`,
-      );
+      const rs0 = await stmt.executeQuery(`SELECT count(*)::int AS cnt FROM ${TEST_TABLE} WHERE name LIKE 'level%'`);
       const row0 = await firstRow(rs0);
       expect(row0.cnt).toBe(1);
     });
@@ -262,9 +235,7 @@ describe.skipIf(!canConnect)("withTestTransaction — E2E adversarial", () => {
     // After outer rollback: nothing
     const conn = await ds.getConnection();
     const stmt = conn.createStatement();
-    const rs = await stmt.executeQuery(
-      `SELECT count(*)::int AS cnt FROM ${TEST_TABLE} WHERE name LIKE 'level%'`,
-    );
+    const rs = await stmt.executeQuery(`SELECT count(*)::int AS cnt FROM ${TEST_TABLE} WHERE name LIKE 'level%'`);
     const row = await firstRow(rs);
     expect(row.cnt).toBe(0);
     await conn.close();
@@ -278,9 +249,7 @@ describe.skipIf(!canConnect)("withTestTransaction — E2E adversarial", () => {
     const results = await Promise.all([
       withTestTransaction(ds, async (ctx) => {
         const stmt = ctx.connection.createStatement();
-        await stmt.executeUpdate(
-          `INSERT INTO ${TEST_TABLE} (name, value) VALUES ('concurrent_a', 1)`,
-        );
+        await stmt.executeUpdate(`INSERT INTO ${TEST_TABLE} (name, value) VALUES ('concurrent_a', 1)`);
         const rs = await stmt.executeQuery(
           `SELECT count(*)::int AS cnt FROM ${TEST_TABLE} WHERE name = 'concurrent_b'`,
         );
@@ -289,9 +258,7 @@ describe.skipIf(!canConnect)("withTestTransaction — E2E adversarial", () => {
       }),
       withTestTransaction(ds, async (ctx) => {
         const stmt = ctx.connection.createStatement();
-        await stmt.executeUpdate(
-          `INSERT INTO ${TEST_TABLE} (name, value) VALUES ('concurrent_b', 2)`,
-        );
+        await stmt.executeUpdate(`INSERT INTO ${TEST_TABLE} (name, value) VALUES ('concurrent_b', 2)`);
         const rs = await stmt.executeQuery(
           `SELECT count(*)::int AS cnt FROM ${TEST_TABLE} WHERE name = 'concurrent_a'`,
         );
@@ -317,9 +284,7 @@ describe.skipIf(!canConnect)("withTestTransaction — E2E adversarial", () => {
     } catch {
       // Transaction.rollback() after commit may throw — that's OK
     }
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining("defeats test isolation"),
-    );
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("defeats test isolation"));
     warnSpy.mockRestore();
   });
 
@@ -373,16 +338,12 @@ describe.skipIf(!canConnect)("withTestTransaction — E2E adversarial", () => {
   it("multiple sequential withTestTransaction calls each start clean", async () => {
     await withTestTransaction(ds, async (ctx) => {
       const stmt = ctx.connection.createStatement();
-      await stmt.executeUpdate(
-        `INSERT INTO ${TEST_TABLE} (name, value) VALUES ('seq_test', 1)`,
-      );
+      await stmt.executeUpdate(`INSERT INTO ${TEST_TABLE} (name, value) VALUES ('seq_test', 1)`);
     });
 
     await withTestTransaction(ds, async (ctx) => {
       const stmt = ctx.connection.createStatement();
-      const rs = await stmt.executeQuery(
-        `SELECT count(*)::int AS cnt FROM ${TEST_TABLE} WHERE name = 'seq_test'`,
-      );
+      const rs = await stmt.executeQuery(`SELECT count(*)::int AS cnt FROM ${TEST_TABLE} WHERE name = 'seq_test'`);
       const row = await firstRow(rs);
       expect(row.cnt).toBe(0);
     });
@@ -465,21 +426,15 @@ describe("withTestTransaction — unit tests (mocked)", () => {
 
   it("closes connection even when rollback throws", async () => {
     const { ds, connection, transaction } = createMockDataSource();
-    (transaction.rollback as ReturnType<typeof vi.fn>).mockRejectedValue(
-      new Error("rollback failed"),
-    );
+    (transaction.rollback as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("rollback failed"));
     await withTestTransaction(ds, async () => {});
     expect(connection.close).toHaveBeenCalledOnce();
   });
 
   it("survives both rollback and close throwing", async () => {
     const { ds, connection, transaction } = createMockDataSource();
-    (transaction.rollback as ReturnType<typeof vi.fn>).mockRejectedValue(
-      new Error("rollback failed"),
-    );
-    (connection.close as ReturnType<typeof vi.fn>).mockRejectedValue(
-      new Error("close failed"),
-    );
+    (transaction.rollback as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("rollback failed"));
+    (connection.close as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("close failed"));
     await withTestTransaction(ds, async () => {});
   });
 
@@ -488,9 +443,7 @@ describe("withTestTransaction — unit tests (mocked)", () => {
       getConnection: vi.fn().mockRejectedValue(new Error("Connection refused")),
       close: vi.fn(),
     };
-    await expect(
-      withTestTransaction(ds, async () => {}),
-    ).rejects.toThrow("Connection refused");
+    await expect(withTestTransaction(ds, async () => {})).rejects.toThrow("Connection refused");
   });
 
   it("beginTransaction failure propagates cleanly", async () => {
@@ -505,18 +458,12 @@ describe("withTestTransaction — unit tests (mocked)", () => {
       getConnection: vi.fn().mockResolvedValue(connection),
       close: vi.fn(),
     };
-    await expect(
-      withTestTransaction(ds, async () => {}),
-    ).rejects.toThrow("TX start failed");
+    await expect(withTestTransaction(ds, async () => {})).rejects.toThrow("TX start failed");
   });
 
   it("passes isolation level to beginTransaction", async () => {
     const { ds, connection } = createMockDataSource();
-    await withTestTransaction(
-      ds,
-      async () => {},
-      { isolation: "SERIALIZABLE" as any },
-    );
+    await withTestTransaction(ds, async () => {}, { isolation: "SERIALIZABLE" as any });
     expect(connection.beginTransaction).toHaveBeenCalledWith("SERIALIZABLE");
   });
 
@@ -527,11 +474,8 @@ describe("withTestTransaction — unit tests (mocked)", () => {
     });
     expect(transaction.setSavepoint).toHaveBeenCalledOnce();
     expect(transaction.rollbackTo).toHaveBeenCalledOnce();
-    const savepointName = (transaction.setSavepoint as ReturnType<typeof vi.fn>).mock
-      .calls[0][0];
-    expect(
-      (transaction.rollbackTo as ReturnType<typeof vi.fn>).mock.calls[0][0],
-    ).toBe(savepointName);
+    const savepointName = (transaction.setSavepoint as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect((transaction.rollbackTo as ReturnType<typeof vi.fn>).mock.calls[0][0]).toBe(savepointName);
   });
 
   it("withNestedTransaction rolls back savepoint even on error", async () => {

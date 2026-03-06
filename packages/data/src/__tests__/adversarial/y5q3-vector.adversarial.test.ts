@@ -6,24 +6,21 @@
  * query vector support. Focus: breaking edge cases, invalid inputs,
  * SQL injection, mutable metadata, NaN/Infinity in vectors.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { Vector, getVectorFields, getVectorFieldMetadata } from "../../decorators/vector.js";
-import type { VectorOptions, VectorMetadataEntry } from "../../decorators/vector.js";
-import { VectorDistanceCriteria, VectorOrderExpression } from "../../query/criteria.js";
-import type { VectorMetric } from "../../query/criteria.js";
-import { VectorIndexManager } from "../../vector/vector-index-manager.js";
-import type { VectorIndexOptions } from "../../vector/vector-index-manager.js";
-import { createEmbeddingHook, registerEmbeddingHook } from "../../vector/embedding-hook.js";
-import type { EmbeddingHookOptions } from "../../vector/embedding-hook.js";
-import { similarTo, nearestTo } from "../../vector/vector-specifications.js";
-import { buildDerivedQuery } from "../../query/derived-query-executor.js";
-import type { DerivedQueryDescriptor } from "../../query/derived-query-parser.js";
-import { Table } from "../../decorators/table.js";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Column } from "../../decorators/column.js";
 import { Id } from "../../decorators/id.js";
+import { Table } from "../../decorators/table.js";
+import type { VectorMetadataEntry } from "../../decorators/vector.js";
+import { getVectorFieldMetadata, getVectorFields, Vector } from "../../decorators/vector.js";
 import { getEntityMetadata } from "../../mapping/entity-metadata.js";
-import { addLifecycleCallback } from "../../decorators/lifecycle.js";
+import { VectorDistanceCriteria, VectorOrderExpression } from "../../query/criteria.js";
+import { buildDerivedQuery } from "../../query/derived-query-executor.js";
+import type { DerivedQueryDescriptor } from "../../query/derived-query-parser.js";
 import { DdlGenerator } from "../../schema/ddl-generator.js";
+import { createEmbeddingHook, registerEmbeddingHook } from "../../vector/embedding-hook.js";
+import type { VectorIndexOptions } from "../../vector/vector-index-manager.js";
+import { VectorIndexManager } from "../../vector/vector-index-manager.js";
+import { nearestTo, similarTo } from "../../vector/vector-specifications.js";
 
 // ============================================================
 // @Vector decorator
@@ -251,13 +248,13 @@ describe("VectorDistanceCriteria — adversarial", () => {
     });
 
     it("vector with NaN throws validation error", () => {
-      expect(() => new VectorDistanceCriteria("col", [NaN], "cosine", "lt", 0.5).toSql(1))
-        .toThrow(/finite number/);
+      expect(() => new VectorDistanceCriteria("col", [NaN], "cosine", "lt", 0.5).toSql(1)).toThrow(/finite number/);
     });
 
     it("vector with Infinity throws validation error", () => {
-      expect(() => new VectorDistanceCriteria("col", [Infinity, -Infinity], "cosine", "lt", 0.5).toSql(1))
-        .toThrow(/finite number/);
+      expect(() => new VectorDistanceCriteria("col", [Infinity, -Infinity], "cosine", "lt", 0.5).toSql(1)).toThrow(
+        /finite number/,
+      );
     });
 
     it("huge vector (10000 elements) produces valid literal", () => {
@@ -278,8 +275,7 @@ describe("VectorDistanceCriteria — adversarial", () => {
     });
 
     it("negative threshold throws validation error", () => {
-      expect(() => new VectorDistanceCriteria("col", [1, 2], "cosine", "lt", -1))
-        .toThrow(/non-negative finite number/);
+      expect(() => new VectorDistanceCriteria("col", [1, 2], "cosine", "lt", -1)).toThrow(/non-negative finite number/);
     });
   });
 
@@ -347,9 +343,7 @@ describe("VectorIndexManager — adversarial", () => {
 
   describe("generateCreateExtension", () => {
     it("returns the correct statement", () => {
-      expect(manager.generateCreateExtension()).toBe(
-        "CREATE EXTENSION IF NOT EXISTS vector",
-      );
+      expect(manager.generateCreateExtension()).toBe("CREATE EXTENSION IF NOT EXISTS vector");
     });
   });
 
@@ -417,27 +411,19 @@ describe("VectorIndexManager — adversarial", () => {
     });
 
     it("rejects efConstruction = 0", () => {
-      expect(() => manager.generateCreateIndex({ ...baseOpts, efConstruction: 0 })).toThrow(
-        /ef_construction/,
-      );
+      expect(() => manager.generateCreateIndex({ ...baseOpts, efConstruction: 0 })).toThrow(/ef_construction/);
     });
 
     it("rejects efConstruction = -1", () => {
-      expect(() => manager.generateCreateIndex({ ...baseOpts, efConstruction: -1 })).toThrow(
-        /ef_construction/,
-      );
+      expect(() => manager.generateCreateIndex({ ...baseOpts, efConstruction: -1 })).toThrow(/ef_construction/);
     });
 
     it("rejects efConstruction = 1001", () => {
-      expect(() => manager.generateCreateIndex({ ...baseOpts, efConstruction: 1001 })).toThrow(
-        /ef_construction/,
-      );
+      expect(() => manager.generateCreateIndex({ ...baseOpts, efConstruction: 1001 })).toThrow(/ef_construction/);
     });
 
     it("rejects efConstruction = NaN", () => {
-      expect(() => manager.generateCreateIndex({ ...baseOpts, efConstruction: NaN })).toThrow(
-        /ef_construction/,
-      );
+      expect(() => manager.generateCreateIndex({ ...baseOpts, efConstruction: NaN })).toThrow(/ef_construction/);
     });
 
     it("accepts efConstruction = 1 (minimum)", () => {
@@ -445,9 +431,7 @@ describe("VectorIndexManager — adversarial", () => {
     });
 
     it("accepts efConstruction = 1000 (maximum)", () => {
-      expect(() =>
-        manager.generateCreateIndex({ ...baseOpts, efConstruction: 1000 }),
-      ).not.toThrow();
+      expect(() => manager.generateCreateIndex({ ...baseOpts, efConstruction: 1000 })).not.toThrow();
     });
 
     it("default m=16 and efConstruction=64 appear in output", () => {
@@ -471,27 +455,19 @@ describe("VectorIndexManager — adversarial", () => {
     });
 
     it("rejects lists = -1", () => {
-      expect(() => manager.generateCreateIndex({ ...baseOpts, lists: -1 })).toThrow(
-        /IVFFlat lists/,
-      );
+      expect(() => manager.generateCreateIndex({ ...baseOpts, lists: -1 })).toThrow(/IVFFlat lists/);
     });
 
     it("rejects lists = 10001", () => {
-      expect(() => manager.generateCreateIndex({ ...baseOpts, lists: 10001 })).toThrow(
-        /IVFFlat lists/,
-      );
+      expect(() => manager.generateCreateIndex({ ...baseOpts, lists: 10001 })).toThrow(/IVFFlat lists/);
     });
 
     it("rejects lists = NaN", () => {
-      expect(() => manager.generateCreateIndex({ ...baseOpts, lists: NaN })).toThrow(
-        /IVFFlat lists/,
-      );
+      expect(() => manager.generateCreateIndex({ ...baseOpts, lists: NaN })).toThrow(/IVFFlat lists/);
     });
 
     it("rejects lists = 100.5 (non-integer)", () => {
-      expect(() => manager.generateCreateIndex({ ...baseOpts, lists: 100.5 })).toThrow(
-        /IVFFlat lists/,
-      );
+      expect(() => manager.generateCreateIndex({ ...baseOpts, lists: 100.5 })).toThrow(/IVFFlat lists/);
     });
 
     it("accepts lists = 1 (minimum)", () => {
@@ -885,8 +861,7 @@ describe("similarTo — adversarial", () => {
   });
 
   it("negative threshold throws validation error", () => {
-    expect(() => similarTo("embedding", [1], -0.5))
-      .toThrow(/non-negative finite number/);
+    expect(() => similarTo("embedding", [1], -0.5)).toThrow(/non-negative finite number/);
   });
 });
 
@@ -948,7 +923,7 @@ describe("buildDerivedQuery — SimilarTo operator", () => {
       @Vector({ dimensions: 3, metric: "cosine" }) embedding!: number[];
     }
 
-    const inst = new Document();
+    const _inst = new Document();
     return getEntityMetadata(Document);
   }
 
@@ -956,9 +931,7 @@ describe("buildDerivedQuery — SimilarTo operator", () => {
     const metadata = makeMetadata();
     const descriptor: DerivedQueryDescriptor = {
       action: "find",
-      properties: [
-        { property: "embedding", operator: "SimilarTo", paramCount: 1 },
-      ],
+      properties: [{ property: "embedding", operator: "SimilarTo", paramCount: 1 }],
       connector: "And",
     };
 
@@ -989,9 +962,7 @@ describe("buildDerivedQuery — SimilarTo operator", () => {
     const metadata = makeMetadata();
     const descriptor: DerivedQueryDescriptor = {
       action: "find",
-      properties: [
-        { property: "embedding", operator: "SimilarTo", paramCount: 1 },
-      ],
+      properties: [{ property: "embedding", operator: "SimilarTo", paramCount: 1 }],
       connector: "And",
     };
 
@@ -1015,9 +986,7 @@ describe("buildDerivedQuery — SimilarTo operator", () => {
 
     const descriptor: DerivedQueryDescriptor = {
       action: "find",
-      properties: [
-        { property: "embedding", operator: "SimilarTo", paramCount: 1 },
-      ],
+      properties: [{ property: "embedding", operator: "SimilarTo", paramCount: 1 }],
       connector: "And",
     };
 

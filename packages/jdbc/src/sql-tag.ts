@@ -63,10 +63,7 @@ function isSqlFragment(value: unknown): value is SqlFragment {
  * // { text: "SELECT * FROM users WHERE name = $1", params: ["Alice"] }
  * ```
  */
-export function sql<T = unknown>(
-  strings: TemplateStringsArray,
-  ...values: unknown[]
-): TypedQuery<T> {
+export function sql<T = unknown>(strings: TemplateStringsArray, ...values: unknown[]): TypedQuery<T> {
   const textParts: string[] = [];
   const params: unknown[] = [];
 

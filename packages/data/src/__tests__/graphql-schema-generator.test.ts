@@ -17,17 +17,17 @@
  * - camelCase query field naming
  * - SDL structure validation
  */
-import { describe, it, expect } from "vitest";
-import { Table } from "../decorators/table.js";
-import { Column } from "../decorators/column.js";
-import { Id } from "../decorators/id.js";
-import { Version } from "../decorators/version.js";
+import { describe, expect, it } from "vitest";
 import { CreatedDate, LastModifiedDate } from "../decorators/auditing.js";
-import { ManyToOne, OneToMany, ManyToMany, OneToOne } from "../decorators/relations.js";
+import { Column } from "../decorators/column.js";
 import { Embeddable, Embedded } from "../decorators/embeddable.js";
+import { Id } from "../decorators/id.js";
+import { ManyToMany, ManyToOne, OneToMany, OneToOne } from "../decorators/relations.js";
+import { Table } from "../decorators/table.js";
 import { TenantId } from "../decorators/tenant.js";
-import { GraphQLSchemaGenerator } from "../graphql/schema-generator.js";
+import { Version } from "../decorators/version.js";
 import { GraphQLPlugin } from "../graphql/graphql-plugin.js";
+import { GraphQLSchemaGenerator } from "../graphql/schema-generator.js";
 
 // ══════════════════════════════════════════════════
 // Test entities
@@ -778,9 +778,7 @@ describe("GraphQLSchemaGenerator — SDL structure", () => {
 
   it("no duplicate type definitions", () => {
     const schema = generator.generate([User, Post, Tag, Profile]);
-    const typeNames = [...schema.sdl.matchAll(/^(type|input|scalar)\s+(\w+)/gm)].map(
-      (m) => `${m[1]} ${m[2]}`,
-    );
+    const typeNames = [...schema.sdl.matchAll(/^(type|input|scalar)\s+(\w+)/gm)].map((m) => `${m[1]} ${m[2]}`);
     const uniqueTypes = new Set(typeNames);
     expect(typeNames.length).toBe(uniqueTypes.size);
   });

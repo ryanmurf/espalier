@@ -1,15 +1,10 @@
-import { describe, it, expect, vi } from "vitest";
+import { ConnectionError, DatabaseErrorCode, IsolationLevel, TransactionError } from "espalier-jdbc";
 import type { PoolConnection as MysqlPoolConnection } from "mysql2/promise";
-import { MysqlConnection } from "../mysql-connection.js";
-import { MysqlStatement, MysqlPreparedStatement } from "../mysql-statement.js";
-import { MysqlNamedPreparedStatement } from "../mysql-named-statement.js";
+import { describe, expect, it, vi } from "vitest";
 import { MysqlBatchStatement } from "../mysql-batch-statement.js";
-import {
-  IsolationLevel,
-  TransactionError,
-  ConnectionError,
-  DatabaseErrorCode,
-} from "espalier-jdbc";
+import { MysqlConnection } from "../mysql-connection.js";
+import { MysqlNamedPreparedStatement } from "../mysql-named-statement.js";
+import { MysqlPreparedStatement, MysqlStatement } from "../mysql-statement.js";
 
 function createMockConnection(): MysqlPoolConnection {
   return {
@@ -33,27 +28,21 @@ describe("MysqlConnection", () => {
   describe("prepareStatement()", () => {
     it("returns a MysqlPreparedStatement", () => {
       const conn = new MysqlConnection(createMockConnection());
-      expect(conn.prepareStatement("SELECT 1")).toBeInstanceOf(
-        MysqlPreparedStatement,
-      );
+      expect(conn.prepareStatement("SELECT 1")).toBeInstanceOf(MysqlPreparedStatement);
     });
   });
 
   describe("prepareNamedStatement()", () => {
     it("returns a MysqlNamedPreparedStatement", () => {
       const conn = new MysqlConnection(createMockConnection());
-      expect(
-        conn.prepareNamedStatement("SELECT * FROM t WHERE id = :id"),
-      ).toBeInstanceOf(MysqlNamedPreparedStatement);
+      expect(conn.prepareNamedStatement("SELECT * FROM t WHERE id = :id")).toBeInstanceOf(MysqlNamedPreparedStatement);
     });
   });
 
   describe("prepareBatchStatement()", () => {
     it("returns a MysqlBatchStatement", () => {
       const conn = new MysqlConnection(createMockConnection());
-      expect(
-        conn.prepareBatchStatement("INSERT INTO t (x) VALUES ($1)"),
-      ).toBeInstanceOf(MysqlBatchStatement);
+      expect(conn.prepareBatchStatement("INSERT INTO t (x) VALUES ($1)")).toBeInstanceOf(MysqlBatchStatement);
     });
   });
 
@@ -69,35 +58,27 @@ describe("MysqlConnection", () => {
       const mockConn = createMockConnection();
       const conn = new MysqlConnection(mockConn);
       await conn.beginTransaction(IsolationLevel.SERIALIZABLE);
-      expect(mockConn.query).toHaveBeenCalledWith(
-        "SET TRANSACTION ISOLATION LEVEL SERIALIZABLE",
-      );
+      expect(mockConn.query).toHaveBeenCalledWith("SET TRANSACTION ISOLATION LEVEL SERIALIZABLE");
       expect(mockConn.beginTransaction).toHaveBeenCalledOnce();
     });
 
     it("wraps errors in TransactionError", async () => {
       const mockConn = createMockConnection();
-      (mockConn.beginTransaction as ReturnType<typeof vi.fn>).mockRejectedValue(
-        new Error("begin failed"),
-      );
+      (mockConn.beginTransaction as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("begin failed"));
       const conn = new MysqlConnection(mockConn);
       await expect(conn.beginTransaction()).rejects.toThrow(TransactionError);
     });
 
     it("wraps begin errors with TX_BEGIN_FAILED code", async () => {
       const mockConn = createMockConnection();
-      (mockConn.beginTransaction as ReturnType<typeof vi.fn>).mockRejectedValue(
-        new Error("begin failed"),
-      );
+      (mockConn.beginTransaction as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("begin failed"));
       const conn = new MysqlConnection(mockConn);
       try {
         await conn.beginTransaction();
         expect.unreachable("should have thrown");
       } catch (err) {
         expect(err).toBeInstanceOf(TransactionError);
-        expect((err as TransactionError).code).toBe(
-          DatabaseErrorCode.TX_BEGIN_FAILED,
-        );
+        expect((err as TransactionError).code).toBe(DatabaseErrorCode.TX_BEGIN_FAILED);
       }
     });
 
@@ -131,26 +112,20 @@ describe("MysqlConnection", () => {
         const conn = new MysqlConnection(mockConn);
         const tx = await conn.beginTransaction();
         await tx.rollbackTo("sp1");
-        expect(mockConn.query).toHaveBeenCalledWith(
-          "ROLLBACK TO SAVEPOINT sp1",
-        );
+        expect(mockConn.query).toHaveBeenCalledWith("ROLLBACK TO SAVEPOINT sp1");
       });
 
       it("commit wraps errors in TransactionError with TX_COMMIT_FAILED", async () => {
         const mockConn = createMockConnection();
         const conn = new MysqlConnection(mockConn);
         const tx = await conn.beginTransaction();
-        (mockConn.commit as ReturnType<typeof vi.fn>).mockRejectedValue(
-          new Error("commit failed"),
-        );
+        (mockConn.commit as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("commit failed"));
         try {
           await tx.commit();
           expect.unreachable("should have thrown");
         } catch (err) {
           expect(err).toBeInstanceOf(TransactionError);
-          expect((err as TransactionError).code).toBe(
-            DatabaseErrorCode.TX_COMMIT_FAILED,
-          );
+          expect((err as TransactionError).code).toBe(DatabaseErrorCode.TX_COMMIT_FAILED);
         }
       });
 
@@ -158,17 +133,13 @@ describe("MysqlConnection", () => {
         const mockConn = createMockConnection();
         const conn = new MysqlConnection(mockConn);
         const tx = await conn.beginTransaction();
-        (mockConn.rollback as ReturnType<typeof vi.fn>).mockRejectedValue(
-          new Error("rollback failed"),
-        );
+        (mockConn.rollback as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("rollback failed"));
         try {
           await tx.rollback();
           expect.unreachable("should have thrown");
         } catch (err) {
           expect(err).toBeInstanceOf(TransactionError);
-          expect((err as TransactionError).code).toBe(
-            DatabaseErrorCode.TX_ROLLBACK_FAILED,
-          );
+          expect((err as TransactionError).code).toBe(DatabaseErrorCode.TX_ROLLBACK_FAILED);
         }
       });
 
@@ -176,17 +147,13 @@ describe("MysqlConnection", () => {
         const mockConn = createMockConnection();
         const conn = new MysqlConnection(mockConn);
         const tx = await conn.beginTransaction();
-        (mockConn.query as ReturnType<typeof vi.fn>).mockRejectedValue(
-          new Error("savepoint failed"),
-        );
+        (mockConn.query as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("savepoint failed"));
         try {
           await tx.setSavepoint("sp");
           expect.unreachable("should have thrown");
         } catch (err) {
           expect(err).toBeInstanceOf(TransactionError);
-          expect((err as TransactionError).code).toBe(
-            DatabaseErrorCode.TX_SAVEPOINT_FAILED,
-          );
+          expect((err as TransactionError).code).toBe(DatabaseErrorCode.TX_SAVEPOINT_FAILED);
         }
       });
 
@@ -194,17 +161,13 @@ describe("MysqlConnection", () => {
         const mockConn = createMockConnection();
         const conn = new MysqlConnection(mockConn);
         const tx = await conn.beginTransaction();
-        (mockConn.query as ReturnType<typeof vi.fn>).mockRejectedValue(
-          new Error("rollback to failed"),
-        );
+        (mockConn.query as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("rollback to failed"));
         try {
           await tx.rollbackTo("sp");
           expect.unreachable("should have thrown");
         } catch (err) {
           expect(err).toBeInstanceOf(TransactionError);
-          expect((err as TransactionError).code).toBe(
-            DatabaseErrorCode.TX_ROLLBACK_FAILED,
-          );
+          expect((err as TransactionError).code).toBe(DatabaseErrorCode.TX_ROLLBACK_FAILED);
         }
       });
     });
@@ -247,17 +210,13 @@ describe("MysqlConnection", () => {
     it("prepareNamedStatement throws ConnectionError", async () => {
       const conn = new MysqlConnection(createMockConnection());
       await conn.close();
-      expect(() => conn.prepareNamedStatement("SELECT :id")).toThrow(
-        ConnectionError,
-      );
+      expect(() => conn.prepareNamedStatement("SELECT :id")).toThrow(ConnectionError);
     });
 
     it("prepareBatchStatement throws ConnectionError", async () => {
       const conn = new MysqlConnection(createMockConnection());
       await conn.close();
-      expect(() =>
-        conn.prepareBatchStatement("INSERT INTO t VALUES ($1)"),
-      ).toThrow(ConnectionError);
+      expect(() => conn.prepareBatchStatement("INSERT INTO t VALUES ($1)")).toThrow(ConnectionError);
     });
 
     it("beginTransaction throws ConnectionError", async () => {
@@ -274,9 +233,7 @@ describe("MysqlConnection", () => {
         expect.unreachable("should have thrown");
       } catch (err) {
         expect(err).toBeInstanceOf(ConnectionError);
-        expect((err as ConnectionError).code).toBe(
-          DatabaseErrorCode.CONNECTION_CLOSED,
-        );
+        expect((err as ConnectionError).code).toBe(DatabaseErrorCode.CONNECTION_CLOSED);
       }
     });
   });

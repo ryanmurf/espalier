@@ -1,7 +1,7 @@
 import type { PreparedStatement, Statement } from "./statement.js";
+import type { StatementCacheStats } from "./statement-cache.js";
 import type { IsolationLevel, Transaction } from "./transaction.js";
 import type { TypeConverterRegistry } from "./type-converter.js";
-import type { StatementCacheStats } from "./statement-cache.js";
 
 export interface Connection {
   createStatement(): Statement;

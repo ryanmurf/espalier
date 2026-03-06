@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { Migration, MigrationRecord, MigrationRunner } from "espalier-data";
 import type { DataSource } from "espalier-jdbc";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../adapter-factory.js", () => ({
   createAdapter: vi.fn(),
@@ -10,8 +10,8 @@ vi.mock("../migrate-loader.js", () => ({
   loadMigrations: vi.fn(),
 }));
 
-import { migrateDown } from "../migrate-down.js";
 import { createAdapter } from "../adapter-factory.js";
+import { migrateDown } from "../migrate-down.js";
 import { loadMigrations } from "../migrate-loader.js";
 
 function makeMigration(version: string, description: string): Migration {
@@ -188,9 +188,7 @@ describe("migrateDown", () => {
     vi.mocked(createAdapter).mockResolvedValue({ dataSource: ds, runner });
     vi.mocked(loadMigrations).mockRejectedValue(new Error("load failed"));
 
-    await expect(
-      migrateDown({ config: baseConfig, migrationsDir: "/tmp/migrations" }),
-    ).rejects.toThrow("load failed");
+    await expect(migrateDown({ config: baseConfig, migrationsDir: "/tmp/migrations" })).rejects.toThrow("load failed");
 
     expect(ds.close).toHaveBeenCalled();
   });
@@ -199,8 +197,13 @@ describe("migrateDown", () => {
     const runner = createMockRunner([]);
     const ds = createMockDataSource();
     const callOrder: string[] = [];
-    vi.mocked(runner.initialize).mockImplementation(async () => { callOrder.push("initialize"); });
-    vi.mocked(runner.getAppliedMigrations).mockImplementation(async () => { callOrder.push("getApplied"); return []; });
+    vi.mocked(runner.initialize).mockImplementation(async () => {
+      callOrder.push("initialize");
+    });
+    vi.mocked(runner.getAppliedMigrations).mockImplementation(async () => {
+      callOrder.push("getApplied");
+      return [];
+    });
     vi.mocked(createAdapter).mockResolvedValue({ dataSource: ds, runner });
     vi.mocked(loadMigrations).mockResolvedValue([]);
 

@@ -7,10 +7,7 @@ function toBase64Url(input: string): string {
   for (const b of bytes) {
     binary += String.fromCharCode(b);
   }
-  return btoa(binary)
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/, "");
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
 function fromBase64Url(encoded: string): string {

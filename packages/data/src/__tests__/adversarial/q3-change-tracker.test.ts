@@ -3,7 +3,7 @@
  * Targets: circular references, symbol properties, deepEqual edge cases,
  * clearAll no-op, rapid save cycles, type confusion.
  */
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { EntityChangeTracker } from "../../mapping/change-tracker.js";
 import type { EntityMetadata } from "../../mapping/entity-metadata.js";
 

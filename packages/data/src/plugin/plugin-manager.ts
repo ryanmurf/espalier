@@ -2,7 +2,7 @@ import type { EventBus } from "../events/event-bus.js";
 import type { EntityMetadata } from "../mapping/entity-metadata.js";
 import { getEntityMetadata } from "../mapping/entity-metadata.js";
 import type { MiddlewareFn } from "./middleware.js";
-import type { Plugin, PluginContext, PluginHook, HookContext, HookType } from "./plugin.js";
+import type { HookContext, HookType, Plugin, PluginContext, PluginHook } from "./plugin.js";
 
 /**
  * Manages plugin lifecycle, dependency resolution, and hook execution.
@@ -197,9 +197,7 @@ export class PluginManager {
 
       for (const dep of plugin.dependencies ?? []) {
         if (!this.plugins.has(dep.name)) {
-          throw new Error(
-            `Plugin "${name}" depends on "${dep.name}" which is not registered`,
-          );
+          throw new Error(`Plugin "${name}" depends on "${dep.name}" which is not registered`);
         }
         visit(dep.name);
       }

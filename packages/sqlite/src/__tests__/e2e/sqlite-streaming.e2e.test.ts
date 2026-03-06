@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import type { Connection } from "espalier-jdbc";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { SqliteDataSource } from "../../sqlite-data-source.js";
 import type { SqliteStatement } from "../../sqlite-statement.js";
 import { createTestDataSource, dropTestTable, isSqliteAvailable } from "./setup.js";
@@ -24,9 +24,7 @@ describe.skipIf(!isSqliteAvailable)("E2E: SQLite streaming/cursor result set", (
 
     // Insert test rows
     for (let i = 1; i <= 100; i++) {
-      const ps = conn.prepareStatement(
-        `INSERT INTO ${TABLE} (value) VALUES ($1)`,
-      );
+      const ps = conn.prepareStatement(`INSERT INTO ${TABLE} (value) VALUES ($1)`);
       ps.setParameter(1, `row_${i}`);
       await ps.executeUpdate();
     }
@@ -43,9 +41,7 @@ describe.skipIf(!isSqliteAvailable)("E2E: SQLite streaming/cursor result set", (
 
   it("streams all rows via iterate()", async () => {
     const stmt = conn.createStatement() as SqliteStatement;
-    const rs = await stmt.executeStreamingQuery(
-      `SELECT * FROM ${TABLE} ORDER BY id`,
-    );
+    const rs = await stmt.executeStreamingQuery(`SELECT * FROM ${TABLE} ORDER BY id`);
 
     const rows: Record<string, unknown>[] = [];
     while (await rs.next()) {
@@ -60,9 +56,7 @@ describe.skipIf(!isSqliteAvailable)("E2E: SQLite streaming/cursor result set", (
 
   it("supports async iteration over streaming result set", async () => {
     const stmt = conn.createStatement() as SqliteStatement;
-    const rs = await stmt.executeStreamingQuery(
-      `SELECT * FROM ${TABLE} ORDER BY id LIMIT 10`,
-    );
+    const rs = await stmt.executeStreamingQuery(`SELECT * FROM ${TABLE} ORDER BY id LIMIT 10`);
 
     const rows: Record<string, unknown>[] = [];
     for await (const row of rs) {

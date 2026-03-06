@@ -4,21 +4,11 @@
  * Tests decorator metadata, filter registration, edge cases.
  * EXTENDED with adversarial scenarios to probe for bugs.
  */
-import { describe, it, expect } from "vitest";
-import {
-  SoftDelete,
-  getSoftDeleteMetadata,
-  isSoftDeleteEntity,
-} from "../../decorators/soft-delete.js";
-import {
-  getFilters,
-  registerFilter,
-  unregisterFilter,
-  resolveActiveFilters,
-} from "../../filter/filter-registry.js";
-import type { FilterRegistration } from "../../filter/filter-registry.js";
+import { describe, expect, it } from "vitest";
+import { getSoftDeleteMetadata, isSoftDeleteEntity, SoftDelete } from "../../decorators/soft-delete.js";
 import { FilterContext } from "../../filter/filter-context.js";
-import type { EntityMetadata, FieldMapping } from "../../mapping/entity-metadata.js";
+import { getFilters, registerFilter, resolveActiveFilters, unregisterFilter } from "../../filter/filter-registry.js";
+import type { EntityMetadata } from "../../mapping/entity-metadata.js";
 
 const fakeMetadata = {
   tableName: "test",
@@ -73,7 +63,7 @@ describe("@SoftDelete decorator", () => {
 
     const filters = getFilters(FilteredEntity);
     expect(filters.length).toBeGreaterThanOrEqual(1);
-    const sdFilter = filters.find(f => f.name === "softDelete");
+    const sdFilter = filters.find((f) => f.name === "softDelete");
     expect(sdFilter).toBeDefined();
     expect(sdFilter!.enabledByDefault).toBe(true);
   });
@@ -83,7 +73,7 @@ describe("@SoftDelete decorator", () => {
     class NullCheckEntity {}
 
     const filters = getFilters(NullCheckEntity);
-    const sdFilter = filters.find(f => f.name === "softDelete")!;
+    const sdFilter = filters.find((f) => f.name === "softDelete")!;
     const criteria = sdFilter.filter(fakeMetadata);
     expect(criteria).toBeDefined();
     const sql = criteria!.toSql(1);
@@ -105,7 +95,7 @@ describe("@SoftDelete decorator", () => {
     } as EntityMetadata;
 
     const filters = getFilters(MappedEntity);
-    const sdFilter = filters.find(f => f.name === "softDelete")!;
+    const sdFilter = filters.find((f) => f.name === "softDelete")!;
     const criteria = sdFilter.filter(customMeta);
     const sql = criteria!.toSql(1);
     // Should use the mapped column name, not the decorator's default
@@ -122,7 +112,7 @@ describe("@SoftDelete decorator", () => {
     } as EntityMetadata;
 
     const filters = getFilters(FallbackEntity);
-    const sdFilter = filters.find(f => f.name === "softDelete")!;
+    const sdFilter = filters.find((f) => f.name === "softDelete")!;
     const criteria = sdFilter.filter(noFieldMeta);
     const sql = criteria!.toSql(1);
     expect(sql.sql).toContain("is_removed");
@@ -140,7 +130,7 @@ describe("@SoftDelete + filter toggle", () => {
 
     const filters = [...getFilters(ToggleEntity)];
     const active = resolveActiveFilters(filters, { disableFilters: ["softDelete"] });
-    expect(active.find(f => f.name === "softDelete")).toBeUndefined();
+    expect(active.find((f) => f.name === "softDelete")).toBeUndefined();
   });
 
   it("softDelete filter is included when disableAllFilters is false", () => {
@@ -149,7 +139,7 @@ describe("@SoftDelete + filter toggle", () => {
 
     const filters = [...getFilters(IncludeEntity)];
     const active = resolveActiveFilters(filters);
-    expect(active.find(f => f.name === "softDelete")).toBeDefined();
+    expect(active.find((f) => f.name === "softDelete")).toBeDefined();
   });
 
   it("softDelete filter is excluded when disableAllFilters is true", () => {
@@ -210,7 +200,7 @@ describe("@SoftDelete with non-existent field", () => {
     } as EntityMetadata;
 
     const filters = getFilters(NoField);
-    const sdFilter = filters.find(f => f.name === "softDelete")!;
+    const sdFilter = filters.find((f) => f.name === "softDelete")!;
     const criteria = sdFilter.filter(noFieldMeta);
     const sql = criteria!.toSql(1);
     // BUG: No validation that the entity actually has the soft-delete field.
@@ -231,7 +221,7 @@ describe("@SoftDelete with non-existent field", () => {
     } as EntityMetadata;
 
     const filters = getFilters(MissingField);
-    const sdFilter = filters.find(f => f.name === "softDelete")!;
+    const sdFilter = filters.find((f) => f.name === "softDelete")!;
     const criteria = sdFilter.filter(noFieldMeta);
     const sql = criteria!.toSql(1);
     // Falls back to decorator's column name
@@ -281,7 +271,7 @@ describe("@SoftDelete + explicit @Filter interaction", () => {
 
     const filters = getFilters(DualFilterEntity);
     expect(filters).toHaveLength(2);
-    const names = filters.map(f => f.name);
+    const names = filters.map((f) => f.name);
     expect(names).toContain("softDelete");
     expect(names).toContain("activeOnly");
   });
@@ -354,7 +344,7 @@ describe("@SoftDelete custom field/column names", () => {
   });
 
   it("column name with SQL injection attempt is safely quoted", () => {
-    @SoftDelete({ column: "deleted_at\"; DROP TABLE users; --" })
+    @SoftDelete({ column: 'deleted_at"; DROP TABLE users; --' })
     class InjectionCol {}
 
     const noFieldMeta = {
@@ -369,7 +359,7 @@ describe("@SoftDelete custom field/column names", () => {
     // So the output is: "deleted_at""; DROP TABLE users; --" IS NULL
     // This is safe SQL — the "" is an escaped quote inside the identifier.
     // The entire string is a single (bizarre) identifier name, NOT executable SQL.
-    expect(sql.sql).toContain('IS NULL');
+    expect(sql.sql).toContain("IS NULL");
     // The internal double-quote is escaped (doubled)
     expect(sql.sql).toContain('""');
     expect(sql.params).toHaveLength(0);
@@ -524,9 +514,14 @@ describe("@SoftDelete filter with FilterContext", () => {
   it("enableFilters can re-enable softDelete if it was disabled by default", () => {
     // Register a softDelete filter that's disabled by default (unusual but possible via programmatic API)
     class ManualSD {}
-    registerFilter(ManualSD, "softDelete", (_meta: EntityMetadata) => {
-      return new (require("../../query/criteria.js").NullCriteria)("isNull", "deleted_at");
-    }, { enabledByDefault: false });
+    registerFilter(
+      ManualSD,
+      "softDelete",
+      (_meta: EntityMetadata) => {
+        return new (require("../../query/criteria.js").NullCriteria)("isNull", "deleted_at");
+      },
+      { enabledByDefault: false },
+    );
 
     const filters = [...getFilters(ManualSD)];
 
@@ -582,7 +577,7 @@ describe("@SoftDelete with symbol field names in metadata", () => {
     } as EntityMetadata;
 
     const filters = getFilters(SymbolField);
-    const sdFilter = filters.find(f => f.name === "softDelete")!;
+    const sdFilter = filters.find((f) => f.name === "softDelete")!;
     const criteria = sdFilter.filter(symbolMeta);
     const sql = criteria!.toSql(1);
 

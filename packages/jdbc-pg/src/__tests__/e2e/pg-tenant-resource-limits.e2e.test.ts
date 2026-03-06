@@ -14,16 +14,11 @@
  * 5. TOCTOU race: concurrent provisions can exceed maxTenants since the
  *    check-then-create is not atomic.
  */
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
-import { createTestDataSource, isPostgresAvailable } from "./setup.js";
-import {
-  Table,
-  Column,
-  Id,
-  TenantSchemaManager,
-  TenantLimitExceededError,
-} from "espalier-data";
+
+import { Column, Id, Table, TenantLimitExceededError, TenantSchemaManager } from "espalier-data";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { PgDataSource } from "../../pg-data-source.js";
+import { createTestDataSource, isPostgresAvailable } from "./setup.js";
 
 const canConnect = await isPostgresAvailable();
 
@@ -124,9 +119,7 @@ describe.skipIf(!canConnect)("TenantSchemaManager — resource limits (#48)", { 
       await mgr.provisionTenant(ds, "a", [RlItem], resolver);
       await mgr.provisionTenant(ds, "b", [RlItem], resolver);
 
-      await expect(
-        mgr.provisionTenant(ds, "c", [RlItem], resolver),
-      ).rejects.toThrow(TenantLimitExceededError);
+      await expect(mgr.provisionTenant(ds, "c", [RlItem], resolver)).rejects.toThrow(TenantLimitExceededError);
     });
 
     it("error is instanceof TenantLimitExceededError", async () => {
@@ -212,9 +205,7 @@ describe.skipIf(!canConnect)("TenantSchemaManager — resource limits (#48)", { 
     it("maxTenants=0 means zero schemas allowed", async () => {
       const mgr = new TenantSchemaManager({ maxTenants: 0 });
 
-      await expect(
-        mgr.provisionTenant(ds, "a", [RlItem], resolver),
-      ).rejects.toThrow(TenantLimitExceededError);
+      await expect(mgr.provisionTenant(ds, "a", [RlItem], resolver)).rejects.toThrow(TenantLimitExceededError);
     });
 
     it("maxTenants=0 with empty database still rejects", async () => {
@@ -241,9 +232,7 @@ describe.skipIf(!canConnect)("TenantSchemaManager — resource limits (#48)", { 
       await mgr.provisionTenant(ds, "b", [RlItem], resolver);
 
       // At limit — should fail
-      await expect(
-        mgr.provisionTenant(ds, "c", [RlItem], resolver),
-      ).rejects.toThrow(TenantLimitExceededError);
+      await expect(mgr.provisionTenant(ds, "c", [RlItem], resolver)).rejects.toThrow(TenantLimitExceededError);
 
       // Deprovision one
       await mgr.deprovisionTenant(ds, "a", resolver);
@@ -289,9 +278,7 @@ describe.skipIf(!canConnect)("TenantSchemaManager — resource limits (#48)", { 
 
       // Fire 5 concurrent provisions with limit for only 2 new schemas
       const results = await Promise.allSettled(
-        Array.from({ length: 5 }, (_, i) =>
-          mgr.provisionTenant(ds, `race${i}`, [RlItem], resolver),
-        ),
+        Array.from({ length: 5 }, (_, i) => mgr.provisionTenant(ds, `race${i}`, [RlItem], resolver)),
       );
 
       const successes = results.filter((r) => r.status === "fulfilled");
@@ -321,9 +308,7 @@ describe.skipIf(!canConnect)("TenantSchemaManager — resource limits (#48)", { 
       const mgr = new TenantSchemaManager({ maxTenants: 5, schemaPrefix: PREFIX });
 
       const results = await Promise.allSettled(
-        Array.from({ length: 5 }, () =>
-          mgr.provisionTenant(ds, "same", [RlItem], resolver),
-        ),
+        Array.from({ length: 5 }, () => mgr.provisionTenant(ds, "same", [RlItem], resolver)),
       );
 
       // All should succeed (idempotent) or at least not throw unexpected errors
@@ -331,9 +316,7 @@ describe.skipIf(!canConnect)("TenantSchemaManager — resource limits (#48)", { 
         if (r.status === "rejected") {
           const msg = (r.reason as Error)?.message ?? "";
           const isAcceptable =
-            r.reason instanceof TenantLimitExceededError ||
-            msg.includes("already exists") ||
-            msg.includes("duplicate");
+            r.reason instanceof TenantLimitExceededError || msg.includes("already exists") || msg.includes("duplicate");
           expect(isAcceptable, `Unexpected error: ${msg}`).toBe(true);
         }
       }
@@ -401,9 +384,7 @@ describe.skipIf(!canConnect)("TenantSchemaManager — resource limits (#48)", { 
       await mgr.provisionTenant(ds, "only", [RlItem], resolver);
 
       // Second one fails
-      await expect(
-        mgr.provisionTenant(ds, "extra", [RlItem], resolver),
-      ).rejects.toThrow(TenantLimitExceededError);
+      await expect(mgr.provisionTenant(ds, "extra", [RlItem], resolver)).rejects.toThrow(TenantLimitExceededError);
 
       // First is intact
       const conn = await ds.getConnection();
@@ -456,9 +437,7 @@ describe.skipIf(!canConnect)("TenantSchemaManager — resource limits (#48)", { 
         // With a limit equal to the current count, we can't add any tenant
         // even though the foreign schema is not ours
         const mgr = new TenantSchemaManager({ maxTenants: currentCount });
-        await expect(
-          mgr.provisionTenant(ds, "mine", [RlItem], resolver),
-        ).rejects.toThrow(TenantLimitExceededError);
+        await expect(mgr.provisionTenant(ds, "mine", [RlItem], resolver)).rejects.toThrow(TenantLimitExceededError);
       } finally {
         const conn2 = await ds.getConnection();
         const stmt2 = conn2.createStatement();
@@ -472,23 +451,19 @@ describe.skipIf(!canConnect)("TenantSchemaManager — resource limits (#48)", { 
     });
 
     it("FIXED: negative maxTenants rejected at construction", () => {
-      expect(() => new TenantSchemaManager({ maxTenants: -1 }))
-        .toThrow(/non-negative integer/);
+      expect(() => new TenantSchemaManager({ maxTenants: -1 })).toThrow(/non-negative integer/);
     });
 
     it("FIXED: NaN maxTenants rejected at construction", () => {
-      expect(() => new TenantSchemaManager({ maxTenants: NaN }))
-        .toThrow(/non-negative integer/);
+      expect(() => new TenantSchemaManager({ maxTenants: NaN })).toThrow(/non-negative integer/);
     });
 
     it("FIXED: fractional maxTenants rejected at construction", () => {
-      expect(() => new TenantSchemaManager({ maxTenants: 1.5 }))
-        .toThrow(/non-negative integer/);
+      expect(() => new TenantSchemaManager({ maxTenants: 1.5 })).toThrow(/non-negative integer/);
     });
 
     it("FIXED: Infinity maxTenants rejected at construction", () => {
-      expect(() => new TenantSchemaManager({ maxTenants: Infinity }))
-        .toThrow(/non-negative integer/);
+      expect(() => new TenantSchemaManager({ maxTenants: Infinity })).toThrow(/non-negative integer/);
     });
   });
 });

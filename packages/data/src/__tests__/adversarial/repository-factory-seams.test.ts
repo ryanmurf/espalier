@@ -5,23 +5,21 @@
  * with various DataSource implementations (including mock new adapters).
  * Focuses on the seam between the repository layer and the JDBC interfaces.
  */
-import { describe, it, expect, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-  Table,
-  Column,
-  Id,
-  Version,
-  getEntityMetadata,
-  EntityChangeTracker,
-  getColumnMappings,
-  parseDerivedQueryMethod,
   buildDerivedQuery,
-  QueryBuilder,
-  SelectBuilder,
-  InsertBuilder,
-  UpdateBuilder,
-  DeleteBuilder,
+  Column,
   ComparisonCriteria,
+  DeleteBuilder,
+  EntityChangeTracker,
+  getEntityMetadata,
+  Id,
+  InsertBuilder,
+  parseDerivedQueryMethod,
+  SelectBuilder,
+  Table,
+  UpdateBuilder,
+  Version,
 } from "../../index.js";
 
 // -- Test entity --
@@ -46,9 +44,7 @@ describe("repository factory seam tests", () => {
 
     it("field mappings include column name and field name", () => {
       const meta = getEntityMetadata(Product);
-      const activeMapping = meta.fields.find(
-        (m) => String(m.fieldName) === "active",
-      );
+      const activeMapping = meta.fields.find((m) => String(m.fieldName) === "active");
       expect(activeMapping).toBeDefined();
       expect(activeMapping!.columnName).toBe("is_active");
     });
@@ -154,9 +150,7 @@ describe("repository factory seam tests", () => {
 
     it("buildDerivedQuery with OrderBy", () => {
       const meta = getEntityMetadata(Product);
-      const descriptor = parseDerivedQueryMethod(
-        "findByActiveOrderByPriceDesc",
-      );
+      const descriptor = parseDerivedQueryMethod("findByActiveOrderByPriceDesc");
       expect(descriptor).toBeDefined();
       const query = buildDerivedQuery(descriptor, meta, [true]);
       expect(query.sql).toContain("ORDER BY");

@@ -1,13 +1,12 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { Connection } from "espalier-jdbc";
-import type { StoredEvent } from "../../types.js";
-import { Projection, getProjectionMetadata, ProjectionRunner } from "../../projection/projection.js";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ProjectionHandler } from "../../projection/projection.js";
-import { SnapshotStore } from "../../snapshot/snapshot-store.js";
-import type { AggregateSnapshot } from "../../snapshot/snapshot-store.js";
+import { getProjectionMetadata, Projection, ProjectionRunner } from "../../projection/projection.js";
 import { EventReplayer } from "../../replay/event-replay.js";
-import type { ReplayOptions } from "../../replay/event-replay.js";
-import { EventStore } from "../../store/event-store.js";
+import type { AggregateSnapshot } from "../../snapshot/snapshot-store.js";
+import { SnapshotStore } from "../../snapshot/snapshot-store.js";
+import type { EventStore } from "../../store/event-store.js";
+import type { StoredEvent } from "../../types.js";
 
 // ── Mock helpers ──────────────────────────────────────────────────────
 
@@ -180,10 +179,11 @@ describe("ProjectionRunner — adversarial", () => {
 
     expect(count).toBe(2);
     expect(handler.handle).toHaveBeenCalledTimes(2);
-    expect(mockEventStore.loadAllEvents).toHaveBeenCalledWith(
-      mockConn,
-      { eventTypes: ["OrderCreated"], fromSequence: undefined, limit: 100 },
-    );
+    expect(mockEventStore.loadAllEvents).toHaveBeenCalledWith(mockConn, {
+      eventTypes: ["OrderCreated"],
+      fromSequence: undefined,
+      limit: 100,
+    });
   });
 
   it("rebuild ignores events that do not match any handler", async () => {
@@ -210,7 +210,9 @@ describe("ProjectionRunner — adversarial", () => {
   it("rebuild propagates handler errors", async () => {
     const handler: ProjectionHandler = {
       eventType: "Boom",
-      handle: vi.fn(async () => { throw new Error("handler exploded"); }),
+      handle: vi.fn(async () => {
+        throw new Error("handler exploded");
+      }),
     };
 
     const events: StoredEvent[] = [makeStoredEvent({ eventType: "Boom" })];
@@ -231,10 +233,11 @@ describe("ProjectionRunner — adversarial", () => {
     const runner = new ProjectionRunner(mockEventStore, mockConn);
     await runner.processNewEvents({ handlers: [handler] }, 42);
 
-    expect(mockEventStore.loadAllEvents).toHaveBeenCalledWith(
-      mockConn,
-      { eventTypes: ["OrderCreated"], fromSequence: 42, limit: 100 },
-    );
+    expect(mockEventStore.loadAllEvents).toHaveBeenCalledWith(mockConn, {
+      eventTypes: ["OrderCreated"],
+      fromSequence: 42,
+      limit: 100,
+    });
   });
 
   it("processNewEvents returns 0 when no handlers", async () => {
@@ -254,10 +257,11 @@ describe("ProjectionRunner — adversarial", () => {
     const runner = new ProjectionRunner(mockEventStore, mockConn);
     await runner.processNewEvents({ handlers: [handler] });
 
-    expect(mockEventStore.loadAllEvents).toHaveBeenCalledWith(
-      mockConn,
-      { eventTypes: ["X"], fromSequence: undefined, limit: 100 },
-    );
+    expect(mockEventStore.loadAllEvents).toHaveBeenCalledWith(mockConn, {
+      eventTypes: ["X"],
+      fromSequence: undefined,
+      limit: 100,
+    });
   });
 
   it("multiple handlers for different event types are all invoked", async () => {
@@ -295,38 +299,31 @@ describe("SnapshotStore — adversarial", () => {
     });
 
     it("rejects SQL injection in tableName", () => {
-      expect(() => new SnapshotStore({ tableName: "Robert'; DROP TABLE students;--" }))
-        .toThrow("Invalid tableName");
+      expect(() => new SnapshotStore({ tableName: "Robert'; DROP TABLE students;--" })).toThrow("Invalid tableName");
     });
 
     it("rejects SQL injection in schemaName", () => {
-      expect(() => new SnapshotStore({ schemaName: "public; DROP TABLE--" }))
-        .toThrow("Invalid schemaName");
+      expect(() => new SnapshotStore({ schemaName: "public; DROP TABLE--" })).toThrow("Invalid schemaName");
     });
 
     it("rejects spaces in tableName", () => {
-      expect(() => new SnapshotStore({ tableName: "my table" }))
-        .toThrow("Invalid tableName");
+      expect(() => new SnapshotStore({ tableName: "my table" })).toThrow("Invalid tableName");
     });
 
     it("rejects empty string tableName", () => {
-      expect(() => new SnapshotStore({ tableName: "" }))
-        .toThrow("Invalid tableName");
+      expect(() => new SnapshotStore({ tableName: "" })).toThrow("Invalid tableName");
     });
 
     it("accepts valid custom names", () => {
-      expect(() => new SnapshotStore({ tableName: "my_snapshots", schemaName: "tenant_1" }))
-        .not.toThrow();
+      expect(() => new SnapshotStore({ tableName: "my_snapshots", schemaName: "tenant_1" })).not.toThrow();
     });
 
     it("allows tableName starting with underscore", () => {
-      expect(() => new SnapshotStore({ tableName: "_private" }))
-        .not.toThrow();
+      expect(() => new SnapshotStore({ tableName: "_private" })).not.toThrow();
     });
 
     it("rejects tableName starting with number", () => {
-      expect(() => new SnapshotStore({ tableName: "1table" }))
-        .toThrow("Invalid tableName");
+      expect(() => new SnapshotStore({ tableName: "1table" })).toThrow("Invalid tableName");
     });
   });
 
@@ -578,34 +575,30 @@ describe("EventReplayer — adversarial", () => {
     (mockEventStore.loadAllEvents as ReturnType<typeof vi.fn>).mockResolvedValueOnce([]);
 
     const replayer = new EventReplayer(mockEventStore);
-    await replayer.replay(mockConn, vi.fn(async () => {}));
-
-    expect(mockEventStore.loadAllEvents).toHaveBeenCalledWith(
+    await replayer.replay(
       mockConn,
-      expect.objectContaining({ limit: 100 }),
+      vi.fn(async () => {}),
     );
+
+    expect(mockEventStore.loadAllEvents).toHaveBeenCalledWith(mockConn, expect.objectContaining({ limit: 100 }));
   });
 
   it("custom batchSize is respected", async () => {
     (mockEventStore.loadAllEvents as ReturnType<typeof vi.fn>).mockResolvedValueOnce([]);
 
     const replayer = new EventReplayer(mockEventStore);
-    await replayer.replay(mockConn, vi.fn(async () => {}), { batchSize: 10 });
-
-    expect(mockEventStore.loadAllEvents).toHaveBeenCalledWith(
+    await replayer.replay(
       mockConn,
-      expect.objectContaining({ limit: 10 }),
+      vi.fn(async () => {}),
+      { batchSize: 10 },
     );
+
+    expect(mockEventStore.loadAllEvents).toHaveBeenCalledWith(mockConn, expect.objectContaining({ limit: 10 }));
   });
 
   it("paginates through multiple batches using lastSequence", async () => {
-    const batch1 = [
-      makeStoredEvent({ sequence: 1 }),
-      makeStoredEvent({ sequence: 2 }),
-    ];
-    const batch2 = [
-      makeStoredEvent({ sequence: 3 }),
-    ];
+    const batch1 = [makeStoredEvent({ sequence: 1 }), makeStoredEvent({ sequence: 2 })];
+    const batch2 = [makeStoredEvent({ sequence: 3 })];
 
     const loadFn = mockEventStore.loadAllEvents as ReturnType<typeof vi.fn>;
     loadFn.mockResolvedValueOnce(batch1);
@@ -638,9 +631,13 @@ describe("EventReplayer — adversarial", () => {
     (mockEventStore.loadAllEvents as ReturnType<typeof vi.fn>).mockResolvedValueOnce([]);
 
     const replayer = new EventReplayer(mockEventStore);
-    await replayer.replay(mockConn, vi.fn(async () => {}), {
-      aggregateTypes: ["Order", "Invoice"],
-    });
+    await replayer.replay(
+      mockConn,
+      vi.fn(async () => {}),
+      {
+        aggregateTypes: ["Order", "Invoice"],
+      },
+    );
 
     expect(mockEventStore.loadAllEvents).toHaveBeenCalledWith(
       mockConn,
@@ -654,10 +651,14 @@ describe("EventReplayer — adversarial", () => {
     (mockEventStore.loadAllEvents as ReturnType<typeof vi.fn>).mockResolvedValueOnce([]);
 
     const replayer = new EventReplayer(mockEventStore);
-    await replayer.replay(mockConn, vi.fn(async () => {}), {
-      fromTimestamp: from,
-      toTimestamp: to,
-    });
+    await replayer.replay(
+      mockConn,
+      vi.fn(async () => {}),
+      {
+        fromTimestamp: from,
+        toTimestamp: to,
+      },
+    );
 
     expect(mockEventStore.loadAllEvents).toHaveBeenCalledWith(
       mockConn,
@@ -670,19 +671,23 @@ describe("EventReplayer — adversarial", () => {
     (mockEventStore.loadAllEvents as ReturnType<typeof vi.fn>).mockResolvedValueOnce(events);
 
     const replayer = new EventReplayer(mockEventStore);
-    const handler = vi.fn(async () => { throw new Error("handler boom"); });
+    const handler = vi.fn(async () => {
+      throw new Error("handler boom");
+    });
 
     await expect(replayer.replay(mockConn, handler)).rejects.toThrow("handler boom");
   });
 
   it("propagates loadAllEvents errors", async () => {
-    (mockEventStore.loadAllEvents as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
-      new Error("connection lost"),
-    );
+    (mockEventStore.loadAllEvents as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error("connection lost"));
 
     const replayer = new EventReplayer(mockEventStore);
-    await expect(replayer.replay(mockConn, vi.fn(async () => {})))
-      .rejects.toThrow("connection lost");
+    await expect(
+      replayer.replay(
+        mockConn,
+        vi.fn(async () => {}),
+      ),
+    ).rejects.toThrow("connection lost");
   });
 
   it("batchSize 0 is passed as-is (0 is not nullish for ?? operator)", async () => {
@@ -690,24 +695,26 @@ describe("EventReplayer — adversarial", () => {
     (mockEventStore.loadAllEvents as ReturnType<typeof vi.fn>).mockResolvedValueOnce([]);
 
     const replayer = new EventReplayer(mockEventStore);
-    await replayer.replay(mockConn, vi.fn(async () => {}), { batchSize: 0 });
+    await replayer.replay(
+      mockConn,
+      vi.fn(async () => {}),
+      { batchSize: 0 },
+    );
 
     // 0 ?? 100 === 0 — zero is passed through to limit
-    expect(mockEventStore.loadAllEvents).toHaveBeenCalledWith(
-      mockConn,
-      expect.objectContaining({ limit: 0 }),
-    );
+    expect(mockEventStore.loadAllEvents).toHaveBeenCalledWith(mockConn, expect.objectContaining({ limit: 0 }));
   });
 
   it("fromVersion option is forwarded to loadAllEvents", async () => {
     (mockEventStore.loadAllEvents as ReturnType<typeof vi.fn>).mockResolvedValueOnce([]);
 
     const replayer = new EventReplayer(mockEventStore);
-    await replayer.replay(mockConn, vi.fn(async () => {}), { fromVersion: 5 });
-
-    expect(mockEventStore.loadAllEvents).toHaveBeenCalledWith(
+    await replayer.replay(
       mockConn,
-      expect.objectContaining({ fromVersion: 5 }),
+      vi.fn(async () => {}),
+      { fromVersion: 5 },
     );
+
+    expect(mockEventStore.loadAllEvents).toHaveBeenCalledWith(mockConn, expect.objectContaining({ fromVersion: 5 }));
   });
 });

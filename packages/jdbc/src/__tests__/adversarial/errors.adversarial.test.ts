@@ -1,14 +1,14 @@
-import { describe, it, expect } from "vitest";
-import {
-  DatabaseError,
-  ConnectionError,
-  QueryError,
-  TransactionError,
-  MigrationError,
-  SchemaError,
-  DatabaseErrorCode,
-} from "../../errors.js";
+import { describe, expect, it } from "vitest";
 import { ErrorCode } from "../../error-codes.js";
+import {
+  ConnectionError,
+  DatabaseError,
+  DatabaseErrorCode,
+  MigrationError,
+  QueryError,
+  SchemaError,
+  TransactionError,
+} from "../../errors.js";
 
 // ── 1. Huge SQL strings ─────────────────────────────────────────────────────
 
@@ -646,12 +646,12 @@ describe("toString formatting edge cases", () => {
     const lines = err.toString().split("\n");
     expect(lines.length).toBeGreaterThanOrEqual(6); // header + errorCode + sql + parameterCount + connectionId + timestamp + cause
     expect(lines[0]).toContain("DatabaseError [QUERY_FAILED]");
-    expect(lines.some(l => l.includes("errorCode:"))).toBe(true);
-    expect(lines.some(l => l.includes("sql:"))).toBe(true);
-    expect(lines.some(l => l.includes("parameterCount:"))).toBe(true);
-    expect(lines.some(l => l.includes("connectionId:"))).toBe(true);
-    expect(lines.some(l => l.includes("timestamp:"))).toBe(true);
-    expect(lines.some(l => l.includes("cause:"))).toBe(true);
+    expect(lines.some((l) => l.includes("errorCode:"))).toBe(true);
+    expect(lines.some((l) => l.includes("sql:"))).toBe(true);
+    expect(lines.some((l) => l.includes("parameterCount:"))).toBe(true);
+    expect(lines.some((l) => l.includes("connectionId:"))).toBe(true);
+    expect(lines.some((l) => l.includes("timestamp:"))).toBe(true);
+    expect(lines.some((l) => l.includes("cause:"))).toBe(true);
   });
 
   it("toString with multiline SQL preserves formatting", () => {
@@ -738,7 +738,7 @@ describe("ErrorCode completeness and uniqueness", () => {
   });
 
   it("DatabaseErrorCode (legacy) values are unique", () => {
-    const values = Object.values(DatabaseErrorCode).filter(v => typeof v === "string");
+    const values = Object.values(DatabaseErrorCode).filter((v) => typeof v === "string");
     const unique = new Set(values);
     expect(unique.size).toBe(values.length);
   });

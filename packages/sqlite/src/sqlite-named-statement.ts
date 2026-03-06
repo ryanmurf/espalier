@@ -1,9 +1,8 @@
 import type Database from "better-sqlite3";
-import type { NamedPreparedStatement, ResultSet, SqlValue } from "espalier-jdbc";
-import { QueryError, parseNamedParams, convertPositionalParams } from "espalier-jdbc";
-import type { ParsedNamedQuery } from "espalier-jdbc";
-import { SqliteResultSet } from "./sqlite-result-set.js";
+import type { NamedPreparedStatement, ParsedNamedQuery, ResultSet, SqlValue } from "espalier-jdbc";
+import { convertPositionalParams, parseNamedParams, QueryError } from "espalier-jdbc";
 import { mapSqliteErrorCode } from "./error-codes.js";
+import { SqliteResultSet } from "./sqlite-result-set.js";
 
 /** Convert SqlValue to a type that better-sqlite3 accepts. */
 function toBindValue(val: SqlValue): unknown {
@@ -69,8 +68,6 @@ export class SqliteNamedPreparedStatement implements NamedPreparedStatement {
   }
 
   private collectParameters(): unknown[] {
-    return this.parsed.paramOrder.map(
-      (name) => toBindValue(this.namedParams.get(name) ?? null),
-    );
+    return this.parsed.paramOrder.map((name) => toBindValue(this.namedParams.get(name) ?? null));
   }
 }

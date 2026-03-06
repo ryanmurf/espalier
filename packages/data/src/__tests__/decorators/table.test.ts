@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { Table, getTableName } from "../../decorators/table.js";
+import { describe, expect, it } from "vitest";
+import { getTableName, Table } from "../../decorators/table.js";
 
 describe("@Table decorator", () => {
   it("sets a custom table name", () => {

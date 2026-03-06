@@ -1,4 +1,4 @@
-import type { DataSource, Connection } from "espalier-jdbc";
+import type { Connection, DataSource } from "espalier-jdbc";
 import { validateIdentifier } from "espalier-jdbc";
 import type { ChangeNotification } from "./types.js";
 
@@ -67,7 +67,8 @@ export class ChangeNotificationListener {
       }, 500);
 
       // Access the underlying pg client's notification events if available
-      const rawClient = (connection as unknown as Record<string, unknown>)["_client"] ??
+      const rawClient =
+        (connection as unknown as Record<string, unknown>)["_client"] ??
         (connection as unknown as Record<string, unknown>)["client"];
 
       const notificationHandler = (msg: { channel: string; payload: string }) => {
@@ -92,7 +93,7 @@ export class ChangeNotificationListener {
         this.activeChannels.delete(channel);
         throw new Error(
           "Cannot access underlying database client for LISTEN/NOTIFY. " +
-          "ChangeNotificationListener requires a PostgreSQL connection from espalier-jdbc-pg.",
+            "ChangeNotificationListener requires a PostgreSQL connection from espalier-jdbc-pg.",
         );
       }
 

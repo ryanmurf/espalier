@@ -1,6 +1,6 @@
-import { describe, it, expect, vi } from "vitest";
-import { N1Detector, N1DetectionError } from "../../observability/n1-detector.js";
+import { describe, expect, it, vi } from "vitest";
 import type { N1DetectionEvent } from "../../observability/n1-detector.js";
+import { N1DetectionError, N1Detector } from "../../observability/n1-detector.js";
 
 describe("N1Detector", () => {
   describe("disabled mode", () => {

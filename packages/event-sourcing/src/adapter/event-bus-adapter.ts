@@ -14,10 +14,7 @@ export interface ExternalEventBusAdapter {
    * Subscribe to events from the external system.
    * Returns an unsubscribe function.
    */
-  subscribe(
-    eventTypes: string[] | "*",
-    handler: (event: DomainEvent) => Promise<void>,
-  ): () => void;
+  subscribe(eventTypes: string[] | "*", handler: (event: DomainEvent) => Promise<void>): () => void;
 
   /**
    * Connect to the external system.
@@ -55,10 +52,7 @@ export class InMemoryEventBusAdapter implements ExternalEventBusAdapter {
     }
   }
 
-  subscribe(
-    eventTypes: string[] | "*",
-    handler: (event: DomainEvent) => Promise<void>,
-  ): () => void {
+  subscribe(eventTypes: string[] | "*", handler: (event: DomainEvent) => Promise<void>): () => void {
     if (!this.connected) throw new Error("Not connected");
     const id = this.nextId++;
     this.subscriptions.set(id, { eventTypes, handler });

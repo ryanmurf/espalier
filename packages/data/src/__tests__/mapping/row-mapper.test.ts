@@ -1,6 +1,6 @@
-import { describe, it, expect } from "vitest";
-import { createRowMapper } from "../../mapping/row-mapper.js";
+import { describe, expect, it } from "vitest";
 import type { EntityMetadata } from "../../mapping/entity-metadata.js";
+import { createRowMapper } from "../../mapping/row-mapper.js";
 import { TestResultSet } from "../test-utils/test-result-set.js";
 
 function createTestResultSetAtRow(row: Record<string, unknown>): TestResultSet {

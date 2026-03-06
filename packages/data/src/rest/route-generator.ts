@@ -1,17 +1,17 @@
-import type { CrudRepository } from "../repository/crud-repository.js";
-import type { Pageable, Sort, Page } from "../repository/paging.js";
-import type { EntityMetadata } from "../mapping/entity-metadata.js";
-import type { RestRequest, RestResponse, RouteDefinition } from "./handler.js";
-import { getEntityMetadata } from "../mapping/entity-metadata.js";
-import { getTenantIdField } from "../decorators/tenant.js";
-import { getSoftDeleteMetadata } from "../decorators/soft-delete.js";
 import { isAuditedEntity } from "../decorators/audited.js";
-import { getVectorFields } from "../decorators/vector.js";
 import { getSearchableFields } from "../decorators/searchable.js";
-import { createPageable } from "../repository/paging.js";
-import { OptimisticLockException } from "../repository/optimistic-lock.js";
+import { getSoftDeleteMetadata } from "../decorators/soft-delete.js";
+import { getTenantIdField } from "../decorators/tenant.js";
+import { getVectorFields } from "../decorators/vector.js";
+import type { EntityMetadata } from "../mapping/entity-metadata.js";
+import { getEntityMetadata } from "../mapping/entity-metadata.js";
+import type { CrudRepository } from "../repository/crud-repository.js";
 import { EntityNotFoundException } from "../repository/entity-not-found.js";
+import { OptimisticLockException } from "../repository/optimistic-lock.js";
+import type { Page, Pageable, Sort } from "../repository/paging.js";
+import { createPageable } from "../repository/paging.js";
 import { TenantContext } from "../tenant/tenant-context.js";
+import type { RestRequest, RestResponse, RouteDefinition } from "./handler.js";
 
 /**
  * Options for REST route generation.
@@ -197,9 +197,10 @@ export class RouteGenerator {
 
         if (this.options.pagination) {
           const pageable = parsePageable(req.query, metadata);
-          const page: Page<any> = includeDeleted && typeof repo.findIncludingDeleted === "function"
-            ? await repo.findIncludingDeleted(pageable)
-            : await repository.findAll(pageable);
+          const page: Page<any> =
+            includeDeleted && typeof repo.findIncludingDeleted === "function"
+              ? await repo.findIncludingDeleted(pageable)
+              : await repository.findAll(pageable);
           return {
             status: 200,
             body: {
@@ -214,9 +215,10 @@ export class RouteGenerator {
           };
         }
 
-        const entities = includeDeleted && typeof repo.findIncludingDeleted === "function"
-          ? await repo.findIncludingDeleted()
-          : await repository.findAll();
+        const entities =
+          includeDeleted && typeof repo.findIncludingDeleted === "function"
+            ? await repo.findIncludingDeleted()
+            : await repository.findAll();
         return { status: 200, body: entities };
       });
     };
@@ -369,9 +371,7 @@ export class RouteGenerator {
           let entity: any;
           if (typeof repo.findIncludingDeleted === "function") {
             const all = await repo.findIncludingDeleted();
-            entity = Array.isArray(all)
-              ? all.find((e: any) => String(e.id) === String(req.params.id))
-              : undefined;
+            entity = Array.isArray(all) ? all.find((e: any) => String(e.id) === String(req.params.id)) : undefined;
           }
           if (!entity) {
             return { status: 404, body: { error: `${entityClass.name} not found` } };
@@ -412,9 +412,7 @@ export class RouteGenerator {
     entityClass: new (...args: any[]) => any,
     vectorFields: Map<string | symbol, any>,
   ): (req: RestRequest) => Promise<RestResponse> {
-    const validFieldNames = new Set(
-      [...vectorFields.keys()].filter((k): k is string => typeof k === "string"),
-    );
+    const validFieldNames = new Set([...vectorFields.keys()].filter((k): k is string => typeof k === "string"));
 
     return async (req: RestRequest) => {
       const tenantCheck = this.checkTenantContext(req, entityClass);
@@ -491,10 +489,7 @@ export class RouteGenerator {
   /**
    * Check if tenant context is required and present. Returns a 403 response if missing.
    */
-  private checkTenantContext(
-    req: RestRequest,
-    entityClass: new (...args: any[]) => any,
-  ): RestResponse | undefined {
+  private checkTenantContext(req: RestRequest, entityClass: new (...args: any[]) => any): RestResponse | undefined {
     if (!this.options.requireTenantContext) return undefined;
 
     const tenantField = getTenantIdField(entityClass);
@@ -615,9 +610,7 @@ const PROTOTYPE_POISON_KEYS = new Set(["__proto__", "constructor", "prototype"])
  * known entity column field names, and reject prototype pollution keys.
  */
 function sanitizeBody(body: Record<string, unknown>, metadata: EntityMetadata): Record<string, unknown> {
-  const allowedFields = new Set(
-    metadata.fields.map((f) => String(f.fieldName)),
-  );
+  const allowedFields = new Set(metadata.fields.map((f) => String(f.fieldName)));
   const result: Record<string, unknown> = {};
   for (const key of Object.keys(body)) {
     if (PROTOTYPE_POISON_KEYS.has(key)) continue;
@@ -636,9 +629,7 @@ function getValidSortFields(metadata: EntityMetadata): Set<string> {
 
 function defaultPathMapper(entityName: string): string {
   // PascalCase -> kebab-case + plural
-  const kebab = entityName
-    .replace(/([a-z])([A-Z])/g, "$1-$2")
-    .toLowerCase();
+  const kebab = entityName.replace(/([a-z])([A-Z])/g, "$1-$2").toLowerCase();
   return kebab.endsWith("s") ? kebab : `${kebab}s`;
 }
 

@@ -1,15 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { loggingMiddleware, retryMiddleware, validationMiddleware } from "../command/built-in-middleware.js";
+import { CommandBus, resetGlobalCommandBus } from "../command/command-bus.js";
 import type { Command, CommandResult } from "../types.js";
-import {
-  CommandBus,
-  resetGlobalCommandBus,
-} from "../command/command-bus.js";
-import type { CommandMiddlewareFn } from "../command/command-bus.js";
-import {
-  loggingMiddleware,
-  validationMiddleware,
-  retryMiddleware,
-} from "../command/built-in-middleware.js";
 
 // ── Tests ─────────────────────────────────────────────────────────────
 
@@ -57,9 +49,7 @@ describe("CommandBus", () => {
     it("throws on duplicate registration", () => {
       bus.register("CreateOrder", successHandler);
 
-      expect(() => bus.register("CreateOrder", successHandler)).toThrow(
-        /already registered/i,
-      );
+      expect(() => bus.register("CreateOrder", successHandler)).toThrow(/already registered/i);
     });
 
     it("allows re-registration after unregister", async () => {
@@ -143,13 +133,7 @@ describe("CommandBus", () => {
 
       await bus.dispatch(makeCommand("X"));
 
-      expect(order).toEqual([
-        "mw1-before",
-        "mw2-before",
-        "handler",
-        "mw2-after",
-        "mw1-after",
-      ]);
+      expect(order).toEqual(["mw1-before", "mw2-before", "handler", "mw2-after", "mw1-after"]);
     });
 
     it("middleware can short-circuit by not calling next()", async () => {
@@ -196,9 +180,7 @@ describe("CommandBus", () => {
 
       bus.register("X", successHandler);
 
-      await expect(bus.dispatch(makeCommand("X"))).rejects.toThrow(
-        "middleware explosion",
-      );
+      await expect(bus.dispatch(makeCommand("X"))).rejects.toThrow("middleware explosion");
     });
 
     it("multiple middleware layers can wrap the result", async () => {
@@ -224,10 +206,12 @@ describe("loggingMiddleware", () => {
     const logger = { info: vi.fn() };
     const mw = loggingMiddleware(logger);
 
-    const result = await mw(
-      { commandType: "TestCmd", payload: { x: 1 } },
-      async () => ({ success: true, events: [{ eventType: "E", aggregateId: "a", aggregateType: "A", payload: {}, version: 1, timestamp: new Date() }] }),
-    );
+    const _result = await mw({ commandType: "TestCmd", payload: { x: 1 } }, async () => ({
+      success: true,
+      events: [
+        { eventType: "E", aggregateId: "a", aggregateType: "A", payload: {}, version: 1, timestamp: new Date() },
+      ],
+    }));
 
     expect(logger.info).toHaveBeenCalledTimes(2);
     // First call: dispatching
@@ -242,14 +226,11 @@ describe("loggingMiddleware", () => {
     const logger = { info: vi.fn() };
     const mw = loggingMiddleware(logger);
 
-    await mw(
-      { commandType: "FailCmd", payload: {} },
-      async () => ({
-        success: false,
-        error: new Error("Something broke"),
-        events: [],
-      }),
-    );
+    await mw({ commandType: "FailCmd", payload: {} }, async () => ({
+      success: false,
+      error: new Error("Something broke"),
+      events: [],
+    }));
 
     expect(logger.info).toHaveBeenCalledTimes(2);
     expect(logger.info.mock.calls[1][0]).toContain("failed");
@@ -263,10 +244,7 @@ describe("validationMiddleware", () => {
     validators.set("CreateOrder", () => null);
 
     const mw = validationMiddleware(validators);
-    const result = await mw(
-      { commandType: "CreateOrder", payload: {} },
-      async () => ({ success: true, events: [] }),
-    );
+    const result = await mw({ commandType: "CreateOrder", payload: {} }, async () => ({ success: true, events: [] }));
 
     expect(result.success).toBe(true);
   });
@@ -280,10 +258,7 @@ describe("validationMiddleware", () => {
 
     const next = vi.fn();
     const mw = validationMiddleware(validators);
-    const result = await mw(
-      { commandType: "CreateOrder", payload: {} },
-      next,
-    );
+    const result = await mw({ commandType: "CreateOrder", payload: {} }, next);
 
     expect(result.success).toBe(false);
     expect(result.error!.message).toContain("Validation failed");
@@ -295,10 +270,7 @@ describe("validationMiddleware", () => {
     const validators = new Map<string, (cmd: Command) => string | null>();
     const mw = validationMiddleware(validators);
 
-    const result = await mw(
-      { commandType: "Unregistered", payload: {} },
-      async () => ({ success: true, events: [] }),
-    );
+    const result = await mw({ commandType: "Unregistered", payload: {} }, async () => ({ success: true, events: [] }));
 
     expect(result.success).toBe(true);
   });
@@ -307,12 +279,9 @@ describe("validationMiddleware", () => {
 describe("retryMiddleware", () => {
   it("returns immediately on success", async () => {
     const mw = retryMiddleware(3, 1);
-    const next = vi.fn(async () => ({ success: true, events: [] } as CommandResult));
+    const next = vi.fn(async () => ({ success: true, events: [] }) as CommandResult);
 
-    const result = await mw(
-      { commandType: "X", payload: {} },
-      next,
-    );
+    const result = await mw({ commandType: "X", payload: {} }, next);
 
     expect(result.success).toBe(true);
     expect(next).toHaveBeenCalledOnce();
@@ -329,10 +298,7 @@ describe("retryMiddleware", () => {
       return { success: true, events: [] } as CommandResult;
     });
 
-    const result = await mw(
-      { commandType: "X", payload: {} },
-      next,
-    );
+    const result = await mw({ commandType: "X", payload: {} }, next);
 
     // 1 initial + 2 retries = 3 total
     expect(result.success).toBe(true);
@@ -341,16 +307,16 @@ describe("retryMiddleware", () => {
 
   it("returns last failure after exhausting retries", async () => {
     const mw = retryMiddleware(1, 1);
-    const next = vi.fn(async () => ({
-      success: false,
-      error: new Error("persistent failure"),
-      events: [],
-    } as CommandResult));
-
-    const result = await mw(
-      { commandType: "X", payload: {} },
-      next,
+    const next = vi.fn(
+      async () =>
+        ({
+          success: false,
+          error: new Error("persistent failure"),
+          events: [],
+        }) as CommandResult,
     );
+
+    const result = await mw({ commandType: "X", payload: {} }, next);
 
     expect(result.success).toBe(false);
     expect(result.error!.message).toBe("persistent failure");
@@ -360,16 +326,16 @@ describe("retryMiddleware", () => {
 
   it("handles zero maxRetries (no retry)", async () => {
     const mw = retryMiddleware(0, 1);
-    const next = vi.fn(async () => ({
-      success: false,
-      error: new Error("fail"),
-      events: [],
-    } as CommandResult));
-
-    const result = await mw(
-      { commandType: "X", payload: {} },
-      next,
+    const next = vi.fn(
+      async () =>
+        ({
+          success: false,
+          error: new Error("fail"),
+          events: [],
+        }) as CommandResult,
     );
+
+    const result = await mw({ commandType: "X", payload: {} }, next);
 
     expect(result.success).toBe(false);
     expect(next).toHaveBeenCalledOnce();

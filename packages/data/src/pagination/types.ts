@@ -1,5 +1,5 @@
-import type { Page, Pageable } from "../repository/paging.js";
 import type { SelectBuilder } from "../query/query-builder.js";
+import type { Page } from "../repository/paging.js";
 
 /**
  * Base pagination strategy interface.

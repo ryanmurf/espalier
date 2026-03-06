@@ -4,25 +4,22 @@
  * relation-loader JOIN spec generation, and DDL verification.
  * Repository E2E tests are in packages/jdbc-pg/src/__tests__/e2e/pg-eager-fetch.e2e.test.ts
  */
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-  Table,
   Column,
-  Id,
-  ManyToOne,
-  OneToMany,
-  ManyToMany,
-  OneToOne,
+  getEntityMetadata,
+  getManyToManyRelations,
   getManyToOneRelations,
   getOneToManyRelations,
-  getManyToManyRelations,
   getOneToOneRelations,
-  getEntityMetadata,
+  Id,
+  ManyToMany,
+  ManyToOne,
+  OneToMany,
+  OneToOne,
+  Table,
 } from "../../index.js";
-import {
-  getJoinFetchSpecs,
-  buildJoinColumns,
-} from "../../repository/relation-loader.js";
+import { buildJoinColumns, getJoinFetchSpecs } from "../../repository/relation-loader.js";
 
 // ══════════════════════════════════════════════════
 // Section 1: FetchType Metadata Edge Cases
@@ -33,7 +30,9 @@ describe("FetchType adversarial: decorator metadata", () => {
 
   it("@ManyToOne defaults to SELECT fetch strategy", () => {
     @Table("ft_m2o_default_target")
-    class Target { @Id @Column() id: number = 0; }
+    class Target {
+      @Id @Column() id: number = 0;
+    }
 
     @Table("ft_m2o_default")
     class Entity {
@@ -41,7 +40,8 @@ describe("FetchType adversarial: decorator metadata", () => {
       @ManyToOne({ target: () => Target })
       ref!: Target;
     }
-    new Target(); new Entity();
+    new Target();
+    new Entity();
 
     const rels = getManyToOneRelations(Entity);
     expect(rels[0].fetchStrategy).toBe("SELECT");
@@ -50,7 +50,9 @@ describe("FetchType adversarial: decorator metadata", () => {
 
   it("@ManyToOne with fetch: 'JOIN'", () => {
     @Table("ft_m2o_join_target")
-    class JTarget { @Id @Column() id: number = 0; }
+    class JTarget {
+      @Id @Column() id: number = 0;
+    }
 
     @Table("ft_m2o_join")
     class JEntity {
@@ -58,7 +60,8 @@ describe("FetchType adversarial: decorator metadata", () => {
       @ManyToOne({ target: () => JTarget, fetch: "JOIN" })
       ref!: JTarget;
     }
-    new JTarget(); new JEntity();
+    new JTarget();
+    new JEntity();
 
     const rels = getManyToOneRelations(JEntity);
     expect(rels[0].fetchStrategy).toBe("JOIN");
@@ -66,7 +69,9 @@ describe("FetchType adversarial: decorator metadata", () => {
 
   it("@ManyToOne with fetch options object", () => {
     @Table("ft_m2o_opts_target")
-    class OTarget { @Id @Column() id: number = 0; }
+    class OTarget {
+      @Id @Column() id: number = 0;
+    }
 
     @Table("ft_m2o_opts")
     class OEntity {
@@ -74,7 +79,8 @@ describe("FetchType adversarial: decorator metadata", () => {
       @ManyToOne({ target: () => OTarget, fetch: { strategy: "BATCH", batchSize: 10 } })
       ref!: OTarget;
     }
-    new OTarget(); new OEntity();
+    new OTarget();
+    new OEntity();
 
     const rels = getManyToOneRelations(OEntity);
     expect(rels[0].fetchStrategy).toBe("BATCH");
@@ -96,7 +102,8 @@ describe("FetchType adversarial: decorator metadata", () => {
       @OneToMany({ target: () => DChild, mappedBy: "parent" })
       children!: DChild[];
     }
-    new DChild(); new DParent();
+    new DChild();
+    new DParent();
 
     const rels = getOneToManyRelations(DParent);
     expect(rels[0].fetchStrategy).toBe("SELECT");
@@ -116,7 +123,8 @@ describe("FetchType adversarial: decorator metadata", () => {
       @OneToMany({ target: () => BChild, mappedBy: "parent", fetch: { strategy: "BATCH", batchSize: 5 } })
       children!: BChild[];
     }
-    new BChild(); new BParent();
+    new BChild();
+    new BParent();
 
     const rels = getOneToManyRelations(BParent);
     expect(rels[0].fetchStrategy).toBe("BATCH");
@@ -127,7 +135,9 @@ describe("FetchType adversarial: decorator metadata", () => {
 
   it("@ManyToMany defaults to SELECT fetch strategy", () => {
     @Table("ft_m2m_d_tag")
-    class DTag { @Id @Column() id: number = 0; }
+    class DTag {
+      @Id @Column() id: number = 0;
+    }
 
     @Table("ft_m2m_d_post")
     class DPost {
@@ -138,7 +148,8 @@ describe("FetchType adversarial: decorator metadata", () => {
       })
       tags!: DTag[];
     }
-    new DTag(); new DPost();
+    new DTag();
+    new DPost();
 
     const rels = getManyToManyRelations(DPost);
     expect(rels[0].fetchStrategy).toBe("SELECT");
@@ -147,7 +158,9 @@ describe("FetchType adversarial: decorator metadata", () => {
 
   it("@ManyToMany with fetch: 'BATCH'", () => {
     @Table("ft_m2m_b_tag")
-    class BTag { @Id @Column() id: number = 0; }
+    class BTag {
+      @Id @Column() id: number = 0;
+    }
 
     @Table("ft_m2m_b_post")
     class BPost {
@@ -159,7 +172,8 @@ describe("FetchType adversarial: decorator metadata", () => {
       })
       tags!: BTag[];
     }
-    new BTag(); new BPost();
+    new BTag();
+    new BPost();
 
     const rels = getManyToManyRelations(BPost);
     expect(rels[0].fetchStrategy).toBe("BATCH");
@@ -170,7 +184,9 @@ describe("FetchType adversarial: decorator metadata", () => {
 
   it("@OneToOne defaults to SELECT fetch strategy", () => {
     @Table("ft_o2o_d_target")
-    class DTarget { @Id @Column() id: number = 0; }
+    class DTarget {
+      @Id @Column() id: number = 0;
+    }
 
     @Table("ft_o2o_d")
     class DEntity {
@@ -178,7 +194,8 @@ describe("FetchType adversarial: decorator metadata", () => {
       @OneToOne({ target: () => DTarget })
       ref!: DTarget;
     }
-    new DTarget(); new DEntity();
+    new DTarget();
+    new DEntity();
 
     const rels = getOneToOneRelations(DEntity);
     expect(rels[0].fetchStrategy).toBe("SELECT");
@@ -187,7 +204,9 @@ describe("FetchType adversarial: decorator metadata", () => {
 
   it("@OneToOne with fetch: 'JOIN'", () => {
     @Table("ft_o2o_j_target")
-    class JTarget { @Id @Column() id: number = 0; }
+    class JTarget {
+      @Id @Column() id: number = 0;
+    }
 
     @Table("ft_o2o_j")
     class JEntity {
@@ -195,7 +214,8 @@ describe("FetchType adversarial: decorator metadata", () => {
       @OneToOne({ target: () => JTarget, fetch: "JOIN" })
       ref!: JTarget;
     }
-    new JTarget(); new JEntity();
+    new JTarget();
+    new JEntity();
 
     const rels = getOneToOneRelations(JEntity);
     expect(rels[0].fetchStrategy).toBe("JOIN");
@@ -205,10 +225,15 @@ describe("FetchType adversarial: decorator metadata", () => {
 
   it("multiple relations with different fetch strategies on same class", () => {
     @Table("ft_mix_dept")
-    class MixDept { @Id @Column() id: number = 0; @Column() name: string = ""; }
+    class MixDept {
+      @Id @Column() id: number = 0;
+      @Column() name: string = "";
+    }
 
     @Table("ft_mix_tag")
-    class MixTag { @Id @Column() id: number = 0; }
+    class MixTag {
+      @Id @Column() id: number = 0;
+    }
 
     @Table("ft_mix_child")
     class MixChild {
@@ -230,7 +255,10 @@ describe("FetchType adversarial: decorator metadata", () => {
       })
       tags!: MixTag[];
     }
-    new MixDept(); new MixTag(); new MixChild(); new MixParent();
+    new MixDept();
+    new MixTag();
+    new MixChild();
+    new MixParent();
 
     const m2o = getManyToOneRelations(MixParent);
     expect(m2o[0].fetchStrategy).toBe("JOIN");
@@ -247,7 +275,9 @@ describe("FetchType adversarial: decorator metadata", () => {
 
   it("batchSize defaults to 25 when not specified", () => {
     @Table("ft_bs_target")
-    class BsTarget { @Id @Column() id: number = 0; }
+    class BsTarget {
+      @Id @Column() id: number = 0;
+    }
 
     @Table("ft_bs")
     class BsEntity {
@@ -255,7 +285,8 @@ describe("FetchType adversarial: decorator metadata", () => {
       @ManyToOne({ target: () => BsTarget, fetch: "BATCH" })
       ref!: BsTarget;
     }
-    new BsTarget(); new BsEntity();
+    new BsTarget();
+    new BsEntity();
 
     const rels = getManyToOneRelations(BsEntity);
     expect(rels[0].fetchStrategy).toBe("BATCH");
@@ -270,7 +301,10 @@ describe("FetchType adversarial: decorator metadata", () => {
 describe("FetchType adversarial: JOIN spec generation", () => {
   it("getJoinFetchSpecs returns specs for JOIN-fetched @ManyToOne relations", () => {
     @Table("js_m2o_dept")
-    class JsDept { @Id @Column() id: number = 0; @Column() name: string = ""; }
+    class JsDept {
+      @Id @Column() id: number = 0;
+      @Column() name: string = "";
+    }
 
     @Table("js_m2o_emp")
     class JsEmp {
@@ -278,7 +312,8 @@ describe("FetchType adversarial: JOIN spec generation", () => {
       @ManyToOne({ target: () => JsDept, fetch: "JOIN" })
       department!: JsDept;
     }
-    new JsDept(); new JsEmp();
+    new JsDept();
+    new JsEmp();
 
     const metadata = getEntityMetadata(JsEmp);
     const specs = getJoinFetchSpecs(metadata);
@@ -289,7 +324,9 @@ describe("FetchType adversarial: JOIN spec generation", () => {
 
   it("getJoinFetchSpecs excludes non-JOIN @ManyToOne relations", () => {
     @Table("js_excl_dept")
-    class ExclDept { @Id @Column() id: number = 0; }
+    class ExclDept {
+      @Id @Column() id: number = 0;
+    }
 
     @Table("js_excl_emp")
     class ExclEmp {
@@ -297,7 +334,8 @@ describe("FetchType adversarial: JOIN spec generation", () => {
       @ManyToOne({ target: () => ExclDept, fetch: "SELECT" })
       department!: ExclDept;
     }
-    new ExclDept(); new ExclEmp();
+    new ExclDept();
+    new ExclEmp();
 
     const metadata = getEntityMetadata(ExclEmp);
     const specs = getJoinFetchSpecs(metadata);
@@ -306,7 +344,10 @@ describe("FetchType adversarial: JOIN spec generation", () => {
 
   it("getJoinFetchSpecs handles @OneToOne with JOIN", () => {
     @Table("js_o2o_profile")
-    class JsProfile { @Id @Column() id: number = 0; @Column() bio: string = ""; }
+    class JsProfile {
+      @Id @Column() id: number = 0;
+      @Column() bio: string = "";
+    }
 
     @Table("js_o2o_user")
     class JsUser {
@@ -314,7 +355,8 @@ describe("FetchType adversarial: JOIN spec generation", () => {
       @OneToOne({ target: () => JsProfile, fetch: "JOIN" })
       profile!: JsProfile;
     }
-    new JsProfile(); new JsUser();
+    new JsProfile();
+    new JsUser();
 
     const metadata = getEntityMetadata(JsUser);
     const specs = getJoinFetchSpecs(metadata);
@@ -336,7 +378,8 @@ describe("FetchType adversarial: JOIN spec generation", () => {
       @OneToOne({ target: () => InvOwner, mappedBy: "inverse", fetch: "JOIN" })
       owner!: InvOwner;
     }
-    new InvOwner(); new InvInverse();
+    new InvOwner();
+    new InvInverse();
 
     const ownerMeta = getEntityMetadata(InvOwner);
     const inverseMeta = getEntityMetadata(InvInverse);
@@ -352,10 +395,14 @@ describe("FetchType adversarial: JOIN spec generation", () => {
 
   it("multiple JOIN relations get incrementing aliases", () => {
     @Table("js_multi_dept")
-    class MDept { @Id @Column() id: number = 0; }
+    class MDept {
+      @Id @Column() id: number = 0;
+    }
 
     @Table("js_multi_profile")
-    class MProfile { @Id @Column() id: number = 0; }
+    class MProfile {
+      @Id @Column() id: number = 0;
+    }
 
     @Table("js_multi_entity")
     class MEntity {
@@ -363,7 +410,9 @@ describe("FetchType adversarial: JOIN spec generation", () => {
       @ManyToOne({ target: () => MDept, fetch: "JOIN" }) dept!: MDept;
       @OneToOne({ target: () => MProfile, fetch: "JOIN" }) profile!: MProfile;
     }
-    new MDept(); new MProfile(); new MEntity();
+    new MDept();
+    new MProfile();
+    new MEntity();
 
     const metadata = getEntityMetadata(MEntity);
     const specs = getJoinFetchSpecs(metadata);
@@ -374,7 +423,10 @@ describe("FetchType adversarial: JOIN spec generation", () => {
 
   it("buildJoinColumns produces aliased column expressions", () => {
     @Table("jc_dept")
-    class JcDept { @Id @Column() id: number = 0; @Column() name: string = ""; }
+    class JcDept {
+      @Id @Column() id: number = 0;
+      @Column() name: string = "";
+    }
 
     @Table("jc_emp")
     class JcEmp {
@@ -383,21 +435,22 @@ describe("FetchType adversarial: JOIN spec generation", () => {
       @ManyToOne({ target: () => JcDept, fetch: "JOIN" })
       department!: JcDept;
     }
-    new JcDept(); new JcEmp();
+    new JcDept();
+    new JcEmp();
 
     const metadata = getEntityMetadata(JcEmp);
     const specs = getJoinFetchSpecs(metadata);
     const cols = buildJoinColumns("jc_emp", metadata.fields, specs);
 
     // Parent columns: "jc_emp"."id" AS "jc_emp__id", etc.
-    expect(cols.some(c => c.includes('"jc_emp"."id"'))).toBe(true);
-    expect(cols.some(c => c.includes('"jc_emp__id"'))).toBe(true);
+    expect(cols.some((c) => c.includes('"jc_emp"."id"'))).toBe(true);
+    expect(cols.some((c) => c.includes('"jc_emp__id"'))).toBe(true);
 
     // Joined columns: "j0"."id" AS "j0__id", "j0"."name" AS "j0__name"
-    expect(cols.some(c => c.includes('"j0"."id"'))).toBe(true);
-    expect(cols.some(c => c.includes('"j0__id"'))).toBe(true);
-    expect(cols.some(c => c.includes('"j0"."name"'))).toBe(true);
-    expect(cols.some(c => c.includes('"j0__name"'))).toBe(true);
+    expect(cols.some((c) => c.includes('"j0"."id"'))).toBe(true);
+    expect(cols.some((c) => c.includes('"j0__id"'))).toBe(true);
+    expect(cols.some((c) => c.includes('"j0"."name"'))).toBe(true);
+    expect(cols.some((c) => c.includes('"j0__name"'))).toBe(true);
   });
 
   it("entity with no JOIN relations returns empty specs", () => {

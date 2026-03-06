@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync, existsSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { SchemaDiffResult } from "./schema-diff.js";
 
@@ -50,8 +50,8 @@ export function generateMigrationFromDiff(options: GenerateMigrationOptions): Ge
     mkdirSync(migrationsDir, { recursive: true });
   }
 
-  const upStatements = diffResult.up.map(s => `      \`${escapeTemplateString(s)}\`,`).join("\n");
-  const downStatements = diffResult.down.map(s => `      \`${escapeTemplateString(s)}\`,`).join("\n");
+  const upStatements = diffResult.up.map((s) => `      \`${escapeTemplateString(s)}\`,`).join("\n");
+  const downStatements = diffResult.down.map((s) => `      \`${escapeTemplateString(s)}\`,`).join("\n");
 
   const content = `import type { Migration } from "espalier-data";
 

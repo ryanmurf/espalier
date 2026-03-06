@@ -6,10 +6,7 @@ import { quoteIdentifier } from "espalier-jdbc";
  * Prevents wildcard injection by escaping %, _, and \.
  */
 function escapeLikeValue(value: string): string {
-  return value
-    .replace(/\\/g, "\\\\")
-    .replace(/%/g, "\\%")
-    .replace(/_/g, "\\_");
+  return value.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
 }
 
 /**
@@ -24,12 +21,7 @@ export class MaterializedPathManager {
   private readonly pathColumn: string;
   private readonly separator: string;
 
-  constructor(
-    entityTable: string,
-    idColumn: string,
-    pathColumn: string,
-    separator: string = "/",
-  ) {
+  constructor(entityTable: string, idColumn: string, pathColumn: string, separator: string = "/") {
     this.entityTable = entityTable;
     this.idColumn = idColumn;
     this.pathColumn = pathColumn;
@@ -55,11 +47,7 @@ export class MaterializedPathManager {
   /**
    * Finds all descendant IDs of a node by matching the path prefix.
    */
-  async findDescendants(
-    connection: Connection,
-    nodePath: string,
-    maxDepth?: number,
-  ): Promise<SqlValue[]> {
+  async findDescendants(connection: Connection, nodePath: string, maxDepth?: number): Promise<SqlValue[]> {
     const table = quoteIdentifier(this.entityTable);
     const pathCol = quoteIdentifier(this.pathColumn);
     const idCol = quoteIdentifier(this.idColumn);
@@ -103,20 +91,13 @@ export class MaterializedPathManager {
    * Moves a node and all its descendants to a new parent path.
    * Updates all descendants whose path starts with the old node path.
    */
-  async moveNode(
-    connection: Connection,
-    nodeId: SqlValue,
-    oldPath: string,
-    newParentPath: string,
-  ): Promise<void> {
+  async moveNode(connection: Connection, nodeId: SqlValue, oldPath: string, newParentPath: string): Promise<void> {
     const s = this.separator;
     const newNodePath = `${newParentPath}${String(nodeId)}${s}`;
 
     // Validate: new parent cannot be a descendant (circular reference check)
     if (newParentPath.startsWith(oldPath)) {
-      throw new Error(
-        `Cannot move node ${String(nodeId)}: new parent is a descendant of the node.`,
-      );
+      throw new Error(`Cannot move node ${String(nodeId)}: new parent is a descendant of the node.`);
     }
 
     const table = quoteIdentifier(this.entityTable);
@@ -126,9 +107,7 @@ export class MaterializedPathManager {
     // Update the node and all descendants: replace old path prefix with new path.
     // For the node itself, SUBSTRING(oldPath FROM len+1) = '', so it becomes newNodePath.
     // For descendants, the old prefix is replaced with the new one.
-    const sql =
-      `UPDATE ${table} SET ${pathCol} = $1 || SUBSTRING(${pathCol} FROM $2) ` +
-      `WHERE ${pathCol} LIKE $3`;
+    const sql = `UPDATE ${table} SET ${pathCol} = $1 || SUBSTRING(${pathCol} FROM $2) ` + `WHERE ${pathCol} LIKE $3`;
     const stmt = connection.prepareStatement(sql);
     stmt.setParameter(1, newNodePath as SqlValue);
     stmt.setParameter(2, (oldPath.length + 1) as SqlValue);
@@ -180,7 +159,7 @@ export class MaterializedPathManager {
 
     const sql =
       `SELECT a.${idCol} FROM ${table} a WHERE NOT EXISTS (` +
-        `SELECT 1 FROM ${table} b WHERE b.${pathCol} LIKE a.${pathCol} || $1 AND b.${idCol} <> a.${idCol}` +
+      `SELECT 1 FROM ${table} b WHERE b.${pathCol} LIKE a.${pathCol} || $1 AND b.${idCol} <> a.${idCol}` +
       `)`;
     const stmt = connection.prepareStatement(sql);
     stmt.setParameter(1, `%` as SqlValue);

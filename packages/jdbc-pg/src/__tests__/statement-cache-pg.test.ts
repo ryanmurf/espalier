@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { createTestDataSource, isPostgresAvailable } from "./e2e/setup.js";
-import type { PgDataSource } from "../pg-data-source.js";
 import type { CacheableConnection } from "espalier-jdbc";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import type { PgDataSource } from "../pg-data-source.js";
+import { createTestDataSource, isPostgresAvailable } from "./e2e/setup.js";
 
 const canConnect = await isPostgresAvailable();
 
@@ -33,7 +33,7 @@ describe.skipIf(!canConnect)("E2E: Prepared Statement Cache with PgConnection", 
     await stmt.executeUpdate(CREATE_TABLE);
     // Seed data
     await stmt.executeUpdate(
-      `INSERT INTO stmt_cache_test (name, value) VALUES ('alpha', 10), ('beta', 20), ('gamma', 30)`
+      `INSERT INTO stmt_cache_test (name, value) VALUES ('alpha', 10), ('beta', 20), ('gamma', 30)`,
     );
     await conn.close();
   });

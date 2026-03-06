@@ -1,8 +1,8 @@
-import { describe, it, expect } from "vitest";
-import { KeysetPaginationStrategy } from "../../pagination/keyset-strategy.js";
+import { describe, expect, it } from "vitest";
 import type { KeysetStrategyOptions } from "../../pagination/keyset-strategy.js";
+import { KeysetPaginationStrategy } from "../../pagination/keyset-strategy.js";
+import type { KeysetPageable } from "../../pagination/types.js";
 import { SelectBuilder } from "../../query/query-builder.js";
-import type { KeysetPageable, KeysetPage } from "../../pagination/types.js";
 
 // ==========================================================================
 // Helpers
@@ -113,12 +113,15 @@ describe("KeysetPaginationStrategy.applyToQuery — adversarial", () => {
   it("with cursor (afterValue + afterId) — adds WHERE condition", () => {
     const s = makeStrategy();
     const builder = new SelectBuilder("t").columns("*");
-    s.applyToQuery(builder, makePageable({
-      sortColumn: "name",
-      sortDirection: "ASC",
-      afterValue: "row-0005",
-      afterId: 5,
-    }));
+    s.applyToQuery(
+      builder,
+      makePageable({
+        sortColumn: "name",
+        sortDirection: "ASC",
+        afterValue: "row-0005",
+        afterId: 5,
+      }),
+    );
     const q = builder.build();
     expect(q.sql).toContain("WHERE");
     expect(q.sql).toContain("OR");
@@ -128,12 +131,15 @@ describe("KeysetPaginationStrategy.applyToQuery — adversarial", () => {
   it("cursor on id column (same as sort) — simple comparison, no OR", () => {
     const s = makeStrategy();
     const builder = new SelectBuilder("t").columns("*");
-    s.applyToQuery(builder, makePageable({
-      sortColumn: "id",
-      sortDirection: "ASC",
-      afterValue: 50,
-      afterId: 50,
-    }));
+    s.applyToQuery(
+      builder,
+      makePageable({
+        sortColumn: "id",
+        sortDirection: "ASC",
+        afterValue: 50,
+        afterId: 50,
+      }),
+    );
     const q = builder.build();
     expect(q.sql).toContain("WHERE");
     // Single column cursor uses simple comparison, no OR in the WHERE clause
@@ -145,12 +151,15 @@ describe("KeysetPaginationStrategy.applyToQuery — adversarial", () => {
   it("DESC cursor — uses < operator", () => {
     const s = makeStrategy();
     const builder = new SelectBuilder("t").columns("*");
-    s.applyToQuery(builder, makePageable({
-      sortColumn: "score",
-      sortDirection: "DESC",
-      afterValue: 100,
-      afterId: 10,
-    }));
+    s.applyToQuery(
+      builder,
+      makePageable({
+        sortColumn: "score",
+        sortDirection: "DESC",
+        afterValue: 100,
+        afterId: 10,
+      }),
+    );
     const q = builder.build();
     expect(q.sql).toContain("<");
   });
@@ -158,12 +167,15 @@ describe("KeysetPaginationStrategy.applyToQuery — adversarial", () => {
   it("ASC cursor — uses > operator", () => {
     const s = makeStrategy();
     const builder = new SelectBuilder("t").columns("*");
-    s.applyToQuery(builder, makePageable({
-      sortColumn: "score",
-      sortDirection: "ASC",
-      afterValue: 100,
-      afterId: 10,
-    }));
+    s.applyToQuery(
+      builder,
+      makePageable({
+        sortColumn: "score",
+        sortDirection: "ASC",
+        afterValue: 100,
+        afterId: 10,
+      }),
+    );
     const q = builder.build();
     expect(q.sql).toContain(">");
   });
@@ -171,10 +183,13 @@ describe("KeysetPaginationStrategy.applyToQuery — adversarial", () => {
   it("afterValue without afterId — no cursor condition applied", () => {
     const s = makeStrategy();
     const builder = new SelectBuilder("t").columns("*");
-    s.applyToQuery(builder, makePageable({
-      afterValue: "something",
-      // afterId is undefined
-    }));
+    s.applyToQuery(
+      builder,
+      makePageable({
+        afterValue: "something",
+        // afterId is undefined
+      }),
+    );
     const q = builder.build();
     expect(q.sql).not.toContain("WHERE");
   });
@@ -182,10 +197,13 @@ describe("KeysetPaginationStrategy.applyToQuery — adversarial", () => {
   it("afterId without afterValue — no cursor condition applied", () => {
     const s = makeStrategy();
     const builder = new SelectBuilder("t").columns("*");
-    s.applyToQuery(builder, makePageable({
-      afterId: 5,
-      // afterValue is undefined
-    }));
+    s.applyToQuery(
+      builder,
+      makePageable({
+        afterId: 5,
+        // afterValue is undefined
+      }),
+    );
     const q = builder.build();
     expect(q.sql).not.toContain("WHERE");
   });
@@ -194,10 +212,13 @@ describe("KeysetPaginationStrategy.applyToQuery — adversarial", () => {
     // null should be treated as "no cursor" — skip cursor condition
     const s = makeStrategy();
     const builder = new SelectBuilder("t").columns("*");
-    s.applyToQuery(builder, makePageable({
-      afterValue: null,
-      afterId: null,
-    }));
+    s.applyToQuery(
+      builder,
+      makePageable({
+        afterValue: null,
+        afterId: null,
+      }),
+    );
     const q = builder.build();
     expect(q.sql).not.toContain("WHERE");
   });
@@ -266,13 +287,19 @@ describe("KeysetPaginationStrategy.buildResult — adversarial", () => {
   });
 
   it("lastValue extracts from sortColumn", () => {
-    const rows = [{ id: 1, name: "Alice" }, { id: 2, name: "Bob" }];
+    const rows = [
+      { id: 1, name: "Alice" },
+      { id: 2, name: "Bob" },
+    ];
     const result = s.buildResult(rows, makePageable({ sortColumn: "name", size: 10 }), 2);
     expect(result.lastValue).toBe("Bob");
   });
 
   it("lastId extracts from idField", () => {
-    const rows = [{ id: 1, name: "Alice" }, { id: 2, name: "Bob" }];
+    const rows = [
+      { id: 1, name: "Alice" },
+      { id: 2, name: "Bob" },
+    ];
     const result = s.buildResult(rows, makePageable({ size: 10 }), 2);
     expect(result.lastId).toBe(2);
   });
@@ -325,11 +352,7 @@ describe("KeysetPaginationStrategy.buildResult — adversarial", () => {
   });
 
   it("single row — lastValue and lastId from that row", () => {
-    const result = s.buildResult(
-      [{ id: 42, name: "only" }],
-      makePageable({ sortColumn: "name", size: 10 }),
-      1,
-    );
+    const result = s.buildResult([{ id: 42, name: "only" }], makePageable({ sortColumn: "name", size: 10 }), 1);
     expect(result.lastValue).toBe("only");
     expect(result.lastId).toBe(42);
   });
@@ -357,12 +380,15 @@ describe("KeysetPaginationStrategy — cursor SQL generation", () => {
   it("ASC composite: (col > val) OR (col = val AND id > id)", () => {
     const s = makeStrategy();
     const builder = new SelectBuilder("t").columns("*");
-    s.applyToQuery(builder, makePageable({
-      sortColumn: "name",
-      sortDirection: "ASC",
-      afterValue: "Alice",
-      afterId: 1,
-    }));
+    s.applyToQuery(
+      builder,
+      makePageable({
+        sortColumn: "name",
+        sortDirection: "ASC",
+        afterValue: "Alice",
+        afterId: 1,
+      }),
+    );
     const q = builder.build();
     // Should use > operator for ASC
     expect(q.sql).toContain(">");
@@ -373,12 +399,15 @@ describe("KeysetPaginationStrategy — cursor SQL generation", () => {
   it("DESC composite: (col < val) OR (col = val AND id < id)", () => {
     const s = makeStrategy();
     const builder = new SelectBuilder("t").columns("*");
-    s.applyToQuery(builder, makePageable({
-      sortColumn: "name",
-      sortDirection: "DESC",
-      afterValue: "Zara",
-      afterId: 100,
-    }));
+    s.applyToQuery(
+      builder,
+      makePageable({
+        sortColumn: "name",
+        sortDirection: "DESC",
+        afterValue: "Zara",
+        afterId: 100,
+      }),
+    );
     const q = builder.build();
     expect(q.sql).toContain("<");
     expect(q.sql).toContain("OR");
@@ -387,12 +416,15 @@ describe("KeysetPaginationStrategy — cursor SQL generation", () => {
   it("cursor params are in correct order: [afterValue, afterValue, afterId]", () => {
     const s = makeStrategy();
     const builder = new SelectBuilder("t").columns("*");
-    s.applyToQuery(builder, makePageable({
-      sortColumn: "name",
-      sortDirection: "ASC",
-      afterValue: "Alice",
-      afterId: 42,
-    }));
+    s.applyToQuery(
+      builder,
+      makePageable({
+        sortColumn: "name",
+        sortDirection: "ASC",
+        afterValue: "Alice",
+        afterId: 42,
+      }),
+    );
     const q = builder.build();
     // Params should include cursor values followed by LIMIT
     // Composite: [afterValue, afterValue, afterId, LIMIT]
@@ -403,12 +435,15 @@ describe("KeysetPaginationStrategy — cursor SQL generation", () => {
   it("single column cursor (sort=id): only [afterValue, LIMIT]", () => {
     const s = makeStrategy();
     const builder = new SelectBuilder("t").columns("*");
-    s.applyToQuery(builder, makePageable({
-      sortColumn: "id",
-      sortDirection: "ASC",
-      afterValue: 50,
-      afterId: 50,
-    }));
+    s.applyToQuery(
+      builder,
+      makePageable({
+        sortColumn: "id",
+        sortDirection: "ASC",
+        afterValue: 50,
+        afterId: 50,
+      }),
+    );
     const q = builder.build();
     // Single column cursor: no OR in WHERE clause ("ORDER" contains "OR")
     const whereClause = q.sql.split("ORDER")[0];
@@ -421,12 +456,15 @@ describe("KeysetPaginationStrategy — cursor SQL generation", () => {
   it("string afterValue with special characters — passed as parameterized value", () => {
     const s = makeStrategy();
     const builder = new SelectBuilder("t").columns("*");
-    s.applyToQuery(builder, makePageable({
-      sortColumn: "name",
-      sortDirection: "ASC",
-      afterValue: "O'Malley; DROP TABLE users;--",
-      afterId: 1,
-    }));
+    s.applyToQuery(
+      builder,
+      makePageable({
+        sortColumn: "name",
+        sortDirection: "ASC",
+        afterValue: "O'Malley; DROP TABLE users;--",
+        afterId: 1,
+      }),
+    );
     const q = builder.build();
     // SQL injection attempt should be safely parameterized
     expect(q.sql).not.toContain("DROP TABLE");
@@ -460,9 +498,8 @@ describe("KeysetPaginationStrategy — forward pagination simulation", () => {
       // Simulate DB: filter after cursor, take size+1
       let available = allRows;
       if (afterValue !== undefined && afterId !== undefined) {
-        available = allRows.filter((r) =>
-          r.name > (afterValue as string) ||
-          (r.name === afterValue && r.id > (afterId as number)),
+        available = allRows.filter(
+          (r) => r.name > (afterValue as string) || (r.name === afterValue && r.id > (afterId as number)),
         );
       }
       const fetched = available.slice(0, pageSize + 1);
@@ -497,9 +534,8 @@ describe("KeysetPaginationStrategy — forward pagination simulation", () => {
 
       let available = [...allRows].reverse();
       if (afterValue !== undefined && afterId !== undefined) {
-        available = available.filter((r) =>
-          r.name < (afterValue as string) ||
-          (r.name === afterValue && r.id < (afterId as number)),
+        available = available.filter(
+          (r) => r.name < (afterValue as string) || (r.name === afterValue && r.id < (afterId as number)),
         );
       }
       const fetched = available.slice(0, pageSize + 1);
@@ -540,9 +576,8 @@ describe("KeysetPaginationStrategy — duplicate sort values", () => {
     for (let iteration = 0; iteration < 10; iteration++) {
       let available = rows;
       if (afterValue !== undefined && afterId !== undefined) {
-        available = rows.filter((r) =>
-          r.name > (afterValue as string) ||
-          (r.name === afterValue && r.id > (afterId as number)),
+        available = rows.filter(
+          (r) => r.name > (afterValue as string) || (r.name === afterValue && r.id > (afterId as number)),
         );
       }
       const fetched = available.slice(0, pageSize + 1);
@@ -646,10 +681,13 @@ describe("KeysetPaginationStrategy — SQL injection resistance", () => {
   it("afterValue with SQL injection — safely parameterized", () => {
     const s = makeStrategy();
     const builder = new SelectBuilder("t").columns("*");
-    s.applyToQuery(builder, makePageable({
-      afterValue: "'; DROP TABLE users; --",
-      afterId: 1,
-    }));
+    s.applyToQuery(
+      builder,
+      makePageable({
+        afterValue: "'; DROP TABLE users; --",
+        afterId: 1,
+      }),
+    );
     const q = builder.build();
     expect(q.sql).not.toContain("DROP TABLE");
     expect(q.params).toContain("'; DROP TABLE users; --");
@@ -658,10 +696,13 @@ describe("KeysetPaginationStrategy — SQL injection resistance", () => {
   it("afterId with SQL injection string — safely parameterized", () => {
     const s = makeStrategy();
     const builder = new SelectBuilder("t").columns("*");
-    s.applyToQuery(builder, makePageable({
-      afterValue: "test",
-      afterId: "1 OR 1=1" as any,
-    }));
+    s.applyToQuery(
+      builder,
+      makePageable({
+        afterValue: "test",
+        afterId: "1 OR 1=1" as any,
+      }),
+    );
     const q = builder.build();
     expect(q.params).toContain("1 OR 1=1");
     expect(q.sql).not.toContain("1 OR 1=1");

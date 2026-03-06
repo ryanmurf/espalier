@@ -3,19 +3,12 @@
  * Tests save/load, null embedded, update embedded fields, dual embeds, large embeds,
  * and DDL verification against live Postgres.
  */
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { createTestDataSource, isPostgresAvailable } from "./setup.js";
-import {
-  Table,
-  Column,
-  Id,
-  Embeddable,
-  Embedded,
-  DdlGenerator,
-  createRepository,
-} from "espalier-data";
-import type { PgDataSource } from "../../pg-data-source.js";
+
+import { Column, createRepository, DdlGenerator, Embeddable, Embedded, Id, Table } from "espalier-data";
 import type { Connection } from "espalier-jdbc";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import type { PgDataSource } from "../../pg-data-source.js";
+import { createTestDataSource, isPostgresAvailable } from "./setup.js";
 
 const canConnect = await isPostgresAvailable();
 const generator = new DdlGenerator();
@@ -92,11 +85,7 @@ describe.skipIf(!canConnect)("@Embedded adversarial: repository E2E (Postgres)",
   let ds: PgDataSource;
   let conn: Connection;
 
-  const ALL_TABLES = [
-    "e2e_emb_place",
-    "e2e_emb_company",
-    "e2e_emb_person",
-  ];
+  const ALL_TABLES = ["e2e_emb_place", "e2e_emb_company", "e2e_emb_person"];
 
   beforeAll(async () => {
     ds = createTestDataSource();
@@ -358,21 +347,25 @@ describe.skipIf(!canConnect)("@Embedded adversarial: repository E2E (Postgres)",
       await clearAllData();
 
       const repo = createRepository<E2ePerson, number>(E2ePerson, ds);
-      await repo.save(newEntity(E2ePerson, {
-        name: "User1",
-        homeAddress: newAddress("1 A", "CityA", "11111"),
-      }));
-      await repo.save(newEntity(E2ePerson, {
-        name: "User2",
-        homeAddress: newAddress("2 B", "CityB", "22222"),
-      }));
+      await repo.save(
+        newEntity(E2ePerson, {
+          name: "User1",
+          homeAddress: newAddress("1 A", "CityA", "11111"),
+        }),
+      );
+      await repo.save(
+        newEntity(E2ePerson, {
+          name: "User2",
+          homeAddress: newAddress("2 B", "CityB", "22222"),
+        }),
+      );
 
       // Use fresh repo to avoid cache
       const freshRepo = createRepository<E2ePerson, number>(E2ePerson, ds);
       const all = await freshRepo.findAll();
       expect(all).toHaveLength(2);
 
-      const cities = all.map(p => p.homeAddress.city).sort();
+      const cities = all.map((p) => p.homeAddress.city).sort();
       expect(cities).toEqual(["CityA", "CityB"]);
     });
   });

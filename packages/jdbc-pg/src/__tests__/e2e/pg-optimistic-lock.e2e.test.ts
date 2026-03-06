@@ -1,14 +1,7 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { createTestDataSource, isPostgresAvailable } from "./setup.js";
-import {
-  Table,
-  Column,
-  Id,
-  Version,
-  createDerivedRepository,
-  OptimisticLockException,
-} from "espalier-data";
+import { Column, createDerivedRepository, Id, OptimisticLockException, Table, Version } from "espalier-data";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { PgDataSource } from "../../pg-data-source.js";
+import { createTestDataSource, isPostgresAvailable } from "./setup.js";
 
 const canConnect = await isPostgresAvailable();
 
@@ -171,9 +164,7 @@ describe.skipIf(!canConnect)("E2E: Optimistic Locking", { timeout: 15000 }, () =
 
     // Simulate concurrent modification: update version in DB directly
     const conn = await ds.getConnection();
-    const stmt = conn.prepareStatement(
-      `UPDATE lock_test_documents SET content = $1, version = $2 WHERE id = $3`,
-    );
+    const stmt = conn.prepareStatement(`UPDATE lock_test_documents SET content = $1, version = $2 WHERE id = $3`);
     stmt.setParameter(1, "Concurrent update");
     stmt.setParameter(2, 2);
     stmt.setParameter(3, saved.id);
@@ -191,9 +182,7 @@ describe.skipIf(!canConnect)("E2E: Optimistic Locking", { timeout: 15000 }, () =
 
     // Bump version in DB
     const conn = await ds.getConnection();
-    const stmt = conn.prepareStatement(
-      `UPDATE lock_test_documents SET version = $1 WHERE id = $2`,
-    );
+    const stmt = conn.prepareStatement(`UPDATE lock_test_documents SET version = $1 WHERE id = $2`);
     stmt.setParameter(1, 99);
     stmt.setParameter(2, saved.id);
     await stmt.executeUpdate();
@@ -219,9 +208,7 @@ describe.skipIf(!canConnect)("E2E: Optimistic Locking", { timeout: 15000 }, () =
 
     // Bump version in DB
     const conn = await ds.getConnection();
-    const stmt = conn.prepareStatement(
-      `UPDATE lock_test_documents SET version = $1 WHERE id = $2`,
-    );
+    const stmt = conn.prepareStatement(`UPDATE lock_test_documents SET version = $1 WHERE id = $2`);
     stmt.setParameter(1, 99);
     stmt.setParameter(2, saved.id);
     await stmt.executeUpdate();
@@ -244,9 +231,7 @@ describe.skipIf(!canConnect)("E2E: Optimistic Locking", { timeout: 15000 }, () =
 
     // Bump version in DB with a specific content
     const conn = await ds.getConnection();
-    const stmt = conn.prepareStatement(
-      `UPDATE lock_test_documents SET content = $1, version = $2 WHERE id = $3`,
-    );
+    const stmt = conn.prepareStatement(`UPDATE lock_test_documents SET content = $1, version = $2 WHERE id = $3`);
     stmt.setParameter(1, "DB content");
     stmt.setParameter(2, 2);
     stmt.setParameter(3, saved.id);
@@ -288,9 +273,7 @@ describe.skipIf(!canConnect)("E2E: Optimistic Locking", { timeout: 15000 }, () =
 
     // Bump version in DB
     const conn = await ds.getConnection();
-    const stmt = conn.prepareStatement(
-      `UPDATE lock_test_documents SET version = $1 WHERE id = $2`,
-    );
+    const stmt = conn.prepareStatement(`UPDATE lock_test_documents SET version = $1 WHERE id = $2`);
     stmt.setParameter(1, 99);
     stmt.setParameter(2, saved.id);
     await stmt.executeUpdate();

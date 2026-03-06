@@ -1,12 +1,12 @@
 import type { DataSource } from "espalier-jdbc";
-import type { CrudRepository } from "./crud-repository.js";
-import { createDerivedRepository } from "./derived-repository.js";
-import type { DerivedRepositoryOptions } from "./derived-repository.js";
 import { getRepositoryMetadata } from "../decorators/repository.js";
-import { parseDerivedQueryMethod } from "../query/derived-query-parser.js";
-import type { DerivedQueryDescriptor } from "../query/derived-query-parser.js";
-import { getEntityMetadata } from "../mapping/entity-metadata.js";
 import type { EntityMetadata, FieldMapping } from "../mapping/entity-metadata.js";
+import { getEntityMetadata } from "../mapping/entity-metadata.js";
+import type { DerivedQueryDescriptor } from "../query/derived-query-parser.js";
+import { parseDerivedQueryMethod } from "../query/derived-query-parser.js";
+import type { CrudRepository } from "./crud-repository.js";
+import type { DerivedRepositoryOptions } from "./derived-repository.js";
+import { createDerivedRepository } from "./derived-repository.js";
 
 export interface AutoRepositoryOptions {
   entityCache?: DerivedRepositoryOptions["entityCache"];
@@ -48,19 +48,12 @@ function isDerivedMethodName(name: string): boolean {
   return DERIVED_PREFIXES.some((prefix) => name.startsWith(prefix));
 }
 
-function resolveColumnForValidation(
-  property: string,
-  entityMetadata: EntityMetadata,
-): void {
-  const found = entityMetadata.fields.find(
-    (f: FieldMapping) => String(f.fieldName) === property,
-  );
+function resolveColumnForValidation(property: string, entityMetadata: EntityMetadata): void {
+  const found = entityMetadata.fields.find((f: FieldMapping) => String(f.fieldName) === property);
   if (found) return;
 
   if (String(entityMetadata.idField) === property) {
-    const idMapping = entityMetadata.fields.find(
-      (f: FieldMapping) => f.fieldName === entityMetadata.idField,
-    );
+    const idMapping = entityMetadata.fields.find((f: FieldMapping) => f.fieldName === entityMetadata.idField);
     if (idMapping) return;
   }
 
@@ -74,9 +67,7 @@ function resolveColumnForValidation(
  * Extract method names from a repository class prototype that look like
  * derived query methods (findBy*, countBy*, deleteBy*, existsBy*).
  */
-export function getDeclaredDerivedMethods(
-  repositoryClass: new (...args: any[]) => any,
-): string[] {
+export function getDeclaredDerivedMethods(repositoryClass: new (...args: any[]) => any): string[] {
   const methods: string[] = [];
   const proto = repositoryClass.prototype;
   if (!proto) return methods;
@@ -153,12 +144,8 @@ export function createAutoRepository<T, ID>(
       const entityMeta = getEntityMetadata(repoMetadata.entity);
       const { errors } = validateDerivedMethods(declaredMethods, entityMeta);
       if (errors.length > 0) {
-        const details = errors
-          .map((e) => `  - ${e.methodName}: ${e.error}`)
-          .join("\n");
-        throw new Error(
-          `Invalid derived query methods on ${repositoryClass.name}:\n${details}`,
-        );
+        const details = errors.map((e) => `  - ${e.methodName}: ${e.error}`).join("\n");
+        throw new Error(`Invalid derived query methods on ${repositoryClass.name}:\n${details}`);
       }
     }
   }
@@ -171,9 +158,5 @@ export function createAutoRepository<T, ID>(
       }
     : undefined;
 
-  return createDerivedRepository<T, ID>(
-    repoMetadata.entity,
-    dataSource,
-    derivedOptions,
-  );
+  return createDerivedRepository<T, ID>(repoMetadata.entity, dataSource, derivedOptions);
 }

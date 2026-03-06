@@ -36,10 +36,10 @@ export function View(options: ViewOptions) {
   if (options.checkOption && !VALID_CHECK_OPTIONS.has(options.checkOption)) {
     throw new Error(`Invalid checkOption: "${options.checkOption}". Must be "LOCAL" or "CASCADED".`);
   }
-  return function <TClass extends new (...args: any[]) => any>(
+  return <TClass extends new (...args: any[]) => any>(
     target: TClass,
     _context: ClassDecoratorContext<TClass>,
-  ): TClass {
+  ): TClass => {
     viewMetadata.set(target, { ...options });
     return target;
   };
@@ -70,10 +70,10 @@ export function MaterializedView(options: MaterializedViewOptions) {
   if (!options.definition || !options.definition.trim()) {
     throw new Error("@MaterializedView definition must be a non-empty SQL SELECT statement.");
   }
-  return function <TClass extends new (...args: any[]) => any>(
+  return <TClass extends new (...args: any[]) => any>(
     target: TClass,
     _context: ClassDecoratorContext<TClass>,
-  ): TClass {
+  ): TClass => {
     materializedViewMetadata.set(target, {
       withData: true,
       ...options,
@@ -86,9 +86,7 @@ export function MaterializedView(options: MaterializedViewOptions) {
 /**
  * Returns materialized view metadata for an entity class, or undefined.
  */
-export function getMaterializedViewMetadata(
-  target: object,
-): MaterializedViewOptions | undefined {
+export function getMaterializedViewMetadata(target: object): MaterializedViewOptions | undefined {
   const entry = materializedViewMetadata.get(target);
   return entry ? { ...entry, unique: entry.unique ? [...entry.unique] : undefined } : undefined;
 }

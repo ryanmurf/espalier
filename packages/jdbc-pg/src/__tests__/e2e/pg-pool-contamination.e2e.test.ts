@@ -5,15 +5,11 @@
  * a failure must NOT return a contaminated connection to the pool.
  * The fix attempts DISCARD ALL as a fallback and throws an error.
  */
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { createTestDataSource, isPostgresAvailable } from "./setup.js";
-import {
-  TenantAwareDataSource,
-  TenantContext,
-  SchemaSetupError,
-} from "espalier-data";
-import type { TenantAwareDataSourceOptions } from "espalier-data";
+
+import { TenantAwareDataSource, TenantContext } from "espalier-data";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { PgDataSource } from "../../pg-data-source.js";
+import { createTestDataSource, isPostgresAvailable } from "./setup.js";
 
 const canConnect = await isPostgresAvailable();
 
@@ -278,9 +274,7 @@ describe.skipIf(!canConnect)("TenantAwareDataSource — pool contamination (#51)
         try {
           // search_path is set to nonexistent_schema_xyz, public
           // Querying 'marker' table should fail (not in public schema)
-          await expect(
-            stmt.executeQuery("SELECT val FROM marker"),
-          ).rejects.toThrow();
+          await expect(stmt.executeQuery("SELECT val FROM marker")).rejects.toThrow();
         } finally {
           await stmt.close();
           await conn.close();

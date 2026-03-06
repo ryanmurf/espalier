@@ -258,9 +258,7 @@ let globalPool: PreparedStatementPool | undefined;
  * Subsequent calls return the existing singleton and ignore `config`.
  * Use {@link setGlobalPreparedStatementPool} to replace the singleton with a new config.
  */
-export function getGlobalPreparedStatementPool(
-  config?: PreparedStatementPoolConfig,
-): PreparedStatementPool {
+export function getGlobalPreparedStatementPool(config?: PreparedStatementPoolConfig): PreparedStatementPool {
   if (!globalPool) {
     globalPool = new PreparedStatementPool(config);
   }
@@ -270,8 +268,6 @@ export function getGlobalPreparedStatementPool(
 /**
  * Replace the global PreparedStatementPool (useful for testing).
  */
-export function setGlobalPreparedStatementPool(
-  pool: PreparedStatementPool | undefined,
-): void {
+export function setGlobalPreparedStatementPool(pool: PreparedStatementPool | undefined): void {
   globalPool = pool;
 }

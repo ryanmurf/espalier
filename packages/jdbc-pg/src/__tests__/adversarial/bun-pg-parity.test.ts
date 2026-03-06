@@ -5,18 +5,13 @@
  * Since these tests run under Node (not Bun), we mock bun:sql and test
  * the adapter classes directly via their BunSqlClient interface.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import {
-  ConnectionError,
-  TransactionError,
-  QueryError,
-  DatabaseErrorCode,
-  IsolationLevel,
-} from "espalier-jdbc";
-import type { BunSqlClient, BunSqlResult } from "../../bun-pg-statement.js";
-import { BunPgResultSet } from "../../bun-pg-result-set.js";
-import { BunPgStatementImpl, BunPgPreparedStatement } from "../../bun-pg-statement.js";
+
+import { ConnectionError, DatabaseErrorCode, IsolationLevel, QueryError, TransactionError } from "espalier-jdbc";
+import { describe, expect, it, vi } from "vitest";
 import { BunPgConnection } from "../../bun-pg-connection.js";
+import { BunPgResultSet } from "../../bun-pg-result-set.js";
+import type { BunSqlClient, BunSqlResult } from "../../bun-pg-statement.js";
+import { BunPgPreparedStatement, BunPgStatementImpl } from "../../bun-pg-statement.js";
 
 // ── Mock BunSqlClient ────────────────────────────────────────────────────────
 
@@ -28,8 +23,7 @@ function createMockResult(rows: Record<string, unknown>[], count?: number): BunS
 
 function createMockClient(overrides: Partial<BunSqlClient> = {}): BunSqlClient {
   return {
-    query: vi.fn<(sql: string, params?: unknown[]) => Promise<BunSqlResult>>()
-      .mockResolvedValue(createMockResult([])),
+    query: vi.fn<(sql: string, params?: unknown[]) => Promise<BunSqlResult>>().mockResolvedValue(createMockResult([])),
     close: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
     ...overrides,
   };
@@ -44,7 +38,11 @@ describe("BunPgResultSet", () => {
   });
 
   it("iterates through all rows", async () => {
-    const rows = [{ id: 1, name: "a" }, { id: 2, name: "b" }, { id: 3, name: "c" }];
+    const rows = [
+      { id: 1, name: "a" },
+      { id: 2, name: "b" },
+      { id: 3, name: "c" },
+    ];
     const rs = new BunPgResultSet(rows);
     const collected: Record<string, unknown>[] = [];
     while (await rs.next()) {
@@ -97,10 +95,14 @@ describe("BunPgResultSet", () => {
 
   it("getBoolean() coerces values", async () => {
     const rs = new BunPgResultSet([{ a: true }, { a: false }, { a: 0 }, { a: 1 }]);
-    await rs.next(); expect(rs.getBoolean("a")).toBe(true);
-    await rs.next(); expect(rs.getBoolean("a")).toBe(false);
-    await rs.next(); expect(rs.getBoolean("a")).toBe(false);
-    await rs.next(); expect(rs.getBoolean("a")).toBe(true);
+    await rs.next();
+    expect(rs.getBoolean("a")).toBe(true);
+    await rs.next();
+    expect(rs.getBoolean("a")).toBe(false);
+    await rs.next();
+    expect(rs.getBoolean("a")).toBe(false);
+    await rs.next();
+    expect(rs.getBoolean("a")).toBe(true);
   });
 
   it("getDate() returns null for null", async () => {
@@ -148,7 +150,7 @@ describe("BunPgResultSet", () => {
     const rs = new BunPgResultSet([{ id: 1, name: "a", active: true }]);
     const meta = rs.getMetadata();
     expect(meta).toHaveLength(3);
-    expect(meta.map(m => m.name)).toEqual(["id", "name", "active"]);
+    expect(meta.map((m) => m.name)).toEqual(["id", "name", "active"]);
     expect(meta[0].dataType).toBe("unknown");
     expect(meta[0].nullable).toBe(true);
     expect(meta[0].primaryKey).toBe(false);
@@ -163,7 +165,7 @@ describe("BunPgResultSet", () => {
     const rs = new BunPgResultSet([], ["id", "name"]);
     const meta = rs.getMetadata();
     expect(meta).toHaveLength(2);
-    expect(meta.map(m => m.name)).toEqual(["id", "name"]);
+    expect(meta.map((m) => m.name)).toEqual(["id", "name"]);
   });
 
   it("close() is a no-op and does not throw", async () => {
@@ -317,7 +319,7 @@ describe("BunPgPreparedStatement", () => {
   it("Uint8Array parameters are passed through", async () => {
     const queryFn = vi.fn().mockResolvedValue(createMockResult([], 1));
     const client = createMockClient({ query: queryFn });
-    const data = new Uint8Array([0xDE, 0xAD, 0xBE, 0xEF]);
+    const data = new Uint8Array([0xde, 0xad, 0xbe, 0xef]);
     const ps = new BunPgPreparedStatement(client, "INSERT INTO t (data) VALUES ($1)");
     ps.setParameter(1, data);
     await ps.executeUpdate();
@@ -331,10 +333,7 @@ describe("BunPgPreparedStatement", () => {
     const ps = new BunPgPreparedStatement(client, "INSERT INTO t (a, b, c) VALUES ($1, $2, $3)");
     ps.setParameter(3, "only-third");
     await ps.executeUpdate();
-    expect(queryFn).toHaveBeenCalledWith(
-      "INSERT INTO t (a, b, c) VALUES ($1, $2, $3)",
-      [null, null, "only-third"],
-    );
+    expect(queryFn).toHaveBeenCalledWith("INSERT INTO t (a, b, c) VALUES ($1, $2, $3)", [null, null, "only-third"]);
   });
 
   it("no parameters means empty array", async () => {
@@ -492,9 +491,11 @@ describe("BunPgConnection", () => {
   });
 
   it("beginTransaction wraps errors in TransactionError", async () => {
-    const conn = new BunPgConnection(createMockClient({
-      query: vi.fn().mockRejectedValue(new Error("connection lost")),
-    }));
+    const conn = new BunPgConnection(
+      createMockClient({
+        query: vi.fn().mockRejectedValue(new Error("connection lost")),
+      }),
+    );
     try {
       await conn.beginTransaction();
       expect.unreachable("should throw");
@@ -579,20 +580,14 @@ describe("BunPgConnection", () => {
   });
 
   it("setSavepoint rejects SQL injection attempts", async () => {
-    const conn = new BunPgConnection(createMockClient({
-      query: vi.fn().mockResolvedValue(createMockResult([])),
-    }));
+    const conn = new BunPgConnection(
+      createMockClient({
+        query: vi.fn().mockResolvedValue(createMockResult([])),
+      }),
+    );
     const tx = await conn.beginTransaction();
 
-    const malicious = [
-      "'; DROP TABLE users; --",
-      "sp 1",
-      "1sp",
-      "",
-      "sp;DROP",
-      "sp\nDROP",
-      "sp-1",
-    ];
+    const malicious = ["'; DROP TABLE users; --", "sp 1", "1sp", "", "sp;DROP", "sp\nDROP", "sp-1"];
 
     for (const name of malicious) {
       try {
@@ -606,9 +601,11 @@ describe("BunPgConnection", () => {
   });
 
   it("rollbackTo rejects invalid names", async () => {
-    const conn = new BunPgConnection(createMockClient({
-      query: vi.fn().mockResolvedValue(createMockResult([])),
-    }));
+    const conn = new BunPgConnection(
+      createMockClient({
+        query: vi.fn().mockResolvedValue(createMockResult([])),
+      }),
+    );
     const tx = await conn.beginTransaction();
 
     try {
@@ -669,7 +666,7 @@ describe("error mapping", () => {
 
   it("syntax error is wrapped in QueryError with SQL", async () => {
     const client = createMockClient({
-      query: vi.fn().mockRejectedValue(new Error("syntax error at or near \"SELECTT\"")),
+      query: vi.fn().mockRejectedValue(new Error('syntax error at or near "SELECTT"')),
     });
     const stmt = new BunPgStatementImpl(client);
     try {
@@ -732,8 +729,7 @@ describe("concurrent operations", () => {
 
   it("50 concurrent prepared statement executions", async () => {
     const client = createMockClient({
-      query: vi.fn(async (_sql: string, params?: unknown[]) =>
-        createMockResult([{ n: params?.[0] ?? 0 }])),
+      query: vi.fn(async (_sql: string, params?: unknown[]) => createMockResult([{ n: params?.[0] ?? 0 }])),
     });
     const promises = Array.from({ length: 50 }, (_, i) => {
       const ps = new BunPgPreparedStatement(client, "SELECT $1 AS n");

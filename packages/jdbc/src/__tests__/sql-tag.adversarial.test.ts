@@ -1,6 +1,6 @@
-import { describe, it, expect } from "vitest";
-import { sql } from "../sql-tag.js";
+import { describe, expect, it } from "vitest";
 import type { TypedQuery } from "../sql-tag.js";
+import { sql } from "../sql-tag.js";
 
 // ==========================================================================
 // Basic parameterization
@@ -153,9 +153,7 @@ describe("sql tag — nested fragments", () => {
     const inner = sql`role = ${"admin"}`;
     const middle = sql`active = ${true} AND ${inner}`;
     const outer = sql`SELECT * FROM users WHERE name = ${"Eve"} AND ${middle}`;
-    expect(outer.text).toBe(
-      "SELECT * FROM users WHERE name = $1 AND active = $2 AND role = $3",
-    );
+    expect(outer.text).toBe("SELECT * FROM users WHERE name = $1 AND active = $2 AND role = $3");
     expect(outer.params).toEqual(["Eve", true, "admin"]);
   });
 
@@ -193,17 +191,13 @@ describe("sql tag — nested fragments", () => {
 describe("sql tag — large param count", () => {
   it("1000 params numbered correctly", () => {
     const values = Array.from({ length: 1000 }, (_, i) => i);
-    const placeholders = values.map((_, i) => `\${val${i}}`);
+    const _placeholders = values.map((_, i) => `\${val${i}}`);
     // Build a query with 1000 interpolations
     const query = sql(
       // Create TemplateStringsArray manually
       Object.assign(
-        Array.from({ length: 1001 }, (_, i) =>
-          i === 0 ? "SELECT " : i < 1000 ? ", " : " FROM t",
-        ),
-        { raw: Array.from({ length: 1001 }, (_, i) =>
-          i === 0 ? "SELECT " : i < 1000 ? ", " : " FROM t",
-        ) },
+        Array.from({ length: 1001 }, (_, i) => (i === 0 ? "SELECT " : i < 1000 ? ", " : " FROM t")),
+        { raw: Array.from({ length: 1001 }, (_, i) => (i === 0 ? "SELECT " : i < 1000 ? ", " : " FROM t")) },
       ) as unknown as TemplateStringsArray,
       ...values,
     );

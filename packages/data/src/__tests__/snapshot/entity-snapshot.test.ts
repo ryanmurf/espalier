@@ -1,9 +1,9 @@
-import { describe, it, expect } from "vitest";
-import { snapshot } from "../../snapshot/entity-snapshot.js";
-import { diff, diffEntity } from "../../snapshot/entity-diff.js";
-import { Table } from "../../decorators/table.js";
+import { describe, expect, it } from "vitest";
 import { Column } from "../../decorators/column.js";
 import { Id } from "../../decorators/id.js";
+import { Table } from "../../decorators/table.js";
+import { diff, diffEntity } from "../../snapshot/entity-diff.js";
+import { snapshot } from "../../snapshot/entity-snapshot.js";
 
 // ──────────────────────────────────────────────────
 // Test entities

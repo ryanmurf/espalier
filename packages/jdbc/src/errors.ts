@@ -54,12 +54,7 @@ export class DatabaseError extends Error {
   public readonly connectionId?: string;
   public readonly timestamp: Date;
 
-  constructor(
-    message: string,
-    cause?: Error,
-    code?: DatabaseErrorCode,
-    context?: ErrorContext,
-  ) {
+  constructor(message: string, cause?: Error, code?: DatabaseErrorCode, context?: ErrorContext) {
     super(message, cause ? { cause } : undefined);
     this.name = "DatabaseError";
     this.code = code ?? DatabaseErrorCode.UNKNOWN;
@@ -80,12 +75,7 @@ export class DatabaseError extends Error {
   // ── Factory methods ─────────────────────────────────────────────
 
   static connectionFailed(message: string, context?: ErrorContext): DatabaseError {
-    return new ConnectionError(
-      message,
-      context?.cause,
-      DatabaseErrorCode.CONNECTION_FAILED,
-      context,
-    );
+    return new ConnectionError(message, context?.cause, DatabaseErrorCode.CONNECTION_FAILED, context);
   }
 
   static queryFailed(
@@ -93,22 +83,15 @@ export class DatabaseError extends Error {
     parameterCount: number,
     context?: Omit<ErrorContext, "sql" | "parameterCount">,
   ): DatabaseError {
-    return new QueryError(
-      `Query failed: ${sql}`,
+    return new QueryError(`Query failed: ${sql}`, sql, context?.cause, DatabaseErrorCode.QUERY_FAILED, {
+      ...context,
       sql,
-      context?.cause,
-      DatabaseErrorCode.QUERY_FAILED,
-      { ...context, sql, parameterCount },
-    );
+      parameterCount,
+    });
   }
 
   static transactionFailed(message: string, context?: ErrorContext): DatabaseError {
-    return new TransactionError(
-      message,
-      context?.cause,
-      DatabaseErrorCode.UNKNOWN,
-      context,
-    );
+    return new TransactionError(message, context?.cause, DatabaseErrorCode.UNKNOWN, context);
   }
 
   // ── Serialisation ───────────────────────────────────────────────
@@ -145,12 +128,7 @@ export class DatabaseError extends Error {
 // ── ConnectionError ─────────────────────────────────────────────────────────
 
 export class ConnectionError extends DatabaseError {
-  constructor(
-    message: string,
-    cause?: Error,
-    code?: DatabaseErrorCode,
-    context?: ErrorContext,
-  ) {
+  constructor(message: string, cause?: Error, code?: DatabaseErrorCode, context?: ErrorContext) {
     super(message, cause, code ?? DatabaseErrorCode.CONNECTION_FAILED, context);
     this.name = "ConnectionError";
   }
@@ -159,13 +137,7 @@ export class ConnectionError extends DatabaseError {
 // ── QueryError ──────────────────────────────────────────────────────────────
 
 export class QueryError extends DatabaseError {
-  constructor(
-    message: string,
-    sql?: string,
-    cause?: Error,
-    code?: DatabaseErrorCode,
-    context?: ErrorContext,
-  ) {
+  constructor(message: string, sql?: string, cause?: Error, code?: DatabaseErrorCode, context?: ErrorContext) {
     super(message, cause, code ?? DatabaseErrorCode.QUERY_FAILED, {
       ...context,
       sql: sql ?? context?.sql,
@@ -182,12 +154,7 @@ export class QueryError extends DatabaseError {
 // ── TransactionError ────────────────────────────────────────────────────────
 
 export class TransactionError extends DatabaseError {
-  constructor(
-    message: string,
-    cause?: Error,
-    code?: DatabaseErrorCode,
-    context?: ErrorContext,
-  ) {
+  constructor(message: string, cause?: Error, code?: DatabaseErrorCode, context?: ErrorContext) {
     super(message, cause, code ?? DatabaseErrorCode.UNKNOWN, context);
     this.name = "TransactionError";
   }
@@ -196,12 +163,7 @@ export class TransactionError extends DatabaseError {
 // ── MigrationError ──────────────────────────────────────────────────────────
 
 export class MigrationError extends DatabaseError {
-  constructor(
-    message: string,
-    cause?: Error,
-    code?: DatabaseErrorCode,
-    context?: ErrorContext,
-  ) {
+  constructor(message: string, cause?: Error, code?: DatabaseErrorCode, context?: ErrorContext) {
     super(message, cause, code ?? DatabaseErrorCode.UNKNOWN, context);
     this.name = "MigrationError";
   }
@@ -210,12 +172,7 @@ export class MigrationError extends DatabaseError {
 // ── SchemaError ─────────────────────────────────────────────────────────────
 
 export class SchemaError extends DatabaseError {
-  constructor(
-    message: string,
-    cause?: Error,
-    code?: DatabaseErrorCode,
-    context?: ErrorContext,
-  ) {
+  constructor(message: string, cause?: Error, code?: DatabaseErrorCode, context?: ErrorContext) {
     super(message, cause, code ?? DatabaseErrorCode.UNKNOWN, context);
     this.name = "SchemaError";
   }

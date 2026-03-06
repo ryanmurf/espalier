@@ -1,4 +1,4 @@
-import type { Connection, SchemaIntrospector, TableInfo, ColumnInfo } from "espalier-jdbc";
+import type { ColumnInfo, Connection, SchemaIntrospector, TableInfo } from "espalier-jdbc";
 
 const DEFAULT_SCHEMA = "public";
 

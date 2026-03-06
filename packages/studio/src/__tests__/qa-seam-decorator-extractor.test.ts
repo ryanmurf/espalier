@@ -14,24 +14,25 @@
  * - Multiple inheritance-like patterns (manual prototype chain)
  * - Zero-column embedded (no @Column inside @Embeddable)
  */
-import { describe, it, expect, beforeAll } from "vitest";
+
 import {
-  Table,
   Column,
-  Id,
-  Version,
   CreatedDate,
-  LastModifiedDate,
-  TenantId,
   Embeddable,
   Embedded,
+  Id,
+  LastModifiedDate,
   ManyToOne,
   OneToMany,
-  PrePersist,
   PostPersist,
+  PrePersist,
+  Table,
+  TenantId,
+  Version,
 } from "espalier-data";
+import { beforeAll, describe, expect, it } from "vitest";
+import type { SchemaColumn, SchemaModel, SchemaTable } from "../schema/index.js";
 import { extractSchema } from "../schema/index.js";
-import type { SchemaModel, SchemaTable, SchemaColumn } from "../schema/index.js";
 
 // =============================================================================
 // Helpers
@@ -45,7 +46,7 @@ function findColumn(table: SchemaTable, fieldName: string): SchemaColumn | undef
   return table.columns.find((c) => c.fieldName === fieldName);
 }
 
-function findColumnByName(table: SchemaTable, columnName: string): SchemaColumn | undefined {
+function _findColumnByName(table: SchemaTable, columnName: string): SchemaColumn | undefined {
   return table.columns.find((c) => c.columnName === columnName);
 }
 
@@ -353,18 +354,14 @@ describe("QA Seam: schema extractor + entity decorators", () => {
       expect(parentRel).toBeDefined();
       expect(parentRel!.type).toBe("OneToMany");
 
-      const childRel = model.relations.find(
-        (r) => r.sourceTable === "fully_loaded_child" && r.fieldName === "parent",
-      );
+      const childRel = model.relations.find((r) => r.sourceTable === "fully_loaded_child" && r.fieldName === "parent");
       expect(childRel).toBeDefined();
       expect(childRel!.type).toBe("ManyToOne");
     });
 
     it("tenantId on both sides does not confuse relation resolution", () => {
       // Verify relations still point to correct tables
-      const childRel = model.relations.find(
-        (r) => r.sourceTable === "fully_loaded_child" && r.fieldName === "parent",
-      );
+      const childRel = model.relations.find((r) => r.sourceTable === "fully_loaded_child" && r.fieldName === "parent");
       expect(childRel!.targetTable).toBe("fully_loaded_parent");
     });
   });

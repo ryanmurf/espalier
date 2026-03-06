@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import type { Connection } from "espalier-jdbc";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { SqliteDataSource } from "../../sqlite-data-source.js";
 import type { SqliteSchemaIntrospector } from "../../sqlite-schema-introspector.js";
 import { createTestDataSource, dropTestTable, isSqliteAvailable } from "./setup.js";

@@ -1,6 +1,6 @@
-import type { PoolClient } from "pg";
 import type { BatchStatement, SqlValue } from "espalier-jdbc";
-import { QueryError, DatabaseErrorCode } from "espalier-jdbc";
+import { DatabaseErrorCode, QueryError } from "espalier-jdbc";
+import type { PoolClient } from "pg";
 import { traceQuery } from "./trace-query.js";
 
 function mapPgErrorCode(err: unknown): DatabaseErrorCode {
@@ -83,17 +83,12 @@ export class PgBatchStatement implements BatchStatement {
 
     // Replace the VALUES (...) clause with multi-row version
     // Regex handles one level of nested parens (e.g., COALESCE($1, 0))
-    const multiSql = this.sql.replace(
-      /VALUES\s*\((?:[^)(]|\([^)]*\))*\)/i,
-      `VALUES ${valueClauses.join(", ")}`,
-    );
+    const multiSql = this.sql.replace(/VALUES\s*\((?:[^)(]|\([^)]*\))*\)/i, `VALUES ${valueClauses.join(", ")}`);
 
     try {
       const result = await this.client.query(multiSql, allParams);
       const totalRows = result.rowCount ?? this.batches.length;
-      return new Array<number>(this.batches.length).fill(
-        Math.floor(totalRows / this.batches.length),
-      );
+      return new Array<number>(this.batches.length).fill(Math.floor(totalRows / this.batches.length));
     } catch (err) {
       throw new QueryError(
         `Failed to execute batch insert: ${(err as Error).message}`,

@@ -50,10 +50,7 @@ export interface CompiledQuery {
  * For "spread" bindings (IN lists), the SQL must be re-templated since the
  * placeholder count is dynamic — this is handled by returning a new SQL string.
  */
-export function bindCompiledQuery(
-  compiled: CompiledQuery,
-  args: unknown[],
-): { sql: string; params: SqlValue[] } {
+export function bindCompiledQuery(compiled: CompiledQuery, args: unknown[]): { sql: string; params: SqlValue[] } {
   const params: SqlValue[] = [];
   let sql = compiled.sql;
   let hasSpread = false;
@@ -81,7 +78,7 @@ export function bindCompiledQuery(
   // output parameter index which grows when arrays are spread.
   const segments: string[] = [];
   let templateParamIdx = 1; // placeholder index in the original SQL template
-  let outputParamIdx = 1;   // placeholder index in the rewritten SQL
+  let outputParamIdx = 1; // placeholder index in the rewritten SQL
   let lastPos = 0;
 
   for (const binding of compiled.paramBindings) {
@@ -143,16 +140,10 @@ export function bindCompiledQuery(
  * Prevents wildcard injection by escaping %, _, and \.
  */
 function escapeLikeValue(value: unknown): string {
-  return String(value)
-    .replace(/\\/g, "\\\\")
-    .replace(/%/g, "\\%")
-    .replace(/_/g, "\\_");
+  return String(value).replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
 }
 
-function applyTransform(
-  arg: unknown,
-  transform: ParamBinding["transform"],
-): SqlValue {
+function applyTransform(arg: unknown, transform: ParamBinding["transform"]): SqlValue {
   switch (transform) {
     case "identity":
       return arg as SqlValue;

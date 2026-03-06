@@ -122,10 +122,10 @@ export class SeedRunner {
     try {
       await stmt.executeUpdate(
         `CREATE TABLE IF NOT EXISTS ${SEED_TABLE} (` +
-        `name VARCHAR(255) PRIMARY KEY, ` +
-        `executed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, ` +
-        `checksum VARCHAR(64) NOT NULL` +
-        `)`,
+          `name VARCHAR(255) PRIMARY KEY, ` +
+          `executed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, ` +
+          `checksum VARCHAR(64) NOT NULL` +
+          `)`,
       );
     } finally {
       await stmt.close();
@@ -154,9 +154,7 @@ export class SeedRunner {
    * Record a seed as executed.
    */
   async recordSeed(conn: Connection, name: string, checksum: string): Promise<void> {
-    const stmt = conn.prepareStatement(
-      `INSERT INTO ${SEED_TABLE} (name, checksum) VALUES ($1, $2)`,
-    );
+    const stmt = conn.prepareStatement(`INSERT INTO ${SEED_TABLE} (name, checksum) VALUES ($1, $2)`);
     try {
       stmt.setParameter(1, name);
       stmt.setParameter(2, checksum);
@@ -239,7 +237,9 @@ export class SeedRunner {
   /**
    * Get status of all seeds.
    */
-  async status(seeds?: Map<string, SeedDefinition>): Promise<Array<{ name: string; status: "executed" | "pending" | "skipped" }>> {
+  async status(
+    seeds?: Map<string, SeedDefinition>,
+  ): Promise<Array<{ name: string; status: "executed" | "pending" | "skipped" }>> {
     const allSeeds = seeds ?? getRegisteredSeeds();
     const conn = await this._dataSource.getConnection();
     try {

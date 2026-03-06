@@ -19,13 +19,12 @@ function parseAuditRow(row: Record<string, unknown>): AuditEntry {
     entityType: row.entity_type as string,
     entityId: row.entity_id as string,
     operation: row.operation as AuditEntry["operation"],
-    changes: typeof row.changes === "string"
-      ? JSON.parse(row.changes) as AuditFieldChange[]
-      : (row.changes as AuditFieldChange[]),
+    changes:
+      typeof row.changes === "string"
+        ? (JSON.parse(row.changes) as AuditFieldChange[])
+        : (row.changes as AuditFieldChange[]),
     userId: (row.user_id as string) ?? undefined,
-    timestamp: row.timestamp instanceof Date
-      ? row.timestamp
-      : new Date(row.timestamp as string),
+    timestamp: row.timestamp instanceof Date ? row.timestamp : new Date(row.timestamp as string),
   };
 }
 
@@ -65,10 +64,7 @@ export async function getAuditLog(
  * @param entity The entity instance
  * @param conn   Active database connection
  */
-export async function getAuditLogForEntity(
-  entity: Record<string, unknown>,
-  conn: Connection,
-): Promise<AuditEntry[]> {
+export async function getAuditLogForEntity(entity: Record<string, unknown>, conn: Connection): Promise<AuditEntry[]> {
   const entityClass = entity.constructor as new (...args: any[]) => any;
   const entityId = entity.id;
   return getAuditLog(entityClass, entityId, conn);

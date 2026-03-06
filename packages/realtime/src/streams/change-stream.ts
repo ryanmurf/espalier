@@ -22,10 +22,7 @@ export class ChangeStream<T> {
    * @param source An async iterable of raw change notifications (e.g., from ChangeNotificationListener or PollingChangeDetector)
    * @param parse A function that parses a notification payload string into a ParsedPayload
    */
-  constructor(
-    source: AsyncIterable<ChangeNotification>,
-    parse?: (payload: string) => ParsedPayload<T>,
-  ) {
+  constructor(source: AsyncIterable<ChangeNotification>, parse?: (payload: string) => ParsedPayload<T>) {
     this.source = source;
     this.parse = parse ?? defaultParse;
   }
@@ -34,12 +31,8 @@ export class ChangeStream<T> {
    * Watch for change events, optionally filtering by operation type and field names.
    */
   async *watch(options?: WatchOptions): AsyncIterable<ChangeEvent<T>> {
-    const allowedOps = options?.operations
-      ? new Set(options.operations)
-      : null;
-    const watchedFields = options?.fields
-      ? new Set(options.fields)
-      : null;
+    const allowedOps = options?.operations ? new Set(options.operations) : null;
+    const watchedFields = options?.fields ? new Set(options.fields) : null;
 
     this.abortController = new AbortController();
     const { signal } = this.abortController;

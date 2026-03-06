@@ -1,15 +1,15 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import type { DataSource, Connection, PreparedStatement, ResultSet, Logger } from "espalier-jdbc";
-import { TestResultSet } from "../test-utils/test-result-set.js";
-import { LogLevel, NoopLogger, ConsoleLogger, setGlobalLogger } from "espalier-jdbc";
+import type { Connection, DataSource, Logger, PreparedStatement, ResultSet } from "espalier-jdbc";
+import { ConsoleLogger, LogLevel, NoopLogger, setGlobalLogger } from "espalier-jdbc";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { EntityCache } from "../../cache/entity-cache.js";
 import { QueryCache } from "../../cache/query-cache.js";
-import { EntityChangeTracker } from "../../mapping/change-tracker.js";
-import type { EntityMetadata, FieldMapping } from "../../mapping/entity-metadata.js";
-import { Table } from "../../decorators/table.js";
 import { Column } from "../../decorators/column.js";
 import { Id } from "../../decorators/id.js";
+import { Table } from "../../decorators/table.js";
+import { EntityChangeTracker } from "../../mapping/change-tracker.js";
+import type { EntityMetadata, FieldMapping } from "../../mapping/entity-metadata.js";
 import { createDerivedRepository } from "../../repository/derived-repository.js";
+import { TestResultSet } from "../test-utils/test-result-set.js";
 
 // ---------------------------------------------------------------------------
 // Mock helpers
@@ -171,7 +171,9 @@ describe("adversarial: logging instrumentation (Data layer)", () => {
         warn: vi.fn(),
         error: vi.fn(),
         isEnabled: vi.fn(() => false),
-        child: vi.fn(function (this: Logger) { return this; }),
+        child: vi.fn(function (this: Logger) {
+          return this;
+        }),
       };
       setGlobalLogger(mockLogger);
 
@@ -207,7 +209,9 @@ describe("adversarial: logging instrumentation (Data layer)", () => {
         warn: vi.fn(),
         error: vi.fn(),
         isEnabled: vi.fn(() => false),
-        child: vi.fn(function (this: Logger) { return this; }),
+        child: vi.fn(function (this: Logger) {
+          return this;
+        }),
       };
       setGlobalLogger(mockLogger);
 
@@ -247,12 +251,12 @@ describe("adversarial: logging instrumentation (Data layer)", () => {
       const cache = new EntityCache({ maxSize: 5 });
 
       cache.get(LogUser, 1); // miss logged to spy1
-      setGlobalLogger(spy2);  // swap!
+      setGlobalLogger(spy2); // swap!
       cache.put(LogUser, 1, { id: 1, name: "A", email: "a" });
       cache.get(LogUser, 1); // hit logged to spy2
 
-      expect(spy1.calls.some(c => c.message === "cache miss")).toBe(true);
-      expect(spy2.calls.some(c => c.message === "cache hit")).toBe(true);
+      expect(spy1.calls.some((c) => c.message === "cache miss")).toBe(true);
+      expect(spy2.calls.some((c) => c.message === "cache hit")).toBe(true);
     });
 
     it("swapping logger to NoopLogger mid-operation silences subsequent EntityCache logs", () => {
@@ -282,8 +286,8 @@ describe("adversarial: logging instrumentation (Data layer)", () => {
       cache.put({ sql: "SELECT 1", params: [] }, [{ id: 1 }], LogUser);
       cache.get({ sql: "SELECT 1", params: [] }); // hit
 
-      expect(spy1.calls.some(c => c.message === "cache miss")).toBe(true);
-      expect(spy2.calls.some(c => c.message === "cache hit")).toBe(true);
+      expect(spy1.calls.some((c) => c.message === "cache miss")).toBe(true);
+      expect(spy2.calls.some((c) => c.message === "cache hit")).toBe(true);
     });
 
     it("swapping global logger between ChangeTracker snapshot/getDirtyFields does not crash", () => {
@@ -300,7 +304,7 @@ describe("adversarial: logging instrumentation (Data layer)", () => {
       entity.name = "Bob";
       tracker.getDirtyFields(entity);
 
-      expect(spy2.calls.some(c => c.message === "dirty fields detected")).toBe(true);
+      expect(spy2.calls.some((c) => c.message === "dirty fields detected")).toBe(true);
     });
   });
 
@@ -317,7 +321,7 @@ describe("adversarial: logging instrumentation (Data layer)", () => {
       const longSql = "SELECT " + "x".repeat(300) + " FROM users";
       cache.get({ sql: longSql, params: [] });
 
-      const missCall = spy.calls.find(c => c.message === "cache miss");
+      const missCall = spy.calls.find((c) => c.message === "cache miss");
       expect(missCall).toBeDefined();
       const loggedKey = missCall!.context!["cacheKey"] as string;
       expect(loggedKey.length).toBeLessThanOrEqual(203);
@@ -333,7 +337,7 @@ describe("adversarial: logging instrumentation (Data layer)", () => {
       cache.put({ sql: longSql, params: [] }, [{ id: 1 }], LogUser);
       cache.get({ sql: longSql, params: [] });
 
-      const hitCall = spy.calls.find(c => c.message === "cache hit");
+      const hitCall = spy.calls.find((c) => c.message === "cache hit");
       expect(hitCall).toBeDefined();
       const loggedKey = hitCall!.context!["cacheKey"] as string;
       expect(loggedKey.length).toBeLessThanOrEqual(203);
@@ -349,11 +353,11 @@ describe("adversarial: logging instrumentation (Data layer)", () => {
       cache.put({ sql: longSql, params: [] }, [{ id: 1 }], LogUser);
 
       // Wait enough time for the entry to expire (Date.now() > expiresAt uses strict >)
-      await new Promise(resolve => setTimeout(resolve, 5));
+      await new Promise((resolve) => setTimeout(resolve, 5));
 
       cache.get({ sql: longSql, params: [] });
 
-      const expiredCall = spy.calls.find(c => c.message === "cache expired");
+      const expiredCall = spy.calls.find((c) => c.message === "cache expired");
       expect(expiredCall).toBeDefined();
       const loggedKey = expiredCall!.context!["cacheKey"] as string;
       expect(loggedKey.length).toBeLessThanOrEqual(203);
@@ -368,7 +372,7 @@ describe("adversarial: logging instrumentation (Data layer)", () => {
       const sql = "S".repeat(200); // exactly 200 chars of SQL
       cache.get({ sql, params: [] });
 
-      const missCall = spy.calls.find(c => c.message === "cache miss");
+      const missCall = spy.calls.find((c) => c.message === "cache miss");
       expect(missCall).toBeDefined();
       const loggedKey = missCall!.context!["cacheKey"] as string;
       expect(loggedKey.length).toBe(200);
@@ -386,7 +390,7 @@ describe("adversarial: logging instrumentation (Data layer)", () => {
       const longSql = "SELECT secret_data FROM " + "x".repeat(500);
       cache.get({ sql: longSql, params: [] });
 
-      const allOutput = consoleSpy.mock.calls.map(c => c[0]).join("\n");
+      const allOutput = consoleSpy.mock.calls.map((c) => c[0]).join("\n");
       expect(allOutput).not.toContain(longSql);
 
       vi.restoreAllMocks();
@@ -447,7 +451,7 @@ describe("adversarial: logging instrumentation (Data layer)", () => {
       const sensitiveParams = ["secret_password_123", 42, true];
       cache.get({ sql: "SELECT * FROM users WHERE pass = $1", params: sensitiveParams });
 
-      const missCall = spy.calls.find(c => c.message === "cache miss");
+      const missCall = spy.calls.find((c) => c.message === "cache miss");
       expect(missCall).toBeDefined();
       const cacheKey = missCall!.context!["cacheKey"] as string;
       // Params are stripped — only SQL portion is logged
@@ -465,7 +469,7 @@ describe("adversarial: logging instrumentation (Data layer)", () => {
       entity.name = "NewSecret";
       tracker.getDirtyFields(entity);
 
-      const dirtyCall = spy.calls.find(c => c.message === "dirty fields detected");
+      const dirtyCall = spy.calls.find((c) => c.message === "dirty fields detected");
       expect(dirtyCall).toBeDefined();
       // Should have field names
       expect(dirtyCall!.context!["fields"]).toContain("name");
@@ -511,7 +515,7 @@ describe("adversarial: logging instrumentation (Data layer)", () => {
 
       cache.invalidate(LogUser);
 
-      const invalidateCall = spy.calls.find(c => c.message === "cache invalidated");
+      const invalidateCall = spy.calls.find((c) => c.message === "cache invalidated");
       expect(invalidateCall).toBeDefined();
       expect(invalidateCall!.context!["entityType"]).toBe("LogUser");
       expect(invalidateCall!.context!["entriesRemoved"]).toBe(2);
@@ -602,7 +606,7 @@ describe("adversarial: logging instrumentation (Data layer)", () => {
       cache.put(LogUser, 1, { id: 1, name: "A", email: "a" });
       cache.get(LogUser, 1); // hit
 
-      const messages = spy.calls.map(c => c.message);
+      const messages = spy.calls.map((c) => c.message);
       expect(messages).toContain("cache miss");
       expect(messages).toContain("cache hit");
     });
@@ -615,7 +619,7 @@ describe("adversarial: logging instrumentation (Data layer)", () => {
       cache.put(LogUser, 1, { id: 1, name: "A", email: "a" });
       cache.put(LogUser, 2, { id: 2, name: "B", email: "b" }); // evicts
 
-      const messages = spy.calls.map(c => c.message);
+      const messages = spy.calls.map((c) => c.message);
       expect(messages).toContain("cache eviction");
     });
 
@@ -628,13 +632,13 @@ describe("adversarial: logging instrumentation (Data layer)", () => {
       cache.put({ sql: "SELECT 1", params: [] }, [{ id: 1 }], LogUser);
 
       // Wait for expiration (TTL=1ms, need Date.now() > expiresAt which is strict >)
-      await new Promise(resolve => setTimeout(resolve, 5));
+      await new Promise((resolve) => setTimeout(resolve, 5));
 
       cache.get({ sql: "SELECT 1", params: [] }); // expired
       cache.put({ sql: "SELECT 2", params: [] }, [{ id: 2 }], LogUser);
       cache.invalidate(LogUser);
 
-      const messages = spy.calls.map(c => c.message);
+      const messages = spy.calls.map((c) => c.message);
       expect(messages).toContain("cache miss");
       expect(messages).toContain("cache expired");
       expect(messages).toContain("cache invalidated");
@@ -650,7 +654,7 @@ describe("adversarial: logging instrumentation (Data layer)", () => {
       entity.name = "Bob";
       tracker.getDirtyFields(entity);
 
-      const dirtyCall = spy.calls.find(c => c.message === "dirty fields detected");
+      const dirtyCall = spy.calls.find((c) => c.message === "dirty fields detected");
       expect(dirtyCall).toBeDefined();
       expect(dirtyCall!.context!["dirtyFieldCount"]).toBe(1);
       expect(dirtyCall!.context!["fields"]).toContain("name");
@@ -664,8 +668,8 @@ describe("adversarial: logging instrumentation (Data layer)", () => {
       const repo = createDerivedRepository<LogUser, number>(LogUser, ds);
       await repo.findById(1 as any);
 
-      const debugCalls = spy.calls.filter(c => c.method === "debug");
-      expect(debugCalls.some(c => c.message === "findById")).toBe(true);
+      const debugCalls = spy.calls.filter((c) => c.method === "debug");
+      expect(debugCalls.some((c) => c.message === "findById")).toBe(true);
     });
 
     it("custom logger receives TRACE lifecycle callback logs", async () => {
@@ -680,7 +684,7 @@ describe("adversarial: logging instrumentation (Data layer)", () => {
       // The repoLogger.trace("lifecycle callback", ...) should fire if there are lifecycle callbacks
       // LogUser has no lifecycle callbacks, so we verify it doesn't crash without them
       // Instead check that the findById debug was logged
-      expect(spy.calls.some(c => c.message === "findById")).toBe(true);
+      expect(spy.calls.some((c) => c.message === "findById")).toBe(true);
     });
 
     it("custom logger child() receives the correct child name for entity-cache", () => {
@@ -690,7 +694,7 @@ describe("adversarial: logging instrumentation (Data layer)", () => {
       const cache = new EntityCache({ maxSize: 5 });
       cache.get(LogUser, 1);
 
-      const entityCacheCalls = spy.calls.filter(c => c.childName === "entity-cache");
+      const entityCacheCalls = spy.calls.filter((c) => c.childName === "entity-cache");
       expect(entityCacheCalls.length).toBeGreaterThan(0);
     });
 
@@ -701,7 +705,7 @@ describe("adversarial: logging instrumentation (Data layer)", () => {
       const cache = new QueryCache({ maxSize: 5 });
       cache.get({ sql: "SELECT 1", params: [] });
 
-      const queryCacheCalls = spy.calls.filter(c => c.childName === "query-cache");
+      const queryCacheCalls = spy.calls.filter((c) => c.childName === "query-cache");
       expect(queryCacheCalls.length).toBeGreaterThan(0);
     });
 
@@ -715,7 +719,7 @@ describe("adversarial: logging instrumentation (Data layer)", () => {
       entity.name = "Bob";
       tracker.getDirtyFields(entity);
 
-      const trackerCalls = spy.calls.filter(c => c.childName === "change-tracker");
+      const trackerCalls = spy.calls.filter((c) => c.childName === "change-tracker");
       expect(trackerCalls.length).toBeGreaterThan(0);
     });
 
@@ -727,7 +731,7 @@ describe("adversarial: logging instrumentation (Data layer)", () => {
       const repo = createDerivedRepository<LogUser, number>(LogUser, ds);
       await repo.findById(1 as any);
 
-      const repoCalls = spy.calls.filter(c => c.childName === "repository");
+      const repoCalls = spy.calls.filter((c) => c.childName === "repository");
       expect(repoCalls.length).toBeGreaterThan(0);
     });
   });
@@ -806,9 +810,7 @@ describe("adversarial: logging instrumentation (Data layer)", () => {
       };
 
       const repo = createDerivedRepository<LogUser, number>(LogUser, ds);
-      const ops = Array.from({ length: 10 }, (_, i) =>
-        repo.findById(i as any),
-      );
+      const ops = Array.from({ length: 10 }, (_, i) => repo.findById(i as any));
 
       await Promise.all(ops);
 
@@ -868,7 +870,7 @@ describe("adversarial: logging instrumentation (Data layer)", () => {
       const cache = new EntityCache({ maxSize: 5 });
       cache.get(LogUser, 42);
 
-      const missCall = spy.calls.find(c => c.message === "cache miss");
+      const missCall = spy.calls.find((c) => c.message === "cache miss");
       expect(missCall).toBeDefined();
       expect(missCall!.context!["entityType"]).toBe("LogUser");
       expect(missCall!.context!["id"]).toBe("42");
@@ -883,7 +885,7 @@ describe("adversarial: logging instrumentation (Data layer)", () => {
       cache.put(LogUser, 2, { id: 2, name: "B", email: "b" });
       cache.get(LogUser, 1);
 
-      const hitCall = spy.calls.find(c => c.message === "cache hit");
+      const hitCall = spy.calls.find((c) => c.message === "cache hit");
       expect(hitCall).toBeDefined();
       expect(hitCall!.context!["cacheSize"]).toBe(2);
     });
@@ -896,7 +898,7 @@ describe("adversarial: logging instrumentation (Data layer)", () => {
       cache.put(LogUser, 1, { id: 1, name: "A", email: "a" });
       cache.put(LogUser, 2, { id: 2, name: "B", email: "b" }); // evicts id:1
 
-      const evictCall = spy.calls.find(c => c.message === "cache eviction");
+      const evictCall = spy.calls.find((c) => c.message === "cache eviction");
       expect(evictCall).toBeDefined();
       expect(evictCall!.context!["entityType"]).toBe("LogUser");
     });
@@ -911,7 +913,7 @@ describe("adversarial: logging instrumentation (Data layer)", () => {
       // Invalidate a different entity type
       cache.invalidate(LogProduct);
 
-      const invalidateCalls = spy.calls.filter(c => c.message === "cache invalidated");
+      const invalidateCalls = spy.calls.filter((c) => c.message === "cache invalidated");
       expect(invalidateCalls).toHaveLength(0);
     });
 
@@ -925,7 +927,7 @@ describe("adversarial: logging instrumentation (Data layer)", () => {
       // No modifications
       tracker.getDirtyFields(entity);
 
-      const dirtyCalls = spy.calls.filter(c => c.message === "dirty fields detected");
+      const dirtyCalls = spy.calls.filter((c) => c.message === "dirty fields detected");
       expect(dirtyCalls).toHaveLength(0);
     });
 
@@ -953,7 +955,7 @@ describe("adversarial: logging instrumentation (Data layer)", () => {
       entity.email = "b@test.com";
       tracker.getDirtyFields(entity);
 
-      const dirtyCall = spy.calls.find(c => c.message === "dirty fields detected");
+      const dirtyCall = spy.calls.find((c) => c.message === "dirty fields detected");
       expect(dirtyCall).toBeDefined();
       expect(dirtyCall!.context!["entityType"]).toBe("test_entities");
       expect(dirtyCall!.context!["dirtyFieldCount"]).toBe(2);
@@ -968,7 +970,7 @@ describe("adversarial: logging instrumentation (Data layer)", () => {
       const repo = createDerivedRepository<LogUser, number>(LogUser, ds);
       await repo.findAll();
 
-      expect(spy.calls.some(c => c.method === "debug" && c.message === "findAll")).toBe(true);
+      expect(spy.calls.some((c) => c.method === "debug" && c.message === "findAll")).toBe(true);
     });
 
     it("derived repository save logs at DEBUG", async () => {
@@ -982,7 +984,7 @@ describe("adversarial: logging instrumentation (Data layer)", () => {
       user.email = "test@test.com";
       await repo.save(user);
 
-      expect(spy.calls.some(c => c.method === "debug" && c.message === "save")).toBe(true);
+      expect(spy.calls.some((c) => c.method === "debug" && c.message === "save")).toBe(true);
     });
 
     it("derived repository delete logs at DEBUG", async () => {
@@ -996,7 +998,7 @@ describe("adversarial: logging instrumentation (Data layer)", () => {
       user.name = "Test";
       await repo.delete(user);
 
-      expect(spy.calls.some(c => c.method === "debug" && c.message === "delete")).toBe(true);
+      expect(spy.calls.some((c) => c.method === "debug" && c.message === "delete")).toBe(true);
     });
 
     it("derived repository count logs at DEBUG", async () => {
@@ -1011,7 +1013,7 @@ describe("adversarial: logging instrumentation (Data layer)", () => {
       const repo = createDerivedRepository<LogUser, number>(LogUser, ds);
       await repo.count();
 
-      expect(spy.calls.some(c => c.method === "debug" && c.message === "count")).toBe(true);
+      expect(spy.calls.some((c) => c.method === "debug" && c.message === "count")).toBe(true);
     });
 
     it("derived repository deleteById logs at DEBUG", async () => {
@@ -1022,18 +1024,32 @@ describe("adversarial: logging instrumentation (Data layer)", () => {
       const repo = createDerivedRepository<LogUser, number>(LogUser, ds);
       await repo.deleteById(1 as any);
 
-      expect(spy.calls.some(c => c.method === "debug" && c.message === "deleteById")).toBe(true);
+      expect(spy.calls.some((c) => c.method === "debug" && c.message === "deleteById")).toBe(true);
     });
 
     it("throwing logger in EntityCache propagates the error", () => {
       const throwingLogger: Logger = {
-        trace() { throw new Error("logger crash!"); },
-        debug() { throw new Error("logger crash!"); },
-        info() { throw new Error("logger crash!"); },
-        warn() { throw new Error("logger crash!"); },
-        error() { throw new Error("logger crash!"); },
-        isEnabled() { return true; },
-        child() { return this; },
+        trace() {
+          throw new Error("logger crash!");
+        },
+        debug() {
+          throw new Error("logger crash!");
+        },
+        info() {
+          throw new Error("logger crash!");
+        },
+        warn() {
+          throw new Error("logger crash!");
+        },
+        error() {
+          throw new Error("logger crash!");
+        },
+        isEnabled() {
+          return true;
+        },
+        child() {
+          return this;
+        },
       };
       setGlobalLogger(throwingLogger);
 
@@ -1044,13 +1060,27 @@ describe("adversarial: logging instrumentation (Data layer)", () => {
 
     it("throwing logger in QueryCache propagates the error", () => {
       const throwingLogger: Logger = {
-        trace() { throw new Error("logger crash!"); },
-        debug() { throw new Error("logger crash!"); },
-        info() { throw new Error("logger crash!"); },
-        warn() { throw new Error("logger crash!"); },
-        error() { throw new Error("logger crash!"); },
-        isEnabled() { return true; },
-        child() { return this; },
+        trace() {
+          throw new Error("logger crash!");
+        },
+        debug() {
+          throw new Error("logger crash!");
+        },
+        info() {
+          throw new Error("logger crash!");
+        },
+        warn() {
+          throw new Error("logger crash!");
+        },
+        error() {
+          throw new Error("logger crash!");
+        },
+        isEnabled() {
+          return true;
+        },
+        child() {
+          return this;
+        },
       };
       setGlobalLogger(throwingLogger);
 
@@ -1066,7 +1096,7 @@ describe("adversarial: logging instrumentation (Data layer)", () => {
       cache.get(LogUser, 1);
       cache.get(LogProduct, 1);
 
-      const missCalls = spy.calls.filter(c => c.message === "cache miss");
+      const missCalls = spy.calls.filter((c) => c.message === "cache miss");
       expect(missCalls).toHaveLength(2);
       expect(missCalls[0]!.context!["entityType"]).toBe("LogUser");
       expect(missCalls[1]!.context!["entityType"]).toBe("LogProduct");
@@ -1080,7 +1110,7 @@ describe("adversarial: logging instrumentation (Data layer)", () => {
       const repo = createDerivedRepository<LogUser, number>(LogUser, ds);
       await repo.findById(1 as any);
 
-      const findCall = spy.calls.find(c => c.message === "findById" && c.method === "debug");
+      const findCall = spy.calls.find((c) => c.message === "findById" && c.method === "debug");
       expect(findCall).toBeDefined();
       expect(findCall!.context!["operation"]).toBe("findById");
       expect(findCall!.context!["entityType"]).toBe("LogUser");

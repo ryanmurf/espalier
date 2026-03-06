@@ -1,12 +1,18 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { EntityCache } from "../../cache/entity-cache.js";
 
 class User {
-  constructor(public id: number, public name: string) {}
+  constructor(
+    public id: number,
+    public name: string,
+  ) {}
 }
 
 class Product {
-  constructor(public id: number, public title: string) {}
+  constructor(
+    public id: number,
+    public title: string,
+  ) {}
 }
 
 describe("EntityCache", () => {

@@ -1,12 +1,7 @@
-import type {
-  Statement,
-  PreparedStatement,
-  ResultSet,
-  SqlValue,
-} from "espalier-jdbc";
-import { QueryError, convertPositionalParams, getGlobalLogger, LogLevel } from "espalier-jdbc";
-import { BunSqliteResultSet } from "./bun-sqlite-result-set.js";
+import type { PreparedStatement, ResultSet, SqlValue, Statement } from "espalier-jdbc";
+import { convertPositionalParams, getGlobalLogger, LogLevel, QueryError } from "espalier-jdbc";
 import type { BunColumnDefinition } from "./bun-sqlite-result-set.js";
+import { BunSqliteResultSet } from "./bun-sqlite-result-set.js";
 
 /**
  * Minimal typing for bun:sqlite Database to avoid importing the Bun-only module at compile time.
@@ -58,12 +53,12 @@ export class BunSqliteStatementImpl implements Statement {
       }
       return new BunSqliteResultSet(rows, columns);
     } catch (err) {
-      logger.error("query failed", { sql: truncateSql(sql), duration: Date.now() - startTime, error: (err as Error).message });
-      throw new QueryError(
-        `Failed to execute query: ${(err as Error).message}`,
-        sql,
-        err as Error,
-      );
+      logger.error("query failed", {
+        sql: truncateSql(sql),
+        duration: Date.now() - startTime,
+        error: (err as Error).message,
+      });
+      throw new QueryError(`Failed to execute query: ${(err as Error).message}`, sql, err as Error);
     } finally {
       stmt?.finalize();
     }
@@ -88,12 +83,12 @@ export class BunSqliteStatementImpl implements Statement {
       }
       return result.changes;
     } catch (err) {
-      logger.error("update failed", { sql: truncateSql(sql), duration: Date.now() - startTime, error: (err as Error).message });
-      throw new QueryError(
-        `Failed to execute update: ${(err as Error).message}`,
-        sql,
-        err as Error,
-      );
+      logger.error("update failed", {
+        sql: truncateSql(sql),
+        duration: Date.now() - startTime,
+        error: (err as Error).message,
+      });
+      throw new QueryError(`Failed to execute update: ${(err as Error).message}`, sql, err as Error);
     } finally {
       stmt?.finalize();
     }
@@ -130,16 +125,21 @@ export class BunSqlitePreparedStatement extends BunSqliteStatementImpl implement
       const columns = stmt.columns();
       const rows = stmt.all(...params) as Record<string, unknown>[];
       if (logger.isEnabled(LogLevel.DEBUG)) {
-        logger.debug("prepared query executed", { sql: truncateSql(queryText), paramCount: params.length, duration: Date.now() - startTime });
+        logger.debug("prepared query executed", {
+          sql: truncateSql(queryText),
+          paramCount: params.length,
+          duration: Date.now() - startTime,
+        });
       }
       return new BunSqliteResultSet(rows, columns);
     } catch (err) {
-      logger.error("prepared query failed", { sql: truncateSql(queryText), paramCount: params.length, duration: Date.now() - startTime, error: (err as Error).message });
-      throw new QueryError(
-        `Failed to execute prepared query: ${(err as Error).message}`,
-        queryText,
-        err as Error,
-      );
+      logger.error("prepared query failed", {
+        sql: truncateSql(queryText),
+        paramCount: params.length,
+        duration: Date.now() - startTime,
+        error: (err as Error).message,
+      });
+      throw new QueryError(`Failed to execute prepared query: ${(err as Error).message}`, queryText, err as Error);
     } finally {
       stmt?.finalize();
     }
@@ -156,16 +156,21 @@ export class BunSqlitePreparedStatement extends BunSqliteStatementImpl implement
       stmt = this.db.query(queryText);
       const result = stmt.run(...params);
       if (logger.isEnabled(LogLevel.DEBUG)) {
-        logger.debug("prepared update executed", { sql: truncateSql(queryText), paramCount: params.length, duration: Date.now() - startTime });
+        logger.debug("prepared update executed", {
+          sql: truncateSql(queryText),
+          paramCount: params.length,
+          duration: Date.now() - startTime,
+        });
       }
       return result.changes;
     } catch (err) {
-      logger.error("prepared update failed", { sql: truncateSql(queryText), paramCount: params.length, duration: Date.now() - startTime, error: (err as Error).message });
-      throw new QueryError(
-        `Failed to execute prepared update: ${(err as Error).message}`,
-        queryText,
-        err as Error,
-      );
+      logger.error("prepared update failed", {
+        sql: truncateSql(queryText),
+        paramCount: params.length,
+        duration: Date.now() - startTime,
+        error: (err as Error).message,
+      });
+      throw new QueryError(`Failed to execute prepared update: ${(err as Error).message}`, queryText, err as Error);
     } finally {
       stmt?.finalize();
     }

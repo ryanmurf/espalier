@@ -39,12 +39,7 @@ export class QueryBatcher<T> {
   private pending: PendingRequest<T>[] = [];
   private scheduled = false;
 
-  constructor(
-    dataSource: DataSource,
-    metadata: EntityMetadata,
-    rowMapper: RowMapper<T>,
-    config?: QueryBatcherConfig,
-  ) {
+  constructor(dataSource: DataSource, metadata: EntityMetadata, rowMapper: RowMapper<T>, config?: QueryBatcherConfig) {
     this.dataSource = dataSource;
     this.metadata = metadata;
     this.rowMapper = rowMapper;
@@ -106,13 +101,9 @@ export class QueryBatcher<T> {
     const idValues = [...new Set(chunk.map((r) => String(r.id)))];
 
     // Find the ID column
-    const idField = this.metadata.fields.find(
-      (f: FieldMapping) => f.fieldName === this.metadata.idField,
-    );
+    const idField = this.metadata.fields.find((f: FieldMapping) => f.fieldName === this.metadata.idField);
     if (!idField) {
-      const err = new Error(
-        `Cannot find ID column for entity "${this.metadata.tableName}"`,
-      );
+      const err = new Error(`Cannot find ID column for entity "${this.metadata.tableName}"`);
       for (const req of chunk) req.reject(err);
       return;
     }

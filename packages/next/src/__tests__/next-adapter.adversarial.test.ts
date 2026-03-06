@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // ═══════════════════════════════════════════════════════════════
 // Adversarial tests for Next.js adapter
@@ -7,13 +7,9 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 // ═══════════════════════════════════════════════════════════════
 
 // We import source directly — vitest handles TS
-import {
-  configureEspalier,
-  getDataSource,
-  closeDataSource,
-} from "../data-source.js";
-import { getRepository, withTransaction } from "../server-actions.js";
+import { closeDataSource, configureEspalier, getDataSource } from "../data-source.js";
 import { getRequestConnection, withConnection } from "../middleware.js";
+import { getRepository, withTransaction } from "../server-actions.js";
 
 // ──────────────────────────────────────────────
 // Mock DataSource / Connection factories
@@ -122,10 +118,7 @@ describe("next.js adapter adversarial tests", () => {
       // Since vitest caches modules, we verify the code path exists instead.
       const src = await import("node:fs").then((fs) =>
         fs.readFileSync(
-          new URL("../data-source.ts", import.meta.url).pathname.replace(
-            "data-source.ts",
-            "data-source.ts",
-          ),
+          new URL("../data-source.ts", import.meta.url).pathname.replace("data-source.ts", "data-source.ts"),
           "utf8",
         ),
       );
@@ -159,11 +152,7 @@ describe("next.js adapter adversarial tests", () => {
       });
       configureEspalier({ dataSourceFactory: factory });
 
-      const [r1, r2, r3] = await Promise.all([
-        getDataSource(),
-        getDataSource(),
-        getDataSource(),
-      ]);
+      const [r1, r2, r3] = await Promise.all([getDataSource(), getDataSource(), getDataSource()]);
       expect(r1).toBe(r2);
       expect(r2).toBe(r3);
       expect(factory).toHaveBeenCalledTimes(1);
@@ -233,9 +222,9 @@ describe("next.js adapter adversarial tests", () => {
     });
 
     it("after close, getDataSource re-initializes with factory", async () => {
-      let callCount = 0;
+      let _callCount = 0;
       const factory = vi.fn(() => {
-        callCount++;
+        _callCount++;
         return createMockDataSource() as any;
       });
       configureEspalier({ dataSourceFactory: factory });
@@ -255,7 +244,7 @@ describe("next.js adapter adversarial tests", () => {
       const ds = createMockDataSource();
       configureEspalier({ dataSourceFactory: () => ds as any });
       const conn = ds._conn;
-      const tx = await conn.beginTransaction();
+      const _tx = await conn.beginTransaction();
 
       const result = await withTransaction(async (_conn) => {
         return "ok";
@@ -321,10 +310,7 @@ describe("next.js adapter adversarial tests", () => {
       };
       configureEspalier({ dataSourceFactory: () => ds as any });
 
-      await Promise.all([
-        withTransaction(async () => {}),
-        withTransaction(async () => {}),
-      ]);
+      await Promise.all([withTransaction(async () => {}), withTransaction(async () => {})]);
 
       expect(conns).toHaveLength(2);
       expect(conns[0]).not.toBe(conns[1]);

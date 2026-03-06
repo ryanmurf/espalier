@@ -28,15 +28,13 @@ const auditedMetadata = new WeakMap<object, AuditedMetadataEntry>();
  * @param options Optional configuration for audit scope.
  */
 export function Audited(options?: AuditedOptions) {
-  return function <TClass extends new (...args: any[]) => any>(
+  return <TClass extends new (...args: any[]) => any>(
     target: TClass,
     _context: ClassDecoratorContext<TClass>,
-  ): TClass {
+  ): TClass => {
     // Normalize: empty array → undefined (audit all), dedupe field names
     const rawFields = options?.fields;
-    const fields = rawFields && rawFields.length > 0
-      ? [...new Set(rawFields)]
-      : undefined;
+    const fields = rawFields && rawFields.length > 0 ? [...new Set(rawFields)] : undefined;
     auditedMetadata.set(target, { fields });
     return target;
   };
@@ -45,9 +43,7 @@ export function Audited(options?: AuditedOptions) {
 /**
  * Returns audit metadata for an entity class, or undefined if not audited.
  */
-export function getAuditedMetadata(
-  target: object,
-): AuditedMetadataEntry | undefined {
+export function getAuditedMetadata(target: object): AuditedMetadataEntry | undefined {
   const entry = auditedMetadata.get(target);
   return entry ? { fields: entry.fields ? [...entry.fields] : undefined } : undefined;
 }

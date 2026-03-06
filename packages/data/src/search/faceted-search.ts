@@ -3,8 +3,8 @@ import { quoteIdentifier } from "espalier-jdbc";
 import type { EntityMetadata, FieldMapping } from "../mapping/entity-metadata.js";
 import type { Criteria } from "../query/criteria.js";
 import type { Specification } from "../query/specification.js";
-import { FullTextSearchCriteria } from "./search-criteria.js";
 import type { SearchMode } from "./search-criteria.js";
+import { FullTextSearchCriteria } from "./search-criteria.js";
 
 /**
  * A specification that performs a full-text search and groups results by a facet field,
@@ -24,21 +24,12 @@ export class FacetedSearchSpecification<T> implements Specification<T> {
 
   toPredicate(metadata: EntityMetadata): Criteria {
     const columnNames = this.searchColumns.map((fieldName) => {
-      const field = metadata.fields.find(
-        (f: FieldMapping) => String(f.fieldName) === fieldName,
-      );
+      const field = metadata.fields.find((f: FieldMapping) => String(f.fieldName) === fieldName);
       if (field) return field.columnName;
-      throw new Error(
-        `Unknown searchable field "${fieldName}" on entity "${metadata.tableName}".`,
-      );
+      throw new Error(`Unknown searchable field "${fieldName}" on entity "${metadata.tableName}".`);
     });
 
-    return new FullTextSearchCriteria(
-      columnNames,
-      this.language,
-      this.searchQuery,
-      this.mode,
-    );
+    return new FullTextSearchCriteria(columnNames, this.language, this.searchQuery, this.mode);
   }
 
   /**
@@ -46,20 +37,17 @@ export class FacetedSearchSpecification<T> implements Specification<T> {
    * Returns SQL like: SELECT facet_col, COUNT(*) as count FROM table WHERE ... GROUP BY facet_col ORDER BY count DESC
    */
   toFacetQuery(metadata: EntityMetadata): { sql: string; params: SqlValue[] } {
-    const facetMapping = metadata.fields.find(
-      (f: FieldMapping) => String(f.fieldName) === this.facetField,
-    );
+    const facetMapping = metadata.fields.find((f: FieldMapping) => String(f.fieldName) === this.facetField);
     if (!facetMapping) {
-      throw new Error(
-        `Unknown facet field "${this.facetField}" on entity "${metadata.tableName}".`,
-      );
+      throw new Error(`Unknown facet field "${this.facetField}" on entity "${metadata.tableName}".`);
     }
     const facetColumn = facetMapping.columnName;
 
     const criteria = this.toPredicate(metadata);
     const whereResult = criteria.toSql(1);
 
-    const sql = `SELECT ${quoteIdentifier(facetColumn)} AS "facetValue", COUNT(*) AS "count" ` +
+    const sql =
+      `SELECT ${quoteIdentifier(facetColumn)} AS "facetValue", COUNT(*) AS "count" ` +
       `FROM ${quoteIdentifier(metadata.tableName)} ` +
       `WHERE ${whereResult.sql} ` +
       `GROUP BY ${quoteIdentifier(facetColumn)} ` +
@@ -85,11 +73,5 @@ export function facetedSearch<T>(
   language?: string,
   mode?: SearchMode,
 ): FacetedSearchSpecification<T> {
-  return new FacetedSearchSpecification<T>(
-    facetField,
-    searchQuery,
-    searchColumns,
-    language,
-    mode,
-  );
+  return new FacetedSearchSpecification<T>(facetField, searchQuery, searchColumns, language, mode);
 }

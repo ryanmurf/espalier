@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import type { Migration } from "espalier-data";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { SqliteDataSource } from "../../sqlite-data-source.js";
 import type { SqliteMigrationRunner } from "../../sqlite-migration-runner.js";
 import { createTestDataSource, dropTestTable, isSqliteAvailable } from "./setup.js";
@@ -136,9 +136,7 @@ describe.skipIf(!isSqliteAvailable)("E2E: SQLite migrations", () => {
       ),
     ];
 
-    await expect(runner.run(modifiedMigrations)).rejects.toThrow(
-      "checksum mismatch",
-    );
+    await expect(runner.run(modifiedMigrations)).rejects.toThrow("checksum mismatch");
   });
 
   it("rolls back the last migration", async () => {

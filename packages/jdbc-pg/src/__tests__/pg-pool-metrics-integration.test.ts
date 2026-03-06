@@ -1,10 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import type {
-  AcquireEvent,
-  ReleaseEvent,
-  TimeoutEvent,
-  ErrorEvent,
-} from "espalier-jdbc";
+import type { ErrorEvent, TimeoutEvent } from "espalier-jdbc";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock pg module
 const mockPoolConnect = vi.fn();
@@ -67,8 +62,16 @@ describe("PgDataSource pool metrics integration", () => {
     const timeoutEvents: TimeoutEvent[] = [];
     ds.getPoolMonitor().onTimeout((e) => timeoutEvents.push(e));
 
-    try { await ds.getConnection(); } catch { /* expected */ }
-    try { await ds.getConnection(); } catch { /* expected */ }
+    try {
+      await ds.getConnection();
+    } catch {
+      /* expected */
+    }
+    try {
+      await ds.getConnection();
+    } catch {
+      /* expected */
+    }
 
     expect(timeoutEvents).toHaveLength(2);
     const metrics = ds.getPoolMetrics();
@@ -83,7 +86,11 @@ describe("PgDataSource pool metrics integration", () => {
     const errorEvents: ErrorEvent[] = [];
     ds.getPoolMonitor().onError((e) => errorEvents.push(e));
 
-    try { await ds.getConnection(); } catch { /* expected */ }
+    try {
+      await ds.getConnection();
+    } catch {
+      /* expected */
+    }
 
     expect(errorEvents).toHaveLength(1);
     expect(errorEvents[0].context).toBe("acquire");
@@ -136,11 +143,19 @@ describe("PgDataSource pool metrics integration", () => {
     const timeoutError = new Error("Timeout");
     (timeoutError as { code?: string }).code = "ETIMEDOUT";
     mockPoolConnect.mockRejectedValueOnce(timeoutError);
-    try { await ds.getConnection(); } catch { /* expected */ }
+    try {
+      await ds.getConnection();
+    } catch {
+      /* expected */
+    }
 
     // Third: error
     mockPoolConnect.mockRejectedValueOnce(new Error("refused"));
-    try { await ds.getConnection(); } catch { /* expected */ }
+    try {
+      await ds.getConnection();
+    } catch {
+      /* expected */
+    }
 
     expect(log).toEqual(["acquire", "release", "timeout", "error"]);
   });
@@ -152,9 +167,9 @@ describe("PgDataSource pool metrics integration", () => {
     ds.getPoolMonitor().onError((e) => errorEvents.push(e));
 
     // Simulate pool idle error via the on("error") handler
-    const errorHandler = mockPoolOn.mock.calls.find(
-      (call: unknown[]) => call[0] === "error",
-    )![1] as (err: Error) => void;
+    const errorHandler = mockPoolOn.mock.calls.find((call: unknown[]) => call[0] === "error")![1] as (
+      err: Error,
+    ) => void;
 
     errorHandler(new Error("connection terminated unexpectedly"));
 

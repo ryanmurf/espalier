@@ -1,7 +1,7 @@
 import type { DataSource } from "./data-source.js";
-import type { TypeConverterRegistry } from "./type-converter.js";
 import type { RuntimeInfo } from "./driver-adapter.js";
 import { detectRuntime } from "./runtime-detect.js";
+import type { TypeConverterRegistry } from "./type-converter.js";
 
 /**
  * Supported database dialects.
@@ -131,8 +131,8 @@ export function createDataSource(dialect: Dialect, config: DataSourceConfig): Da
 
   throw new Error(
     `No DataSource factory registered for dialect "${dialect}" on runtime "${runtime.runtime}". ` +
-    `Register one with registerDataSourceFactory("${dialect}", factory) or ` +
-    `registerDataSourceFactory("${dialect}", "${runtime.runtime}", factory).`,
+      `Register one with registerDataSourceFactory("${dialect}", factory) or ` +
+      `registerDataSourceFactory("${dialect}", "${runtime.runtime}", factory).`,
   );
 }
 

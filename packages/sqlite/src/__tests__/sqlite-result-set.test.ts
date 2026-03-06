@@ -1,15 +1,12 @@
-import { describe, it, expect } from "vitest";
 import type Database from "better-sqlite3";
+import { describe, expect, it } from "vitest";
 import { SqliteResultSet } from "../sqlite-result-set.js";
 
 function createResultSet(
   rows: Record<string, unknown>[],
   columns: Array<{ name: string; type?: string | null }>,
 ): SqliteResultSet {
-  return new SqliteResultSet(
-    rows,
-    columns as Database.ColumnDefinition[],
-  );
+  return new SqliteResultSet(rows, columns as Database.ColumnDefinition[]);
 }
 
 describe("SqliteResultSet", () => {
@@ -89,10 +86,7 @@ describe("SqliteResultSet", () => {
 
   describe("getDate()", () => {
     it("returns Date object from ISO string", async () => {
-      const rs = createResultSet(
-        [{ created: "2024-01-15T10:30:00.000Z" }],
-        [{ name: "created" }],
-      );
+      const rs = createResultSet([{ created: "2024-01-15T10:30:00.000Z" }], [{ name: "created" }]);
       await rs.next();
       const result = rs.getDate("created");
       expect(result).toBeInstanceOf(Date);
@@ -107,10 +101,7 @@ describe("SqliteResultSet", () => {
     });
 
     it("returns null for null value", async () => {
-      const rs = createResultSet(
-        [{ created: null }],
-        [{ name: "created" }],
-      );
+      const rs = createResultSet([{ created: null }], [{ name: "created" }]);
       await rs.next();
       expect(rs.getDate("created")).toBeNull();
     });
@@ -118,10 +109,7 @@ describe("SqliteResultSet", () => {
 
   describe("getRow()", () => {
     it("returns current row object", async () => {
-      const rs = createResultSet(
-        [{ id: 1, name: "Alice" }],
-        [{ name: "id" }, { name: "name" }],
-      );
+      const rs = createResultSet([{ id: 1, name: "Alice" }], [{ name: "id" }, { name: "name" }]);
       await rs.next();
       expect(rs.getRow()).toEqual({ id: 1, name: "Alice" });
     });
@@ -154,10 +142,7 @@ describe("SqliteResultSet", () => {
 
   describe("[Symbol.asyncIterator]", () => {
     it("iterates over all rows", async () => {
-      const rs = createResultSet(
-        [{ id: 1 }, { id: 2 }, { id: 3 }],
-        [{ name: "id" }],
-      );
+      const rs = createResultSet([{ id: 1 }, { id: 2 }, { id: 3 }], [{ name: "id" }]);
       const rows: Record<string, unknown>[] = [];
       for await (const row of rs) {
         rows.push(row);

@@ -1,5 +1,5 @@
-import { getGlobalLogger, LogLevel } from "espalier-jdbc";
 import type { Logger } from "espalier-jdbc";
+import { getGlobalLogger, LogLevel } from "espalier-jdbc";
 
 export interface QueryCacheConfig {
   enabled?: boolean;
@@ -93,15 +93,19 @@ export class QueryCache {
   }
 
   private static cacheKey(key: QueryCacheKey): string {
-    return key.sql + "\0" + JSON.stringify(key.params, (_key, value) => {
-      if (typeof value === "number") {
-        if (Number.isNaN(value)) return "__NaN__";
-        if (value === Infinity) return "__Inf__";
-        if (value === -Infinity) return "__-Inf__";
-      }
-      if (value === undefined) return "__undefined__";
-      return value;
-    });
+    return (
+      key.sql +
+      "\0" +
+      JSON.stringify(key.params, (_key, value) => {
+        if (typeof value === "number") {
+          if (Number.isNaN(value)) return "__NaN__";
+          if (value === Infinity) return "__Inf__";
+          if (value === -Infinity) return "__-Inf__";
+        }
+        if (value === undefined) return "__undefined__";
+        return value;
+      })
+    );
   }
 
   get(key: QueryCacheKey): unknown[] | undefined {
@@ -136,20 +140,14 @@ export class QueryCache {
     return entry.results;
   }
 
-  put(
-    key: QueryCacheKey,
-    results: unknown[],
-    entityClass: new (...args: any[]) => any,
-    ttlMs?: number,
-  ): void {
+  put(key: QueryCacheKey, results: unknown[], entityClass: new (...args: any[]) => any, ttlMs?: number): void {
     if (!this.enabled) return;
     if (results.length > this.maxResultSize) return;
 
     const strKey = QueryCache.cacheKey(key);
     const ttl = ttlMs ?? this.defaultTtlMs;
-    const jitter = this.ttlJitterPercent > 0
-      ? Math.floor(ttl * (this.ttlJitterPercent / 100) * (Math.random() * 2 - 1))
-      : 0;
+    const jitter =
+      this.ttlJitterPercent > 0 ? Math.floor(ttl * (this.ttlJitterPercent / 100) * (Math.random() * 2 - 1)) : 0;
     const expiresAt = Date.now() + ttl + jitter;
 
     const existing = this.map.get(strKey);

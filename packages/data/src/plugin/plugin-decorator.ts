@@ -13,7 +13,7 @@ const discoveredPlugins = new Set<new (...args: any[]) => any>();
  * Decorator to mark a class as a plugin with metadata for auto-discovery.
  */
 export function PluginDecorator(options: PluginMetadata) {
-  return function <T extends new (...args: any[]) => any>(target: T, _context: ClassDecoratorContext): T {
+  return <T extends new (...args: any[]) => any>(target: T, _context: ClassDecoratorContext): T => {
     pluginMetadataMap.set(target, options);
     discoveredPlugins.add(target);
     return target;

@@ -25,7 +25,10 @@ export function createPluginDecorator<TOptions = void>(
   }
 
   // For void options (no-arg decorator)
-  const decorator = (optionsOrTarget: TOptions | unknown, contextOrUndefined?: ClassFieldDecoratorContext | ClassDecoratorContext) => {
+  const decorator = (
+    optionsOrTarget: TOptions | unknown,
+    contextOrUndefined?: ClassFieldDecoratorContext | ClassDecoratorContext,
+  ) => {
     if (contextOrUndefined !== undefined) {
       // Called as @Decorator (no args)
       const context = contextOrUndefined as ClassFieldDecoratorContext;

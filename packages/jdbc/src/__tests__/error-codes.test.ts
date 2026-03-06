@@ -1,11 +1,5 @@
-import { describe, it, expect } from "vitest";
-import {
-  DatabaseError,
-  ConnectionError,
-  QueryError,
-  TransactionError,
-  DatabaseErrorCode,
-} from "../errors.js";
+import { describe, expect, it } from "vitest";
+import { ConnectionError, DatabaseError, DatabaseErrorCode, QueryError, TransactionError } from "../errors.js";
 
 describe("DatabaseErrorCode enum", () => {
   it("has all connection error codes", () => {
@@ -39,21 +33,13 @@ describe("DatabaseError with code", () => {
   });
 
   it("accepts a specific code", () => {
-    const err = new DatabaseError(
-      "test",
-      undefined,
-      DatabaseErrorCode.CONNECTION_FAILED,
-    );
+    const err = new DatabaseError("test", undefined, DatabaseErrorCode.CONNECTION_FAILED);
     expect(err.code).toBe(DatabaseErrorCode.CONNECTION_FAILED);
   });
 
   it("preserves cause and code together", () => {
     const cause = new Error("root");
-    const err = new DatabaseError(
-      "test",
-      cause,
-      DatabaseErrorCode.QUERY_FAILED,
-    );
+    const err = new DatabaseError("test", cause, DatabaseErrorCode.QUERY_FAILED);
     expect(err.cause).toBe(cause);
     expect(err.code).toBe(DatabaseErrorCode.QUERY_FAILED);
   });
@@ -66,11 +52,7 @@ describe("ConnectionError with code", () => {
   });
 
   it("accepts a specific code", () => {
-    const err = new ConnectionError(
-      "closed",
-      undefined,
-      DatabaseErrorCode.CONNECTION_CLOSED,
-    );
+    const err = new ConnectionError("closed", undefined, DatabaseErrorCode.CONNECTION_CLOSED);
     expect(err.code).toBe(DatabaseErrorCode.CONNECTION_CLOSED);
   });
 });
@@ -82,12 +64,7 @@ describe("QueryError with code", () => {
   });
 
   it("accepts a specific code", () => {
-    const err = new QueryError(
-      "constraint violation",
-      "INSERT ...",
-      undefined,
-      DatabaseErrorCode.QUERY_CONSTRAINT,
-    );
+    const err = new QueryError("constraint violation", "INSERT ...", undefined, DatabaseErrorCode.QUERY_CONSTRAINT);
     expect(err.code).toBe(DatabaseErrorCode.QUERY_CONSTRAINT);
     expect(err.sql).toBe("INSERT ...");
   });
@@ -100,11 +77,7 @@ describe("TransactionError with code", () => {
   });
 
   it("accepts a specific code", () => {
-    const err = new TransactionError(
-      "commit failed",
-      undefined,
-      DatabaseErrorCode.TX_COMMIT_FAILED,
-    );
+    const err = new TransactionError("commit failed", undefined, DatabaseErrorCode.TX_COMMIT_FAILED);
     expect(err.code).toBe(DatabaseErrorCode.TX_COMMIT_FAILED);
   });
 });

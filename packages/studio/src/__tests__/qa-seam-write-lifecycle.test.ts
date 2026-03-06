@@ -14,22 +14,15 @@
  *
  * E2E with real Postgres.
  */
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { Hono } from "hono";
+
+import { Column, CreatedDate, Id, LastModifiedDate, Table, TenantId, Version } from "espalier-data";
 import { PgDataSource } from "espalier-jdbc-pg";
-import {
-  Table,
-  Column,
-  Id,
-  Version,
-  CreatedDate,
-  LastModifiedDate,
-  TenantId,
-} from "espalier-data";
+import { Hono } from "hono";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { extractSchema } from "../schema/index.js";
-import { createApiRoutes } from "../server/api-routes.js";
-import type { ApiRouteContext } from "../server/api-routes.js";
 import type { SchemaModel } from "../schema/schema-model.js";
+import type { ApiRouteContext } from "../server/api-routes.js";
+import { createApiRoutes } from "../server/api-routes.js";
 
 // =============================================================================
 // Postgres connectivity check
@@ -49,7 +42,11 @@ async function isPostgresAvailable(): Promise<boolean> {
     await ds.close();
     return true;
   } catch {
-    try { await ds.close(); } catch { /* ignore */ }
+    try {
+      await ds.close();
+    } catch {
+      /* ignore */
+    }
     return false;
   }
 }
@@ -201,9 +198,7 @@ describe.skipIf(!canConnect)("QA Seam: Studio write-mode + lifecycle hooks (E2E)
     it("UPDATE via studio does not auto-update updated_at", async () => {
       // Manually set timestamps first
       const conn = await ds.getConnection();
-      const ps = conn.prepareStatement(
-        `UPDATE ${TABLE} SET created_at = NOW(), updated_at = NOW() WHERE id = $1`,
-      );
+      const ps = conn.prepareStatement(`UPDATE ${TABLE} SET created_at = NOW(), updated_at = NOW() WHERE id = $1`);
       ps.setParameter(1, TEST_ID);
       await ps.executeUpdate();
       await ps.close();
@@ -270,30 +265,20 @@ describe.skipIf(!canConnect)("QA Seam: Studio write-mode + lifecycle hooks (E2E)
       expect(res.status).toBe(201);
 
       // Verify it was stored
-      const getRes = await req(
-        readApp,
-        `/api/tables/${TABLE}/rows/55555555-5555-5555-5555-555555555555`,
-      );
+      const getRes = await req(readApp, `/api/tables/${TABLE}/rows/55555555-5555-5555-5555-555555555555`);
       const body: any = await getRes.json();
       expect(body.tenant_id).toBe("tenant-evil");
     });
 
     it("UPDATE via studio can change tenant_id (no tenant boundary enforcement)", async () => {
-      const res = await req(
-        writeApp,
-        `/api/tables/${TABLE}/rows/55555555-5555-5555-5555-555555555555`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ tenant_id: "tenant-hijacked" }),
-        },
-      );
+      const res = await req(writeApp, `/api/tables/${TABLE}/rows/55555555-5555-5555-5555-555555555555`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tenant_id: "tenant-hijacked" }),
+      });
       expect(res.status).toBe(200);
 
-      const getRes = await req(
-        readApp,
-        `/api/tables/${TABLE}/rows/55555555-5555-5555-5555-555555555555`,
-      );
+      const getRes = await req(readApp, `/api/tables/${TABLE}/rows/55555555-5555-5555-5555-555555555555`);
       const body: any = await getRes.json();
       expect(body.tenant_id).toBe("tenant-hijacked");
     });
@@ -314,20 +299,15 @@ describe.skipIf(!canConnect)("QA Seam: Studio write-mode + lifecycle hooks (E2E)
       });
 
       // Delete it — no lifecycle hook is called
-      const res = await req(
-        writeApp,
-        `/api/tables/${TABLE}/rows/66666666-6666-6666-6666-666666666666`,
-        { method: "DELETE" },
-      );
+      const res = await req(writeApp, `/api/tables/${TABLE}/rows/66666666-6666-6666-6666-666666666666`, {
+        method: "DELETE",
+      });
       expect(res.status).toBe(200);
       const body: any = await res.json();
       expect((body as any).affected).toBe(1);
 
       // Verify it's gone
-      const getRes = await req(
-        readApp,
-        `/api/tables/${TABLE}/rows/66666666-6666-6666-6666-666666666666`,
-      );
+      const getRes = await req(readApp, `/api/tables/${TABLE}/rows/66666666-6666-6666-6666-666666666666`);
       expect(getRes.status).toBe(404);
     });
   });

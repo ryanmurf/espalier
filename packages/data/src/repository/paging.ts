@@ -21,19 +21,11 @@ export interface Page<T> {
   hasPrevious: boolean;
 }
 
-export function createPageable(
-  page: number,
-  size: number,
-  sort?: Sort[],
-): Pageable {
+export function createPageable(page: number, size: number, sort?: Sort[]): Pageable {
   return { page, size, sort };
 }
 
-export function createPage<T>(
-  content: T[],
-  pageable: Pageable,
-  totalElements: number,
-): Page<T> {
+export function createPage<T>(content: T[], pageable: Pageable, totalElements: number): Page<T> {
   if (!Number.isFinite(pageable.size) || pageable.size <= 0) {
     throw new Error(`Page size must be a positive number, got ${pageable.size}`);
   }

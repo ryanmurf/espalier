@@ -1,6 +1,6 @@
+import type { DataSource } from "espalier-jdbc";
 import type { Hono } from "hono";
 import type { SchemaModel, SchemaTable } from "../schema/schema-model.js";
-import type { DataSource } from "espalier-jdbc";
 
 export interface ApiRouteContext {
   schema: SchemaModel;
@@ -161,7 +161,7 @@ function parseSortParam(
   const columnName = sanitizeIdentifier(parts[0]);
   const col = table.columns.find((c) => c.columnName === columnName);
   if (!col) return null;
-  const dir = parts[1]?.toUpperCase() === "DESC" ? "DESC" as const : "ASC" as const;
+  const dir = parts[1]?.toUpperCase() === "DESC" ? ("DESC" as const) : ("ASC" as const);
   return { column: col.columnName, direction: dir };
 }
 
@@ -283,9 +283,7 @@ export function createApiRoutes(app: Hono, ctx: ApiRouteContext): void {
 
     const conn = await ctx.dataSource.getConnection();
     try {
-      const ps = conn.prepareStatement(
-        `SELECT * FROM ${safeName} WHERE ${safePk} = $1`,
-      );
+      const ps = conn.prepareStatement(`SELECT * FROM ${safeName} WHERE ${safePk} = $1`);
       try {
         ps.setParameter(1, id);
         const rs = await ps.executeQuery();
@@ -385,9 +383,7 @@ export function createApiRoutes(app: Hono, ctx: ApiRouteContext): void {
       return c.json({ error: "Invalid JSON body" }, 400);
     }
 
-    const columnNames = table.columns
-      .filter((col) => !col.isPrimaryKey)
-      .map((col) => col.columnName);
+    const columnNames = table.columns.filter((col) => !col.isPrimaryKey).map((col) => col.columnName);
     const setClauses: string[] = [];
     const values: unknown[] = [];
     let paramIdx = 1;
@@ -455,9 +451,7 @@ export function createApiRoutes(app: Hono, ctx: ApiRouteContext): void {
 
     const conn = await ctx.dataSource.getConnection();
     try {
-      const ps = conn.prepareStatement(
-        `DELETE FROM ${safeName} WHERE ${safePk} = $1`,
-      );
+      const ps = conn.prepareStatement(`DELETE FROM ${safeName} WHERE ${safePk} = $1`);
       try {
         ps.setParameter(1, id);
         const affected = await ps.executeUpdate();
@@ -548,9 +542,7 @@ export function createApiRoutes(app: Hono, ctx: ApiRouteContext): void {
 
     const conn = await ctx.dataSource.getConnection();
     try {
-      const ps = conn.prepareStatement(
-        `UPDATE ${safeName} SET ${safeDeleteCol} = NULL WHERE ${safePk} = $1`,
-      );
+      const ps = conn.prepareStatement(`UPDATE ${safeName} SET ${safeDeleteCol} = NULL WHERE ${safePk} = $1`);
       try {
         ps.setParameter(1, id);
         const affected = await ps.executeUpdate();
@@ -577,10 +569,7 @@ export function createApiRoutes(app: Hono, ctx: ApiRouteContext): void {
 
     const vectorColumns = table.columns.filter((col) => col.isVector);
     if (vectorColumns.length === 0) {
-      return c.json(
-        { error: `Table "${tableName}" has no vector fields` },
-        400,
-      );
+      return c.json({ error: `Table "${tableName}" has no vector fields` }, 400);
     }
 
     let body: {
@@ -600,9 +589,7 @@ export function createApiRoutes(app: Hono, ctx: ApiRouteContext): void {
       return c.json({ error: "field is required and must be a string" }, 400);
     }
 
-    const targetCol = vectorColumns.find(
-      (col) => col.columnName === body.field || col.fieldName === body.field,
-    );
+    const targetCol = vectorColumns.find((col) => col.columnName === body.field || col.fieldName === body.field);
     if (!targetCol) {
       return c.json(
         {
@@ -616,10 +603,7 @@ export function createApiRoutes(app: Hono, ctx: ApiRouteContext): void {
       return c.json({ error: "vector is required and must be a non-empty array of numbers" }, 400);
     }
 
-    if (
-      targetCol.vectorDimensions &&
-      body.vector.length !== targetCol.vectorDimensions
-    ) {
+    if (targetCol.vectorDimensions && body.vector.length !== targetCol.vectorDimensions) {
       return c.json(
         {
           error: `Vector dimension mismatch: expected ${targetCol.vectorDimensions}, got ${body.vector.length}`,
@@ -632,10 +616,7 @@ export function createApiRoutes(app: Hono, ctx: ApiRouteContext): void {
       return c.json({ error: "All vector elements must be finite numbers" }, 400);
     }
 
-    const limit = Math.min(
-      Math.max(1, Math.floor(body.limit ?? 10)),
-      MAX_PAGE_SIZE,
-    );
+    const limit = Math.min(Math.max(1, Math.floor(body.limit ?? 10)), MAX_PAGE_SIZE);
 
     const metric = body.metric ?? targetCol.vectorMetric ?? "l2";
     const distanceOps: Record<string, string> = {
@@ -645,10 +626,7 @@ export function createApiRoutes(app: Hono, ctx: ApiRouteContext): void {
     };
     const distOp = distanceOps[metric];
     if (!distOp) {
-      return c.json(
-        { error: `Invalid metric: "${metric}". Must be one of: l2, cosine, inner_product` },
-        400,
-      );
+      return c.json({ error: `Invalid metric: "${metric}". Must be one of: l2, cosine, inner_product` }, 400);
     }
 
     const safeTable = sanitizeIdentifier(table.tableName);
@@ -708,19 +686,13 @@ export function createApiRoutes(app: Hono, ctx: ApiRouteContext): void {
 
     // Reject multi-statement queries (semicolons outside string literals)
     if (containsSemicolon(sql)) {
-      return c.json(
-        { error: "Multi-statement queries are not allowed. Remove semicolons." },
-        400,
-      );
+      return c.json({ error: "Multi-statement queries are not allowed. Remove semicolons." }, 400);
     }
 
     const isReadQuery = isReadOnlyQuery(sql);
 
     if (!isReadQuery && ctx.readOnly) {
-      return c.json(
-        { error: "Write queries disabled in read-only mode. Start studio with --write-mode." },
-        403,
-      );
+      return c.json({ error: "Write queries disabled in read-only mode. Start studio with --write-mode." }, 403);
     }
 
     const params = Array.isArray(body.params) ? body.params : [];

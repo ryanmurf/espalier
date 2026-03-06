@@ -1,15 +1,11 @@
 /**
  * Adversarial E2E tests round 2: confirming additional bugs from reviewers.
  */
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { createTestDataSource, isPostgresAvailable } from "./setup.js";
-import {
-  Table,
-  Column,
-  Id,
-  createDerivedRepository,
-} from "espalier-data";
+
+import { Column, createDerivedRepository, Id, Table } from "espalier-data";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { PgDataSource } from "../../pg-data-source.js";
+import { createTestDataSource, isPostgresAvailable } from "./setup.js";
 
 const canConnect = await isPostgresAvailable();
 

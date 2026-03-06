@@ -1,12 +1,8 @@
-import { describe, it, expect, vi } from "vitest";
-import type { DomainEvent } from "../types.js";
+import { describe, expect, it } from "vitest";
 import { AggregateBase } from "../aggregate/aggregate-base.js";
-import {
-  AggregateRoot,
-  getAggregateRootMetadata,
-  isAggregateRoot,
-} from "../aggregate/aggregate-root.js";
+import { AggregateRoot, getAggregateRootMetadata, isAggregateRoot } from "../aggregate/aggregate-root.js";
 import { EventHandler } from "../aggregate/event-handler.js";
+import type { DomainEvent } from "../types.js";
 
 // ── Concrete aggregate for testing ─────────────────────────────────────
 
@@ -54,9 +50,7 @@ class OrderAggregate extends AggregateBase {
 }
 
 // Undecorated class
-class PlainClass {
-  constructor() {}
-}
+class PlainClass {}
 
 // Class with no handlers
 @AggregateRoot({ type: "Bare" })
@@ -74,7 +68,9 @@ class BareAggregate extends AggregateBase {
 // Class with snapshotEvery config
 @AggregateRoot({ snapshotEvery: 50 })
 class SnapshotAggregate extends AggregateBase {
-  constructor() { super(); }
+  constructor() {
+    super();
+  }
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────
@@ -196,11 +192,7 @@ describe("AggregateBase", () => {
       order.addItem("i1");
       order.cancel();
 
-      expect(order.handlerCalls).toEqual([
-        "OrderCreated",
-        "ItemAdded",
-        "OrderCancelled",
-      ]);
+      expect(order.handlerCalls).toEqual(["OrderCreated", "ItemAdded", "OrderCancelled"]);
       expect(order.items).toEqual(["i1"]);
       expect(order.status).toBe("cancelled");
     });
@@ -292,9 +284,7 @@ describe("AggregateBase", () => {
         },
       ];
 
-      expect(() => order.loadFromHistory(history)).toThrow(
-        /Out-of-order event/,
-      );
+      expect(() => order.loadFromHistory(history)).toThrow(/Out-of-order event/);
     });
   });
 
@@ -375,16 +365,28 @@ describe("AggregateBase", () => {
       // Load history sets version to 3
       order.loadFromHistory([
         {
-          eventType: "OrderCreated", aggregateId: "ord-1",
-          aggregateType: "Order", payload: {}, version: 1, timestamp: new Date(),
+          eventType: "OrderCreated",
+          aggregateId: "ord-1",
+          aggregateType: "Order",
+          payload: {},
+          version: 1,
+          timestamp: new Date(),
         },
         {
-          eventType: "ItemAdded", aggregateId: "ord-1",
-          aggregateType: "Order", payload: { itemId: "x" }, version: 2, timestamp: new Date(),
+          eventType: "ItemAdded",
+          aggregateId: "ord-1",
+          aggregateType: "Order",
+          payload: { itemId: "x" },
+          version: 2,
+          timestamp: new Date(),
         },
         {
-          eventType: "ItemAdded", aggregateId: "ord-1",
-          aggregateType: "Order", payload: { itemId: "y" }, version: 3, timestamp: new Date(),
+          eventType: "ItemAdded",
+          aggregateId: "ord-1",
+          aggregateType: "Order",
+          payload: { itemId: "y" },
+          version: 3,
+          timestamp: new Date(),
         },
       ]);
 

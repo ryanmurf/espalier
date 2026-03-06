@@ -1,32 +1,32 @@
-import { Pool, type PoolClient, type PoolConfig as PgPoolConfig } from "pg";
 import type {
   Connection,
-  PoolConfig,
-  PoolStats,
   MonitoredPooledDataSource,
-  TypeConverterRegistry,
-  PoolMonitor,
+  PoolConfig,
   PoolMetricsSnapshot,
-  StatementCacheConfig,
-  WarmupResult,
+  PoolMonitor,
+  PoolStats,
   PrePingConfig,
+  StatementCacheConfig,
+  TypeConverterRegistry,
+  WarmupResult,
 } from "espalier-jdbc";
 import {
   ConnectionError,
   DatabaseErrorCode,
-  DefaultPoolMetricsCollector,
-  StatementCache,
-  warmupPool,
-  DEFAULT_PRE_PING_QUERY,
-  DEFAULT_PRE_PING_INTERVAL_MS,
+  DbAttributes,
   DEFAULT_MAX_PING_RETRIES,
+  DEFAULT_PRE_PING_INTERVAL_MS,
+  DEFAULT_PRE_PING_QUERY,
+  DefaultPoolMetricsCollector,
   getGlobalLogger,
-  LogLevel,
   getGlobalTracerProvider,
+  LogLevel,
   SpanKind,
   SpanStatusCode,
-  DbAttributes,
+  StatementCache,
+  warmupPool,
 } from "espalier-jdbc";
+import { type PoolConfig as PgPoolConfig, Pool, type PoolClient } from "pg";
 import { PgConnection } from "./pg-connection.js";
 
 export interface PgDataSourceConfig {
@@ -50,11 +50,7 @@ function mapPoolConfig(config: PgDataSourceConfig): PgPoolConfig {
 }
 
 function isPgDataSourceConfig(config: unknown): config is PgDataSourceConfig {
-  return (
-    typeof config === "object" &&
-    config !== null &&
-    ("pg" in config || "pool" in config)
-  );
+  return typeof config === "object" && config !== null && ("pg" in config || "pool" in config);
 }
 
 export class PgDataSource implements MonitoredPooledDataSource {
@@ -125,11 +121,7 @@ export class PgDataSource implements MonitoredPooledDataSource {
 
   async getConnection(): Promise<Connection> {
     if (this.closed) {
-      throw new ConnectionError(
-        "DataSource is closed",
-        undefined,
-        DatabaseErrorCode.CONNECTION_CLOSED,
-      );
+      throw new ConnectionError("DataSource is closed", undefined, DatabaseErrorCode.CONNECTION_CLOSED);
     }
 
     const tracer = getGlobalTracerProvider().getTracer("espalier-jdbc-pg");
@@ -149,12 +141,13 @@ export class PgDataSource implements MonitoredPooledDataSource {
         client = await this.pool.connect();
       } catch (err) {
         const waitTimeMs = Date.now() - startTime;
-        const code = (err as { code?: string }).code === "ETIMEDOUT"
-          ? DatabaseErrorCode.CONNECTION_TIMEOUT
-          : DatabaseErrorCode.CONNECTION_FAILED;
+        const code =
+          (err as { code?: string }).code === "ETIMEDOUT"
+            ? DatabaseErrorCode.CONNECTION_TIMEOUT
+            : DatabaseErrorCode.CONNECTION_FAILED;
 
         if (code === DatabaseErrorCode.CONNECTION_TIMEOUT) {
-          acquireSpan.addEvent("timeout", { "wait_time_ms": waitTimeMs });
+          acquireSpan.addEvent("timeout", { wait_time_ms: waitTimeMs });
           this.metrics.emitTimeout({
             timestamp: new Date(),
             poolStats: this.getPoolStats(),
@@ -172,11 +165,7 @@ export class PgDataSource implements MonitoredPooledDataSource {
         acquireSpan.setStatus({ code: SpanStatusCode.ERROR, message: (err as Error).message });
         acquireSpan.end();
 
-        throw new ConnectionError(
-          `Failed to get connection: ${(err as Error).message}`,
-          err as Error,
-          code,
-        );
+        throw new ConnectionError(`Failed to get connection: ${(err as Error).message}`, err as Error, code);
       }
 
       const acquireTimeMs = Date.now() - startTime;
@@ -184,7 +173,7 @@ export class PgDataSource implements MonitoredPooledDataSource {
       // Pre-ping validation
       if (this.prePingConfig) {
         const lastPing = this.lastPingTimestamps.get(client);
-        const skipPing = lastPing !== undefined && (Date.now() - lastPing) < this.prePingConfig.intervalMs;
+        const skipPing = lastPing !== undefined && Date.now() - lastPing < this.prePingConfig.intervalMs;
 
         if (!skipPing) {
           try {
@@ -258,7 +247,7 @@ export class PgDataSource implements MonitoredPooledDataSource {
       const acquiredAt = Date.now();
       const metrics = this.metrics;
       const getStats = () => this.getPoolStats();
-      conn.close = async function () {
+      conn.close = async () => {
         await originalClose();
         const heldTimeMs = Date.now() - acquiredAt;
         const releaseStats = getStats();

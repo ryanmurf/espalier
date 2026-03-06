@@ -44,24 +44,14 @@ const vectorMetadata = new WeakMap<object, Map<string | symbol, VectorMetadataEn
 export function Vector(options: VectorOptions) {
   const { dimensions } = options;
 
-  if (
-    typeof dimensions !== "number" ||
-    !Number.isInteger(dimensions) ||
-    dimensions <= 0 ||
-    dimensions > 65535
-  ) {
-    throw new Error(
-      `@Vector dimensions must be a positive integer between 1 and 65535, got: ${dimensions}`,
-    );
+  if (typeof dimensions !== "number" || !Number.isInteger(dimensions) || dimensions <= 0 || dimensions > 65535) {
+    throw new Error(`@Vector dimensions must be a positive integer between 1 and 65535, got: ${dimensions}`);
   }
 
   const metric = options.metric ?? "l2";
   const indexType = options.indexType ?? "hnsw";
 
-  return function <T>(
-    _target: undefined,
-    context: ClassFieldDecoratorContext<T>,
-  ): void {
+  return <T>(_target: undefined, context: ClassFieldDecoratorContext<T>): void => {
     const columnName = camelToSnakeCase(String(context.name));
 
     const entry: VectorMetadataEntry = {
@@ -89,19 +79,14 @@ export function Vector(options: VectorOptions) {
 /**
  * Returns all vector field metadata entries for an entity class.
  */
-export function getVectorFields(
-  target: object,
-): Map<string | symbol, VectorMetadataEntry> {
+export function getVectorFields(target: object): Map<string | symbol, VectorMetadataEntry> {
   return new Map(vectorMetadata.get(target) ?? []);
 }
 
 /**
  * Returns vector metadata for a specific field, or undefined if not a vector field.
  */
-export function getVectorFieldMetadata(
-  target: object,
-  fieldName: string | symbol,
-): VectorMetadataEntry | undefined {
+export function getVectorFieldMetadata(target: object, fieldName: string | symbol): VectorMetadataEntry | undefined {
   const fields = vectorMetadata.get(target);
   if (!fields) return undefined;
   const entry = fields.get(fieldName);

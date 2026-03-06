@@ -1,10 +1,9 @@
 import type { SqlValue } from "espalier-jdbc";
 import { quoteIdentifier } from "espalier-jdbc";
 import type { SelectBuilder } from "../query/query-builder.js";
-import { RawComparisonCriteria } from "../query/criteria.js";
-import type { CursorPageable, CursorPage, Edge, PageInfo, PaginationStrategy } from "./types.js";
-import { encodeCursor, decodeCursor } from "./cursor-encoding.js";
 import type { CursorPayload } from "./cursor-encoding.js";
+import { decodeCursor, encodeCursor } from "./cursor-encoding.js";
+import type { CursorPage, CursorPageable, Edge, PageInfo, PaginationStrategy } from "./types.js";
 
 /**
  * Options for configuring the Relay cursor strategy.
@@ -52,16 +51,14 @@ export class RelayCursorStrategy implements PaginationStrategy<CursorPageable, C
   constructor(options: RelayCursorStrategyOptions) {
     this.idColumn = options.idColumn;
     this.idField = options.idField ?? "id";
-    this.sortColumns = options.sortColumns ?? [
-      { column: options.idColumn, direction: "ASC" },
-    ];
+    this.sortColumns = options.sortColumns ?? [{ column: options.idColumn, direction: "ASC" }];
     this.maxPageSize = options.maxPageSize ?? 1000;
 
     const maxSortColumns = options.maxSortColumns ?? 8;
     if (this.sortColumns.length > maxSortColumns) {
       throw new Error(
         `Too many sort columns: ${this.sortColumns.length} (max ${maxSortColumns}). ` +
-        `Reduce the number of sortColumns or increase maxSortColumns.`,
+          `Reduce the number of sortColumns or increase maxSortColumns.`,
       );
     }
   }
@@ -77,9 +74,7 @@ export class RelayCursorStrategy implements PaginationStrategy<CursorPageable, C
 
     // Apply ordering
     for (const col of this.sortColumns) {
-      const effectiveDir = isBackward
-        ? (col.direction === "ASC" ? "DESC" : "ASC")
-        : col.direction;
+      const effectiveDir = isBackward ? (col.direction === "ASC" ? "DESC" : "ASC") : col.direction;
       builder.orderBy(col.column, effectiveDir);
     }
 
@@ -139,11 +134,7 @@ export class RelayCursorStrategy implements PaginationStrategy<CursorPageable, C
     };
   }
 
-  private applyCursorCondition(
-    builder: SelectBuilder,
-    payload: CursorPayload,
-    isBackward: boolean,
-  ): void {
+  private applyCursorCondition(builder: SelectBuilder, payload: CursorPayload, isBackward: boolean): void {
     // Build a composite cursor condition:
     // For forward (after): (col1, col2, id) > (val1, val2, idVal)
     // For backward (before): (col1, col2, id) < (val1, val2, idVal)
@@ -177,9 +168,7 @@ export class RelayCursorStrategy implements PaginationStrategy<CursorPageable, C
 
       // Current column comparison
       const col = columns[depth];
-      const sortDir = depth < this.sortColumns.length
-        ? this.sortColumns[depth].direction
-        : "ASC"; // ID column default
+      const sortDir = depth < this.sortColumns.length ? this.sortColumns[depth].direction : "ASC"; // ID column default
 
       let op: string;
       if (isBackward) {
@@ -232,9 +221,7 @@ export class RelayCursorStrategy implements PaginationStrategy<CursorPageable, C
       values.push(val);
     }
     const obj = row as Record<string, unknown>;
-    const id = this.idField in obj ? obj[this.idField]
-      : this.idColumn in obj ? obj[this.idColumn]
-      : null;
+    const id = this.idField in obj ? obj[this.idField] : this.idColumn in obj ? obj[this.idColumn] : null;
     return encodeCursor({ values, id });
   }
 

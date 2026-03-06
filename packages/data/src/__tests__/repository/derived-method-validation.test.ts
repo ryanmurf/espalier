@@ -1,15 +1,15 @@
-import { describe, it, expect, vi } from "vitest";
-import type { DataSource, Connection, PreparedStatement } from "espalier-jdbc";
-import { Repository } from "../../decorators/repository.js";
-import { Table } from "../../decorators/table.js";
+import type { Connection, DataSource, PreparedStatement } from "espalier-jdbc";
+import { describe, expect, it, vi } from "vitest";
 import { Column } from "../../decorators/column.js";
 import { Id } from "../../decorators/id.js";
+import { Repository } from "../../decorators/repository.js";
+import { Table } from "../../decorators/table.js";
+import { getEntityMetadata } from "../../mapping/entity-metadata.js";
 import {
   createAutoRepository,
   getDeclaredDerivedMethods,
   validateDerivedMethods,
 } from "../../repository/auto-repository.js";
-import { getEntityMetadata } from "../../mapping/entity-metadata.js";
 import { TestResultSet } from "../test-utils/test-result-set.js";
 
 // --- Test Entities ---
@@ -161,10 +161,7 @@ describe("validateDerivedMethods", () => {
 
   it("validates multi-property And method", () => {
     const meta = getEntityMetadata(User);
-    const { valid, errors } = validateDerivedMethods(
-      ["findByNameAndEmail"],
-      meta,
-    );
+    const { valid, errors } = validateDerivedMethods(["findByNameAndEmail"], meta);
 
     expect(errors).toHaveLength(0);
     expect(valid).toHaveLength(1);
@@ -175,10 +172,7 @@ describe("validateDerivedMethods", () => {
 
   it("validates method with operator suffix", () => {
     const meta = getEntityMetadata(User);
-    const { valid, errors } = validateDerivedMethods(
-      ["findByAgeGreaterThan"],
-      meta,
-    );
+    const { valid, errors } = validateDerivedMethods(["findByAgeGreaterThan"], meta);
 
     expect(errors).toHaveLength(0);
     expect(valid).toHaveLength(1);
@@ -212,10 +206,7 @@ describe("validateDerivedMethods", () => {
 
   it("returns error for unknown property", () => {
     const meta = getEntityMetadata(User);
-    const { valid, errors } = validateDerivedMethods(
-      ["findByNonExistentField"],
-      meta,
-    );
+    const { valid, errors } = validateDerivedMethods(["findByNonExistentField"], meta);
 
     expect(valid).toHaveLength(0);
     expect(errors).toHaveLength(1);
@@ -234,10 +225,7 @@ describe("validateDerivedMethods", () => {
 
   it("validates mix of valid and invalid methods", () => {
     const meta = getEntityMetadata(User);
-    const { valid, errors } = validateDerivedMethods(
-      ["findByName", "findByFakeField", "countByEmail"],
-      meta,
-    );
+    const { valid, errors } = validateDerivedMethods(["findByName", "findByFakeField", "countByEmail"], meta);
 
     expect(valid).toHaveLength(2);
     expect(valid.map((v) => v.methodName)).toEqual(["findByName", "countByEmail"]);
@@ -247,10 +235,7 @@ describe("validateDerivedMethods", () => {
 
   it("validates Between operator (2 params)", () => {
     const meta = getEntityMetadata(User);
-    const { valid, errors } = validateDerivedMethods(
-      ["findByAgeBetween"],
-      meta,
-    );
+    const { valid, errors } = validateDerivedMethods(["findByAgeBetween"], meta);
 
     expect(errors).toHaveLength(0);
     expect(valid[0].descriptor.properties[0].operator).toBe("Between");
@@ -259,10 +244,7 @@ describe("validateDerivedMethods", () => {
 
   it("validates IsNull operator (0 params)", () => {
     const meta = getEntityMetadata(User);
-    const { valid, errors } = validateDerivedMethods(
-      ["findByEmailIsNull"],
-      meta,
-    );
+    const { valid, errors } = validateDerivedMethods(["findByEmailIsNull"], meta);
 
     expect(errors).toHaveLength(0);
     expect(valid[0].descriptor.properties[0].operator).toBe("IsNull");
@@ -298,9 +280,7 @@ describe("createAutoRepository with method validation", () => {
     }
 
     const ds = makeDs();
-    expect(() => createAutoRepository<User, number>(BadUserRepo, ds)).toThrow(
-      /Invalid derived query methods/,
-    );
+    expect(() => createAutoRepository<User, number>(BadUserRepo, ds)).toThrow(/Invalid derived query methods/);
   });
 
   it("error message lists all invalid methods", () => {
@@ -311,12 +291,8 @@ describe("createAutoRepository with method validation", () => {
     }
 
     const ds = makeDs();
-    expect(() => createAutoRepository<User, number>(BadUserRepo, ds)).toThrow(
-      /findByFoo/,
-    );
-    expect(() => createAutoRepository<User, number>(BadUserRepo, ds)).toThrow(
-      /findByBar/,
-    );
+    expect(() => createAutoRepository<User, number>(BadUserRepo, ds)).toThrow(/findByFoo/);
+    expect(() => createAutoRepository<User, number>(BadUserRepo, ds)).toThrow(/findByBar/);
   });
 
   it("skips validation when validateMethods is false", () => {

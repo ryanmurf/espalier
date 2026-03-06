@@ -52,10 +52,7 @@ export interface ManyToOneRelation {
 const manyToOneMetadata = new WeakMap<object, Map<string | symbol, ManyToOneRelation>>();
 
 export function ManyToOne(options: ManyToOneOptions) {
-  return function <T>(
-    _target: undefined,
-    context: ClassFieldDecoratorContext<T>,
-  ): void {
+  return <T>(_target: undefined, context: ClassFieldDecoratorContext<T>): void => {
     const fieldName = context.name;
     const joinColumn = options.joinColumn ?? `${String(fieldName)}_id`;
     const nullable = options.nullable ?? true;
@@ -109,10 +106,7 @@ export interface OneToManyRelation {
 const oneToManyMetadata = new WeakMap<object, Map<string | symbol, OneToManyRelation>>();
 
 export function OneToMany(options: OneToManyOptions) {
-  return function <T>(
-    _target: undefined,
-    context: ClassFieldDecoratorContext<T>,
-  ): void {
+  return <T>(_target: undefined, context: ClassFieldDecoratorContext<T>): void => {
     const fieldName = context.name;
     const { fetchStrategy, batchSize } = parseFetch(options.fetch);
     const lazy = options.lazy ?? false;
@@ -172,10 +166,7 @@ export interface ManyToManyRelation {
 const manyToManyMetadata = new WeakMap<object, Map<string | symbol, ManyToManyRelation>>();
 
 export function ManyToMany(options: ManyToManyOptions) {
-  return function <T>(
-    _target: undefined,
-    context: ClassFieldDecoratorContext<T>,
-  ): void {
+  return <T>(_target: undefined, context: ClassFieldDecoratorContext<T>): void => {
     const fieldName = context.name;
     const isOwning = options.joinTable !== undefined;
     const { fetchStrategy, batchSize } = parseFetch(options.fetch);
@@ -236,15 +227,10 @@ export interface OneToOneRelation {
 const oneToOneMetadata = new WeakMap<object, Map<string | symbol, OneToOneRelation>>();
 
 export function OneToOne(options: OneToOneOptions) {
-  return function <T>(
-    _target: undefined,
-    context: ClassFieldDecoratorContext<T>,
-  ): void {
+  return <T>(_target: undefined, context: ClassFieldDecoratorContext<T>): void => {
     const fieldName = context.name;
     const isOwning = options.mappedBy === undefined;
-    const joinColumn = isOwning
-      ? (options.joinColumn ?? `${String(fieldName)}_id`)
-      : undefined;
+    const joinColumn = isOwning ? (options.joinColumn ?? `${String(fieldName)}_id`) : undefined;
     const nullable = options.nullable ?? true;
     const orphanRemoval = options.orphanRemoval ?? false;
     const { fetchStrategy, batchSize } = parseFetch(options.fetch);

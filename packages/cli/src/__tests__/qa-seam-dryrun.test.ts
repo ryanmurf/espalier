@@ -11,9 +11,9 @@
  * The key seam: migrateDryRun uses the same runner.pending() call as the
  * real migrate-up, but never calls runner.run() — we verify this contract.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import type { DryRunStatement, MigrateDryRunResult } from "../migrate-dry-run.js";
 import { formatDryRunOutput } from "../migrate-dry-run.js";
-import type { MigrateDryRunResult, DryRunStatement } from "../migrate-dry-run.js";
 
 // =============================================================================
 // Seam 6A: formatDryRunOutput — pure formatting, no side effects
@@ -198,9 +198,7 @@ describe("Seam: migrateDryRun result type contract", () => {
 
   it("formatDryRunOutput result is immutable (calling it twice gives same output)", () => {
     const input: MigrateDryRunResult = {
-      pending: [
-        { version: "0001", description: "first", statements: ["SELECT 1"] },
-      ],
+      pending: [{ version: "0001", description: "first", statements: ["SELECT 1"] }],
     };
     const out1 = formatDryRunOutput(input);
     const out2 = formatDryRunOutput(input);

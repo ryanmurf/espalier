@@ -19,10 +19,7 @@ const eventHandlerMetadata = new WeakMap<object, Map<string, string | symbol>>()
 const registeredPairs = new WeakMap<object, Set<string>>();
 
 export function EventHandler(eventType: string) {
-  return function <This>(
-    _target: (this: This, event: DomainEvent) => void,
-    context: DecoratorContext,
-  ) {
+  return <This>(_target: (this: This, event: DomainEvent) => void, context: DecoratorContext) => {
     context.addInitializer(function (this: any) {
       const ctor = this.constructor;
 
@@ -45,8 +42,6 @@ export function EventHandler(eventType: string) {
   };
 }
 
-export function getEventHandlers(
-  target: object,
-): Map<string, string | symbol> {
+export function getEventHandlers(target: object): Map<string, string | symbol> {
   return new Map(eventHandlerMetadata.get(target) ?? []);
 }

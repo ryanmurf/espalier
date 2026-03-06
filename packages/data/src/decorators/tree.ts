@@ -21,10 +21,10 @@ const treeMetadata = new WeakMap<object, TreeOptions>();
  * - "materialized-path": stores the full path in a column on the entity
  */
 export function Tree(options: TreeOptions) {
-  return function <TClass extends new (...args: any[]) => any>(
+  return <TClass extends new (...args: any[]) => any>(
     target: TClass,
     _context: ClassDecoratorContext<TClass>,
-  ): TClass {
+  ): TClass => {
     treeMetadata.set(target, {
       parentField: "parent",
       pathField: "path",

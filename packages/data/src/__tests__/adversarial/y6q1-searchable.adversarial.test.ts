@@ -8,25 +8,24 @@
  * Focus: SQL injection, invalid inputs, mutable metadata, param offset bugs,
  * ts_headline injection, edge cases.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { Searchable, getSearchableFields, getSearchableFieldMetadata } from "../../decorators/searchable.js";
-import type { SearchableMetadataEntry } from "../../decorators/searchable.js";
-import {
-  FullTextSearchCriteria,
-  SearchRankExpression,
-  SearchHighlightExpression,
-} from "../../search/search-criteria.js";
-import type { SearchMode, HighlightOptions } from "../../search/search-criteria.js";
-import { FacetedSearchSpecification, facetedSearch } from "../../search/faceted-search.js";
-import { Table } from "../../decorators/table.js";
+import { describe, expect, it, vi } from "vitest";
 import { Column } from "../../decorators/column.js";
 import { Id } from "../../decorators/id.js";
-import { DdlGenerator } from "../../schema/ddl-generator.js";
+import { getSearchableFieldMetadata, getSearchableFields, Searchable } from "../../decorators/searchable.js";
+import { Table } from "../../decorators/table.js";
+import { ResolverGenerator } from "../../graphql/resolver-generator.js";
 import { getEntityMetadata } from "../../mapping/entity-metadata.js";
 import { SelectBuilder } from "../../query/query-builder.js";
-import { ResolverGenerator } from "../../graphql/resolver-generator.js";
-import { RouteGenerator } from "../../rest/route-generator.js";
 import type { RestRequest } from "../../rest/handler.js";
+import { RouteGenerator } from "../../rest/route-generator.js";
+import { DdlGenerator } from "../../schema/ddl-generator.js";
+import { FacetedSearchSpecification, facetedSearch } from "../../search/faceted-search.js";
+import type { SearchMode } from "../../search/search-criteria.js";
+import {
+  FullTextSearchCriteria,
+  SearchHighlightExpression,
+  SearchRankExpression,
+} from "../../search/search-criteria.js";
 
 // ============================================================
 // Helper: create entity classes inside tests to avoid metadata leaks
@@ -99,7 +98,9 @@ describe("@Searchable decorator — adversarial", () => {
     });
 
     it("rejects language with special characters (SQL injection attempt)", () => {
-      expect(() => Searchable({ language: "english'; DROP TABLE articles; --" })).toThrow(/language must be a simple identifier/);
+      expect(() => Searchable({ language: "english'; DROP TABLE articles; --" })).toThrow(
+        /language must be a simple identifier/,
+      );
     });
 
     it("rejects language with uppercase letters", () => {
@@ -143,7 +144,13 @@ describe("@Searchable decorator — adversarial", () => {
       const Article = makeSearchableEntity();
       const fields1 = getSearchableFields(Article);
       fields1.delete("title");
-      fields1.set("hacked", { fieldName: "hacked", columnName: "hacked", language: "english", weight: "A", indexType: "gin" });
+      fields1.set("hacked", {
+        fieldName: "hacked",
+        columnName: "hacked",
+        language: "english",
+        weight: "A",
+        indexType: "gin",
+      });
 
       const fields2 = getSearchableFields(Article);
       expect(fields2.has("title")).toBe(true);
@@ -185,7 +192,7 @@ describe("FullTextSearchCriteria — adversarial", () => {
     const injectionPayloads = [
       "'; DROP TABLE articles; --",
       "test' OR '1'='1",
-      "test\"; DROP TABLE articles; --",
+      'test"; DROP TABLE articles; --',
       "test\\'; DROP TABLE articles; --",
       "test/* comment */",
       "test' UNION SELECT * FROM users --",
@@ -260,13 +267,10 @@ describe("FullTextSearchCriteria — adversarial", () => {
 
   describe("weight configuration", () => {
     it("applies setweight when weights are provided", () => {
-      const criteria = new FullTextSearchCriteria(
-        ["title", "body"],
-        "english",
-        "test",
-        "plain",
-        { title: "A", body: "B" },
-      );
+      const criteria = new FullTextSearchCriteria(["title", "body"], "english", "test", "plain", {
+        title: "A",
+        body: "B",
+      });
       const result = criteria.toSql(1);
       expect(result.sql).toContain("setweight");
       expect(result.sql).toContain("'A'");
@@ -294,12 +298,7 @@ describe("FullTextSearchCriteria — adversarial", () => {
 
   describe("multi-field search concatenation", () => {
     it("joins multiple columns with ||", () => {
-      const criteria = new FullTextSearchCriteria(
-        ["title", "body", "summary"],
-        "english",
-        "test",
-        "plain",
-      );
+      const criteria = new FullTextSearchCriteria(["title", "body", "summary"], "english", "test", "plain");
       const result = criteria.toSql(1);
       // Should have || between tsvector expressions
       const pipeCount = (result.sql.match(/\|\|/g) || []).length;
@@ -349,13 +348,7 @@ describe("SearchRankExpression — adversarial", () => {
   });
 
   it("handles multi-column with weights", () => {
-    const expr = new SearchRankExpression(
-      ["title", "body"],
-      "english",
-      "test",
-      "plain",
-      { title: "A", body: "C" },
-    );
+    const expr = new SearchRankExpression(["title", "body"], "english", "test", "plain", { title: "A", body: "C" });
     const result = expr.toSql(3);
     expect(result.sql).toContain("$3");
     expect(result.sql).toContain("setweight");
@@ -494,7 +487,7 @@ describe("SelectBuilder.search() — adversarial", () => {
     const result = builder.build();
     expect(result.params.length).toBe(3);
     // All params should be "test"
-    expect(result.params.every(p => p === "test")).toBe(true);
+    expect(result.params.every((p) => p === "test")).toBe(true);
     // Check that $1, $2, $3 are all present
     expect(result.sql).toContain("$1");
     expect(result.sql).toContain("$2");
@@ -629,7 +622,14 @@ describe("DdlGenerator.generateSearchIndexes — adversarial", () => {
 describe("GraphQL search resolver — adversarial", () => {
   it("rejects empty search query", async () => {
     const Article = makeSearchableEntity();
-    const mockRepo = { findAll: vi.fn(), findById: vi.fn(), save: vi.fn(), deleteById: vi.fn(), count: vi.fn(), search: vi.fn() } as any;
+    const mockRepo = {
+      findAll: vi.fn(),
+      findById: vi.fn(),
+      save: vi.fn(),
+      deleteById: vi.fn(),
+      count: vi.fn(),
+      search: vi.fn(),
+    } as any;
     const gen = new ResolverGenerator({ tenantAware: false });
     const resolvers = gen.generate([{ entityClass: Article, repository: mockRepo }]);
     const searchResolver = resolvers.Query["articleSearch"];
@@ -640,7 +640,14 @@ describe("GraphQL search resolver — adversarial", () => {
 
   it("rejects whitespace-only search query", async () => {
     const Article = makeSearchableEntity();
-    const mockRepo = { findAll: vi.fn(), findById: vi.fn(), save: vi.fn(), deleteById: vi.fn(), count: vi.fn(), search: vi.fn() } as any;
+    const mockRepo = {
+      findAll: vi.fn(),
+      findById: vi.fn(),
+      save: vi.fn(),
+      deleteById: vi.fn(),
+      count: vi.fn(),
+      search: vi.fn(),
+    } as any;
     const gen = new ResolverGenerator({ tenantAware: false });
     const resolvers = gen.generate([{ entityClass: Article, repository: mockRepo }]);
     const searchResolver = resolvers.Query["articleSearch"];
@@ -650,7 +657,14 @@ describe("GraphQL search resolver — adversarial", () => {
 
   it("rejects non-string search query", async () => {
     const Article = makeSearchableEntity();
-    const mockRepo = { findAll: vi.fn(), findById: vi.fn(), save: vi.fn(), deleteById: vi.fn(), count: vi.fn(), search: vi.fn() } as any;
+    const mockRepo = {
+      findAll: vi.fn(),
+      findById: vi.fn(),
+      save: vi.fn(),
+      deleteById: vi.fn(),
+      count: vi.fn(),
+      search: vi.fn(),
+    } as any;
     const gen = new ResolverGenerator({ tenantAware: false });
     const resolvers = gen.generate([{ entityClass: Article, repository: mockRepo }]);
     const searchResolver = resolvers.Query["articleSearch"];
@@ -661,7 +675,11 @@ describe("GraphQL search resolver — adversarial", () => {
   it("clamps limit to max 1000", async () => {
     const Article = makeSearchableEntity();
     const mockRepo = {
-      findAll: vi.fn(), findById: vi.fn(), save: vi.fn(), deleteById: vi.fn(), count: vi.fn(),
+      findAll: vi.fn(),
+      findById: vi.fn(),
+      save: vi.fn(),
+      deleteById: vi.fn(),
+      count: vi.fn(),
       search: vi.fn().mockResolvedValue([]),
     } as any;
     const gen = new ResolverGenerator({ tenantAware: false });
@@ -675,7 +693,11 @@ describe("GraphQL search resolver — adversarial", () => {
   it("clamps limit to min 1", async () => {
     const Article = makeSearchableEntity();
     const mockRepo = {
-      findAll: vi.fn(), findById: vi.fn(), save: vi.fn(), deleteById: vi.fn(), count: vi.fn(),
+      findAll: vi.fn(),
+      findById: vi.fn(),
+      save: vi.fn(),
+      deleteById: vi.fn(),
+      count: vi.fn(),
       search: vi.fn().mockResolvedValue([]),
     } as any;
     const gen = new ResolverGenerator({ tenantAware: false });
@@ -689,7 +711,11 @@ describe("GraphQL search resolver — adversarial", () => {
   it("clamps offset to min 0", async () => {
     const Article = makeSearchableEntity();
     const mockRepo = {
-      findAll: vi.fn(), findById: vi.fn(), save: vi.fn(), deleteById: vi.fn(), count: vi.fn(),
+      findAll: vi.fn(),
+      findById: vi.fn(),
+      save: vi.fn(),
+      deleteById: vi.fn(),
+      count: vi.fn(),
       search: vi.fn().mockResolvedValue([]),
     } as any;
     const gen = new ResolverGenerator({ tenantAware: false });
@@ -713,16 +739,26 @@ describe("GraphQL search resolver — adversarial", () => {
 // REST Search Handler — adversarial
 // ============================================================
 describe("REST search handler — adversarial", () => {
-  function makeRequest(query: Record<string, string | undefined> = {}, headers: Record<string, string> = {}): RestRequest {
+  function makeRequest(
+    query: Record<string, string | undefined> = {},
+    headers: Record<string, string> = {},
+  ): RestRequest {
     return { params: {}, query: query as any, headers, body: undefined };
   }
 
   it("returns 400 when q param is missing", async () => {
     const Article = makeSearchableEntity();
-    const mockRepo = { findAll: vi.fn(), findById: vi.fn(), save: vi.fn(), deleteById: vi.fn(), count: vi.fn(), search: vi.fn() } as any;
+    const mockRepo = {
+      findAll: vi.fn(),
+      findById: vi.fn(),
+      save: vi.fn(),
+      deleteById: vi.fn(),
+      count: vi.fn(),
+      search: vi.fn(),
+    } as any;
     const gen = new RouteGenerator({ tenantAware: false });
     const routes = gen.generate([{ entityClass: Article, repository: mockRepo }]);
-    const searchRoute = routes.find(r => r.path.includes("/search"));
+    const searchRoute = routes.find((r) => r.path.includes("/search"));
     expect(searchRoute).toBeDefined();
 
     const response = await searchRoute!.handler(makeRequest({}));
@@ -731,10 +767,17 @@ describe("REST search handler — adversarial", () => {
 
   it("returns 400 when q param is empty string", async () => {
     const Article = makeSearchableEntity();
-    const mockRepo = { findAll: vi.fn(), findById: vi.fn(), save: vi.fn(), deleteById: vi.fn(), count: vi.fn(), search: vi.fn() } as any;
+    const mockRepo = {
+      findAll: vi.fn(),
+      findById: vi.fn(),
+      save: vi.fn(),
+      deleteById: vi.fn(),
+      count: vi.fn(),
+      search: vi.fn(),
+    } as any;
     const gen = new RouteGenerator({ tenantAware: false });
     const routes = gen.generate([{ entityClass: Article, repository: mockRepo }]);
-    const searchRoute = routes.find(r => r.path.includes("/search"));
+    const searchRoute = routes.find((r) => r.path.includes("/search"));
 
     const response = await searchRoute!.handler(makeRequest({ q: "" }));
     expect(response.status).toBe(400);
@@ -742,10 +785,17 @@ describe("REST search handler — adversarial", () => {
 
   it("returns 400 when q is whitespace only", async () => {
     const Article = makeSearchableEntity();
-    const mockRepo = { findAll: vi.fn(), findById: vi.fn(), save: vi.fn(), deleteById: vi.fn(), count: vi.fn(), search: vi.fn() } as any;
+    const mockRepo = {
+      findAll: vi.fn(),
+      findById: vi.fn(),
+      save: vi.fn(),
+      deleteById: vi.fn(),
+      count: vi.fn(),
+      search: vi.fn(),
+    } as any;
     const gen = new RouteGenerator({ tenantAware: false });
     const routes = gen.generate([{ entityClass: Article, repository: mockRepo }]);
-    const searchRoute = routes.find(r => r.path.includes("/search"));
+    const searchRoute = routes.find((r) => r.path.includes("/search"));
 
     const response = await searchRoute!.handler(makeRequest({ q: "   " }));
     expect(response.status).toBe(400);
@@ -753,10 +803,17 @@ describe("REST search handler — adversarial", () => {
 
   it("returns 400 when limit is 0", async () => {
     const Article = makeSearchableEntity();
-    const mockRepo = { findAll: vi.fn(), findById: vi.fn(), save: vi.fn(), deleteById: vi.fn(), count: vi.fn(), search: vi.fn() } as any;
+    const mockRepo = {
+      findAll: vi.fn(),
+      findById: vi.fn(),
+      save: vi.fn(),
+      deleteById: vi.fn(),
+      count: vi.fn(),
+      search: vi.fn(),
+    } as any;
     const gen = new RouteGenerator({ tenantAware: false });
     const routes = gen.generate([{ entityClass: Article, repository: mockRepo }]);
-    const searchRoute = routes.find(r => r.path.includes("/search"));
+    const searchRoute = routes.find((r) => r.path.includes("/search"));
 
     const response = await searchRoute!.handler(makeRequest({ q: "test", limit: "0" }));
     expect(response.status).toBe(400);
@@ -764,10 +821,17 @@ describe("REST search handler — adversarial", () => {
 
   it("returns 400 when limit is negative", async () => {
     const Article = makeSearchableEntity();
-    const mockRepo = { findAll: vi.fn(), findById: vi.fn(), save: vi.fn(), deleteById: vi.fn(), count: vi.fn(), search: vi.fn() } as any;
+    const mockRepo = {
+      findAll: vi.fn(),
+      findById: vi.fn(),
+      save: vi.fn(),
+      deleteById: vi.fn(),
+      count: vi.fn(),
+      search: vi.fn(),
+    } as any;
     const gen = new RouteGenerator({ tenantAware: false });
     const routes = gen.generate([{ entityClass: Article, repository: mockRepo }]);
-    const searchRoute = routes.find(r => r.path.includes("/search"));
+    const searchRoute = routes.find((r) => r.path.includes("/search"));
 
     const response = await searchRoute!.handler(makeRequest({ q: "test", limit: "-5" }));
     expect(response.status).toBe(400);
@@ -775,10 +839,17 @@ describe("REST search handler — adversarial", () => {
 
   it("returns 400 when limit is NaN", async () => {
     const Article = makeSearchableEntity();
-    const mockRepo = { findAll: vi.fn(), findById: vi.fn(), save: vi.fn(), deleteById: vi.fn(), count: vi.fn(), search: vi.fn() } as any;
+    const mockRepo = {
+      findAll: vi.fn(),
+      findById: vi.fn(),
+      save: vi.fn(),
+      deleteById: vi.fn(),
+      count: vi.fn(),
+      search: vi.fn(),
+    } as any;
     const gen = new RouteGenerator({ tenantAware: false });
     const routes = gen.generate([{ entityClass: Article, repository: mockRepo }]);
-    const searchRoute = routes.find(r => r.path.includes("/search"));
+    const searchRoute = routes.find((r) => r.path.includes("/search"));
 
     const response = await searchRoute!.handler(makeRequest({ q: "test", limit: "not_a_number" }));
     expect(response.status).toBe(400);
@@ -786,10 +857,17 @@ describe("REST search handler — adversarial", () => {
 
   it("returns 400 when offset is negative", async () => {
     const Article = makeSearchableEntity();
-    const mockRepo = { findAll: vi.fn(), findById: vi.fn(), save: vi.fn(), deleteById: vi.fn(), count: vi.fn(), search: vi.fn() } as any;
+    const mockRepo = {
+      findAll: vi.fn(),
+      findById: vi.fn(),
+      save: vi.fn(),
+      deleteById: vi.fn(),
+      count: vi.fn(),
+      search: vi.fn(),
+    } as any;
     const gen = new RouteGenerator({ tenantAware: false });
     const routes = gen.generate([{ entityClass: Article, repository: mockRepo }]);
-    const searchRoute = routes.find(r => r.path.includes("/search"));
+    const searchRoute = routes.find((r) => r.path.includes("/search"));
 
     const response = await searchRoute!.handler(makeRequest({ q: "test", offset: "-1" }));
     expect(response.status).toBe(400);
@@ -798,12 +876,16 @@ describe("REST search handler — adversarial", () => {
   it("clamps limit to 1000 max", async () => {
     const Article = makeSearchableEntity();
     const mockRepo = {
-      findAll: vi.fn(), findById: vi.fn(), save: vi.fn(), deleteById: vi.fn(), count: vi.fn(),
+      findAll: vi.fn(),
+      findById: vi.fn(),
+      save: vi.fn(),
+      deleteById: vi.fn(),
+      count: vi.fn(),
       search: vi.fn().mockResolvedValue([]),
     } as any;
     const gen = new RouteGenerator({ tenantAware: false });
     const routes = gen.generate([{ entityClass: Article, repository: mockRepo }]);
-    const searchRoute = routes.find(r => r.path.includes("/search"));
+    const searchRoute = routes.find((r) => r.path.includes("/search"));
 
     await searchRoute!.handler(makeRequest({ q: "test", limit: "99999" }));
     expect(mockRepo.search).toHaveBeenCalledWith("test", expect.objectContaining({ limit: 1000 }));
@@ -814,7 +896,7 @@ describe("REST search handler — adversarial", () => {
     const mockRepo = { findAll: vi.fn(), findById: vi.fn(), save: vi.fn(), deleteById: vi.fn(), count: vi.fn() } as any;
     const gen = new RouteGenerator({ tenantAware: false });
     const routes = gen.generate([{ entityClass: Plain, repository: mockRepo }]);
-    const searchRoute = routes.find(r => r.path.includes("/search"));
+    const searchRoute = routes.find((r) => r.path.includes("/search"));
     expect(searchRoute).toBeUndefined();
   });
 });

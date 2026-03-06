@@ -62,21 +62,14 @@ export function Searchable(options?: SearchableOptions) {
   }
 
   if (!VALID_WEIGHTS.has(weight)) {
-    throw new Error(
-      `@Searchable weight must be one of A, B, C, D, got: "${weight}"`,
-    );
+    throw new Error(`@Searchable weight must be one of A, B, C, D, got: "${weight}"`);
   }
 
   if (!VALID_INDEX_TYPES.has(indexType)) {
-    throw new Error(
-      `@Searchable indexType must be "gin" or "gist", got: "${indexType}"`,
-    );
+    throw new Error(`@Searchable indexType must be "gin" or "gist", got: "${indexType}"`);
   }
 
-  return function <T>(
-    _target: undefined,
-    context: ClassFieldDecoratorContext<T>,
-  ): void {
+  return <T>(_target: undefined, context: ClassFieldDecoratorContext<T>): void => {
     const columnName = camelToSnakeCase(String(context.name));
 
     const entry: SearchableMetadataEntry = {
@@ -104,9 +97,7 @@ export function Searchable(options?: SearchableOptions) {
 /**
  * Returns all searchable field metadata entries for an entity class.
  */
-export function getSearchableFields(
-  target: object,
-): Map<string | symbol, SearchableMetadataEntry> {
+export function getSearchableFields(target: object): Map<string | symbol, SearchableMetadataEntry> {
   return new Map(searchableMetadata.get(target) ?? []);
 }
 

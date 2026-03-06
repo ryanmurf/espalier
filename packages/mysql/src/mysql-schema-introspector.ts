@@ -1,10 +1,10 @@
-import type { Connection, SchemaIntrospector, TableInfo, ColumnInfo } from "espalier-jdbc";
+import type { ColumnInfo, Connection, SchemaIntrospector, TableInfo } from "espalier-jdbc";
 
 export class MysqlSchemaIntrospector implements SchemaIntrospector {
   constructor(private readonly connection: Connection) {}
 
   async getTables(schema?: string): Promise<TableInfo[]> {
-    const dbName = schema ?? await this.currentDatabase();
+    const dbName = schema ?? (await this.currentDatabase());
     const ps = this.connection.prepareStatement(
       `SELECT table_name, table_schema
        FROM information_schema.tables
@@ -32,7 +32,7 @@ export class MysqlSchemaIntrospector implements SchemaIntrospector {
   }
 
   async getColumns(tableName: string, schema?: string): Promise<ColumnInfo[]> {
-    const dbName = schema ?? await this.currentDatabase();
+    const dbName = schema ?? (await this.currentDatabase());
 
     // Get primary key columns
     const pkColumns = new Set(await this.getPrimaryKeys(tableName, dbName));
@@ -74,7 +74,7 @@ export class MysqlSchemaIntrospector implements SchemaIntrospector {
   }
 
   async getPrimaryKeys(tableName: string, schema?: string): Promise<string[]> {
-    const dbName = schema ?? await this.currentDatabase();
+    const dbName = schema ?? (await this.currentDatabase());
     const ps = this.connection.prepareStatement(
       `SELECT kcu.column_name
        FROM information_schema.table_constraints tc
@@ -105,7 +105,7 @@ export class MysqlSchemaIntrospector implements SchemaIntrospector {
   }
 
   async tableExists(tableName: string, schema?: string): Promise<boolean> {
-    const dbName = schema ?? await this.currentDatabase();
+    const dbName = schema ?? (await this.currentDatabase());
     const ps = this.connection.prepareStatement(
       `SELECT 1 FROM information_schema.tables
        WHERE table_name = $1 AND table_schema = $2 AND table_type = 'BASE TABLE'`,

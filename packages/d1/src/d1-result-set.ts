@@ -1,4 +1,4 @@
-import type { ResultSet, ColumnMetadata } from "espalier-jdbc";
+import type { ColumnMetadata, ResultSet } from "espalier-jdbc";
 import type { D1Result } from "./d1-types.js";
 
 export class D1ResultSet implements ResultSet {
@@ -8,8 +8,7 @@ export class D1ResultSet implements ResultSet {
 
   constructor(result: D1Result) {
     this.rows = (result.results ?? []) as Record<string, unknown>[];
-    this.columnNames =
-      this.rows.length > 0 ? Object.keys(this.rows[0]) : [];
+    this.columnNames = this.rows.length > 0 ? Object.keys(this.rows[0]) : [];
   }
 
   async next(): Promise<boolean> {

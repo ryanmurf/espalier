@@ -1,20 +1,27 @@
-import { getTableName } from "../decorators/table.js";
+import { getCreatedDateField, getLastModifiedDateField } from "../decorators/auditing.js";
 import { getColumnMappings } from "../decorators/column.js";
-import { getIdField } from "../decorators/id.js";
-import {
-  getCreatedDateField,
-  getLastModifiedDateField,
-} from "../decorators/auditing.js";
-import { getManyToOneRelations, getOneToManyRelations, getManyToManyRelations, getOneToOneRelations } from "../decorators/relations.js";
-import type { ManyToOneRelation, OneToManyRelation, ManyToManyRelation, OneToOneRelation } from "../decorators/relations.js";
-import { getVersionField } from "../decorators/version.js";
-import { getLifecycleCallbacks } from "../decorators/lifecycle.js";
-import type { LifecycleEvent } from "../decorators/lifecycle.js";
-import { getEmbeddedFields, isEmbeddable } from "../decorators/embeddable.js";
 import type { EmbeddedField } from "../decorators/embeddable.js";
+import { getEmbeddedFields, isEmbeddable } from "../decorators/embeddable.js";
+import { getIdField } from "../decorators/id.js";
+import type { LifecycleEvent } from "../decorators/lifecycle.js";
+import { getLifecycleCallbacks } from "../decorators/lifecycle.js";
+import type {
+  ManyToManyRelation,
+  ManyToOneRelation,
+  OneToManyRelation,
+  OneToOneRelation,
+} from "../decorators/relations.js";
+import {
+  getManyToManyRelations,
+  getManyToOneRelations,
+  getOneToManyRelations,
+  getOneToOneRelations,
+} from "../decorators/relations.js";
+import { getTableName } from "../decorators/table.js";
 import { getTenantIdField } from "../decorators/tenant.js";
-import { getVectorFields } from "../decorators/vector.js";
 import type { VectorMetadataEntry } from "../decorators/vector.js";
+import { getVectorFields } from "../decorators/vector.js";
+import { getVersionField } from "../decorators/version.js";
 import { enhanceError } from "../errors/error-diagnostics.js";
 
 export interface FieldMapping {
@@ -39,27 +46,21 @@ export interface EntityMetadata {
   lifecycleCallbacks: Map<LifecycleEvent, (string | symbol)[]>;
 }
 
-export function getEntityMetadata(
-  entityClass: new (...args: any[]) => any,
-): EntityMetadata {
+export function getEntityMetadata(entityClass: new (...args: any[]) => any): EntityMetadata {
   // Create a temp instance to trigger field decorator initializers (@Column, @Id, @Version, etc.)
   // which register metadata in WeakMaps keyed on the constructor.
   new entityClass();
 
   const tableName = getTableName(entityClass);
   if (!tableName) {
-    throw enhanceError(
-      new Error(`No @Table decorator found on ${entityClass.name}.`),
-      { entityName: entityClass.name },
-    );
+    throw enhanceError(new Error(`No @Table decorator found on ${entityClass.name}.`), {
+      entityName: entityClass.name,
+    });
   }
 
   const idField = getIdField(entityClass);
   if (!idField) {
-    throw enhanceError(
-      new Error(`No @Id decorator found on ${entityClass.name}.`),
-      { entityName: entityClass.name },
-    );
+    throw enhanceError(new Error(`No @Id decorator found on ${entityClass.name}.`), { entityName: entityClass.name });
   }
 
   const columnMappings = getColumnMappings(entityClass);
@@ -76,7 +77,7 @@ export function getEntityMetadata(
     if (!isEmbeddable(embeddableClass)) {
       throw new Error(
         `Class "${embeddableClass.name}" used in @Embedded field "${String(embedded.fieldName)}" ` +
-        `is not decorated with @Embeddable.`,
+          `is not decorated with @Embeddable.`,
       );
     }
 
@@ -85,8 +86,7 @@ export function getEntityMetadata(
     const nestedEmbedded = getEmbeddedFields(embeddableClass);
     if (nestedEmbedded.length > 0) {
       throw new Error(
-        `Nested @Embedded is not supported. Class "${embeddableClass.name}" ` +
-        `contains @Embedded fields.`,
+        `Nested @Embedded is not supported. Class "${embeddableClass.name}" ` + `contains @Embedded fields.`,
       );
     }
 

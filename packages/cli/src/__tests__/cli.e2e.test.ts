@@ -2,11 +2,12 @@
  * CLI E2E tests: exercises the CLI binary as a subprocess.
  * Tests help output, migrate create, error handling, and unknown commands.
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+
 import { execFile } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync, readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 const BIN_PATH = join(__dirname, "..", "bin.ts");
 
@@ -28,11 +29,16 @@ function runCli(
         resolve({
           stdout: stdout ?? "",
           stderr: stderr ?? "",
-          exitCode: error?.code === undefined
-            ? (typeof error?.code === "number" ? error.code : (error ? 1 : 0))
-            : typeof error.code === "number"
-              ? error.code
-              : 1,
+          exitCode:
+            error?.code === undefined
+              ? typeof error?.code === "number"
+                ? error.code
+                : error
+                  ? 1
+                  : 0
+              : typeof error.code === "number"
+                ? error.code
+                : 1,
         });
       },
     );
@@ -90,10 +96,7 @@ describe("CLI E2E: migrate create", () => {
 
   it("creates a migration file in the specified directory", async () => {
     const migrationsDir = join(tempDir, "migrations");
-    const { stdout, exitCode } = await runCli([
-      "migrate", "create", "add_users_table",
-      "--dir", migrationsDir,
-    ]);
+    const { stdout, exitCode } = await runCli(["migrate", "create", "add_users_table", "--dir", migrationsDir]);
 
     expect(exitCode).toBe(0);
     expect(stdout).toContain("Created migration:");
@@ -112,10 +115,7 @@ describe("CLI E2E: migrate create", () => {
 
   it("creates migrations directory if it does not exist", async () => {
     const nested = join(tempDir, "a", "b", "migrations");
-    const { exitCode } = await runCli([
-      "migrate", "create", "init",
-      "--dir", nested,
-    ]);
+    const { exitCode } = await runCli(["migrate", "create", "init", "--dir", nested]);
 
     expect(exitCode).toBe(0);
     const files = readdirSync(nested);
@@ -130,14 +130,9 @@ describe("CLI E2E: migrate create", () => {
       connection: { filename: ":memory:" },
       migrations: { directory: "db/migrations" },
     };
-    writeFileSync(
-      join(tempDir, "espalier.config.json"),
-      JSON.stringify(config),
-    );
+    writeFileSync(join(tempDir, "espalier.config.json"), JSON.stringify(config));
 
-    const { stdout, exitCode } = await runCli(
-      ["migrate", "create", "initial", "--config", tempDir],
-    );
+    const { stdout, exitCode } = await runCli(["migrate", "create", "initial", "--config", tempDir]);
 
     expect(exitCode).toBe(0);
     expect(stdout).toContain("Created migration:");
@@ -153,8 +148,11 @@ describe("CLI E2E: migrate create", () => {
 
   it("fails with invalid migration name characters", async () => {
     const { stderr, exitCode } = await runCli([
-      "migrate", "create", "invalid!@#name",
-      "--dir", join(tempDir, "migrations"),
+      "migrate",
+      "create",
+      "invalid!@#name",
+      "--dir",
+      join(tempDir, "migrations"),
     ]);
     expect(stderr).toContain("Invalid migration name");
     expect(exitCode).not.toBe(0);
@@ -183,9 +181,7 @@ describe("CLI E2E: error handling", () => {
   it("migrate up without config file prints error", async () => {
     const tempDir = mkdtempSync(join(tmpdir(), "espalier-noconfig-"));
     try {
-      const { stderr, exitCode } = await runCli(
-        ["migrate", "up", "--config", tempDir],
-      );
+      const { stderr, exitCode } = await runCli(["migrate", "up", "--config", tempDir]);
       expect(stderr).toContain("No espalier config file found");
       expect(exitCode).not.toBe(0);
     } finally {
@@ -196,9 +192,7 @@ describe("CLI E2E: error handling", () => {
   it("migrate down without config file prints error", async () => {
     const tempDir = mkdtempSync(join(tmpdir(), "espalier-noconfig-"));
     try {
-      const { stderr, exitCode } = await runCli(
-        ["migrate", "down", "--config", tempDir],
-      );
+      const { stderr, exitCode } = await runCli(["migrate", "down", "--config", tempDir]);
       expect(stderr).toContain("No espalier config file found");
       expect(exitCode).not.toBe(0);
     } finally {
@@ -209,9 +203,7 @@ describe("CLI E2E: error handling", () => {
   it("migrate status without config file prints error", async () => {
     const tempDir = mkdtempSync(join(tmpdir(), "espalier-noconfig-"));
     try {
-      const { stderr, exitCode } = await runCli(
-        ["migrate", "status", "--config", tempDir],
-      );
+      const { stderr, exitCode } = await runCli(["migrate", "status", "--config", tempDir]);
       expect(stderr).toContain("No espalier config file found");
       expect(exitCode).not.toBe(0);
     } finally {

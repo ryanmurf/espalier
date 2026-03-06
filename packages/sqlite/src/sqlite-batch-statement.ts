@@ -1,6 +1,6 @@
 import type Database from "better-sqlite3";
 import type { BatchStatement, SqlValue } from "espalier-jdbc";
-import { QueryError, convertPositionalParams } from "espalier-jdbc";
+import { convertPositionalParams, QueryError } from "espalier-jdbc";
 import { mapSqliteErrorCode } from "./error-codes.js";
 
 /** Convert SqlValue to a type that better-sqlite3 accepts. */

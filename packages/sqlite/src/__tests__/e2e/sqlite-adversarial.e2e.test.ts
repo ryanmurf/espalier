@@ -3,8 +3,9 @@
  * Tests SQL injection, type coercion edge cases, boundary values,
  * Unicode/special characters, and concurrent write patterns.
  */
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+
 import type { Connection } from "espalier-jdbc";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { SqliteDataSource } from "../../sqlite-data-source.js";
 
 // Graceful skip if better-sqlite3 native module can't load
@@ -56,17 +57,13 @@ describe.skipIf(!canLoadSqlite)("E2E: SQLite adversarial tests", () => {
 
   describe("SQL injection resistance", () => {
     it("handles single quotes in parameterized values", async () => {
-      const ps = conn.prepareStatement(
-        "INSERT INTO adv_test (name, value) VALUES ($1, $2)",
-      );
+      const ps = conn.prepareStatement("INSERT INTO adv_test (name, value) VALUES ($1, $2)");
       ps.setParameter(1, "O'Brien");
       ps.setParameter(2, "It's a test");
       const count = await ps.executeUpdate();
       expect(count).toBe(1);
 
-      const query = conn.prepareStatement(
-        "SELECT name, value FROM adv_test WHERE name = $1",
-      );
+      const query = conn.prepareStatement("SELECT name, value FROM adv_test WHERE name = $1");
       query.setParameter(1, "O'Brien");
       const rs = await query.executeQuery();
       expect(await rs.next()).toBe(true);
@@ -75,9 +72,7 @@ describe.skipIf(!canLoadSqlite)("E2E: SQLite adversarial tests", () => {
     });
 
     it("handles semicolons in parameterized values (no multi-statement injection)", async () => {
-      const ps = conn.prepareStatement(
-        "INSERT INTO adv_test (name) VALUES ($1)",
-      );
+      const ps = conn.prepareStatement("INSERT INTO adv_test (name) VALUES ($1)");
       ps.setParameter(1, "test; DROP TABLE adv_test; --");
       const count = await ps.executeUpdate();
       expect(count).toBe(1);
@@ -90,24 +85,18 @@ describe.skipIf(!canLoadSqlite)("E2E: SQLite adversarial tests", () => {
     });
 
     it("handles SQL keywords in parameterized values", async () => {
-      const ps = conn.prepareStatement(
-        "INSERT INTO adv_test (name) VALUES ($1)",
-      );
+      const ps = conn.prepareStatement("INSERT INTO adv_test (name) VALUES ($1)");
       ps.setParameter(1, "SELECT * FROM sqlite_master WHERE type='table'");
       const count = await ps.executeUpdate();
       expect(count).toBe(1);
     });
 
     it("handles double quotes in parameterized values", async () => {
-      const ps = conn.prepareStatement(
-        "INSERT INTO adv_test (name) VALUES ($1)",
-      );
+      const ps = conn.prepareStatement("INSERT INTO adv_test (name) VALUES ($1)");
       ps.setParameter(1, 'value with "double quotes"');
       await ps.executeUpdate();
 
-      const query = conn.prepareStatement(
-        "SELECT name FROM adv_test WHERE name = $1",
-      );
+      const query = conn.prepareStatement("SELECT name FROM adv_test WHERE name = $1");
       query.setParameter(1, 'value with "double quotes"');
       const rs = await query.executeQuery();
       expect(await rs.next()).toBe(true);
@@ -115,15 +104,11 @@ describe.skipIf(!canLoadSqlite)("E2E: SQLite adversarial tests", () => {
     });
 
     it("handles backslash sequences in parameterized values", async () => {
-      const ps = conn.prepareStatement(
-        "INSERT INTO adv_test (name) VALUES ($1)",
-      );
+      const ps = conn.prepareStatement("INSERT INTO adv_test (name) VALUES ($1)");
       ps.setParameter(1, "path\\to\\file");
       await ps.executeUpdate();
 
-      const query = conn.prepareStatement(
-        "SELECT name FROM adv_test WHERE name = $1",
-      );
+      const query = conn.prepareStatement("SELECT name FROM adv_test WHERE name = $1");
       query.setParameter(1, "path\\to\\file");
       const rs = await query.executeQuery();
       expect(await rs.next()).toBe(true);
@@ -137,17 +122,13 @@ describe.skipIf(!canLoadSqlite)("E2E: SQLite adversarial tests", () => {
 
   describe("type coercion edge cases", () => {
     it("handles null values correctly", async () => {
-      const ps = conn.prepareStatement(
-        "INSERT INTO adv_test (name, value, num_val) VALUES ($1, $2, $3)",
-      );
+      const ps = conn.prepareStatement("INSERT INTO adv_test (name, value, num_val) VALUES ($1, $2, $3)");
       ps.setParameter(1, "null_test");
       ps.setParameter(2, null);
       ps.setParameter(3, null);
       await ps.executeUpdate();
 
-      const query = conn.prepareStatement(
-        "SELECT value, num_val FROM adv_test WHERE name = $1",
-      );
+      const query = conn.prepareStatement("SELECT value, num_val FROM adv_test WHERE name = $1");
       query.setParameter(1, "null_test");
       const rs = await query.executeQuery();
       expect(await rs.next()).toBe(true);
@@ -156,16 +137,12 @@ describe.skipIf(!canLoadSqlite)("E2E: SQLite adversarial tests", () => {
     });
 
     it("handles empty string vs null", async () => {
-      const ps = conn.prepareStatement(
-        "INSERT INTO adv_test (name, value) VALUES ($1, $2)",
-      );
+      const ps = conn.prepareStatement("INSERT INTO adv_test (name, value) VALUES ($1, $2)");
       ps.setParameter(1, "empty_string_test");
       ps.setParameter(2, "");
       await ps.executeUpdate();
 
-      const query = conn.prepareStatement(
-        "SELECT value FROM adv_test WHERE name = $1",
-      );
+      const query = conn.prepareStatement("SELECT value FROM adv_test WHERE name = $1");
       query.setParameter(1, "empty_string_test");
       const rs = await query.executeQuery();
       expect(await rs.next()).toBe(true);
@@ -174,16 +151,12 @@ describe.skipIf(!canLoadSqlite)("E2E: SQLite adversarial tests", () => {
     });
 
     it("handles NaN stored as REAL", async () => {
-      const ps = conn.prepareStatement(
-        "INSERT INTO adv_test (name, num_val) VALUES ($1, $2)",
-      );
+      const ps = conn.prepareStatement("INSERT INTO adv_test (name, num_val) VALUES ($1, $2)");
       ps.setParameter(1, "nan_test");
       ps.setParameter(2, NaN);
       await ps.executeUpdate();
 
-      const query = conn.prepareStatement(
-        "SELECT num_val FROM adv_test WHERE name = $1",
-      );
+      const query = conn.prepareStatement("SELECT num_val FROM adv_test WHERE name = $1");
       query.setParameter(1, "nan_test");
       const rs = await query.executeQuery();
       expect(await rs.next()).toBe(true);
@@ -192,16 +165,12 @@ describe.skipIf(!canLoadSqlite)("E2E: SQLite adversarial tests", () => {
     });
 
     it("handles Infinity stored as REAL", async () => {
-      const ps = conn.prepareStatement(
-        "INSERT INTO adv_test (name, num_val) VALUES ($1, $2)",
-      );
+      const ps = conn.prepareStatement("INSERT INTO adv_test (name, num_val) VALUES ($1, $2)");
       ps.setParameter(1, "infinity_test");
       ps.setParameter(2, Infinity);
       await ps.executeUpdate();
 
-      const query = conn.prepareStatement(
-        "SELECT num_val FROM adv_test WHERE name = $1",
-      );
+      const query = conn.prepareStatement("SELECT num_val FROM adv_test WHERE name = $1");
       query.setParameter(1, "infinity_test");
       const rs = await query.executeQuery();
       expect(await rs.next()).toBe(true);
@@ -213,16 +182,12 @@ describe.skipIf(!canLoadSqlite)("E2E: SQLite adversarial tests", () => {
 
     it("handles very long strings", async () => {
       const longString = "x".repeat(100_000);
-      const ps = conn.prepareStatement(
-        "INSERT INTO adv_test (name, value) VALUES ($1, $2)",
-      );
+      const ps = conn.prepareStatement("INSERT INTO adv_test (name, value) VALUES ($1, $2)");
       ps.setParameter(1, "long_string_test");
       ps.setParameter(2, longString);
       await ps.executeUpdate();
 
-      const query = conn.prepareStatement(
-        "SELECT value FROM adv_test WHERE name = $1",
-      );
+      const query = conn.prepareStatement("SELECT value FROM adv_test WHERE name = $1");
       query.setParameter(1, "long_string_test");
       const rs = await query.executeQuery();
       expect(await rs.next()).toBe(true);
@@ -230,31 +195,23 @@ describe.skipIf(!canLoadSqlite)("E2E: SQLite adversarial tests", () => {
     });
 
     it("handles boolean values stored as INTEGER", async () => {
-      const ps = conn.prepareStatement(
-        "INSERT INTO adv_test (name, int_val) VALUES ($1, $2)",
-      );
+      const ps = conn.prepareStatement("INSERT INTO adv_test (name, int_val) VALUES ($1, $2)");
       ps.setParameter(1, "bool_true");
       ps.setParameter(2, true);
       await ps.executeUpdate();
 
-      const ps2 = conn.prepareStatement(
-        "INSERT INTO adv_test (name, int_val) VALUES ($1, $2)",
-      );
+      const ps2 = conn.prepareStatement("INSERT INTO adv_test (name, int_val) VALUES ($1, $2)");
       ps2.setParameter(1, "bool_false");
       ps2.setParameter(2, false);
       await ps2.executeUpdate();
 
-      const query = conn.prepareStatement(
-        "SELECT int_val FROM adv_test WHERE name = $1",
-      );
+      const query = conn.prepareStatement("SELECT int_val FROM adv_test WHERE name = $1");
       query.setParameter(1, "bool_true");
       const rs = await query.executeQuery();
       expect(await rs.next()).toBe(true);
       expect(rs.getNumber("int_val")).toBe(1);
 
-      const query2 = conn.prepareStatement(
-        "SELECT int_val FROM adv_test WHERE name = $1",
-      );
+      const query2 = conn.prepareStatement("SELECT int_val FROM adv_test WHERE name = $1");
       query2.setParameter(1, "bool_false");
       const rs2 = await query2.executeQuery();
       expect(await rs2.next()).toBe(true);
@@ -268,16 +225,12 @@ describe.skipIf(!canLoadSqlite)("E2E: SQLite adversarial tests", () => {
 
   describe("boundary values", () => {
     it("handles MAX_SAFE_INTEGER", async () => {
-      const ps = conn.prepareStatement(
-        "INSERT INTO adv_test (name, int_val) VALUES ($1, $2)",
-      );
+      const ps = conn.prepareStatement("INSERT INTO adv_test (name, int_val) VALUES ($1, $2)");
       ps.setParameter(1, "max_safe_int");
       ps.setParameter(2, Number.MAX_SAFE_INTEGER);
       await ps.executeUpdate();
 
-      const query = conn.prepareStatement(
-        "SELECT int_val FROM adv_test WHERE name = $1",
-      );
+      const query = conn.prepareStatement("SELECT int_val FROM adv_test WHERE name = $1");
       query.setParameter(1, "max_safe_int");
       const rs = await query.executeQuery();
       expect(await rs.next()).toBe(true);
@@ -285,16 +238,12 @@ describe.skipIf(!canLoadSqlite)("E2E: SQLite adversarial tests", () => {
     });
 
     it("handles negative numbers", async () => {
-      const ps = conn.prepareStatement(
-        "INSERT INTO adv_test (name, int_val) VALUES ($1, $2)",
-      );
+      const ps = conn.prepareStatement("INSERT INTO adv_test (name, int_val) VALUES ($1, $2)");
       ps.setParameter(1, "negative");
       ps.setParameter(2, -2147483648);
       await ps.executeUpdate();
 
-      const query = conn.prepareStatement(
-        "SELECT int_val FROM adv_test WHERE name = $1",
-      );
+      const query = conn.prepareStatement("SELECT int_val FROM adv_test WHERE name = $1");
       query.setParameter(1, "negative");
       const rs = await query.executeQuery();
       expect(await rs.next()).toBe(true);
@@ -302,16 +251,12 @@ describe.skipIf(!canLoadSqlite)("E2E: SQLite adversarial tests", () => {
     });
 
     it("handles zero", async () => {
-      const ps = conn.prepareStatement(
-        "INSERT INTO adv_test (name, int_val) VALUES ($1, $2)",
-      );
+      const ps = conn.prepareStatement("INSERT INTO adv_test (name, int_val) VALUES ($1, $2)");
       ps.setParameter(1, "zero_val");
       ps.setParameter(2, 0);
       await ps.executeUpdate();
 
-      const query = conn.prepareStatement(
-        "SELECT int_val FROM adv_test WHERE name = $1",
-      );
+      const query = conn.prepareStatement("SELECT int_val FROM adv_test WHERE name = $1");
       query.setParameter(1, "zero_val");
       const rs = await query.executeQuery();
       expect(await rs.next()).toBe(true);
@@ -319,16 +264,12 @@ describe.skipIf(!canLoadSqlite)("E2E: SQLite adversarial tests", () => {
     });
 
     it("handles floating point precision", async () => {
-      const ps = conn.prepareStatement(
-        "INSERT INTO adv_test (name, num_val) VALUES ($1, $2)",
-      );
+      const ps = conn.prepareStatement("INSERT INTO adv_test (name, num_val) VALUES ($1, $2)");
       ps.setParameter(1, "float_precision");
       ps.setParameter(2, 0.1 + 0.2);
       await ps.executeUpdate();
 
-      const query = conn.prepareStatement(
-        "SELECT num_val FROM adv_test WHERE name = $1",
-      );
+      const query = conn.prepareStatement("SELECT num_val FROM adv_test WHERE name = $1");
       query.setParameter(1, "float_precision");
       const rs = await query.executeQuery();
       expect(await rs.next()).toBe(true);
@@ -343,16 +284,12 @@ describe.skipIf(!canLoadSqlite)("E2E: SQLite adversarial tests", () => {
 
   describe("Unicode and special characters", () => {
     it("handles emoji characters", async () => {
-      const ps = conn.prepareStatement(
-        "INSERT INTO adv_test (name, value) VALUES ($1, $2)",
-      );
+      const ps = conn.prepareStatement("INSERT INTO adv_test (name, value) VALUES ($1, $2)");
       ps.setParameter(1, "emoji_test");
       ps.setParameter(2, "Hello World! \u{1F600}\u{1F4AF}\u{1F680}");
       await ps.executeUpdate();
 
-      const query = conn.prepareStatement(
-        "SELECT value FROM adv_test WHERE name = $1",
-      );
+      const query = conn.prepareStatement("SELECT value FROM adv_test WHERE name = $1");
       query.setParameter(1, "emoji_test");
       const rs = await query.executeQuery();
       expect(await rs.next()).toBe(true);
@@ -360,16 +297,12 @@ describe.skipIf(!canLoadSqlite)("E2E: SQLite adversarial tests", () => {
     });
 
     it("handles null bytes in strings", async () => {
-      const ps = conn.prepareStatement(
-        "INSERT INTO adv_test (name, value) VALUES ($1, $2)",
-      );
+      const ps = conn.prepareStatement("INSERT INTO adv_test (name, value) VALUES ($1, $2)");
       ps.setParameter(1, "null_byte_test");
       ps.setParameter(2, "before\0after");
       await ps.executeUpdate();
 
-      const query = conn.prepareStatement(
-        "SELECT value FROM adv_test WHERE name = $1",
-      );
+      const query = conn.prepareStatement("SELECT value FROM adv_test WHERE name = $1");
       query.setParameter(1, "null_byte_test");
       const rs = await query.executeQuery();
       expect(await rs.next()).toBe(true);
@@ -380,16 +313,12 @@ describe.skipIf(!canLoadSqlite)("E2E: SQLite adversarial tests", () => {
 
     it("handles RTL text (Arabic)", async () => {
       const rtlText = "\u0645\u0631\u062D\u0628\u0627 \u0628\u0627\u0644\u0639\u0627\u0644\u0645";
-      const ps = conn.prepareStatement(
-        "INSERT INTO adv_test (name, value) VALUES ($1, $2)",
-      );
+      const ps = conn.prepareStatement("INSERT INTO adv_test (name, value) VALUES ($1, $2)");
       ps.setParameter(1, "rtl_test");
       ps.setParameter(2, rtlText);
       await ps.executeUpdate();
 
-      const query = conn.prepareStatement(
-        "SELECT value FROM adv_test WHERE name = $1",
-      );
+      const query = conn.prepareStatement("SELECT value FROM adv_test WHERE name = $1");
       query.setParameter(1, "rtl_test");
       const rs = await query.executeQuery();
       expect(await rs.next()).toBe(true);
@@ -398,16 +327,12 @@ describe.skipIf(!canLoadSqlite)("E2E: SQLite adversarial tests", () => {
 
     it("handles CJK characters", async () => {
       const cjkText = "\u4F60\u597D\u4E16\u754C \u3053\u3093\u306B\u3061\u306F \uD55C\uAD6D\uC5B4";
-      const ps = conn.prepareStatement(
-        "INSERT INTO adv_test (name, value) VALUES ($1, $2)",
-      );
+      const ps = conn.prepareStatement("INSERT INTO adv_test (name, value) VALUES ($1, $2)");
       ps.setParameter(1, "cjk_test");
       ps.setParameter(2, cjkText);
       await ps.executeUpdate();
 
-      const query = conn.prepareStatement(
-        "SELECT value FROM adv_test WHERE name = $1",
-      );
+      const query = conn.prepareStatement("SELECT value FROM adv_test WHERE name = $1");
       query.setParameter(1, "cjk_test");
       const rs = await query.executeQuery();
       expect(await rs.next()).toBe(true);
@@ -417,16 +342,12 @@ describe.skipIf(!canLoadSqlite)("E2E: SQLite adversarial tests", () => {
     it("handles mixed Unicode combining characters", async () => {
       // e + combining acute accent
       const combining = "e\u0301";
-      const ps = conn.prepareStatement(
-        "INSERT INTO adv_test (name, value) VALUES ($1, $2)",
-      );
+      const ps = conn.prepareStatement("INSERT INTO adv_test (name, value) VALUES ($1, $2)");
       ps.setParameter(1, "combining_test");
       ps.setParameter(2, combining);
       await ps.executeUpdate();
 
-      const query = conn.prepareStatement(
-        "SELECT value FROM adv_test WHERE name = $1",
-      );
+      const query = conn.prepareStatement("SELECT value FROM adv_test WHERE name = $1");
       query.setParameter(1, "combining_test");
       const rs = await query.executeQuery();
       expect(await rs.next()).toBe(true);
@@ -442,9 +363,7 @@ describe.skipIf(!canLoadSqlite)("E2E: SQLite adversarial tests", () => {
     it("handles rapid sequential inserts", async () => {
       const promises: Promise<number>[] = [];
       for (let i = 0; i < 100; i++) {
-        const ps = conn.prepareStatement(
-          "INSERT INTO adv_test (name, int_val) VALUES ($1, $2)",
-        );
+        const ps = conn.prepareStatement("INSERT INTO adv_test (name, int_val) VALUES ($1, $2)");
         ps.setParameter(1, `rapid_${i}`);
         ps.setParameter(2, i);
         promises.push(ps.executeUpdate());
@@ -455,9 +374,7 @@ describe.skipIf(!canLoadSqlite)("E2E: SQLite adversarial tests", () => {
 
       // Verify all rows inserted
       const stmt = conn.createStatement();
-      const rs = await stmt.executeQuery(
-        "SELECT count(*) as cnt FROM adv_test WHERE name LIKE 'rapid_%'",
-      );
+      const rs = await stmt.executeQuery("SELECT count(*) as cnt FROM adv_test WHERE name LIKE 'rapid_%'");
       expect(await rs.next()).toBe(true);
       expect(rs.getNumber("cnt")).toBe(100);
     });
@@ -465,16 +382,12 @@ describe.skipIf(!canLoadSqlite)("E2E: SQLite adversarial tests", () => {
     it("handles insert + select interleaving", async () => {
       // Insert and immediately read back
       for (let i = 0; i < 10; i++) {
-        const ps = conn.prepareStatement(
-          "INSERT INTO adv_test (name, int_val) VALUES ($1, $2)",
-        );
+        const ps = conn.prepareStatement("INSERT INTO adv_test (name, int_val) VALUES ($1, $2)");
         ps.setParameter(1, `interleave_${i}`);
         ps.setParameter(2, i * 10);
         await ps.executeUpdate();
 
-        const query = conn.prepareStatement(
-          "SELECT int_val FROM adv_test WHERE name = $1",
-        );
+        const query = conn.prepareStatement("SELECT int_val FROM adv_test WHERE name = $1");
         query.setParameter(1, `interleave_${i}`);
         const rs = await query.executeQuery();
         expect(await rs.next()).toBe(true);
@@ -485,9 +398,7 @@ describe.skipIf(!canLoadSqlite)("E2E: SQLite adversarial tests", () => {
     it("handles concurrent reads while writing", async () => {
       // Insert a batch of rows
       for (let i = 0; i < 5; i++) {
-        const ps = conn.prepareStatement(
-          "INSERT INTO adv_test (name, int_val) VALUES ($1, $2)",
-        );
+        const ps = conn.prepareStatement("INSERT INTO adv_test (name, int_val) VALUES ($1, $2)");
         ps.setParameter(1, `concurrent_${i}`);
         ps.setParameter(2, i);
         await ps.executeUpdate();
@@ -496,9 +407,7 @@ describe.skipIf(!canLoadSqlite)("E2E: SQLite adversarial tests", () => {
       // Concurrent reads should all succeed
       const readPromises = Array.from({ length: 10 }, async () => {
         const stmt = conn.createStatement();
-        const rs = await stmt.executeQuery(
-          "SELECT count(*) as cnt FROM adv_test WHERE name LIKE 'concurrent_%'",
-        );
+        const rs = await stmt.executeQuery("SELECT count(*) as cnt FROM adv_test WHERE name LIKE 'concurrent_%'");
         expect(await rs.next()).toBe(true);
         return rs.getNumber("cnt");
       });

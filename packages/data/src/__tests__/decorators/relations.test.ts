@@ -1,8 +1,15 @@
-import { describe, it, expect } from "vitest";
-import { ManyToOne, getManyToOneRelations, OneToMany, getOneToManyRelations, ManyToMany, getManyToManyRelations } from "../../decorators/relations.js";
-import { Table } from "../../decorators/table.js";
+import { describe, expect, it } from "vitest";
 import { Column } from "../../decorators/column.js";
 import { Id } from "../../decorators/id.js";
+import {
+  getManyToManyRelations,
+  getManyToOneRelations,
+  getOneToManyRelations,
+  ManyToMany,
+  ManyToOne,
+  OneToMany,
+} from "../../decorators/relations.js";
+import { Table } from "../../decorators/table.js";
 import { getEntityMetadata } from "../../mapping/entity-metadata.js";
 import { DdlGenerator } from "../../schema/ddl-generator.js";
 

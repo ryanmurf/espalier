@@ -9,10 +9,7 @@
  * For "address.street", reads entity.address.street.
  * For simple "name", reads entity.name.
  */
-export function getFieldValue(
-  entity: Record<string | symbol, unknown>,
-  fieldName: string | symbol,
-): unknown {
+export function getFieldValue(entity: Record<string | symbol, unknown>, fieldName: string | symbol): unknown {
   if (typeof fieldName === "symbol") return entity[fieldName];
   if (!fieldName.includes(".")) return entity[fieldName];
   const parts = fieldName.split(".");

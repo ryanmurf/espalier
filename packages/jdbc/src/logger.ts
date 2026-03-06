@@ -99,9 +99,8 @@ export class ConsoleLogger implements Logger {
     const timestamp = new Date().toISOString();
     const label = LEVEL_LABELS[level] ?? "UNKNOWN";
     const prefix = `${timestamp} ${label} [${this.name}]`;
-    const line = context !== undefined
-      ? `${prefix} ${message} ${ConsoleLogger.safeStringify(context)}`
-      : `${prefix} ${message}`;
+    const line =
+      context !== undefined ? `${prefix} ${message} ${ConsoleLogger.safeStringify(context)}` : `${prefix} ${message}`;
 
     if (level >= LogLevel.ERROR) {
       console.error(line);

@@ -1,13 +1,9 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { Connection, DataSource } from "espalier-jdbc";
-import type { DomainEvent, OutboxEntry } from "../types.js";
-import { OutboxStore } from "../outbox/outbox-store.js";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { getOutboxMetadata, isOutboxEntity, Outbox } from "../outbox/outbox-decorator.js";
 import { OutboxPublisher } from "../outbox/outbox-publisher.js";
-import {
-  Outbox,
-  getOutboxMetadata,
-  isOutboxEntity,
-} from "../outbox/outbox-decorator.js";
+import { OutboxStore } from "../outbox/outbox-store.js";
+import type { DomainEvent, OutboxEntry } from "../types.js";
 
 // ── Mock helpers ──────────────────────────────────────────────────────
 
@@ -32,10 +28,7 @@ function createMockResultSet(rows: Record<string, unknown>[]) {
   };
 }
 
-function createMockPreparedStatement(
-  rs?: ReturnType<typeof createMockResultSet>,
-  updateCount = 0,
-) {
+function createMockPreparedStatement(rs?: ReturnType<typeof createMockResultSet>, updateCount = 0) {
   return {
     setParameter: vi.fn(),
     executeQuery: vi.fn(async () => rs ?? createMockResultSet([])),
@@ -44,9 +37,7 @@ function createMockPreparedStatement(
   };
 }
 
-function createMockConnection(
-  stmts: ReturnType<typeof createMockPreparedStatement>[],
-) {
+function createMockConnection(stmts: ReturnType<typeof createMockPreparedStatement>[]) {
   let callIdx = 0;
   return {
     prepareStatement: vi.fn((_sql: string) => {
@@ -124,10 +115,7 @@ describe("OutboxStore", () => {
       const stmt = createMockPreparedStatement();
       const conn = createMockConnection([stmt]);
 
-      const entries = await store.writeEvents(conn, [
-        makeEvent("OrderCreated"),
-        makeEvent("ItemAdded"),
-      ]);
+      const entries = await store.writeEvents(conn, [makeEvent("OrderCreated"), makeEvent("ItemAdded")]);
 
       expect(entries).toHaveLength(2);
       expect(entries[0].id).toBe("outbox-000000000001");
@@ -163,9 +151,7 @@ describe("OutboxStore", () => {
       await store.writeEvents(conn, [makeEvent("X")]);
 
       const calls = stmt.setParameter.mock.calls;
-      const payloadParam = calls.find(
-        (c: unknown[]) => c[1] === JSON.stringify({ key: "value" }),
-      );
+      const payloadParam = calls.find((c: unknown[]) => c[1] === JSON.stringify({ key: "value" }));
       expect(payloadParam).toBeTruthy();
     });
 
@@ -175,9 +161,7 @@ describe("OutboxStore", () => {
       stmt.executeUpdate.mockRejectedValue(new Error("DB error"));
       const conn = createMockConnection([stmt]);
 
-      await expect(
-        store.writeEvents(conn, [makeEvent("X")]),
-      ).rejects.toThrow("DB error");
+      await expect(store.writeEvents(conn, [makeEvent("X")])).rejects.toThrow("DB error");
 
       expect(stmt.close).toHaveBeenCalled();
     });
@@ -188,14 +172,22 @@ describe("OutboxStore", () => {
       const store = new OutboxStore();
       const rows = [
         {
-          id: "e1", aggregate_type: "Order", aggregate_id: "a1",
-          event_type: "Created", payload: '{"x":1}',
-          created_at: "2026-01-01T00:00:00Z", published_at: null,
+          id: "e1",
+          aggregate_type: "Order",
+          aggregate_id: "a1",
+          event_type: "Created",
+          payload: '{"x":1}',
+          created_at: "2026-01-01T00:00:00Z",
+          published_at: null,
         },
         {
-          id: "e2", aggregate_type: "Order", aggregate_id: "a1",
-          event_type: "Updated", payload: '{"x":2}',
-          created_at: "2026-01-01T01:00:00Z", published_at: null,
+          id: "e2",
+          aggregate_type: "Order",
+          aggregate_id: "a1",
+          event_type: "Updated",
+          payload: '{"x":2}',
+          created_at: "2026-01-01T01:00:00Z",
+          published_at: null,
         },
       ];
 
@@ -239,11 +231,17 @@ describe("OutboxStore", () => {
 
     it("handles already-parsed payload objects", async () => {
       const store = new OutboxStore();
-      const rs = createMockResultSet([{
-        id: "e1", aggregate_type: "T", aggregate_id: "a",
-        event_type: "X", payload: { parsed: true },
-        created_at: new Date(), published_at: null,
-      }]);
+      const rs = createMockResultSet([
+        {
+          id: "e1",
+          aggregate_type: "T",
+          aggregate_id: "a",
+          event_type: "X",
+          payload: { parsed: true },
+          created_at: new Date(),
+          published_at: null,
+        },
+      ]);
       const stmt = createMockPreparedStatement(rs);
       const conn = createMockConnection([stmt]);
 
@@ -352,9 +350,7 @@ describe("OutboxStore", () => {
     });
 
     it("rejects invalid table names with special characters", () => {
-      expect(() => new OutboxStore({ tableName: "my-outbox.v2" })).toThrow(
-        /Invalid tableName/,
-      );
+      expect(() => new OutboxStore({ tableName: "my-outbox.v2" })).toThrow(/Invalid tableName/);
     });
   });
 });
@@ -414,14 +410,22 @@ describe("OutboxPublisher", () => {
   it("poll() fetches unpublished entries and publishes them", async () => {
     const rows = [
       {
-        id: "e1", aggregate_type: "Order", aggregate_id: "a1",
-        event_type: "Created", payload: '{"x":1}',
-        created_at: "2026-01-01", published_at: null,
+        id: "e1",
+        aggregate_type: "Order",
+        aggregate_id: "a1",
+        event_type: "Created",
+        payload: '{"x":1}',
+        created_at: "2026-01-01",
+        published_at: null,
       },
       {
-        id: "e2", aggregate_type: "Order", aggregate_id: "a1",
-        event_type: "Updated", payload: '{"x":2}',
-        created_at: "2026-01-02", published_at: null,
+        id: "e2",
+        aggregate_type: "Order",
+        aggregate_id: "a1",
+        event_type: "Updated",
+        payload: '{"x":2}',
+        created_at: "2026-01-02",
+        published_at: null,
       },
     ];
 
@@ -456,11 +460,17 @@ describe("OutboxPublisher", () => {
   });
 
   it("poll() calls onError and returns 0 on publish error", async () => {
-    const rows = [{
-      id: "e1", aggregate_type: "T", aggregate_id: "a",
-      event_type: "X", payload: "{}", created_at: "2026-01-01",
-      published_at: null,
-    }];
+    const rows = [
+      {
+        id: "e1",
+        aggregate_type: "T",
+        aggregate_id: "a",
+        event_type: "X",
+        payload: "{}",
+        created_at: "2026-01-01",
+        published_at: null,
+      },
+    ];
 
     const fetchRs = createMockResultSet(rows);
     const fetchStmt = createMockPreparedStatement(fetchRs);

@@ -1,9 +1,9 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { createTestDataSource, isPostgresAvailable } from "./setup.js";
-import { PgSchemaIntrospector } from "../../pg-schema-introspector.js";
-import { DdlGenerator, Table, Column, Id, CreatedDate, LastModifiedDate } from "espalier-data";
-import type { PgDataSource } from "../../pg-data-source.js";
+import { Column, CreatedDate, DdlGenerator, Id, LastModifiedDate, Table } from "espalier-data";
 import type { Connection } from "espalier-jdbc";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import type { PgDataSource } from "../../pg-data-source.js";
+import { PgSchemaIntrospector } from "../../pg-schema-introspector.js";
+import { createTestDataSource, isPostgresAvailable } from "./setup.js";
 
 const canConnect = await isPostgresAvailable();
 
@@ -166,13 +166,9 @@ describe.skipIf(!canConnect)("DdlGenerator E2E (round-trip)", () => {
       await stmt.executeUpdate(createSql);
 
       // Insert a row without specifying status (has DEFAULT 'pending')
-      await stmt.executeUpdate(
-        "INSERT INTO e2e_ddl_constrained (name, email) VALUES ('Alice', 'alice@test.com')",
-      );
+      await stmt.executeUpdate("INSERT INTO e2e_ddl_constrained (name, email) VALUES ('Alice', 'alice@test.com')");
 
-      const ps = conn.prepareStatement(
-        "SELECT status FROM e2e_ddl_constrained WHERE email = $1",
-      );
+      const ps = conn.prepareStatement("SELECT status FROM e2e_ddl_constrained WHERE email = $1");
       ps.setParameter(1, "alice@test.com");
       const rs = await ps.executeQuery();
       expect(await rs.next()).toBe(true);
@@ -259,13 +255,9 @@ describe.skipIf(!canConnect)("DdlGenerator E2E (round-trip)", () => {
     it("should auto-populate @CreatedDate on insert", async () => {
       const before = new Date();
       const stmt = conn.createStatement();
-      await stmt.executeUpdate(
-        "INSERT INTO e2e_ddl_audited (title) VALUES ('test entry')",
-      );
+      await stmt.executeUpdate("INSERT INTO e2e_ddl_audited (title) VALUES ('test entry')");
 
-      const ps = conn.prepareStatement(
-        "SELECT created_at FROM e2e_ddl_audited WHERE title = $1",
-      );
+      const ps = conn.prepareStatement("SELECT created_at FROM e2e_ddl_audited WHERE title = $1");
       ps.setParameter(1, "test entry");
       const rs = await ps.executeQuery();
       expect(await rs.next()).toBe(true);

@@ -1,15 +1,9 @@
-import type { PoolConnection as MysqlPoolConnection, FieldPacket, ResultSetHeader } from "mysql2/promise";
-import type {
-  Statement,
-  PreparedStatement,
-  ResultSet,
-  StreamingResultSet,
-  SqlValue,
-} from "espalier-jdbc";
-import { QueryError, convertPositionalParams, getGlobalLogger, LogLevel } from "espalier-jdbc";
-import { MysqlResultSet } from "./mysql-result-set.js";
-import { MysqlCursorResultSet } from "./mysql-cursor-result-set.js";
+import type { PreparedStatement, ResultSet, SqlValue, Statement, StreamingResultSet } from "espalier-jdbc";
+import { convertPositionalParams, getGlobalLogger, LogLevel, QueryError } from "espalier-jdbc";
+import type { FieldPacket, PoolConnection as MysqlPoolConnection, ResultSetHeader } from "mysql2/promise";
 import { mapMysqlErrorCode } from "./error-codes.js";
+import { MysqlCursorResultSet } from "./mysql-cursor-result-set.js";
+import { MysqlResultSet } from "./mysql-result-set.js";
 
 function truncateSql(sql: string): string {
   return sql.length > 200 ? sql.slice(0, 200) + "..." : sql;
@@ -26,12 +20,13 @@ export class MysqlStatement implements Statement {
       if (logger.isEnabled(LogLevel.DEBUG)) {
         logger.debug("query executed", { sql: truncateSql(sql), duration: Date.now() - startTime });
       }
-      return new MysqlResultSet(
-        rows as Record<string, unknown>[],
-        fields as FieldPacket[],
-      );
+      return new MysqlResultSet(rows as Record<string, unknown>[], fields as FieldPacket[]);
     } catch (err) {
-      logger.error("query failed", { sql: truncateSql(sql), duration: Date.now() - startTime, error: (err as Error).message });
+      logger.error("query failed", {
+        sql: truncateSql(sql),
+        duration: Date.now() - startTime,
+        error: (err as Error).message,
+      });
       throw new QueryError(
         `Failed to execute query: ${(err as Error).message}`,
         sql,
@@ -51,7 +46,11 @@ export class MysqlStatement implements Statement {
       }
       return (result as ResultSetHeader).affectedRows ?? 0;
     } catch (err) {
-      logger.error("update failed", { sql: truncateSql(sql), duration: Date.now() - startTime, error: (err as Error).message });
+      logger.error("update failed", {
+        sql: truncateSql(sql),
+        duration: Date.now() - startTime,
+        error: (err as Error).message,
+      });
       throw new QueryError(
         `Failed to execute update: ${(err as Error).message}`,
         sql,
@@ -107,14 +106,20 @@ export class MysqlPreparedStatement extends MysqlStatement implements PreparedSt
     try {
       const [rows, fields] = await this.connection.execute(queryText, params);
       if (logger.isEnabled(LogLevel.DEBUG)) {
-        logger.debug("prepared query executed", { sql: truncateSql(queryText), paramCount: params.length, duration: Date.now() - startTime });
+        logger.debug("prepared query executed", {
+          sql: truncateSql(queryText),
+          paramCount: params.length,
+          duration: Date.now() - startTime,
+        });
       }
-      return new MysqlResultSet(
-        rows as Record<string, unknown>[],
-        fields as FieldPacket[],
-      );
+      return new MysqlResultSet(rows as Record<string, unknown>[], fields as FieldPacket[]);
     } catch (err) {
-      logger.error("prepared query failed", { sql: truncateSql(queryText), paramCount: params.length, duration: Date.now() - startTime, error: (err as Error).message });
+      logger.error("prepared query failed", {
+        sql: truncateSql(queryText),
+        paramCount: params.length,
+        duration: Date.now() - startTime,
+        error: (err as Error).message,
+      });
       throw new QueryError(
         `Failed to execute prepared query: ${(err as Error).message}`,
         queryText,
@@ -133,11 +138,20 @@ export class MysqlPreparedStatement extends MysqlStatement implements PreparedSt
     try {
       const [result] = await this.connection.execute(queryText, params);
       if (logger.isEnabled(LogLevel.DEBUG)) {
-        logger.debug("prepared update executed", { sql: truncateSql(queryText), paramCount: params.length, duration: Date.now() - startTime });
+        logger.debug("prepared update executed", {
+          sql: truncateSql(queryText),
+          paramCount: params.length,
+          duration: Date.now() - startTime,
+        });
       }
       return (result as ResultSetHeader).affectedRows ?? 0;
     } catch (err) {
-      logger.error("prepared update failed", { sql: truncateSql(queryText), paramCount: params.length, duration: Date.now() - startTime, error: (err as Error).message });
+      logger.error("prepared update failed", {
+        sql: truncateSql(queryText),
+        paramCount: params.length,
+        duration: Date.now() - startTime,
+        error: (err as Error).message,
+      });
       throw new QueryError(
         `Failed to execute prepared update: ${(err as Error).message}`,
         queryText,

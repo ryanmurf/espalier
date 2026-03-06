@@ -1,5 +1,5 @@
-import type { ResultSet, ColumnMetadata } from "espalier-jdbc";
 import type Database from "better-sqlite3";
+import type { ColumnMetadata, ResultSet } from "espalier-jdbc";
 
 export class SqliteResultSet implements ResultSet {
   private readonly rows: Record<string, unknown>[];

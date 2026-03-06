@@ -1,7 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { Connection, PreparedStatement, ResultSet, Statement, DataSource, Transaction } from "espalier-jdbc";
 import type { Migration } from "espalier-data";
-import { PgMigrationRunner, computeChecksum } from "../pg-migration-runner.js";
+import type { Connection, DataSource, PreparedStatement, ResultSet, Statement, Transaction } from "espalier-jdbc";
+import { describe, expect, it, vi } from "vitest";
+import { computeChecksum, PgMigrationRunner } from "../pg-migration-runner.js";
 
 // --- Mock factories ---
 
@@ -57,7 +57,10 @@ function createMockResultSet(rows: Record<string, unknown>[]): ResultSet {
   };
 }
 
-function createMockStatement(): Statement & { executeUpdate: ReturnType<typeof vi.fn>; close: ReturnType<typeof vi.fn> } {
+function createMockStatement(): Statement & {
+  executeUpdate: ReturnType<typeof vi.fn>;
+  close: ReturnType<typeof vi.fn>;
+} {
   return {
     executeQuery: vi.fn(async () => createMockResultSet([])),
     executeUpdate: vi.fn(async () => 0),
@@ -131,7 +134,12 @@ function createMockDataSource(connectionFactory: () => Connection): DataSource {
   };
 }
 
-function createMigration(version: string, description: string, upSql: string | string[], downSql: string | string[] = "SELECT 1"): Migration {
+function createMigration(
+  version: string,
+  description: string,
+  upSql: string | string[],
+  downSql: string | string[] = "SELECT 1",
+): Migration {
   return {
     version,
     description,
@@ -155,12 +163,8 @@ describe("PgMigrationRunner", () => {
       expect(stmt.executeUpdate).toHaveBeenCalledWith(
         expect.stringContaining('CREATE TABLE IF NOT EXISTS "public"."_espalier_migrations"'),
       );
-      expect(stmt.executeUpdate).toHaveBeenCalledWith(
-        expect.stringContaining("version VARCHAR(255) PRIMARY KEY"),
-      );
-      expect(stmt.executeUpdate).toHaveBeenCalledWith(
-        expect.stringContaining("checksum VARCHAR(64) NOT NULL"),
-      );
+      expect(stmt.executeUpdate).toHaveBeenCalledWith(expect.stringContaining("version VARCHAR(255) PRIMARY KEY"));
+      expect(stmt.executeUpdate).toHaveBeenCalledWith(expect.stringContaining("checksum VARCHAR(64) NOT NULL"));
       expect(conn.close).toHaveBeenCalled();
     });
 
@@ -175,9 +179,7 @@ describe("PgMigrationRunner", () => {
 
       await runner.initialize();
 
-      expect(stmt.executeUpdate).toHaveBeenCalledWith(
-        expect.stringContaining('"myschema"."custom_migrations"'),
-      );
+      expect(stmt.executeUpdate).toHaveBeenCalledWith(expect.stringContaining('"myschema"."custom_migrations"'));
     });
   });
 
@@ -224,9 +226,7 @@ describe("PgMigrationRunner", () => {
 
       await runner.getAppliedMigrations();
 
-      expect(conn.prepareStatement).toHaveBeenCalledWith(
-        expect.stringContaining("ORDER BY version"),
-      );
+      expect(conn.prepareStatement).toHaveBeenCalledWith(expect.stringContaining("ORDER BY version"));
     });
   });
 
@@ -264,9 +264,7 @@ describe("PgMigrationRunner", () => {
 
       await runner.getCurrentVersion();
 
-      expect(conn.prepareStatement).toHaveBeenCalledWith(
-        expect.stringContaining("ORDER BY version DESC LIMIT 1"),
-      );
+      expect(conn.prepareStatement).toHaveBeenCalledWith(expect.stringContaining("ORDER BY version DESC LIMIT 1"));
     });
   });
 
@@ -469,7 +467,12 @@ describe("PgMigrationRunner", () => {
   describe("rollback()", () => {
     it("rolls back the last migration by default", async () => {
       const m1 = createMigration("001", "Create users", "CREATE TABLE users (id INT)", "DROP TABLE users");
-      const m2 = createMigration("002", "Add email", "ALTER TABLE users ADD COLUMN email TEXT", "ALTER TABLE users DROP COLUMN email");
+      const m2 = createMigration(
+        "002",
+        "Add email",
+        "ALTER TABLE users ADD COLUMN email TEXT",
+        "ALTER TABLE users DROP COLUMN email",
+      );
       const cs1 = await computeChecksum(m1);
       const cs2 = await computeChecksum(m2);
 
@@ -507,7 +510,12 @@ describe("PgMigrationRunner", () => {
 
     it("rolls back multiple steps", async () => {
       const m1 = createMigration("001", "Create users", "CREATE TABLE users (id INT)", "DROP TABLE users");
-      const m2 = createMigration("002", "Add email", "ALTER TABLE users ADD email TEXT", "ALTER TABLE users DROP COLUMN email");
+      const m2 = createMigration(
+        "002",
+        "Add email",
+        "ALTER TABLE users ADD email TEXT",
+        "ALTER TABLE users DROP COLUMN email",
+      );
       const cs1 = await computeChecksum(m1);
       const cs2 = await computeChecksum(m2);
 
@@ -608,8 +616,18 @@ describe("PgMigrationRunner", () => {
   describe("rollbackTo()", () => {
     it("rolls back to a specific version", async () => {
       const m1 = createMigration("001", "Create users", "CREATE TABLE users (id INT)", "DROP TABLE users");
-      const m2 = createMigration("002", "Add email", "ALTER TABLE users ADD email TEXT", "ALTER TABLE users DROP COLUMN email");
-      const m3 = createMigration("003", "Add age", "ALTER TABLE users ADD age INT", "ALTER TABLE users DROP COLUMN age");
+      const m2 = createMigration(
+        "002",
+        "Add email",
+        "ALTER TABLE users ADD email TEXT",
+        "ALTER TABLE users DROP COLUMN email",
+      );
+      const m3 = createMigration(
+        "003",
+        "Add age",
+        "ALTER TABLE users ADD age INT",
+        "ALTER TABLE users DROP COLUMN age",
+      );
       const cs1 = await computeChecksum(m1);
       const cs2 = await computeChecksum(m2);
       const cs3 = await computeChecksum(m3);

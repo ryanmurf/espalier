@@ -7,40 +7,32 @@
  * Focus: edge cases, SQL injection, boundary conditions, error handling,
  * concurrency, type normalization, cross-feature interactions.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
-
-// -- Schema Diff --
-import { SchemaDiffEngine } from "../../migration/schema-diff.js";
-import type { SchemaDiff, TableDiff, TableModification, ColumnModification } from "../../migration/schema-diff.js";
-
+import { beforeEach, describe, expect, it, vi } from "vitest";
 // -- Deprecated --
 import { Deprecated, getDeprecatedFields, isDeprecatedField } from "../../decorators/deprecated.js";
-import type { DeprecatedOptions } from "../../decorators/deprecated.js";
-
+import type { DataMigration } from "../../migration/data-migration.js";
+// -- Data Migration --
+import { createDataMigration, isDataMigration } from "../../migration/data-migration.js";
 // -- Expand/Contract --
 import { generateExpandContractMigration } from "../../migration/expand-contract.js";
-import type { ExpandContractMigration } from "../../migration/expand-contract.js";
-
+import type { SchemaDiff } from "../../migration/schema-diff.js";
+// -- Schema Diff --
+import { SchemaDiffEngine } from "../../migration/schema-diff.js";
+import type { TenantMigrationProgress } from "../../migration/tenant-migration-runner.js";
 // -- Tenant Migration Runner --
 import { TenantAwareMigrationRunner } from "../../migration/tenant-migration-runner.js";
-import type { TenantMigrationProgress, TenantMigrationOptions } from "../../migration/tenant-migration-runner.js";
-
-// -- Data Migration --
-import { isDataMigration, createDataMigration } from "../../migration/data-migration.js";
-import type { DataMigration } from "../../migration/data-migration.js";
 
 // -- Migration Testing --
 // Note: migration-tester lives in espalier-testing, which is not a dep of espalier-data.
 // We test it via inline mocks that mirror the real implementation behavior.
 
-// -- Decorators for entity setup --
-import { Table } from "../../decorators/table.js";
+import type { ColumnInfo, Connection, SchemaIntrospector } from "espalier-jdbc";
 import { Column } from "../../decorators/column.js";
 import { Id } from "../../decorators/id.js";
-
+// -- Decorators for entity setup --
+import { Table } from "../../decorators/table.js";
 // -- Migration types --
-import type { Migration, MigrationRunner, MigrationRecord } from "../../migration/migration.js";
-import type { SchemaIntrospector, ColumnInfo, Connection } from "espalier-jdbc";
+import type { Migration, MigrationRecord, MigrationRunner } from "../../migration/migration.js";
 
 // ============================================================
 // Helpers
@@ -89,7 +81,9 @@ function makeMockMigrationRunner(overrides?: Partial<MigrationRunner>): Migratio
         });
       }
     }),
-    getCurrentVersion: vi.fn(async () => appliedMigrations.length ? appliedMigrations[appliedMigrations.length - 1].version : null),
+    getCurrentVersion: vi.fn(async () =>
+      appliedMigrations.length ? appliedMigrations[appliedMigrations.length - 1].version : null,
+    ),
     rollback: vi.fn(async (_migrations: Migration[], steps?: number) => {
       const count = steps ?? 1;
       appliedMigrations.splice(-count, count);
@@ -103,7 +97,7 @@ function makeMockMigrationRunner(overrides?: Partial<MigrationRunner>): Migratio
   };
 }
 
-function makeMockConnection(): Connection {
+function _makeMockConnection(): Connection {
   return {
     createStatement: vi.fn(() => ({
       executeQuery: vi.fn(async () => ({ next: async () => false, close: async () => {} })),
@@ -183,10 +177,9 @@ describe("SchemaDiffEngine -- adversarial", () => {
     }
     new Users();
 
-    const introspector = makeMockIntrospector(
-      [{ tableName: "users" }],
-      { Users: [{ columnName: "id", dataType: "TEXT", nullable: true }] },
-    );
+    const introspector = makeMockIntrospector([{ tableName: "users" }], {
+      Users: [{ columnName: "id", dataType: "TEXT", nullable: true }],
+    });
     const diff = await engine.diff([Users], introspector);
     expect(diff.addedTables).toHaveLength(0);
     expect(diff.removedTables).toHaveLength(0);
@@ -201,10 +194,9 @@ describe("SchemaDiffEngine -- adversarial", () => {
     }
     new Product();
 
-    const introspector = makeMockIntrospector(
-      [{ tableName: "products" }],
-      { products: [{ columnName: "id", dataType: "TEXT", nullable: false }] },
-    );
+    const introspector = makeMockIntrospector([{ tableName: "products" }], {
+      products: [{ columnName: "id", dataType: "TEXT", nullable: false }],
+    });
     const diff = await engine.diff([Product], introspector);
     expect(diff.modifiedTables).toHaveLength(1);
     expect(diff.modifiedTables[0].addedColumns.length).toBeGreaterThanOrEqual(2);
@@ -220,15 +212,12 @@ describe("SchemaDiffEngine -- adversarial", () => {
     }
     new Slim();
 
-    const introspector = makeMockIntrospector(
-      [{ tableName: "slim" }],
-      {
-        slim: [
-          { columnName: "id", dataType: "TEXT", nullable: false },
-          { columnName: "old_col", dataType: "VARCHAR", nullable: true },
-        ],
-      },
-    );
+    const introspector = makeMockIntrospector([{ tableName: "slim" }], {
+      slim: [
+        { columnName: "id", dataType: "TEXT", nullable: false },
+        { columnName: "old_col", dataType: "VARCHAR", nullable: true },
+      ],
+    });
     const diff = await engine.diff([Slim], introspector);
     expect(diff.modifiedTables).toHaveLength(1);
     expect(diff.modifiedTables[0].removedColumns).toHaveLength(1);
@@ -244,15 +233,12 @@ describe("SchemaDiffEngine -- adversarial", () => {
     }
     new Typed();
 
-    const introspector = makeMockIntrospector(
-      [{ tableName: "typed" }],
-      {
-        typed: [
-          { columnName: "id", dataType: "TEXT", nullable: false },
-          { columnName: "count", dataType: "VARCHAR(255)", nullable: true },
-        ],
-      },
-    );
+    const introspector = makeMockIntrospector([{ tableName: "typed" }], {
+      typed: [
+        { columnName: "id", dataType: "TEXT", nullable: false },
+        { columnName: "count", dataType: "VARCHAR(255)", nullable: true },
+      ],
+    });
     const diff = await engine.diff([Typed], introspector);
     const mod = diff.modifiedTables.find((m) => m.tableName === "typed");
     expect(mod).toBeDefined();
@@ -270,15 +256,12 @@ describe("SchemaDiffEngine -- adversarial", () => {
     }
     new NormCheck();
 
-    const introspector = makeMockIntrospector(
-      [{ tableName: "norm_check" }],
-      {
-        norm_check: [
-          { columnName: "id", dataType: "TEXT", nullable: false },
-          { columnName: "val", dataType: "int4", nullable: true },
-        ],
-      },
-    );
+    const introspector = makeMockIntrospector([{ tableName: "norm_check" }], {
+      norm_check: [
+        { columnName: "id", dataType: "TEXT", nullable: false },
+        { columnName: "val", dataType: "int4", nullable: true },
+      ],
+    });
     const diff = await engine.diff([NormCheck], introspector);
     if (diff.modifiedTables.length > 0) {
       expect(diff.modifiedTables[0].modifiedColumns).toHaveLength(0);
@@ -293,15 +276,12 @@ describe("SchemaDiffEngine -- adversarial", () => {
     }
     new BoolCheck();
 
-    const introspector = makeMockIntrospector(
-      [{ tableName: "bool_check" }],
-      {
-        bool_check: [
-          { columnName: "id", dataType: "TEXT", nullable: false },
-          { columnName: "active", dataType: "bool", nullable: true },
-        ],
-      },
-    );
+    const introspector = makeMockIntrospector([{ tableName: "bool_check" }], {
+      bool_check: [
+        { columnName: "id", dataType: "TEXT", nullable: false },
+        { columnName: "active", dataType: "bool", nullable: true },
+      ],
+    });
     const diff = await engine.diff([BoolCheck], introspector);
     if (diff.modifiedTables.length > 0) {
       expect(diff.modifiedTables[0].modifiedColumns).toHaveLength(0);
@@ -316,15 +296,12 @@ describe("SchemaDiffEngine -- adversarial", () => {
     }
     new TsCheck();
 
-    const introspector = makeMockIntrospector(
-      [{ tableName: "ts_check" }],
-      {
-        ts_check: [
-          { columnName: "id", dataType: "TEXT", nullable: false },
-          { columnName: "created", dataType: "timestamptz", nullable: true },
-        ],
-      },
-    );
+    const introspector = makeMockIntrospector([{ tableName: "ts_check" }], {
+      ts_check: [
+        { columnName: "id", dataType: "TEXT", nullable: false },
+        { columnName: "created", dataType: "timestamptz", nullable: true },
+      ],
+    });
     const diff = await engine.diff([TsCheck], introspector);
     if (diff.modifiedTables.length > 0) {
       expect(diff.modifiedTables[0].modifiedColumns).toHaveLength(0);
@@ -339,15 +316,12 @@ describe("SchemaDiffEngine -- adversarial", () => {
     }
     new SerialCheck();
 
-    const introspector = makeMockIntrospector(
-      [{ tableName: "serial_check" }],
-      {
-        serial_check: [
-          { columnName: "id", dataType: "TEXT", nullable: false },
-          { columnName: "seq", dataType: "serial", nullable: false },
-        ],
-      },
-    );
+    const introspector = makeMockIntrospector([{ tableName: "serial_check" }], {
+      serial_check: [
+        { columnName: "id", dataType: "TEXT", nullable: false },
+        { columnName: "seq", dataType: "serial", nullable: false },
+      ],
+    });
     const diff = await engine.diff([SerialCheck], introspector);
     if (diff.modifiedTables.length > 0) {
       expect(diff.modifiedTables[0].modifiedColumns).toHaveLength(0);
@@ -355,9 +329,7 @@ describe("SchemaDiffEngine -- adversarial", () => {
   });
 
   it("SQL injection in table name is escaped by quoteIdentifier in DDL", async () => {
-    const introspector = makeMockIntrospector([
-      { tableName: 'evil"; DROP TABLE users;--' },
-    ]);
+    const introspector = makeMockIntrospector([{ tableName: 'evil"; DROP TABLE users;--' }]);
     const diff = await engine.diff([], introspector);
     expect(diff.removedTables).toHaveLength(1);
     // The DDL should quote the table name with doubled internal quotes,
@@ -373,9 +345,7 @@ describe("SchemaDiffEngine -- adversarial", () => {
 
   it("generateMigration produces correct up/down for added tables", () => {
     const diff: SchemaDiff = {
-      addedTables: [
-        { tableName: "foo", ddl: 'CREATE TABLE "foo" (id TEXT PRIMARY KEY)' },
-      ],
+      addedTables: [{ tableName: "foo", ddl: 'CREATE TABLE "foo" (id TEXT PRIMARY KEY)' }],
       removedTables: [],
       modifiedTables: [],
     };
@@ -390,9 +360,7 @@ describe("SchemaDiffEngine -- adversarial", () => {
   it("generateMigration produces correct up/down for removed tables", () => {
     const diff: SchemaDiff = {
       addedTables: [],
-      removedTables: [
-        { tableName: "old", ddl: 'DROP TABLE "old"' },
-      ],
+      removedTables: [{ tableName: "old", ddl: 'DROP TABLE "old"' }],
       modifiedTables: [],
     };
     const { up, down } = engine.generateMigration(diff);
@@ -496,15 +464,12 @@ describe("SchemaDiffEngine -- adversarial", () => {
     }
     new LenTest();
 
-    const introspector = makeMockIntrospector(
-      [{ tableName: "len_test" }],
-      {
-        len_test: [
-          { columnName: "id", dataType: "TEXT", nullable: false },
-          { columnName: "name", dataType: "TEXT", nullable: true },
-        ],
-      },
-    );
+    const introspector = makeMockIntrospector([{ tableName: "len_test" }], {
+      len_test: [
+        { columnName: "id", dataType: "TEXT", nullable: false },
+        { columnName: "name", dataType: "TEXT", nullable: true },
+      ],
+    });
     const diff = await engine.diff([LenTest], introspector);
     const mod = diff.modifiedTables.find((m) => m.tableName === "len_test");
     // name should show type change from TEXT to VARCHAR(100)
@@ -647,7 +612,8 @@ describe("generateExpandContractMigration -- adversarial", () => {
     class Items {
       @Id @Column() id!: string;
       @Deprecated({ replacedBy: "fullName" })
-      @Column() name!: string;
+      @Column()
+      name!: string;
       @Column({ type: "VARCHAR(200)" }) fullName!: string;
     }
     const result = generateExpandContractMigration(Items);
@@ -665,7 +631,8 @@ describe("generateExpandContractMigration -- adversarial", () => {
     class Legacy {
       @Id @Column() id!: string;
       @Deprecated()
-      @Column() removable!: string;
+      @Column()
+      removable!: string;
     }
     const result = generateExpandContractMigration(Legacy);
     expect(result.expand).toHaveLength(0);
@@ -678,10 +645,12 @@ describe("generateExpandContractMigration -- adversarial", () => {
     class Multi {
       @Id @Column() id!: string;
       @Deprecated({ replacedBy: "newA" })
-      @Column() oldA!: string;
+      @Column()
+      oldA!: string;
       @Column({ type: "TEXT" }) newA!: string;
       @Deprecated()
-      @Column() oldB!: string;
+      @Column()
+      oldB!: string;
     }
     const result = generateExpandContractMigration(Multi);
     // oldA -> expand (ADD + UPDATE) + contract (DROP)
@@ -702,7 +671,8 @@ describe("generateExpandContractMigration -- adversarial", () => {
     class Quoted {
       @Id @Column() id!: string;
       @Deprecated()
-      @Column() dropMe!: string;
+      @Column()
+      dropMe!: string;
     }
     const result = generateExpandContractMigration(Quoted);
     // Should see quoted identifiers in output
@@ -716,7 +686,8 @@ describe("generateExpandContractMigration -- adversarial", () => {
     class Phantom {
       @Id @Column() id!: string;
       @Deprecated({ replacedBy: "doesNotExist" })
-      @Column() old!: string;
+      @Column()
+      old!: string;
     }
     const result = generateExpandContractMigration(Phantom);
     // Since replacedBy field doesn't exist in columnMappings, expand should be empty
@@ -732,27 +703,21 @@ describe("generateExpandContractMigration -- adversarial", () => {
 // ============================================================
 describe("TenantAwareMigrationRunner -- adversarial", () => {
   it("throws on empty tenant list", () => {
-    expect(
-      () => new TenantAwareMigrationRunner(() => makeMockMigrationRunner(), []),
-    ).toThrow("tenantSchemas must not be empty");
+    expect(() => new TenantAwareMigrationRunner(() => makeMockMigrationRunner(), [])).toThrow(
+      "tenantSchemas must not be empty",
+    );
   });
 
   it("throws on concurrency < 1", async () => {
-    const runner = new TenantAwareMigrationRunner(
-      () => makeMockMigrationRunner(),
-      ["tenant_a"],
+    const runner = new TenantAwareMigrationRunner(() => makeMockMigrationRunner(), ["tenant_a"]);
+    await expect(runner.runAll([makeSimpleMigration("001")], { concurrency: 0 })).rejects.toThrow(
+      "concurrency must be at least 1",
     );
-    await expect(
-      runner.runAll([makeSimpleMigration("001")], { concurrency: 0 }),
-    ).rejects.toThrow("concurrency must be at least 1");
   });
 
   it("single tenant success", async () => {
     const mockRunner = makeMockMigrationRunner();
-    const runner = new TenantAwareMigrationRunner(
-      () => mockRunner,
-      ["tenant_a"],
-    );
+    const runner = new TenantAwareMigrationRunner(() => mockRunner, ["tenant_a"]);
     const results = await runner.runAll([makeSimpleMigration("001")]);
     expect(results).toHaveLength(1);
     expect(results[0].status).toBe("completed");
@@ -762,10 +727,7 @@ describe("TenantAwareMigrationRunner -- adversarial", () => {
 
   it("multiple tenants all succeed sequentially", async () => {
     const schemas = ["t1", "t2", "t3"];
-    const runner = new TenantAwareMigrationRunner(
-      () => makeMockMigrationRunner(),
-      schemas,
-    );
+    const runner = new TenantAwareMigrationRunner(() => makeMockMigrationRunner(), schemas);
     const results = await runner.runAll([makeSimpleMigration("001")]);
     expect(results).toHaveLength(3);
     results.forEach((r, i) => {
@@ -785,10 +747,7 @@ describe("TenantAwareMigrationRunner -- adversarial", () => {
       return r;
     };
 
-    const runner = new TenantAwareMigrationRunner(
-      factory,
-      ["a", "b", "c", "d"],
-    );
+    const runner = new TenantAwareMigrationRunner(factory, ["a", "b", "c", "d"]);
     await runner.runAll([makeSimpleMigration("001")], { concurrency: 2 });
     // Should have 4 results, processed in 2 batches of 2
     expect(startTimes).toHaveLength(4);
@@ -843,10 +802,7 @@ describe("TenantAwareMigrationRunner -- adversarial", () => {
 
   it("progress callback fires for each tenant", async () => {
     const progressCalls: TenantMigrationProgress[] = [];
-    const runner = new TenantAwareMigrationRunner(
-      () => makeMockMigrationRunner(),
-      ["t1", "t2"],
-    );
+    const runner = new TenantAwareMigrationRunner(() => makeMockMigrationRunner(), ["t1", "t2"]);
     await runner.runAll([makeSimpleMigration("001")], {
       onProgress: (p) => progressCalls.push({ ...p }),
     });
@@ -885,9 +841,7 @@ describe("TenantAwareMigrationRunner -- adversarial", () => {
   it("rollbackAll across multiple tenants", async () => {
     const rollbackCalls: string[] = [];
     const factory = (schema: string) => {
-      const applied: MigrationRecord[] = [
-        { version: "001", description: "m1", appliedAt: new Date(), checksum: "x" },
-      ];
+      const applied: MigrationRecord[] = [{ version: "001", description: "m1", appliedAt: new Date(), checksum: "x" }];
       return {
         initialize: vi.fn(async () => {}),
         getAppliedMigrations: vi.fn(async () => [...applied]),
@@ -913,9 +867,8 @@ describe("TenantAwareMigrationRunner -- adversarial", () => {
     let callCount = 0;
     const factory = (_schema: string) => {
       callCount++;
-      const applied = callCount === 1
-        ? [{ version: "001", description: "m1", appliedAt: new Date(), checksum: "x" }]
-        : [];
+      const applied =
+        callCount === 1 ? [{ version: "001", description: "m1", appliedAt: new Date(), checksum: "x" }] : [];
       return {
         initialize: vi.fn(async () => {}),
         getAppliedMigrations: vi.fn(async () => applied),
@@ -940,22 +893,13 @@ describe("TenantAwareMigrationRunner -- adversarial", () => {
   });
 
   it("migrationsApplied count is correct", async () => {
-    const runner = new TenantAwareMigrationRunner(
-      () => makeMockMigrationRunner(),
-      ["t1"],
-    );
-    const results = await runner.runAll([
-      makeSimpleMigration("001"),
-      makeSimpleMigration("002"),
-    ]);
+    const runner = new TenantAwareMigrationRunner(() => makeMockMigrationRunner(), ["t1"]);
+    const results = await runner.runAll([makeSimpleMigration("001"), makeSimpleMigration("002")]);
     expect(results[0].migrationsApplied).toBe(2);
   });
 
   it("concurrency equal to tenant count processes all at once", async () => {
-    const runner = new TenantAwareMigrationRunner(
-      () => makeMockMigrationRunner(),
-      ["a", "b", "c"],
-    );
+    const runner = new TenantAwareMigrationRunner(() => makeMockMigrationRunner(), ["a", "b", "c"]);
     const results = await runner.runAll([makeSimpleMigration("001")], {
       concurrency: 3,
     });
@@ -964,10 +908,7 @@ describe("TenantAwareMigrationRunner -- adversarial", () => {
   });
 
   it("concurrency greater than tenant count works fine", async () => {
-    const runner = new TenantAwareMigrationRunner(
-      () => makeMockMigrationRunner(),
-      ["a"],
-    );
+    const runner = new TenantAwareMigrationRunner(() => makeMockMigrationRunner(), ["a"]);
     const results = await runner.runAll([makeSimpleMigration("001")], {
       concurrency: 100,
     });
@@ -1091,11 +1032,15 @@ function inlineCreateSchemaAssertion(introspector: SchemaIntrospector): SchemaAs
     async columnExists(tableName: string, columnName: string, expectedType?: string) {
       const columns = await introspector.getColumns(tableName);
       const column = columns.find((c: any) => c.columnName.toLowerCase() === columnName.toLowerCase());
-      if (!column) throw new Error(`Expected column '${columnName}' to exist on table '${tableName}', but it does not.`);
+      if (!column)
+        throw new Error(`Expected column '${columnName}' to exist on table '${tableName}', but it does not.`);
       if (expectedType !== undefined) {
         const actual = column.dataType.trim().toLowerCase();
         const expected = expectedType.trim().toLowerCase();
-        if (actual !== expected) throw new Error(`Expected column '${columnName}' on table '${tableName}' to have type '${expectedType}', but it has type '${column.dataType}'.`);
+        if (actual !== expected)
+          throw new Error(
+            `Expected column '${columnName}' on table '${tableName}' to have type '${expectedType}', but it has type '${column.dataType}'.`,
+          );
       }
     },
     async columnNotExists(tableName: string, columnName: string) {
@@ -1106,21 +1051,30 @@ function inlineCreateSchemaAssertion(introspector: SchemaIntrospector): SchemaAs
     async columnIsNullable(tableName: string, columnName: string) {
       const columns = await introspector.getColumns(tableName);
       const column = columns.find((c: any) => c.columnName.toLowerCase() === columnName.toLowerCase());
-      if (!column) throw new Error(`Expected column '${columnName}' to exist on table '${tableName}', but it does not.`);
-      if (!column.nullable) throw new Error(`Expected column '${columnName}' on table '${tableName}' to be nullable, but it is NOT NULL.`);
+      if (!column)
+        throw new Error(`Expected column '${columnName}' to exist on table '${tableName}', but it does not.`);
+      if (!column.nullable)
+        throw new Error(`Expected column '${columnName}' on table '${tableName}' to be nullable, but it is NOT NULL.`);
     },
     async columnIsNotNullable(tableName: string, columnName: string) {
       const columns = await introspector.getColumns(tableName);
       const column = columns.find((c: any) => c.columnName.toLowerCase() === columnName.toLowerCase());
-      if (!column) throw new Error(`Expected column '${columnName}' to exist on table '${tableName}', but it does not.`);
-      if (column.nullable) throw new Error(`Expected column '${columnName}' on table '${tableName}' to be NOT NULL, but it is nullable.`);
+      if (!column)
+        throw new Error(`Expected column '${columnName}' to exist on table '${tableName}', but it does not.`);
+      if (column.nullable)
+        throw new Error(`Expected column '${columnName}' on table '${tableName}' to be NOT NULL, but it is nullable.`);
     },
     async primaryKeyExists(tableName: string, columns: string[]) {
       const pkColumns = await introspector.getPrimaryKeys(tableName);
       const normalizedExpected = columns.map((c) => c.toLowerCase()).sort();
       const normalizedActual = pkColumns.map((c: string) => c.toLowerCase()).sort();
-      if (normalizedExpected.length !== normalizedActual.length || !normalizedExpected.every((col: string, i: number) => col === normalizedActual[i])) {
-        throw new Error(`Expected primary key on table '${tableName}' to be [${columns.join(", ")}], but got [${pkColumns.join(", ")}].`);
+      if (
+        normalizedExpected.length !== normalizedActual.length ||
+        !normalizedExpected.every((col: string, i: number) => col === normalizedActual[i])
+      ) {
+        throw new Error(
+          `Expected primary key on table '${tableName}' to be [${columns.join(", ")}], but got [${pkColumns.join(", ")}].`,
+        );
       }
     },
   };
@@ -1172,9 +1126,7 @@ describe("Migration testing utilities (schema assertions) -- adversarial", () =>
 
   it("columnExists passes with matching column", async () => {
     const introspector = {
-      getColumns: vi.fn(async () => [
-        { columnName: "id", dataType: "INTEGER", nullable: false },
-      ]),
+      getColumns: vi.fn(async () => [{ columnName: "id", dataType: "INTEGER", nullable: false }]),
     } as unknown as SchemaIntrospector;
     const assert = inlineCreateSchemaAssertion(introspector);
     await expect(assert.columnExists("users", "id")).resolves.toBeUndefined();
@@ -1182,9 +1134,7 @@ describe("Migration testing utilities (schema assertions) -- adversarial", () =>
 
   it("columnExists with type check (case-insensitive)", async () => {
     const introspector = {
-      getColumns: vi.fn(async () => [
-        { columnName: "age", dataType: "integer", nullable: false },
-      ]),
+      getColumns: vi.fn(async () => [{ columnName: "age", dataType: "integer", nullable: false }]),
     } as unknown as SchemaIntrospector;
     const assert = inlineCreateSchemaAssertion(introspector);
     await expect(assert.columnExists("users", "AGE", "integer")).resolves.toBeUndefined();
@@ -1192,9 +1142,7 @@ describe("Migration testing utilities (schema assertions) -- adversarial", () =>
 
   it("columnExists with wrong type throws", async () => {
     const introspector = {
-      getColumns: vi.fn(async () => [
-        { columnName: "age", dataType: "TEXT", nullable: false },
-      ]),
+      getColumns: vi.fn(async () => [{ columnName: "age", dataType: "TEXT", nullable: false }]),
     } as unknown as SchemaIntrospector;
     const assert = inlineCreateSchemaAssertion(introspector);
     await expect(assert.columnExists("users", "age", "INTEGER")).rejects.toThrow("to have type 'INTEGER'");
@@ -1210,9 +1158,7 @@ describe("Migration testing utilities (schema assertions) -- adversarial", () =>
 
   it("columnNotExists throws when column exists", async () => {
     const introspector = {
-      getColumns: vi.fn(async () => [
-        { columnName: "name", dataType: "TEXT", nullable: true },
-      ]),
+      getColumns: vi.fn(async () => [{ columnName: "name", dataType: "TEXT", nullable: true }]),
     } as unknown as SchemaIntrospector;
     const assert = inlineCreateSchemaAssertion(introspector);
     await expect(assert.columnNotExists("users", "name")).rejects.toThrow("not to exist");
@@ -1220,9 +1166,7 @@ describe("Migration testing utilities (schema assertions) -- adversarial", () =>
 
   it("columnIsNullable passes for nullable column", async () => {
     const introspector = {
-      getColumns: vi.fn(async () => [
-        { columnName: "bio", dataType: "TEXT", nullable: true },
-      ]),
+      getColumns: vi.fn(async () => [{ columnName: "bio", dataType: "TEXT", nullable: true }]),
     } as unknown as SchemaIntrospector;
     const assert = inlineCreateSchemaAssertion(introspector);
     await expect(assert.columnIsNullable("users", "bio")).resolves.toBeUndefined();
@@ -1230,9 +1174,7 @@ describe("Migration testing utilities (schema assertions) -- adversarial", () =>
 
   it("columnIsNullable throws for NOT NULL column", async () => {
     const introspector = {
-      getColumns: vi.fn(async () => [
-        { columnName: "id", dataType: "INT", nullable: false },
-      ]),
+      getColumns: vi.fn(async () => [{ columnName: "id", dataType: "INT", nullable: false }]),
     } as unknown as SchemaIntrospector;
     const assert = inlineCreateSchemaAssertion(introspector);
     await expect(assert.columnIsNullable("users", "id")).rejects.toThrow("to be nullable");
@@ -1240,9 +1182,7 @@ describe("Migration testing utilities (schema assertions) -- adversarial", () =>
 
   it("columnIsNotNullable passes for NOT NULL column", async () => {
     const introspector = {
-      getColumns: vi.fn(async () => [
-        { columnName: "id", dataType: "INT", nullable: false },
-      ]),
+      getColumns: vi.fn(async () => [{ columnName: "id", dataType: "INT", nullable: false }]),
     } as unknown as SchemaIntrospector;
     const assert = inlineCreateSchemaAssertion(introspector);
     await expect(assert.columnIsNotNullable("users", "id")).resolves.toBeUndefined();
@@ -1250,9 +1190,7 @@ describe("Migration testing utilities (schema assertions) -- adversarial", () =>
 
   it("columnIsNotNullable throws for nullable column", async () => {
     const introspector = {
-      getColumns: vi.fn(async () => [
-        { columnName: "bio", dataType: "TEXT", nullable: true },
-      ]),
+      getColumns: vi.fn(async () => [{ columnName: "bio", dataType: "TEXT", nullable: true }]),
     } as unknown as SchemaIntrospector;
     const assert = inlineCreateSchemaAssertion(introspector);
     await expect(assert.columnIsNotNullable("users", "bio")).rejects.toThrow("to be NOT NULL");
@@ -1319,13 +1257,9 @@ describe("testMigration utility -- adversarial", () => {
       getPrimaryKeys: vi.fn(async () => []),
     } as unknown as SchemaIntrospector;
 
-    await inlineTestMigration(
-      { connection: conn, introspector },
-      "CREATE TABLE test (id INT)",
-      async (assert) => {
-        await assert.tableExists("test");
-      },
-    );
+    await inlineTestMigration({ connection: conn, introspector }, "CREATE TABLE test (id INT)", async (assert) => {
+      await assert.tableExists("test");
+    });
 
     expect(mockExecuteUpdate).toHaveBeenCalledWith("CREATE TABLE test (id INT)");
     expect(mockRollback).toHaveBeenCalled();
@@ -1378,13 +1312,9 @@ describe("testMigration utility -- adversarial", () => {
     } as unknown as SchemaIntrospector;
 
     await expect(
-      inlineTestMigration(
-        { connection: conn, introspector },
-        "CREATE TABLE x (id INT)",
-        async (assert) => {
-          await assert.tableExists("x");
-        },
-      ),
+      inlineTestMigration({ connection: conn, introspector }, "CREATE TABLE x (id INT)", async (assert) => {
+        await assert.tableExists("x");
+      }),
     ).rejects.toThrow("Expected table 'x' to exist");
 
     expect(mockRollback).toHaveBeenCalled();
@@ -1437,10 +1367,7 @@ describe("Cross-feature interactions -- adversarial", () => {
       data: dm.data,
     };
 
-    const runner = new TenantAwareMigrationRunner(
-      () => makeMockMigrationRunner(),
-      ["schema_a"],
-    );
+    const runner = new TenantAwareMigrationRunner(() => makeMockMigrationRunner(), ["schema_a"]);
     const results = await runner.runAll([migration]);
     expect(results).toHaveLength(1);
     expect(results[0].status).toBe("completed");
@@ -1451,7 +1378,8 @@ describe("Cross-feature interactions -- adversarial", () => {
     class Order {
       @Id @Column() id!: string;
       @Deprecated({ replacedBy: "totalAmount", reason: "renamed" })
-      @Column({ type: "NUMERIC(10,2)" }) total!: number;
+      @Column({ type: "NUMERIC(10,2)" })
+      total!: number;
       @Column({ type: "NUMERIC(12,2)" }) totalAmount!: number;
     }
     const result = generateExpandContractMigration(Order);

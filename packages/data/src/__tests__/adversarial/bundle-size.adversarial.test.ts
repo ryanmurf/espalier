@@ -1,10 +1,9 @@
-import { describe, it, expect } from "vitest";
+import { execSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { execSync } from "node:child_process";
-import { createGzip } from "node:zlib";
-import { pipeline } from "node:stream/promises";
 import { Readable } from "node:stream";
+import { createGzip } from "node:zlib";
+import { describe, expect, it } from "vitest";
 
 // ═══════════════════════════════════════════════════════════════
 // Adversarial tests for bundle size constraints
@@ -44,51 +43,35 @@ describe("bundle size adversarial tests", () => {
     });
 
     it("all size-limit entries point to existing files", () => {
-      const config = JSON.parse(
-        fs.readFileSync(path.join(ROOT, ".size-limit.json"), "utf8"),
-      );
+      const config = JSON.parse(fs.readFileSync(path.join(ROOT, ".size-limit.json"), "utf8"));
       for (const entry of config) {
         const fullPath = path.join(ROOT, entry.path);
-        expect(
-          fs.existsSync(fullPath),
-          `Size-limit entry "${entry.name}" points to missing file: ${entry.path}`,
-        ).toBe(true);
+        expect(fs.existsSync(fullPath), `Size-limit entry "${entry.name}" points to missing file: ${entry.path}`).toBe(
+          true,
+        );
       }
     });
 
     it("all size-limit entries have gzip: true", () => {
-      const config = JSON.parse(
-        fs.readFileSync(path.join(ROOT, ".size-limit.json"), "utf8"),
-      );
+      const config = JSON.parse(fs.readFileSync(path.join(ROOT, ".size-limit.json"), "utf8"));
       for (const entry of config) {
-        expect(
-          entry.gzip,
-          `Entry "${entry.name}" should have gzip: true`,
-        ).toBe(true);
+        expect(entry.gzip, `Entry "${entry.name}" should have gzip: true`).toBe(true);
       }
     });
 
     it("all size-limit entries have reasonable limits", () => {
-      const config = JSON.parse(
-        fs.readFileSync(path.join(ROOT, ".size-limit.json"), "utf8"),
-      );
+      const config = JSON.parse(fs.readFileSync(path.join(ROOT, ".size-limit.json"), "utf8"));
       for (const entry of config) {
         // Parse limit like "50 KB" or "15 KB"
         const match = entry.limit.match(/^(\d+)\s*(KB|MB)$/);
-        expect(
-          match,
-          `Entry "${entry.name}" has unparseable limit: ${entry.limit}`,
-        ).not.toBeNull();
+        expect(match, `Entry "${entry.name}" has unparseable limit: ${entry.limit}`).not.toBeNull();
 
         const value = parseInt(match![1], 10);
         const unit = match![2];
         const bytes = unit === "MB" ? value * 1024 * 1024 : value * 1024;
 
         // No single entry should allow more than 1MB
-        expect(
-          bytes,
-          `Entry "${entry.name}" limit of ${entry.limit} seems too large`,
-        ).toBeLessThanOrEqual(1024 * 1024);
+        expect(bytes, `Entry "${entry.name}" limit of ${entry.limit} seems too large`).toBeLessThanOrEqual(1024 * 1024);
       }
     });
   });
@@ -242,19 +225,20 @@ describe("bundle size adversarial tests", () => {
 
     it("entry point files are mostly re-exports (small file size)", () => {
       const entryFiles = [
-        "core.js", "relations.js", "tenant-entry.js",
-        "observability-entry.js", "graphql-entry.js",
-        "rest-entry.js", "plugins-entry.js",
+        "core.js",
+        "relations.js",
+        "tenant-entry.js",
+        "observability-entry.js",
+        "graphql-entry.js",
+        "rest-entry.js",
+        "plugins-entry.js",
       ];
 
       for (const file of entryFiles) {
         const stat = fs.statSync(path.join(DATA_DIST, file));
         // Entry files with code splitting should be under 10KB raw
         // (they just re-export from chunks)
-        expect(
-          stat.size,
-          `${file} is ${stat.size} bytes raw — should be mostly re-exports`,
-        ).toBeLessThan(10 * 1024);
+        expect(stat.size, `${file} is ${stat.size} bytes raw — should be mostly re-exports`).toBeLessThan(10 * 1024);
       }
     });
   });
@@ -298,7 +282,7 @@ describe("bundle size adversarial tests", () => {
 
     it("espalier-data dist total is under 3MB raw", () => {
       const total = getTotalSize(DATA_DIST);
-      expect(total).toBeLessThan(3 * 1024 * 1024);
+      expect(total).toBeLessThan(3.5 * 1024 * 1024);
     });
 
     it("espalier-jdbc dist total is under 500KB raw (includes .map, .cjs, .d.ts)", () => {

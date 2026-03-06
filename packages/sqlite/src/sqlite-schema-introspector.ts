@@ -1,5 +1,5 @@
+import type { ColumnInfo, Connection, SchemaIntrospector, TableInfo } from "espalier-jdbc";
 import { quoteIdentifier } from "espalier-jdbc";
-import type { Connection, SchemaIntrospector, TableInfo, ColumnInfo } from "espalier-jdbc";
 
 export class SqliteSchemaIntrospector implements SchemaIntrospector {
   constructor(private readonly connection: Connection) {}
@@ -83,9 +83,7 @@ export class SqliteSchemaIntrospector implements SchemaIntrospector {
   }
 
   async tableExists(tableName: string, schema?: string): Promise<boolean> {
-    const ps = this.connection.prepareStatement(
-      `SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = $1`,
-    );
+    const ps = this.connection.prepareStatement(`SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = $1`);
     ps.setParameter(1, tableName);
     try {
       const rs = await ps.executeQuery();

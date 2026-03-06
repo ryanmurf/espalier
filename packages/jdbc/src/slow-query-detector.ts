@@ -4,14 +4,16 @@ import { getGlobalLogger, LogLevel } from "./logger.js";
  * Redacts literal values from SQL for safe logging/callbacks.
  */
 function redactSql(sql: string): string {
-  return sql
-    // Remove string literals (handles escaped quotes)
-    .replace(/'(?:[^'\\]|\\.)*'/g, "'?'")
-    // Remove numeric literals
-    .replace(/\b\d+(\.\d+)?\b/g, "?")
-    // Collapse whitespace
-    .replace(/\s+/g, " ")
-    .trim();
+  return (
+    sql
+      // Remove string literals (handles escaped quotes)
+      .replace(/'(?:[^'\\]|\\.)*'/g, "'?'")
+      // Remove numeric literals
+      .replace(/\b\d+(\.\d+)?\b/g, "?")
+      // Collapse whitespace
+      .replace(/\s+/g, " ")
+      .trim()
+  );
 }
 
 /**
@@ -74,9 +76,12 @@ export class SlowQueryDetector {
 
     const logger = getGlobalLogger().child("slow-query");
     if (logger.isEnabled(this.logLevel)) {
-      const logFn = this.logLevel === LogLevel.ERROR ? logger.error.bind(logger)
-        : this.logLevel === LogLevel.WARN ? logger.warn.bind(logger)
-        : logger.info.bind(logger);
+      const logFn =
+        this.logLevel === LogLevel.ERROR
+          ? logger.error.bind(logger)
+          : this.logLevel === LogLevel.WARN
+            ? logger.warn.bind(logger)
+            : logger.info.bind(logger);
       logFn("slow query detected", { sql: truncatedSql, durationMs, threshold: this.thresholdMs });
     }
 

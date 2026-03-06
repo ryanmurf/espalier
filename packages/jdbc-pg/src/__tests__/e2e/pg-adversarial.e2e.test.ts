@@ -2,15 +2,11 @@
  * Adversarial E2E tests targeting bugs found by code review.
  * These run against live PostgreSQL to confirm real-world impact.
  */
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { createTestDataSource, isPostgresAvailable } from "./setup.js";
-import {
-  Table,
-  Column,
-  Id,
-  createDerivedRepository,
-} from "espalier-data";
+
+import { Column, createDerivedRepository, Id, Table } from "espalier-data";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { PgDataSource } from "../../pg-data-source.js";
+import { createTestDataSource, isPostgresAvailable } from "./setup.js";
 
 const canConnect = await isPostgresAvailable();
 
@@ -49,7 +45,7 @@ describe.skipIf(!canConnect)("E2E: Adversarial Tests", { timeout: 15000 }, () =>
        ('Alice', 'alice@test.com', 30),
        ('Bob', 'bob@test.com', 25),
        ('Charlie', 'charlie@test.com', 35),
-       ('Alice', 'alice2@test.com', 28)`
+       ('Alice', 'alice2@test.com', 28)`,
     );
     await conn.close();
   });
@@ -81,19 +77,15 @@ describe.skipIf(!canConnect)("E2E: Adversarial Tests", { timeout: 15000 }, () =>
     const conn = await ds.getConnection();
     try {
       const stmt = conn.createStatement();
-      let invalidSqlRejected = false;
+      let _invalidSqlRejected = false;
       try {
-        await stmt.executeQuery(
-          "SELECT DISTINCT id, DISTINCT name FROM adversarial_users"
-        );
+        await stmt.executeQuery("SELECT DISTINCT id, DISTINCT name FROM adversarial_users");
       } catch {
-        invalidSqlRejected = true;
+        _invalidSqlRejected = true;
       }
 
       // Also test the valid DISTINCT syntax works
-      const rs = await stmt.executeQuery(
-        "SELECT DISTINCT name FROM adversarial_users"
-      );
+      const rs = await stmt.executeQuery("SELECT DISTINCT name FROM adversarial_users");
       let count = 0;
       while (await rs.next()) count++;
       expect(count).toBeGreaterThan(0);
@@ -244,17 +236,19 @@ describe.skipIf(!canConnect)("E2E: Adversarial Tests", { timeout: 15000 }, () =>
 
   it("concurrent saves of different entities don't interfere", async () => {
     const repo = createRepo();
-    const entities = Array.from({ length: 10 }, (_, i) =>
-      Object.assign(Object.create(AdvUser.prototype), {
-        name: `Concurrent${i}`,
-        email: `c${i}@test.com`,
-        age: 20 + i,
-      }) as AdvUser
+    const entities = Array.from(
+      { length: 10 },
+      (_, i) =>
+        Object.assign(Object.create(AdvUser.prototype), {
+          name: `Concurrent${i}`,
+          email: `c${i}@test.com`,
+          age: 20 + i,
+        }) as AdvUser,
     );
 
     // Save all concurrently
-    const results = await Promise.all(entities.map(e => repo.save(e)));
-    const ids = results.map(r => r.id);
+    const results = await Promise.all(entities.map((e) => repo.save(e)));
+    const ids = results.map((r) => r.id);
 
     // All should have unique IDs
     const uniqueIds = new Set(ids);

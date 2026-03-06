@@ -5,22 +5,23 @@
  * Focuses on: filter bypass, conflicting filters, filter + JOINs,
  * toggle mid-query, filter on DELETE, throwing filters, etc.
  */
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
-import type { Connection } from "espalier-jdbc";
-import type { PgDataSource } from "../../pg-data-source.js";
-import { createTestDataSource, isPostgresAvailable } from "./setup.js";
+
+import type { CrudRepository } from "espalier-data";
 import {
-  Table,
-  Id,
   Column,
+  ComparisonCriteria,
+  createDerivedRepository,
   Filter,
   FilterContext,
+  Id,
   registerFilter,
+  Table,
   unregisterFilter,
-  createDerivedRepository,
 } from "espalier-data";
-import type { CrudRepository } from "espalier-data";
-import { ComparisonCriteria } from "espalier-data";
+import type { Connection } from "espalier-jdbc";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import type { PgDataSource } from "../../pg-data-source.js";
+import { createTestDataSource, isPostgresAvailable } from "./setup.js";
 
 const canConnect = await isPostgresAvailable();
 
@@ -132,9 +133,7 @@ describe.skipIf(!canConnect)("E2E: Global query filters", { timeout: 15000 }, ()
     );
 
     // Seed plain
-    await stmt.executeUpdate(
-      `INSERT INTO ${TABLE_PLAIN} (value) VALUES ('x'), ('y'), ('z')`,
-    );
+    await stmt.executeUpdate(`INSERT INTO ${TABLE_PLAIN} (value) VALUES ('x'), ('y'), ('z')`);
 
     await c.close();
   });
@@ -156,8 +155,8 @@ describe.skipIf(!canConnect)("E2E: Global query filters", { timeout: 15000 }, ()
   it("findAll respects activeOnly filter — excludes inactive users", async () => {
     const users = await userRepo.findAll();
     expect(users).toHaveLength(2);
-    expect(users.every(u => u.active)).toBe(true);
-    expect(users.map(u => u.name).sort()).toEqual(["Alice", "Bob"]);
+    expect(users.every((u) => u.active)).toBe(true);
+    expect(users.map((u) => u.name).sort()).toEqual(["Alice", "Bob"]);
   });
 
   it("count respects active filter", async () => {
@@ -169,9 +168,7 @@ describe.skipIf(!canConnect)("E2E: Global query filters", { timeout: 15000 }, ()
     // Get Charlie's id
     const c = await ds.getConnection();
     const stmt = c.createStatement();
-    const rs = await stmt.executeQuery(
-      `SELECT id FROM ${TABLE_USERS} WHERE name = 'Charlie'`,
-    );
+    const rs = await stmt.executeQuery(`SELECT id FROM ${TABLE_USERS} WHERE name = 'Charlie'`);
     await rs.next();
     const charlieId = rs.getNumber("id");
     await c.close();
@@ -195,14 +192,11 @@ describe.skipIf(!canConnect)("E2E: Global query filters", { timeout: 15000 }, ()
     const posts = await postRepo.findAll();
     // Should get Post 1 (not archived, visible) and Post 2 (not archived, not visible)
     expect(posts).toHaveLength(2);
-    expect(posts.every(p => !p.archived)).toBe(true);
+    expect(posts.every((p) => !p.archived)).toBe(true);
   });
 
   it("FilterContext.withFilters can enable an opt-in filter", async () => {
-    const posts = await FilterContext.withFilters(
-      { enableFilters: ["visibleOnly"] },
-      () => postRepo.findAll(),
-    );
+    const posts = await FilterContext.withFilters({ enableFilters: ["visibleOnly"] }, () => postRepo.findAll());
     // Both "notArchived" (default on) and "visibleOnly" (now enabled) apply
     // Only Post 1 matches (not archived AND visible)
     expect(posts).toHaveLength(1);
@@ -219,10 +213,7 @@ describe.skipIf(!canConnect)("E2E: Global query filters", { timeout: 15000 }, ()
   });
 
   it("FilterContext.withFilters can disable a specific filter", async () => {
-    const users = await FilterContext.withFilters(
-      { disableFilters: ["activeOnly"] },
-      () => userRepo.findAll(),
-    );
+    const users = await FilterContext.withFilters({ disableFilters: ["activeOnly"] }, () => userRepo.findAll());
     expect(users).toHaveLength(3);
   });
 
@@ -258,9 +249,7 @@ describe.skipIf(!canConnect)("E2E: Global query filters", { timeout: 15000 }, ()
     // Get Charlie's id (inactive, filtered out)
     const c = await ds.getConnection();
     const stmt = c.createStatement();
-    const rs = await stmt.executeQuery(
-      `SELECT id FROM ${TABLE_USERS} WHERE name = 'Charlie'`,
-    );
+    const rs = await stmt.executeQuery(`SELECT id FROM ${TABLE_USERS} WHERE name = 'Charlie'`);
     await rs.next();
     const charlieId = rs.getNumber("id");
     await c.close();
@@ -279,9 +268,7 @@ describe.skipIf(!canConnect)("E2E: Global query filters", { timeout: 15000 }, ()
     // Verify Charlie still exists in the raw database
     const c2 = await ds.getConnection();
     const stmt2 = c2.createStatement();
-    const rs2 = await stmt2.executeQuery(
-      `SELECT COUNT(*)::int as cnt FROM ${TABLE_USERS} WHERE name = 'Charlie'`,
-    );
+    const rs2 = await stmt2.executeQuery(`SELECT COUNT(*)::int as cnt FROM ${TABLE_USERS} WHERE name = 'Charlie'`);
     await rs2.next();
     const count = rs2.getNumber("cnt");
     await c2.close();
@@ -290,9 +277,7 @@ describe.skipIf(!canConnect)("E2E: Global query filters", { timeout: 15000 }, ()
     // If count is 1, the filter correctly prevented the delete.
     if (count === 0) {
       // Global filters do NOT protect from delete — delete bypasses filters
-      console.warn(
-        "FINDING: deleteById bypasses global filters. Filtered-out entities can be deleted by ID.",
-      );
+      console.warn("FINDING: deleteById bypasses global filters. Filtered-out entities can be deleted by ID.");
     }
     // Accept either behavior — this documents the actual behavior
     expect([0, 1]).toContain(count);
@@ -302,9 +287,7 @@ describe.skipIf(!canConnect)("E2E: Global query filters", { timeout: 15000 }, ()
     // Get Alice's id (active, visible to filter)
     const c = await ds.getConnection();
     const stmt = c.createStatement();
-    const rs = await stmt.executeQuery(
-      `SELECT id FROM ${TABLE_USERS} WHERE name = 'Alice'`,
-    );
+    const rs = await stmt.executeQuery(`SELECT id FROM ${TABLE_USERS} WHERE name = 'Alice'`);
     await rs.next();
     const aliceId = rs.getNumber("id");
     await c.close();
@@ -429,10 +412,10 @@ describe.skipIf(!canConnect)("E2E: Global query filters", { timeout: 15000 }, ()
 
     // Should NOT appear in filtered findAll
     const visible = await userRepo.findAll();
-    expect(visible.find(u => u.name === "Hidden")).toBeUndefined();
+    expect(visible.find((u) => u.name === "Hidden")).toBeUndefined();
 
     // But should exist in DB (bypass filters)
     const all = await FilterContext.withoutFilters(() => userRepo.findAll());
-    expect(all.find(u => u.name === "Hidden")).toBeDefined();
+    expect(all.find((u) => u.name === "Hidden")).toBeDefined();
   });
 });

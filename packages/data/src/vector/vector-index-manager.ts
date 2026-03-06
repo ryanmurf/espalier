@@ -86,13 +86,7 @@ export class VectorIndexManager {
    * ```
    */
   generateCreateIndex(options: VectorIndexOptions): string {
-    const {
-      tableName,
-      columnName,
-      metric,
-      indexType,
-      schema,
-    } = options;
+    const { tableName, columnName, metric, indexType, schema } = options;
 
     validateIdentifier(tableName, "tableName");
     validateIdentifier(columnName, "columnName");
@@ -133,11 +127,7 @@ export class VectorIndexManager {
    * Convenience method: generates index DDL from a VectorMetadataEntry and table name.
    * Returns undefined if the entry's indexType is "none".
    */
-  generateIndexFromMetadata(
-    tableName: string,
-    entry: VectorMetadataEntry,
-    schema?: string,
-  ): string | undefined {
+  generateIndexFromMetadata(tableName: string, entry: VectorMetadataEntry, schema?: string): string | undefined {
     if (entry.indexType === "none") return undefined;
 
     return this.generateCreateIndex({
@@ -164,9 +154,7 @@ export class VectorIndexManager {
         throw new Error(`HNSW m must be an integer between 2 and 100, got: ${m}`);
       }
       if (!Number.isInteger(efConstruction) || efConstruction < 1 || efConstruction > 1000) {
-        throw new Error(
-          `HNSW ef_construction must be an integer between 1 and 1000, got: ${efConstruction}`,
-        );
+        throw new Error(`HNSW ef_construction must be an integer between 1 and 1000, got: ${efConstruction}`);
       }
 
       params.push(`m = ${m}`, `ef_construction = ${efConstruction}`);

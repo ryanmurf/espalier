@@ -1,7 +1,7 @@
 import type { Connection, DataSource } from "espalier-jdbc";
 import { ConnectionError, DatabaseErrorCode, getGlobalLogger } from "espalier-jdbc";
-import type { LibSqlClient, LibSqlConfig } from "./libsql-types.js";
 import { LibSqlConnection } from "./libsql-connection.js";
+import type { LibSqlClient, LibSqlConfig } from "./libsql-types.js";
 
 export interface LibSqlDataSourceConfig {
   /** LibSQL connection URL (e.g., "libsql://your-db.turso.io" or "file:local.db"). */
@@ -27,11 +27,7 @@ export class LibSqlDataSource implements DataSource {
 
   async getConnection(): Promise<Connection> {
     if (this.closed) {
-      throw new ConnectionError(
-        "DataSource is closed",
-        undefined,
-        DatabaseErrorCode.CONNECTION_CLOSED,
-      );
+      throw new ConnectionError("DataSource is closed", undefined, DatabaseErrorCode.CONNECTION_CLOSED);
     }
 
     if (!this.client) {

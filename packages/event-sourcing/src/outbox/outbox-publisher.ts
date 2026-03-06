@@ -1,5 +1,5 @@
 import type { DataSource } from "espalier-jdbc";
-import type { OutboxOptions, OutboxEntry } from "../types.js";
+import type { OutboxEntry, OutboxOptions } from "../types.js";
 import { OutboxStore } from "./outbox-store.js";
 
 // Ambient timer globals (available in Node, Bun, Deno, browsers)
@@ -52,9 +52,7 @@ export class OutboxPublisher {
   start(): void {
     if (this.running) return;
     if (!this.publishFn) {
-      throw new Error(
-        "No publish function registered. Call onPublish() before start().",
-      );
+      throw new Error("No publish function registered. Call onPublish() before start().");
     }
     this.running = true;
     this.timer = setInterval(() => {
@@ -91,10 +89,7 @@ export class OutboxPublisher {
     try {
       const connection = await this.dataSource.getConnection();
       try {
-        const entries = await this.store.fetchUnpublished(
-          connection,
-          this.batchSize,
-        );
+        const entries = await this.store.fetchUnpublished(connection, this.batchSize);
         if (entries.length === 0) return 0;
 
         // Publish to external system

@@ -1,12 +1,12 @@
-import { describe, it, expect, vi } from "vitest";
-import type { DataSource, Connection, PreparedStatement, ResultSet } from "espalier-jdbc";
-import { Repository, getRepositoryMetadata, getRegisteredRepositories } from "../../decorators/repository.js";
-import { Table } from "../../decorators/table.js";
+import type { Connection, DataSource, PreparedStatement, ResultSet } from "espalier-jdbc";
+import { describe, expect, it, vi } from "vitest";
 import { Column } from "../../decorators/column.js";
 import { Id } from "../../decorators/id.js";
+import { getRegisteredRepositories, getRepositoryMetadata, Repository } from "../../decorators/repository.js";
+import { Table } from "../../decorators/table.js";
+import { parseDerivedQueryMethod } from "../../query/derived-query-parser.js";
 import { createAutoRepository } from "../../repository/auto-repository.js";
 import { createRepository } from "../../repository/repository-factory.js";
-import { parseDerivedQueryMethod } from "../../query/derived-query-parser.js";
 import { TestResultSet } from "../test-utils/test-result-set.js";
 
 // ---------------------------------------------------------------------------
@@ -87,7 +87,6 @@ class BareTableEntity {}
 // ---------------------------------------------------------------------------
 
 describe("Adversarial: @Repository decorator and auto-generated repository", () => {
-
   // =========================================================================
   // 1. Undecorated class passed to createAutoRepository
   // =========================================================================
@@ -95,17 +94,13 @@ describe("Adversarial: @Repository decorator and auto-generated repository", () 
     it("throws a clear error when class has no @Repository", () => {
       class PlainClass {}
       const { ds } = buildMockStack();
-      expect(() => createAutoRepository(PlainClass, ds)).toThrow(
-        /No @Repository decorator found on PlainClass/,
-      );
+      expect(() => createAutoRepository(PlainClass, ds)).toThrow(/No @Repository decorator found on PlainClass/);
     });
 
     it("throws when an anonymous class is passed", () => {
       const { ds } = buildMockStack();
       const Anon = class {};
-      expect(() => createAutoRepository(Anon, ds)).toThrow(
-        /No @Repository decorator found/,
-      );
+      expect(() => createAutoRepository(Anon, ds)).toThrow(/No @Repository decorator found/);
     });
 
     it("getRepositoryMetadata returns undefined for undecorated class", () => {
@@ -125,9 +120,7 @@ describe("Adversarial: @Repository decorator and auto-generated repository", () 
       const { ds } = buildMockStack();
       // createAutoRepository calls createDerivedRepository which calls getEntityMetadata
       // which should throw "No @Table decorator found"
-      expect(() => createAutoRepository<NoTableEntity, number>(NoTableRepo, ds)).toThrow(
-        /No @Table decorator found/,
-      );
+      expect(() => createAutoRepository<NoTableEntity, number>(NoTableRepo, ds)).toThrow(/No @Table decorator found/);
     });
 
     it("throws when @Repository entity has no @Id decorator", () => {
@@ -135,9 +128,7 @@ describe("Adversarial: @Repository decorator and auto-generated repository", () 
       class NoIdRepo {}
 
       const { ds } = buildMockStack();
-      expect(() => createAutoRepository<NoIdEntity, number>(NoIdRepo, ds)).toThrow(
-        /No @Id decorator found/,
-      );
+      expect(() => createAutoRepository<NoIdEntity, number>(NoIdRepo, ds)).toThrow(/No @Id decorator found/);
     });
 
     it("throws when @Repository entity has @Table but no @Column or @Id", () => {
@@ -146,9 +137,7 @@ describe("Adversarial: @Repository decorator and auto-generated repository", () 
 
       const { ds } = buildMockStack();
       // Should throw about missing @Id
-      expect(() => createAutoRepository(BareRepo, ds)).toThrow(
-        /No @Id decorator found/,
-      );
+      expect(() => createAutoRepository(BareRepo, ds)).toThrow(/No @Id decorator found/);
     });
   });
 
@@ -208,9 +197,7 @@ describe("Adversarial: @Repository decorator and auto-generated repository", () 
       class DerivedRepo extends BaseRepo {}
 
       const { ds } = buildMockStack();
-      expect(() => createAutoRepository(DerivedRepo, ds)).toThrow(
-        /No @Repository decorator found on DerivedRepo/,
-      );
+      expect(() => createAutoRepository(DerivedRepo, ds)).toThrow(/No @Repository decorator found on DerivedRepo/);
     });
 
     it("child with its own @Repository can use a different entity", () => {
@@ -233,24 +220,18 @@ describe("Adversarial: @Repository decorator and auto-generated repository", () 
   // =========================================================================
   describe("method name edge cases", () => {
     it("'find' alone (no 'By') throws", () => {
-      expect(() => parseDerivedQueryMethod("find")).toThrow(
-        /must start with findBy/,
-      );
+      expect(() => parseDerivedQueryMethod("find")).toThrow(/must start with findBy/);
     });
 
     it("'findBy' with nothing after 'By' throws", () => {
-      expect(() => parseDerivedQueryMethod("findBy")).toThrow(
-        /no property predicates found after "By"/,
-      );
+      expect(() => parseDerivedQueryMethod("findBy")).toThrow(/no property predicates found after "By"/);
     });
 
     it("'findByAndAnd' throws because it produces zero properties", () => {
       // After findBy: rest = "AndAnd"
       // splitProperties produces empty parts which are filtered out.
       // The parser now validates that at least one property predicate is present.
-      expect(() => parseDerivedQueryMethod("findByAndAnd")).toThrow(
-        /no property predicates could be parsed/,
-      );
+      expect(() => parseDerivedQueryMethod("findByAndAnd")).toThrow(/no property predicates could be parsed/);
     });
 
     it("'countByCountBy' parses without crashing", () => {
@@ -265,27 +246,19 @@ describe("Adversarial: @Repository decorator and auto-generated repository", () 
     });
 
     it("empty method name throws", () => {
-      expect(() => parseDerivedQueryMethod("")).toThrow(
-        /method name is empty/,
-      );
+      expect(() => parseDerivedQueryMethod("")).toThrow(/method name is empty/);
     });
 
     it("'findDistinct' without 'By' throws", () => {
-      expect(() => parseDerivedQueryMethod("findDistinct")).toThrow(
-        /expected "By" after "findDistinct"/,
-      );
+      expect(() => parseDerivedQueryMethod("findDistinct")).toThrow(/expected "By" after "findDistinct"/);
     });
 
     it("'existsBy' with nothing after 'By' throws", () => {
-      expect(() => parseDerivedQueryMethod("existsBy")).toThrow(
-        /no property predicates found after "By"/,
-      );
+      expect(() => parseDerivedQueryMethod("existsBy")).toThrow(/no property predicates found after "By"/);
     });
 
     it("'deleteBy' with nothing after 'By' throws", () => {
-      expect(() => parseDerivedQueryMethod("deleteBy")).toThrow(
-        /no property predicates found after "By"/,
-      );
+      expect(() => parseDerivedQueryMethod("deleteBy")).toThrow(/no property predicates found after "By"/);
     });
 
     it("'findByOrderBy' (no predicate before OrderBy) throws about empty OrderBy property", () => {
@@ -294,15 +267,11 @@ describe("Adversarial: @Repository decorator and auto-generated repository", () 
       //   predicatePart = "" (empty)
       //   orderByPart = "" (empty after removing "OrderBy")
       // Empty orderByPart throws BEFORE the empty-predicate check runs
-      expect(() => parseDerivedQueryMethod("findByOrderBy")).toThrow(
-        /expected property name after "OrderBy"/,
-      );
+      expect(() => parseDerivedQueryMethod("findByOrderBy")).toThrow(/expected property name after "OrderBy"/);
     });
 
     it("'findByNameOrderBy' (no property after OrderBy) throws", () => {
-      expect(() => parseDerivedQueryMethod("findByNameOrderBy")).toThrow(
-        /expected property name after "OrderBy"/,
-      );
+      expect(() => parseDerivedQueryMethod("findByNameOrderBy")).toThrow(/expected property name after "OrderBy"/);
     });
 
     it("findFirst0By parses limit as 0", () => {
@@ -473,9 +442,7 @@ describe("Adversarial: @Repository decorator and auto-generated repository", () 
   describe("type mismatches", () => {
     it("createRepository throws for entity without @Id", () => {
       const { ds } = buildMockStack();
-      expect(() => createRepository<NoIdEntity, number>(NoIdEntity, ds)).toThrow(
-        /No @Id decorator found/,
-      );
+      expect(() => createRepository<NoIdEntity, number>(NoIdEntity, ds)).toThrow(/No @Id decorator found/);
     });
 
     it("createRepository throws for entity without @Table", () => {
@@ -490,7 +457,7 @@ describe("Adversarial: @Repository decorator and auto-generated repository", () 
       // Let's test what happens with a class that has @Table and @Id but @Id without @Column
       @Table("id_only")
       class IdOnlyEntity {
-        @Id id: number = 0;  // @Id but no @Column — id won't appear in column mappings
+        @Id id: number = 0; // @Id but no @Column — id won't appear in column mappings
       }
 
       const { ds } = buildMockStack([{ id: 1 }]);
@@ -510,9 +477,11 @@ describe("Adversarial: @Repository decorator and auto-generated repository", () 
       class NegCacheRepo {}
 
       const { ds } = buildMockStack();
-      expect(() => createAutoRepository<AdvUser, number>(NegCacheRepo, ds, {
-        entityCache: { maxSize: -1 },
-      })).toThrow(/Invalid EntityCache maxSize: -1/);
+      expect(() =>
+        createAutoRepository<AdvUser, number>(NegCacheRepo, ds, {
+          entityCache: { maxSize: -1 },
+        }),
+      ).toThrow(/Invalid EntityCache maxSize: -1/);
     });
 
     it("negative TTL for queryCache throws at creation time", () => {
@@ -520,9 +489,11 @@ describe("Adversarial: @Repository decorator and auto-generated repository", () 
       class NegTtlRepo {}
 
       const { ds } = buildMockStack();
-      expect(() => createAutoRepository<AdvUser, number>(NegTtlRepo, ds, {
-        queryCache: { defaultTtlMs: -5000 },
-      })).toThrow(/Invalid QueryCache defaultTtlMs: -5000/);
+      expect(() =>
+        createAutoRepository<AdvUser, number>(NegTtlRepo, ds, {
+          queryCache: { defaultTtlMs: -5000 },
+        }),
+      ).toThrow(/Invalid QueryCache defaultTtlMs: -5000/);
     });
 
     it("zero maxSize for entityCache still allows puts (LRU immediately evicts)", async () => {
@@ -545,9 +516,11 @@ describe("Adversarial: @Repository decorator and auto-generated repository", () 
       class NaNCacheRepo {}
 
       const { ds } = buildMockStack();
-      expect(() => createAutoRepository<AdvUser, number>(NaNCacheRepo, ds, {
-        entityCache: { maxSize: NaN },
-      })).toThrow(/Invalid EntityCache maxSize: NaN/);
+      expect(() =>
+        createAutoRepository<AdvUser, number>(NaNCacheRepo, ds, {
+          entityCache: { maxSize: NaN },
+        }),
+      ).toThrow(/Invalid EntityCache maxSize: NaN/);
     });
 
     it("Infinity maxSize for queryCache throws at creation time", () => {
@@ -555,9 +528,11 @@ describe("Adversarial: @Repository decorator and auto-generated repository", () 
       class InfCacheRepo {}
 
       const { ds } = buildMockStack();
-      expect(() => createAutoRepository<AdvUser, number>(InfCacheRepo, ds, {
-        queryCache: { maxSize: Infinity },
-      })).toThrow(/Invalid QueryCache maxSize: Infinity/);
+      expect(() =>
+        createAutoRepository<AdvUser, number>(InfCacheRepo, ds, {
+          queryCache: { maxSize: Infinity },
+        }),
+      ).toThrow(/Invalid QueryCache maxSize: Infinity/);
     });
   });
 
@@ -680,9 +655,7 @@ describe("Adversarial: @Repository decorator and auto-generated repository", () 
 
       // The proxy throws synchronously because query compilation happens
       // eagerly during property access (not deferred to execution).
-      expect(() => (repo as any).findByNonexistentField("value")).toThrow(
-        /Unknown property "nonexistentField"/,
-      );
+      expect(() => (repo as any).findByNonexistentField("value")).toThrow(/Unknown property "nonexistentField"/);
     });
 
     it("deleteByNonexistentField throws at execution time", async () => {
@@ -692,9 +665,7 @@ describe("Adversarial: @Repository decorator and auto-generated repository", () 
       const { ds } = buildMockStack();
       const repo = createAutoRepository<AdvUser, number>(DeleteFieldErrRepo, ds);
 
-      expect(() => (repo as any).deleteByNonexistentField("val")).toThrow(
-        /Unknown property "nonexistentField"/,
-      );
+      expect(() => (repo as any).deleteByNonexistentField("val")).toThrow(/Unknown property "nonexistentField"/);
     });
   });
 

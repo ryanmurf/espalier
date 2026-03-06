@@ -1,4 +1,4 @@
-import type { SchemaModel, SchemaTable, SchemaRelation } from "../schema/schema-model.js";
+import type { SchemaModel, SchemaRelation } from "../schema/schema-model.js";
 
 export type DiagramFormat = "mermaid" | "d2" | "plantuml";
 
@@ -125,10 +125,7 @@ function generateD2(schema: SchemaModel, title?: string): string {
   return lines.join("\n") + "\n";
 }
 
-function d2Constraint(col: {
-  isPrimaryKey: boolean;
-  unique?: boolean;
-}): string {
+function d2Constraint(col: { isPrimaryKey: boolean; unique?: boolean }): string {
   if (col.isPrimaryKey) return " {constraint: primary_key}";
   if (col.unique) return " {constraint: unique}";
   return "";

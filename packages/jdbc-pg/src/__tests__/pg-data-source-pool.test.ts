@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { PoolConfig } from "espalier-jdbc";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock pg module
 const mockPoolEnd = vi.fn().mockResolvedValue(undefined);
@@ -28,17 +28,15 @@ beforeEach(() => {
 
 describe("PgDataSource pool config mapping", () => {
   it("accepts raw pg PoolConfig for backwards compatibility", () => {
-    const ds = new PgDataSource({ host: "localhost", port: 5432 });
+    const _ds = new PgDataSource({ host: "localhost", port: 5432 });
     expect(Pool).toHaveBeenCalledWith({ host: "localhost", port: 5432 });
   });
 
   it("accepts PgDataSourceConfig with pg options", () => {
-    const ds = new PgDataSource({
+    const _ds = new PgDataSource({
       pg: { host: "localhost", database: "mydb" },
     });
-    expect(Pool).toHaveBeenCalledWith(
-      expect.objectContaining({ host: "localhost", database: "mydb" }),
-    );
+    expect(Pool).toHaveBeenCalledWith(expect.objectContaining({ host: "localhost", database: "mydb" }));
   });
 
   it("maps PoolConfig to pg Pool options", () => {
@@ -49,7 +47,7 @@ describe("PgDataSource pool config mapping", () => {
       idleTimeout: 10000,
       maxLifetime: 1800000,
     };
-    const ds = new PgDataSource({ pool });
+    const _ds = new PgDataSource({ pool });
     expect(Pool).toHaveBeenCalledWith(
       expect.objectContaining({
         min: 2,
@@ -62,7 +60,7 @@ describe("PgDataSource pool config mapping", () => {
   });
 
   it("merges pg config with pool config", () => {
-    const ds = new PgDataSource({
+    const _ds = new PgDataSource({
       pg: { host: "db.example.com", database: "prod" },
       pool: { maxConnections: 50 },
     });
@@ -76,7 +74,7 @@ describe("PgDataSource pool config mapping", () => {
   });
 
   it("pool config overrides equivalent pg config", () => {
-    const ds = new PgDataSource({
+    const _ds = new PgDataSource({
       pg: { max: 5 },
       pool: { maxConnections: 50 },
     });
@@ -85,21 +83,17 @@ describe("PgDataSource pool config mapping", () => {
   });
 
   it("converts maxLifetime from ms to seconds", () => {
-    const ds = new PgDataSource({
+    const _ds = new PgDataSource({
       pool: { maxLifetime: 60000 },
     });
-    expect(Pool).toHaveBeenCalledWith(
-      expect.objectContaining({ maxLifetimeSeconds: 60 }),
-    );
+    expect(Pool).toHaveBeenCalledWith(expect.objectContaining({ maxLifetimeSeconds: 60 }));
   });
 
   it("floors maxLifetime conversion", () => {
-    const ds = new PgDataSource({
+    const _ds = new PgDataSource({
       pool: { maxLifetime: 1500 }, // 1.5 seconds -> floors to 1
     });
-    expect(Pool).toHaveBeenCalledWith(
-      expect.objectContaining({ maxLifetimeSeconds: 1 }),
-    );
+    expect(Pool).toHaveBeenCalledWith(expect.objectContaining({ maxLifetimeSeconds: 1 }));
   });
 });
 

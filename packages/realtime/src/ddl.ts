@@ -9,9 +9,7 @@ import { EntityChangeCapture } from "./notifications/entity-change-capture.js";
  * @param entityClasses Array of entity classes decorated with @Table
  * @returns Combined DDL string for all triggers
  */
-export function generateRealtimeDdl(
-  entityClasses: Array<new (...args: unknown[]) => unknown>,
-): string {
+export function generateRealtimeDdl(entityClasses: Array<new (...args: unknown[]) => unknown>): string {
   const capture = new EntityChangeCapture();
   const statements: string[] = [];
 
@@ -19,8 +17,7 @@ export function generateRealtimeDdl(
     const tableName = getTableName(entityClass);
     if (!tableName) {
       throw new Error(
-        `Entity class "${entityClass.name}" does not have a @Table decorator. ` +
-          "Cannot generate realtime DDL.",
+        `Entity class "${entityClass.name}" does not have a @Table decorator. ` + "Cannot generate realtime DDL.",
       );
     }
     const channel = `${tableName}_changes`;

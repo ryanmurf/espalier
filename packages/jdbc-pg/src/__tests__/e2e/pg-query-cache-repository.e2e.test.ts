@@ -1,13 +1,8 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { createTestDataSource, isPostgresAvailable } from "./setup.js";
-import {
-  Table,
-  Column,
-  Id,
-  createDerivedRepository,
-} from "espalier-data";
 import type { QueryCache } from "espalier-data";
+import { Column, createDerivedRepository, Id, Table } from "espalier-data";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { PgDataSource } from "../../pg-data-source.js";
+import { createTestDataSource, isPostgresAvailable } from "./setup.js";
 
 const canConnect = await isPostgresAvailable();
 
@@ -50,11 +45,9 @@ describe.skipIf(!canConnect)("E2E: Query Cache with Repository", { timeout: 1500
   });
 
   function createRepo(queryCacheConfig?: { enabled?: boolean; maxSize?: number; defaultTtlMs?: number }) {
-    return createDerivedRepository<QCacheTestItem, number>(
-      QCacheTestItem,
-      ds,
-      { queryCache: queryCacheConfig ?? { enabled: true } },
-    );
+    return createDerivedRepository<QCacheTestItem, number>(QCacheTestItem, ds, {
+      queryCache: queryCacheConfig ?? { enabled: true },
+    });
   }
 
   function getQueryCache(repo: any): QueryCache {

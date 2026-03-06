@@ -8,19 +8,15 @@
  * - Connection release after read-only transaction rollback in query playground
  * - Tiny pool (max=2) + many concurrent requests does not deadlock
  */
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { Hono } from "hono";
+
+import { Column, Id, Table, Version } from "espalier-data";
 import { PgDataSource } from "espalier-jdbc-pg";
-import {
-  Table,
-  Column,
-  Id,
-  Version,
-} from "espalier-data";
+import { Hono } from "hono";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { extractSchema } from "../schema/index.js";
-import { createApiRoutes } from "../server/api-routes.js";
-import type { ApiRouteContext } from "../server/api-routes.js";
 import type { SchemaModel } from "../schema/schema-model.js";
+import type { ApiRouteContext } from "../server/api-routes.js";
+import { createApiRoutes } from "../server/api-routes.js";
 
 // =============================================================================
 // Postgres connectivity check
@@ -40,7 +36,11 @@ async function isPostgresAvailable(): Promise<boolean> {
     await ds.close();
     return true;
   } catch {
-    try { await ds.close(); } catch { /* ignore */ }
+    try {
+      await ds.close();
+    } catch {
+      /* ignore */
+    }
     return false;
   }
 }
@@ -145,9 +145,7 @@ describe.skipIf(!canConnect)("QA Seam: Studio API + connection pool (E2E)", () =
 
     it("concurrent requests on tiny pool do not deadlock", async () => {
       // Fire 5 concurrent requests on a pool of 2 — they should queue, not deadlock
-      const promises = Array.from({ length: 5 }, (_, i) =>
-        req(app, `/api/tables/${TEST_TABLE}/rows?size=2&page=${i}`),
-      );
+      const promises = Array.from({ length: 5 }, (_, i) => req(app, `/api/tables/${TEST_TABLE}/rows?size=2&page=${i}`));
       const results = await Promise.all(promises);
       for (const res of results) {
         expect(res.status).toBe(200);
@@ -167,10 +165,7 @@ describe.skipIf(!canConnect)("QA Seam: Studio API + connection pool (E2E)", () =
 
     it("row-by-id with non-existent UUID releases connection", async () => {
       for (let i = 0; i < 5; i++) {
-        const res = await req(
-          app,
-          `/api/tables/${TEST_TABLE}/rows/00000000-0000-0000-0000-000000000000`,
-        );
+        const res = await req(app, `/api/tables/${TEST_TABLE}/rows/00000000-0000-0000-0000-000000000000`);
         expect(res.status).toBe(404);
       }
       // Verify pool still works

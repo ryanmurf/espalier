@@ -1,6 +1,6 @@
-import { describe, it, expect } from "vitest";
+import type { Connection, DataSource } from "espalier-jdbc";
+import { describe, expect, it } from "vitest";
 import { PollingChangeDetector } from "../notifications/polling-change-detector.js";
-import type { DataSource, Connection } from "espalier-jdbc";
 
 function createMockDataSource(rows: Record<string, unknown>[][] = [[]]): DataSource {
   let callIndex = 0;
@@ -155,7 +155,9 @@ describe("PollingChangeDetector", () => {
     let unblock: (() => void) | undefined;
     const blockingDs: DataSource = {
       async getConnection(): Promise<Connection> {
-        await new Promise<void>((resolve) => { unblock = resolve; });
+        await new Promise<void>((resolve) => {
+          unblock = resolve;
+        });
         // Return a dummy connection (won't actually be used since we abort)
         return createMockDataSource([[{ id: 1 }]]).getConnection();
       },
@@ -180,9 +182,7 @@ describe("PollingChangeDetector", () => {
     // Second watch should throw synchronously inside the generator
     const secondIter = detector.watch("ch2");
     // Calling .next() triggers the generator body which checks the guard
-    await expect(
-      (secondIter as AsyncGenerator).next(),
-    ).rejects.toThrow(/already watching/);
+    await expect((secondIter as AsyncGenerator).next()).rejects.toThrow(/already watching/);
 
     // Clean up
     detector.stop();

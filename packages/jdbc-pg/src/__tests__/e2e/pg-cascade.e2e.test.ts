@@ -14,21 +14,22 @@
  * We still call getEntityMetadata() upfront for all entity classes as good
  * practice to ensure metadata initialization.
  */
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { createTestDataSource, isPostgresAvailable } from "./setup.js";
+
 import {
-  Table,
   Column,
-  Id,
-  ManyToOne,
-  OneToMany,
-  ManyToMany,
-  OneToOne,
   createRepository,
   getEntityMetadata,
+  Id,
+  ManyToMany,
+  ManyToOne,
+  OneToMany,
+  OneToOne,
+  Table,
 } from "espalier-data";
-import type { PgDataSource } from "../../pg-data-source.js";
 import type { Connection } from "espalier-jdbc";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import type { PgDataSource } from "../../pg-data-source.js";
+import { createTestDataSource, isPostgresAvailable } from "./setup.js";
 
 const canConnect = await isPostgresAvailable();
 
@@ -168,10 +169,22 @@ class CscInvUser {
 
 // Ensure metadata initialization for all entity classes (good practice).
 const allEntityClasses = [
-  CscDepartment, CscEmployee, CscJDepartment, CscJEmployee,
-  CscAuthor, CscBook, CscProfile, CscUser,
-  CscTag, CscArticle, CscTeam, CscMember,
-  CscRemoveParent, CscRemoveChild, CscInvProfile, CscInvUser,
+  CscDepartment,
+  CscEmployee,
+  CscJDepartment,
+  CscJEmployee,
+  CscAuthor,
+  CscBook,
+  CscProfile,
+  CscUser,
+  CscTag,
+  CscArticle,
+  CscTeam,
+  CscMember,
+  CscRemoveParent,
+  CscRemoveChild,
+  CscInvProfile,
+  CscInvUser,
 ];
 for (const cls of allEntityClasses) {
   getEntityMetadata(cls);
@@ -187,7 +200,11 @@ function make<T>(cls: new (...args: any[]) => T, fields: Partial<T>): T {
 
 async function rawExec(conn: Connection, sql: string): Promise<void> {
   const stmt = conn.createStatement();
-  try { await stmt.executeUpdate(sql); } finally { await stmt.close().catch(() => {}); }
+  try {
+    await stmt.executeUpdate(sql);
+  } finally {
+    await stmt.close().catch(() => {});
+  }
 }
 
 async function rawQuery(conn: Connection, sql: string): Promise<Record<string, unknown>[]> {
@@ -216,35 +233,68 @@ describe.skipIf(!canConnect)("cascade operations E2E", () => {
     const conn = await ds.getConnection();
     try {
       const drops = [
-        "e2e_csc_article_tags", "e2e_csc_articles", "e2e_csc_tags",
-        "e2e_csc_books", "e2e_csc_authors",
-        "e2e_csc_users", "e2e_csc_profiles",
-        "e2e_csc_jemployees", "e2e_csc_jdepartments",
-        "e2e_csc_employees", "e2e_csc_departments",
-        "e2e_csc_members", "e2e_csc_teams",
-        "e2e_csc_remove_child", "e2e_csc_remove_parent",
-        "e2e_csc_inv_profiles", "e2e_csc_inv_users",
+        "e2e_csc_article_tags",
+        "e2e_csc_articles",
+        "e2e_csc_tags",
+        "e2e_csc_books",
+        "e2e_csc_authors",
+        "e2e_csc_users",
+        "e2e_csc_profiles",
+        "e2e_csc_jemployees",
+        "e2e_csc_jdepartments",
+        "e2e_csc_employees",
+        "e2e_csc_departments",
+        "e2e_csc_members",
+        "e2e_csc_teams",
+        "e2e_csc_remove_child",
+        "e2e_csc_remove_parent",
+        "e2e_csc_inv_profiles",
+        "e2e_csc_inv_users",
       ];
       for (const t of drops) {
         await rawExec(conn, `DROP TABLE IF EXISTS ${t} CASCADE`);
       }
       await rawExec(conn, `CREATE TABLE e2e_csc_departments (id SERIAL PRIMARY KEY, name TEXT NOT NULL)`);
-      await rawExec(conn, `CREATE TABLE e2e_csc_employees (id SERIAL PRIMARY KEY, emp_name TEXT NOT NULL, dept_id INT REFERENCES e2e_csc_departments(id))`);
+      await rawExec(
+        conn,
+        `CREATE TABLE e2e_csc_employees (id SERIAL PRIMARY KEY, emp_name TEXT NOT NULL, dept_id INT REFERENCES e2e_csc_departments(id))`,
+      );
       await rawExec(conn, `CREATE TABLE e2e_csc_jdepartments (id SERIAL PRIMARY KEY, name TEXT NOT NULL)`);
-      await rawExec(conn, `CREATE TABLE e2e_csc_jemployees (id SERIAL PRIMARY KEY, emp_name TEXT NOT NULL, dept_id INT REFERENCES e2e_csc_jdepartments(id))`);
+      await rawExec(
+        conn,
+        `CREATE TABLE e2e_csc_jemployees (id SERIAL PRIMARY KEY, emp_name TEXT NOT NULL, dept_id INT REFERENCES e2e_csc_jdepartments(id))`,
+      );
       await rawExec(conn, `CREATE TABLE e2e_csc_authors (id SERIAL PRIMARY KEY, author_name TEXT NOT NULL)`);
-      await rawExec(conn, `CREATE TABLE e2e_csc_books (id SERIAL PRIMARY KEY, title TEXT NOT NULL, author_id INT REFERENCES e2e_csc_authors(id))`);
+      await rawExec(
+        conn,
+        `CREATE TABLE e2e_csc_books (id SERIAL PRIMARY KEY, title TEXT NOT NULL, author_id INT REFERENCES e2e_csc_authors(id))`,
+      );
       await rawExec(conn, `CREATE TABLE e2e_csc_profiles (id SERIAL PRIMARY KEY, bio TEXT NOT NULL)`);
-      await rawExec(conn, `CREATE TABLE e2e_csc_users (id SERIAL PRIMARY KEY, user_name TEXT NOT NULL, profile_id INT UNIQUE REFERENCES e2e_csc_profiles(id))`);
+      await rawExec(
+        conn,
+        `CREATE TABLE e2e_csc_users (id SERIAL PRIMARY KEY, user_name TEXT NOT NULL, profile_id INT UNIQUE REFERENCES e2e_csc_profiles(id))`,
+      );
       await rawExec(conn, `CREATE TABLE e2e_csc_tags (id SERIAL PRIMARY KEY, label TEXT NOT NULL)`);
       await rawExec(conn, `CREATE TABLE e2e_csc_articles (id SERIAL PRIMARY KEY, title TEXT NOT NULL)`);
-      await rawExec(conn, `CREATE TABLE e2e_csc_article_tags (article_id INT REFERENCES e2e_csc_articles(id), tag_id INT REFERENCES e2e_csc_tags(id), PRIMARY KEY (article_id, tag_id))`);
+      await rawExec(
+        conn,
+        `CREATE TABLE e2e_csc_article_tags (article_id INT REFERENCES e2e_csc_articles(id), tag_id INT REFERENCES e2e_csc_tags(id), PRIMARY KEY (article_id, tag_id))`,
+      );
       await rawExec(conn, `CREATE TABLE e2e_csc_teams (id SERIAL PRIMARY KEY, team_name TEXT NOT NULL)`);
-      await rawExec(conn, `CREATE TABLE e2e_csc_members (id SERIAL PRIMARY KEY, member_name TEXT NOT NULL, team_id INT REFERENCES e2e_csc_teams(id))`);
+      await rawExec(
+        conn,
+        `CREATE TABLE e2e_csc_members (id SERIAL PRIMARY KEY, member_name TEXT NOT NULL, team_id INT REFERENCES e2e_csc_teams(id))`,
+      );
       await rawExec(conn, `CREATE TABLE e2e_csc_remove_parent (id SERIAL PRIMARY KEY, name TEXT NOT NULL)`);
-      await rawExec(conn, `CREATE TABLE e2e_csc_remove_child (id SERIAL PRIMARY KEY, child_name TEXT NOT NULL, parent_id INT REFERENCES e2e_csc_remove_parent(id))`);
+      await rawExec(
+        conn,
+        `CREATE TABLE e2e_csc_remove_child (id SERIAL PRIMARY KEY, child_name TEXT NOT NULL, parent_id INT REFERENCES e2e_csc_remove_parent(id))`,
+      );
       await rawExec(conn, `CREATE TABLE e2e_csc_inv_users (id SERIAL PRIMARY KEY, user_name TEXT NOT NULL)`);
-      await rawExec(conn, `CREATE TABLE e2e_csc_inv_profiles (id SERIAL PRIMARY KEY, bio TEXT NOT NULL, user_id INT UNIQUE REFERENCES e2e_csc_inv_users(id))`);
+      await rawExec(
+        conn,
+        `CREATE TABLE e2e_csc_inv_profiles (id SERIAL PRIMARY KEY, bio TEXT NOT NULL, user_id INT UNIQUE REFERENCES e2e_csc_inv_users(id))`,
+      );
     } finally {
       await conn.close();
     }
@@ -254,14 +304,23 @@ describe.skipIf(!canConnect)("cascade operations E2E", () => {
     const conn = await ds.getConnection();
     try {
       const drops = [
-        "e2e_csc_article_tags", "e2e_csc_articles", "e2e_csc_tags",
-        "e2e_csc_books", "e2e_csc_authors",
-        "e2e_csc_users", "e2e_csc_profiles",
-        "e2e_csc_jemployees", "e2e_csc_jdepartments",
-        "e2e_csc_employees", "e2e_csc_departments",
-        "e2e_csc_members", "e2e_csc_teams",
-        "e2e_csc_remove_child", "e2e_csc_remove_parent",
-        "e2e_csc_inv_profiles", "e2e_csc_inv_users",
+        "e2e_csc_article_tags",
+        "e2e_csc_articles",
+        "e2e_csc_tags",
+        "e2e_csc_books",
+        "e2e_csc_authors",
+        "e2e_csc_users",
+        "e2e_csc_profiles",
+        "e2e_csc_jemployees",
+        "e2e_csc_jdepartments",
+        "e2e_csc_employees",
+        "e2e_csc_departments",
+        "e2e_csc_members",
+        "e2e_csc_teams",
+        "e2e_csc_remove_child",
+        "e2e_csc_remove_parent",
+        "e2e_csc_inv_profiles",
+        "e2e_csc_inv_users",
       ];
       for (const t of drops) {
         await rawExec(conn, `DROP TABLE IF EXISTS ${t} CASCADE`);
@@ -340,10 +399,7 @@ describe.skipIf(!canConnect)("cascade operations E2E", () => {
       const repo = createRepository(CscAuthor, ds);
       const author = make(CscAuthor, {
         authorName: "Tolkien",
-        books: [
-          make(CscBook, { title: "The Hobbit" }),
-          make(CscBook, { title: "LOTR" }),
-        ],
+        books: [make(CscBook, { title: "The Hobbit" }), make(CscBook, { title: "LOTR" })],
       });
       const saved = await repo.save(author);
       expect(saved.id).toBeGreaterThan(0);
@@ -362,10 +418,7 @@ describe.skipIf(!canConnect)("cascade operations E2E", () => {
       const repo = createRepository(CscArticle, ds);
       const article = make(CscArticle, {
         title: "Cascade Testing",
-        tags: [
-          make(CscTag, { label: "typescript" }),
-          make(CscTag, { label: "testing" }),
-        ],
+        tags: [make(CscTag, { label: "typescript" }), make(CscTag, { label: "testing" })],
       });
       const saved = await repo.save(article);
       expect(saved.id).toBeGreaterThan(0);
@@ -373,7 +426,10 @@ describe.skipIf(!canConnect)("cascade operations E2E", () => {
       try {
         const jtRows = await rawQuery(conn, `SELECT * FROM e2e_csc_article_tags WHERE article_id = ${saved.id}`);
         expect(jtRows.length).toBe(2);
-        const tagRows = await rawQuery(conn, `SELECT t.label FROM e2e_csc_tags t JOIN e2e_csc_article_tags jt ON t.id = jt.tag_id WHERE jt.article_id = ${saved.id} ORDER BY t.label`);
+        const tagRows = await rawQuery(
+          conn,
+          `SELECT t.label FROM e2e_csc_tags t JOIN e2e_csc_article_tags jt ON t.id = jt.tag_id WHERE jt.article_id = ${saved.id} ORDER BY t.label`,
+        );
         expect(tagRows.length).toBe(2);
         expect(tagRows[0].label).toBe("testing");
         expect(tagRows[1].label).toBe("typescript");
@@ -397,9 +453,15 @@ describe.skipIf(!canConnect)("cascade operations E2E", () => {
       try {
         const aRows = await rawQuery(conn, `INSERT INTO e2e_csc_authors (author_name) VALUES ('DeleteMe') RETURNING *`);
         authorId = aRows[0].id as number;
-        const b1 = await rawQuery(conn, `INSERT INTO e2e_csc_books (title, author_id) VALUES ('Book1', ${authorId}) RETURNING *`);
+        const b1 = await rawQuery(
+          conn,
+          `INSERT INTO e2e_csc_books (title, author_id) VALUES ('Book1', ${authorId}) RETURNING *`,
+        );
         bookId1 = b1[0].id as number;
-        const b2 = await rawQuery(conn, `INSERT INTO e2e_csc_books (title, author_id) VALUES ('Book2', ${authorId}) RETURNING *`);
+        const b2 = await rawQuery(
+          conn,
+          `INSERT INTO e2e_csc_books (title, author_id) VALUES ('Book2', ${authorId}) RETURNING *`,
+        );
         bookId2 = b2[0].id as number;
       } finally {
         await conn.close();
@@ -409,10 +471,7 @@ describe.skipIf(!canConnect)("cascade operations E2E", () => {
       const repo = createRepository(CscAuthor, ds);
       const loaded = await repo.findById(authorId);
       expect(loaded).not.toBeNull();
-      loaded!.books = [
-        make(CscBook, { id: bookId1, title: "Book1" }),
-        make(CscBook, { id: bookId2, title: "Book2" }),
-      ];
+      loaded!.books = [make(CscBook, { id: bookId1, title: "Book1" }), make(CscBook, { id: bookId2, title: "Book2" })];
       await repo.delete(loaded!);
 
       const conn2 = await ds.getConnection();
@@ -460,7 +519,10 @@ describe.skipIf(!canConnect)("cascade operations E2E", () => {
         tagId1 = t1[0].id as number;
         const t2 = await rawQuery(conn0, `INSERT INTO e2e_csc_tags (label) VALUES ('rm2') RETURNING *`);
         tagId2 = t2[0].id as number;
-        await rawExec(conn0, `INSERT INTO e2e_csc_article_tags (article_id, tag_id) VALUES (${articleId}, ${tagId1}), (${articleId}, ${tagId2})`);
+        await rawExec(
+          conn0,
+          `INSERT INTO e2e_csc_article_tags (article_id, tag_id) VALUES (${articleId}, ${tagId1}), (${articleId}, ${tagId2})`,
+        );
       } finally {
         await conn0.close();
       }
@@ -468,15 +530,14 @@ describe.skipIf(!canConnect)("cascade operations E2E", () => {
       const repo = createRepository(CscArticle, ds);
       const loaded = await repo.findById(articleId);
       expect(loaded).not.toBeNull();
-      loaded!.tags = [
-        make(CscTag, { id: tagId1, label: "rm1" }),
-        make(CscTag, { id: tagId2, label: "rm2" }),
-      ];
+      loaded!.tags = [make(CscTag, { id: tagId1, label: "rm1" }), make(CscTag, { id: tagId2, label: "rm2" })];
       await repo.delete(loaded!);
 
       const conn = await ds.getConnection();
       try {
-        expect((await rawQuery(conn, `SELECT * FROM e2e_csc_article_tags WHERE article_id = ${articleId}`)).length).toBe(0);
+        expect(
+          (await rawQuery(conn, `SELECT * FROM e2e_csc_article_tags WHERE article_id = ${articleId}`)).length,
+        ).toBe(0);
         expect((await rawQuery(conn, `SELECT * FROM e2e_csc_tags WHERE id = ${tagId1}`)).length).toBe(0);
         expect((await rawQuery(conn, `SELECT * FROM e2e_csc_tags WHERE id = ${tagId2}`)).length).toBe(0);
       } finally {
@@ -491,7 +552,10 @@ describe.skipIf(!canConnect)("cascade operations E2E", () => {
       const conn0 = await ds.getConnection();
       let profileId: number;
       try {
-        const rows = await rawQuery(conn0, `INSERT INTO e2e_csc_inv_profiles (bio, user_id) VALUES ('inv bio', ${savedUser.id}) RETURNING *`);
+        const rows = await rawQuery(
+          conn0,
+          `INSERT INTO e2e_csc_inv_profiles (bio, user_id) VALUES ('inv bio', ${savedUser.id}) RETURNING *`,
+        );
         profileId = rows[0].id as number;
       } finally {
         await conn0.close();
@@ -528,7 +592,7 @@ describe.skipIf(!canConnect)("cascade operations E2E", () => {
 
       // Modify dept and save employee again (UPDATE path)
       saved.department!.name = "MergeDeptUpdated";
-      const updated = await repo.save(saved);
+      const _updated = await repo.save(saved);
 
       const conn = await ds.getConnection();
       try {
@@ -545,9 +609,15 @@ describe.skipIf(!canConnect)("cascade operations E2E", () => {
       let authorId: number;
       let bookId: number;
       try {
-        const aRows = await rawQuery(conn0, `INSERT INTO e2e_csc_authors (author_name) VALUES ('MergeAuthor') RETURNING *`);
+        const aRows = await rawQuery(
+          conn0,
+          `INSERT INTO e2e_csc_authors (author_name) VALUES ('MergeAuthor') RETURNING *`,
+        );
         authorId = aRows[0].id as number;
-        const bRows = await rawQuery(conn0, `INSERT INTO e2e_csc_books (title, author_id) VALUES ('Original', ${authorId}) RETURNING *`);
+        const bRows = await rawQuery(
+          conn0,
+          `INSERT INTO e2e_csc_books (title, author_id) VALUES ('Original', ${authorId}) RETURNING *`,
+        );
         bookId = bRows[0].id as number;
       } finally {
         await conn0.close();
@@ -626,7 +696,10 @@ describe.skipIf(!canConnect)("cascade operations E2E", () => {
 
       const conn = await ds.getConnection();
       try {
-        await rawExec(conn, `UPDATE e2e_csc_departments SET name = 'SelectRefreshUpdated' WHERE id = ${saved.department!.id}`);
+        await rawExec(
+          conn,
+          `UPDATE e2e_csc_departments SET name = 'SelectRefreshUpdated' WHERE id = ${saved.department!.id}`,
+        );
       } finally {
         await conn.close();
       }
@@ -672,7 +745,10 @@ describe.skipIf(!canConnect)("cascade operations E2E", () => {
       const conn1 = await ds.getConnection();
       let childId: number;
       try {
-        const rows = await rawQuery(conn1, `INSERT INTO e2e_csc_remove_child (child_name, parent_id) VALUES ('R1', ${saved.id}) RETURNING *`);
+        const rows = await rawQuery(
+          conn1,
+          `INSERT INTO e2e_csc_remove_child (child_name, parent_id) VALUES ('R1', ${saved.id}) RETURNING *`,
+        );
         childId = rows[0].id as number;
       } finally {
         await conn1.close();

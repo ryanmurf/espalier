@@ -1,7 +1,7 @@
 import type { Connection, DataSource, TypeConverterRegistry } from "espalier-jdbc";
 import { ConnectionError, DatabaseErrorCode, getGlobalLogger } from "espalier-jdbc";
-import type { BunSqlClient } from "./bun-pg-statement.js";
 import { BunPgConnection } from "./bun-pg-connection.js";
+import type { BunSqlClient } from "./bun-pg-statement.js";
 
 export interface BunPgDataSourceConfig {
   /** PostgreSQL connection URL (e.g., "postgres://user:pass@host:port/db"). */
@@ -33,9 +33,7 @@ export class BunPgDataSource implements DataSource {
     this.typeConverters = config.typeConverters;
     try {
       // Bun's built-in SQL client (Bun.sql / require("bun:sql"))
-      const BunSQL = (globalThis as any).Bun
-        ? require("bun:sql")
-        : undefined;
+      const BunSQL = (globalThis as any).Bun ? require("bun:sql") : undefined;
 
       if (!BunSQL) {
         throw new Error("bun:sql is not available. BunPgDataSource requires the Bun runtime.");
@@ -72,11 +70,7 @@ export class BunPgDataSource implements DataSource {
 
   async getConnection(): Promise<Connection> {
     if (this.closed) {
-      throw new ConnectionError(
-        "DataSource is closed",
-        undefined,
-        DatabaseErrorCode.CONNECTION_CLOSED,
-      );
+      throw new ConnectionError("DataSource is closed", undefined, DatabaseErrorCode.CONNECTION_CLOSED);
     }
     return new BunPgConnection(this.client, this.typeConverters);
   }

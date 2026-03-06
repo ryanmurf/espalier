@@ -1,6 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { LibSqlDataSource, createLibSqlDataSource } from "../libsql-data-source.js";
-import type { LibSqlDataSourceConfig } from "../libsql-data-source.js";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { LibSqlDataSource } from "../libsql-data-source.js";
 
 // ==========================================================================
 // E2E tests: require @libsql/client to be available
@@ -33,14 +32,10 @@ describe.skipIf(!canUseLibSql)("LibSQL E2E — in-memory database", () => {
     const conn = await ds.getConnection();
     try {
       const stmt = conn.createStatement();
-      await stmt.executeUpdate(
-        "CREATE TABLE crud_test (id INTEGER PRIMARY KEY, name TEXT, value INTEGER)",
-      );
+      await stmt.executeUpdate("CREATE TABLE crud_test (id INTEGER PRIMARY KEY, name TEXT, value INTEGER)");
 
       // INSERT
-      const insertCount = await stmt.executeUpdate(
-        "INSERT INTO crud_test (id, name, value) VALUES (1, 'Alice', 42)",
-      );
+      const insertCount = await stmt.executeUpdate("INSERT INTO crud_test (id, name, value) VALUES (1, 'Alice', 42)");
       expect(insertCount).toBe(1);
 
       // SELECT
@@ -75,9 +70,7 @@ describe.skipIf(!canUseLibSql)("LibSQL E2E — in-memory database", () => {
     const conn = await ds.getConnection();
     try {
       const setup = conn.createStatement();
-      await setup.executeUpdate(
-        "CREATE TABLE ps_test (id INTEGER PRIMARY KEY, name TEXT, age INTEGER)",
-      );
+      await setup.executeUpdate("CREATE TABLE ps_test (id INTEGER PRIMARY KEY, name TEXT, age INTEGER)");
       await setup.close();
 
       const insert = conn.prepareStatement("INSERT INTO ps_test (id, name, age) VALUES ($1, $2, $3)");
@@ -146,9 +139,7 @@ describe.skipIf(!canUseLibSql)("LibSQL E2E — in-memory database", () => {
       // It should use this.client (not the committed tx) and successfully execute.
       const verify = conn.createStatement();
       // Simple query that doesn't depend on cross-connection visibility
-      await expect(
-        verify.executeQuery("SELECT 1 as n"),
-      ).resolves.toBeDefined(); // No TRANSACTION_CLOSED error thrown
+      await expect(verify.executeQuery("SELECT 1 as n")).resolves.toBeDefined(); // No TRANSACTION_CLOSED error thrown
     } finally {
       await conn.close();
     }
@@ -165,9 +156,7 @@ describe.skipIf(!canUseLibSql)("LibSQL E2E — in-memory database", () => {
       // The old BUG caused TRANSACTION_CLOSED errors after rollback.
       // Verify the connection is usable again without TRANSACTION_CLOSED error.
       const verify = conn.createStatement();
-      await expect(
-        verify.executeQuery("SELECT 1 as n"),
-      ).resolves.toBeDefined(); // No TRANSACTION_CLOSED error
+      await expect(verify.executeQuery("SELECT 1 as n")).resolves.toBeDefined(); // No TRANSACTION_CLOSED error
     } finally {
       await conn.close();
     }
@@ -179,9 +168,7 @@ describe.skipIf(!canUseLibSql)("LibSQL E2E — in-memory database", () => {
     const conn = await ds.getConnection();
     try {
       const stmt = conn.createStatement();
-      await stmt.executeUpdate(
-        "CREATE TABLE null_test (id INTEGER PRIMARY KEY, s TEXT, n REAL, b INTEGER, d TEXT)",
-      );
+      await stmt.executeUpdate("CREATE TABLE null_test (id INTEGER PRIMARY KEY, s TEXT, n REAL, b INTEGER, d TEXT)");
       await stmt.executeUpdate("INSERT INTO null_test (id) VALUES (1)");
 
       const rs = await stmt.executeQuery("SELECT s, n, b, d FROM null_test WHERE id = 1");
@@ -202,9 +189,7 @@ describe.skipIf(!canUseLibSql)("LibSQL E2E — in-memory database", () => {
     const conn = await ds.getConnection();
     try {
       const stmt = conn.createStatement();
-      await expect(
-        stmt.executeQuery("SELECT * FROM absolutely_nonexistent_table_xyz_abc"),
-      ).rejects.toThrow();
+      await expect(stmt.executeQuery("SELECT * FROM absolutely_nonexistent_table_xyz_abc")).rejects.toThrow();
       await stmt.close();
     } finally {
       await conn.close();
@@ -289,18 +274,14 @@ describe.skipIf(!canUseLibSql)("LibSQL E2E — in-memory database", () => {
     const conn = await ds.getConnection();
     try {
       const stmt = conn.createStatement();
-      await stmt.executeUpdate(
-        "CREATE TABLE types_test (id INTEGER PRIMARY KEY, i INTEGER, r REAL, t TEXT, b BLOB)",
-      );
+      await stmt.executeUpdate("CREATE TABLE types_test (id INTEGER PRIMARY KEY, i INTEGER, r REAL, t TEXT, b BLOB)");
 
-      const ps = conn.prepareStatement(
-        "INSERT INTO types_test (id, i, r, t, b) VALUES ($1, $2, $3, $4, $5)",
-      );
+      const ps = conn.prepareStatement("INSERT INTO types_test (id, i, r, t, b) VALUES ($1, $2, $3, $4, $5)");
       ps.setParameter(1, 1);
       ps.setParameter(2, 2147483647); // max 32-bit int
-      ps.setParameter(3, 3.14159);
+      ps.setParameter(3, Math.PI);
       ps.setParameter(4, "hello world");
-      ps.setParameter(5, new Uint8Array([0xDE, 0xAD, 0xBE, 0xEF]));
+      ps.setParameter(5, new Uint8Array([0xde, 0xad, 0xbe, 0xef]));
       await ps.executeUpdate();
       await ps.close();
 
@@ -308,7 +289,7 @@ describe.skipIf(!canUseLibSql)("LibSQL E2E — in-memory database", () => {
       expect(await rs.next()).toBe(true);
       const row = rs.getRow();
       expect(Number(row.i)).toBe(2147483647);
-      expect(Number(row.r)).toBeCloseTo(3.14159, 4);
+      expect(Number(row.r)).toBeCloseTo(Math.PI, 4);
       expect(row.t).toBe("hello world");
       // Blob might come back as ArrayBuffer or Uint8Array
       expect(row.b).toBeDefined();

@@ -7,21 +7,17 @@
  * - validateIdentifier rejects malicious input
  * - convertPositionalParams works with D1-style ? conversion
  */
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-  quoteIdentifier,
-  validateIdentifier,
-  convertPositionalParams,
-} from "../../sql-utils.js";
-import {
-  DatabaseError,
   ConnectionError,
-  QueryError,
-  TransactionError,
-  SchemaError,
-  MigrationError,
+  DatabaseError,
   DatabaseErrorCode,
+  MigrationError,
+  QueryError,
+  SchemaError,
+  TransactionError,
 } from "../../errors.js";
+import { convertPositionalParams, quoteIdentifier, validateIdentifier } from "../../sql-utils.js";
 
 describe("SQL utility seam tests", () => {
   describe("quoteIdentifier", () => {
@@ -56,21 +52,15 @@ describe("SQL utility seam tests", () => {
     });
 
     it("accepts identifier with underscores", () => {
-      expect(() =>
-        validateIdentifier("user_table", "table"),
-      ).not.toThrow();
+      expect(() => validateIdentifier("user_table", "table")).not.toThrow();
     });
 
     it("accepts identifier starting with underscore", () => {
-      expect(() =>
-        validateIdentifier("_espalier_migrations", "table"),
-      ).not.toThrow();
+      expect(() => validateIdentifier("_espalier_migrations", "table")).not.toThrow();
     });
 
     it("rejects identifier with semicolon (SQL injection)", () => {
-      expect(() =>
-        validateIdentifier("users; DROP TABLE users", "table"),
-      ).toThrow();
+      expect(() => validateIdentifier("users; DROP TABLE users", "table")).toThrow();
     });
 
     it("rejects identifier with single quotes", () => {
@@ -88,33 +78,25 @@ describe("SQL utility seam tests", () => {
 
   describe("convertPositionalParams", () => {
     it("converts $1 to ?", () => {
-      const result = convertPositionalParams(
-        "SELECT * FROM t WHERE id = $1",
-      );
+      const result = convertPositionalParams("SELECT * FROM t WHERE id = $1");
       expect(result).toContain("?");
       expect(result).not.toContain("$1");
     });
 
     it("converts multiple $N params", () => {
-      const result = convertPositionalParams(
-        "INSERT INTO t (a, b, c) VALUES ($1, $2, $3)",
-      );
+      const result = convertPositionalParams("INSERT INTO t (a, b, c) VALUES ($1, $2, $3)");
       expect(result).toBe("INSERT INTO t (a, b, c) VALUES (?, ?, ?)");
     });
 
     it("always converts positional to question mark style", () => {
       // convertPositionalParams always converts $N to ? (single arg, no style option)
-      const result = convertPositionalParams(
-        "SELECT * FROM t WHERE id = $1",
-      );
+      const result = convertPositionalParams("SELECT * FROM t WHERE id = $1");
       expect(result).toBe("SELECT * FROM t WHERE id = ?");
       expect(result).not.toContain("$1");
     });
 
     it("handles SQL with no params", () => {
-      const result = convertPositionalParams(
-        "SELECT * FROM t",
-      );
+      const result = convertPositionalParams("SELECT * FROM t");
       expect(result).toBe("SELECT * FROM t");
     });
   });
@@ -146,11 +128,7 @@ describe("SQL utility seam tests", () => {
     });
 
     it("ConnectionError includes error code", () => {
-      const err = new ConnectionError(
-        "connection refused",
-        undefined,
-        DatabaseErrorCode.CONNECTION_FAILED,
-      );
+      const err = new ConnectionError("connection refused", undefined, DatabaseErrorCode.CONNECTION_FAILED);
       expect(err.code).toBe(DatabaseErrorCode.CONNECTION_FAILED);
     });
 

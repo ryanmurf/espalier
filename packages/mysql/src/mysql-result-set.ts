@@ -1,4 +1,4 @@
-import type { ResultSet, ColumnMetadata } from "espalier-jdbc";
+import type { ColumnMetadata, ResultSet } from "espalier-jdbc";
 import type { FieldPacket } from "mysql2/promise";
 
 export class MysqlResultSet implements ResultSet {

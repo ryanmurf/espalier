@@ -1,9 +1,9 @@
-import { describe, it, expect } from "vitest";
-import { DefaultTypeConverterRegistry } from "../type-converter-registry.js";
-import { JsonConverter, JsonbConverter } from "../converters/json-converter.js";
+import { describe, expect, it } from "vitest";
 import { BooleanConverter } from "../converters/boolean-converter.js";
 import { DateConverter } from "../converters/date-converter.js";
+import { JsonbConverter, JsonConverter } from "../converters/json-converter.js";
 import type { TypeConverter } from "../type-converter.js";
+import { DefaultTypeConverterRegistry } from "../type-converter-registry.js";
 
 describe("DefaultTypeConverterRegistry", () => {
   it("registers and retrieves a converter by name", () => {
@@ -64,7 +64,7 @@ describe("DefaultTypeConverterRegistry", () => {
   it("overwrites dbType mapping when registering with the same dbType", () => {
     const registry = new DefaultTypeConverterRegistry();
     const json = new JsonConverter();
-    const jsonb = new JsonbConverter();
+    const _jsonb = new JsonbConverter();
     // Both have different names but if we register two with same dbType,
     // the second one wins for dbType lookup
     const customJson: TypeConverter = {

@@ -2,22 +2,20 @@ import type { SqlValue } from "espalier-jdbc";
 import type { EntityMetadata, FieldMapping } from "../mapping/entity-metadata.js";
 import type { Criteria } from "./criteria.js";
 import {
+  BetweenCriteria,
   ComparisonCriteria,
   InCriteria,
-  BetweenCriteria,
-  NullCriteria,
   LogicalCriteria,
   NotCriteria,
+  NullCriteria,
 } from "./criteria.js";
 
-export interface Specification<T> {
+export interface Specification<_T> {
   toPredicate(metadata: EntityMetadata): Criteria;
 }
 
 function resolveColumn(property: string, metadata: EntityMetadata): string {
-  const field = metadata.fields.find(
-    (f: FieldMapping) => String(f.fieldName) === property,
-  );
+  const field = metadata.fields.find((f: FieldMapping) => String(f.fieldName) === property);
   if (field) return field.columnName;
 
   throw new Error(
@@ -72,10 +70,7 @@ export class Specifications {
   }
 }
 
-export function equal<T>(
-  property: keyof T & string,
-  value: SqlValue,
-): Specification<T> {
+export function equal<T>(property: keyof T & string, value: SqlValue): Specification<T> {
   return {
     toPredicate(metadata: EntityMetadata): Criteria {
       return new ComparisonCriteria("eq", resolveColumn(property, metadata), value);
@@ -83,10 +78,7 @@ export function equal<T>(
   };
 }
 
-export function like<T>(
-  property: keyof T & string,
-  pattern: string,
-): Specification<T> {
+export function like<T>(property: keyof T & string, pattern: string): Specification<T> {
   return {
     toPredicate(metadata: EntityMetadata): Criteria {
       return new ComparisonCriteria("like", resolveColumn(property, metadata), pattern);
@@ -94,10 +86,7 @@ export function like<T>(
   };
 }
 
-export function greaterThan<T>(
-  property: keyof T & string,
-  value: SqlValue,
-): Specification<T> {
+export function greaterThan<T>(property: keyof T & string, value: SqlValue): Specification<T> {
   return {
     toPredicate(metadata: EntityMetadata): Criteria {
       return new ComparisonCriteria("gt", resolveColumn(property, metadata), value);
@@ -105,10 +94,7 @@ export function greaterThan<T>(
   };
 }
 
-export function lessThan<T>(
-  property: keyof T & string,
-  value: SqlValue,
-): Specification<T> {
+export function lessThan<T>(property: keyof T & string, value: SqlValue): Specification<T> {
   return {
     toPredicate(metadata: EntityMetadata): Criteria {
       return new ComparisonCriteria("lt", resolveColumn(property, metadata), value);
@@ -116,11 +102,7 @@ export function lessThan<T>(
   };
 }
 
-export function between<T>(
-  property: keyof T & string,
-  low: SqlValue,
-  high: SqlValue,
-): Specification<T> {
+export function between<T>(property: keyof T & string, low: SqlValue, high: SqlValue): Specification<T> {
   return {
     toPredicate(metadata: EntityMetadata): Criteria {
       return new BetweenCriteria(resolveColumn(property, metadata), low, high);
@@ -128,10 +110,7 @@ export function between<T>(
   };
 }
 
-export function isIn<T>(
-  property: keyof T & string,
-  values: SqlValue[],
-): Specification<T> {
+export function isIn<T>(property: keyof T & string, values: SqlValue[]): Specification<T> {
   return {
     toPredicate(metadata: EntityMetadata): Criteria {
       return new InCriteria(resolveColumn(property, metadata), values);
@@ -139,9 +118,7 @@ export function isIn<T>(
   };
 }
 
-export function isNull<T>(
-  property: keyof T & string,
-): Specification<T> {
+export function isNull<T>(property: keyof T & string): Specification<T> {
   return {
     toPredicate(metadata: EntityMetadata): Criteria {
       return new NullCriteria("isNull", resolveColumn(property, metadata));
@@ -149,9 +126,7 @@ export function isNull<T>(
   };
 }
 
-export function isNotNull<T>(
-  property: keyof T & string,
-): Specification<T> {
+export function isNotNull<T>(property: keyof T & string): Specification<T> {
   return {
     toPredicate(metadata: EntityMetadata): Criteria {
       return new NullCriteria("isNotNull", resolveColumn(property, metadata));

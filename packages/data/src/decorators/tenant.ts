@@ -5,10 +5,7 @@ const tenantIdMetadata = new WeakMap<object, string | symbol>();
  * The field will be automatically set from TenantContext on INSERT and used to filter
  * all queries (SELECT, UPDATE, DELETE) by the current tenant.
  */
-export function TenantId<T>(
-  _target: undefined,
-  context: ClassFieldDecoratorContext<T>,
-): void {
+export function TenantId<T>(_target: undefined, context: ClassFieldDecoratorContext<T>): void {
   context.addInitializer(function (this: T) {
     const constructor = (this as object).constructor;
     tenantIdMetadata.set(constructor, context.name);

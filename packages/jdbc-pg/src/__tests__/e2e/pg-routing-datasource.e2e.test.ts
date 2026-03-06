@@ -4,15 +4,11 @@
  * Tests against live Postgres. Creates two schemas and uses
  * TenantRoutingDataSource to route tenants to different schemas.
  */
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { createTestDataSource, isPostgresAvailable } from "./setup.js";
-import {
-  TenantContext,
-  TenantRoutingDataSource,
-  TenantAwareDataSource,
-  RoutingError,
-} from "espalier-data";
+
+import { RoutingError, TenantAwareDataSource, TenantContext, TenantRoutingDataSource } from "espalier-data";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { PgDataSource } from "../../pg-data-source.js";
+import { createTestDataSource, isPostgresAvailable } from "./setup.js";
 
 const canConnect = await isPostgresAvailable();
 
@@ -36,19 +32,11 @@ describe.skipIf(!canConnect)("RoutingDataSource — E2E", () => {
       await stmt.executeUpdate(`DROP SCHEMA IF EXISTS ${SCHEMA_2} CASCADE`);
       await stmt.executeUpdate(`CREATE SCHEMA ${SCHEMA_1}`);
       await stmt.executeUpdate(`CREATE SCHEMA ${SCHEMA_2}`);
-      await stmt.executeUpdate(
-        `CREATE TABLE ${SCHEMA_1}.${TABLE} (id SERIAL PRIMARY KEY, name TEXT NOT NULL)`,
-      );
-      await stmt.executeUpdate(
-        `CREATE TABLE ${SCHEMA_2}.${TABLE} (id SERIAL PRIMARY KEY, name TEXT NOT NULL)`,
-      );
+      await stmt.executeUpdate(`CREATE TABLE ${SCHEMA_1}.${TABLE} (id SERIAL PRIMARY KEY, name TEXT NOT NULL)`);
+      await stmt.executeUpdate(`CREATE TABLE ${SCHEMA_2}.${TABLE} (id SERIAL PRIMARY KEY, name TEXT NOT NULL)`);
       // Seed data
-      await stmt.executeUpdate(
-        `INSERT INTO ${SCHEMA_1}.${TABLE} (name) VALUES ('item-from-schema1')`,
-      );
-      await stmt.executeUpdate(
-        `INSERT INTO ${SCHEMA_2}.${TABLE} (name) VALUES ('item-from-schema2')`,
-      );
+      await stmt.executeUpdate(`INSERT INTO ${SCHEMA_1}.${TABLE} (name) VALUES ('item-from-schema1')`);
+      await stmt.executeUpdate(`INSERT INTO ${SCHEMA_2}.${TABLE} (name) VALUES ('item-from-schema2')`);
     } finally {
       await stmt.close();
       await conn.close();
@@ -217,9 +205,7 @@ describe.skipIf(!canConnect)("RoutingDataSource — E2E", () => {
       });
 
       // Initially fails
-      await expect(
-        TenantContext.run("dynamic", () => router.getConnection()),
-      ).rejects.toThrow(RoutingError);
+      await expect(TenantContext.run("dynamic", () => router.getConnection())).rejects.toThrow(RoutingError);
 
       // Add route
       const tds = new TenantAwareDataSource({
@@ -263,9 +249,7 @@ describe.skipIf(!canConnect)("RoutingDataSource — E2E", () => {
       router.removeDataSource("removeme");
 
       // No longer works
-      await expect(
-        TenantContext.run("removeme", () => router.getConnection()),
-      ).rejects.toThrow(RoutingError);
+      await expect(TenantContext.run("removeme", () => router.getConnection())).rejects.toThrow(RoutingError);
     });
   });
 });

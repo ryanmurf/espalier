@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { Id, getIdField } from "../../decorators/id.js";
+import { describe, expect, it } from "vitest";
+import { getIdField, Id } from "../../decorators/id.js";
 
 describe("@Id decorator", () => {
   it("stores the id field name", () => {

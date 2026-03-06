@@ -18,17 +18,13 @@ export interface LoggingMiddlewareOptions {
  * Logging middleware — logs command dispatch and results.
  * By default the command payload is redacted to avoid info leakage.
  */
-export function loggingMiddleware(
-  loggerOrOptions?: Logger | LoggingMiddlewareOptions,
-): CommandMiddlewareFn {
+export function loggingMiddleware(loggerOrOptions?: Logger | LoggingMiddlewareOptions): CommandMiddlewareFn {
   const opts: LoggingMiddlewareOptions =
-    loggerOrOptions && "info" in loggerOrOptions
-      ? { logger: loggerOrOptions }
-      : (loggerOrOptions ?? {});
+    loggerOrOptions && "info" in loggerOrOptions ? { logger: loggerOrOptions } : (loggerOrOptions ?? {});
   const redact = opts.redact ?? true;
 
   return async (command: Command, next: () => Promise<CommandResult>) => {
-    const log = opts.logger ?? console as Logger;
+    const log = opts.logger ?? (console as Logger);
     const start = Date.now();
     if (redact) {
       log.info(`Dispatching command: ${command.commandType}`);
@@ -49,9 +45,7 @@ export function loggingMiddleware(
 /**
  * Validation middleware — validates commands before dispatch.
  */
-export function validationMiddleware(
-  validators: Map<string, (cmd: Command) => string | null>,
-): CommandMiddlewareFn {
+export function validationMiddleware(validators: Map<string, (cmd: Command) => string | null>): CommandMiddlewareFn {
   return async (command: Command, next: () => Promise<CommandResult>) => {
     const validator = validators.get(command.commandType);
     if (validator) {
@@ -84,7 +78,7 @@ export function retryMiddleware(maxRetries: number = 3, baseDelayMs: number = 10
       lastResult = await next();
       if (lastResult.success) return lastResult;
       if (attempt < maxRetries) {
-        await new Promise<void>(resolve => setTimeout(() => resolve(), baseDelayMs * Math.pow(2, attempt)));
+        await new Promise<void>((resolve) => setTimeout(() => resolve(), baseDelayMs * 2 ** attempt));
       }
     }
     return lastResult;

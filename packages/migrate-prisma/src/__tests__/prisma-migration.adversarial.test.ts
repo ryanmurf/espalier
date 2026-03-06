@@ -1,6 +1,6 @@
-import { describe, it, expect } from "vitest";
-import { parsePrismaSchema, generateEntityFile, generateEnumFile, generateIndexFile } from "../index.js";
+import { describe, expect, it } from "vitest";
 import type { PrismaSchema } from "../index.js";
+import { generateEntityFile, generateEnumFile, generateIndexFile, parsePrismaSchema } from "../index.js";
 
 // ═══════════════════════════════════════════════════════════════
 // Adversarial tests for Prisma migration tool
@@ -61,7 +61,18 @@ model AllTypes {
       const model = schema.models[0];
       expect(model.fields).toHaveLength(10);
       const types = model.fields.map((f) => f.type);
-      expect(types).toEqual(["Int", "String", "Int", "Float", "Decimal", "BigInt", "Boolean", "DateTime", "Json", "Bytes"]);
+      expect(types).toEqual([
+        "Int",
+        "String",
+        "Int",
+        "Float",
+        "Decimal",
+        "BigInt",
+        "Boolean",
+        "DateTime",
+        "Json",
+        "Bytes",
+      ]);
     });
 
     it("parses optional fields", () => {
@@ -777,7 +788,7 @@ model Post {
 }
       `);
       const postOutput = generateEntityFile(schema.models[1], schema);
-      expect(postOutput).toContain('import type { User }');
+      expect(postOutput).toContain("import type { User }");
     });
   });
 
@@ -822,9 +833,9 @@ model Post {
 }
       `);
       const output = generateIndexFile(schema.models, schema.enums);
-      expect(output).toContain('export { Role }');
-      expect(output).toContain('export { User }');
-      expect(output).toContain('export { Post }');
+      expect(output).toContain("export { Role }");
+      expect(output).toContain("export { User }");
+      expect(output).toContain("export { Post }");
     });
 
     it("uses snake_case file names with .js extension", () => {
@@ -915,10 +926,7 @@ model Category {
 
     it("generates User entity with all decorators", () => {
       schema = parsePrismaSchema(complexSchema);
-      const output = generateEntityFile(
-        schema.models.find((m) => m.name === "User")!,
-        schema,
-      );
+      const output = generateEntityFile(schema.models.find((m) => m.name === "User")!, schema);
       expect(output).toContain('@Table("users")');
       expect(output).toContain("@Id()");
       expect(output).toContain("@CreatedDate()");
@@ -929,10 +937,7 @@ model Category {
 
     it("generates Post entity with ManyToOne and ManyToMany", () => {
       schema = parsePrismaSchema(complexSchema);
-      const output = generateEntityFile(
-        schema.models.find((m) => m.name === "Post")!,
-        schema,
-      );
+      const output = generateEntityFile(schema.models.find((m) => m.name === "Post")!, schema);
       expect(output).toContain("@ManyToOne");
       expect(output).toContain("@ManyToMany");
       expect(output).toContain("() => User");
@@ -1114,10 +1119,7 @@ model Profile {
   userId Int  @unique
 }
       `);
-      const profileOutput = generateEntityFile(
-        schema.models.find((m) => m.name === "Profile")!,
-        schema,
-      );
+      const profileOutput = generateEntityFile(schema.models.find((m) => m.name === "Profile")!, schema);
       expect(profileOutput).toContain("@OneToOne");
     });
   });

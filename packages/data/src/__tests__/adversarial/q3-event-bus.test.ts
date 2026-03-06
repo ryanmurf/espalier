@@ -4,7 +4,7 @@
  * handler that calls on() during emit, once() memory accumulation,
  * concurrent emit, handler ordering corruption.
  */
-import { describe, it, expect, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { EventBus } from "../../events/event-bus.js";
 
 // ══════════════════════════════════════════════════
@@ -38,12 +38,16 @@ describe("EventBus adversarial: handler self-removal during emit", () => {
     const bus = new EventBus();
     const log: string[] = [];
 
-    const handler1 = () => { log.push("h1"); };
+    const handler1 = () => {
+      log.push("h1");
+    };
     const handler2 = () => {
       log.push("h2");
       bus.off("evt", handler1);
     };
-    const handler3 = () => { log.push("h3"); };
+    const handler3 = () => {
+      log.push("h3");
+    };
 
     bus.on("evt", handler1);
     bus.on("evt", handler2);
@@ -65,7 +69,9 @@ describe("EventBus adversarial: handler addition during emit", () => {
 
     bus.on("evt", () => {
       log.push("original");
-      bus.on("evt", () => { log.push("added-during-emit"); });
+      bus.on("evt", () => {
+        log.push("added-during-emit");
+      });
     });
 
     return bus.emit("evt", null).then(() => {
@@ -80,7 +86,9 @@ describe("EventBus adversarial: handler addition during emit", () => {
 
     bus.on("evt", () => {
       log.push("trigger");
-      bus.once("evt", () => { log.push("once-added-mid-emit"); });
+      bus.once("evt", () => {
+        log.push("once-added-mid-emit");
+      });
     });
 
     return bus.emit("evt", null).then(() => {
@@ -130,7 +138,9 @@ describe("EventBus adversarial: removeAllListeners during emit", () => {
       log.push("h1");
       bus.removeAllListeners(); // clears ALL events
     });
-    bus.on("evt", () => { log.push("h2"); });
+    bus.on("evt", () => {
+      log.push("h2");
+    });
 
     return bus.emit("evt", null).then(() => {
       expect(log).toContain("h1");
@@ -159,10 +169,7 @@ describe("EventBus adversarial: concurrent emit", () => {
     });
 
     // Fire two emits concurrently
-    const [r1, r2] = await Promise.allSettled([
-      bus.emit("evt", "first"),
-      bus.emit("evt", "second"),
-    ]);
+    const [r1, r2] = await Promise.allSettled([bus.emit("evt", "first"), bus.emit("evt", "second")]);
 
     // Both should complete (emit is sequential within each call, but two calls are concurrent)
     expect(r1.status).toBe("fulfilled");
@@ -186,10 +193,7 @@ describe("EventBus adversarial: concurrent emit", () => {
       await new Promise((r) => setTimeout(r, 5));
     });
 
-    const [r1, r2] = await Promise.allSettled([
-      bus.emit("evt", null),
-      bus.emit("evt", null),
-    ]);
+    const [r1, r2] = await Promise.allSettled([bus.emit("evt", null), bus.emit("evt", null)]);
 
     expect(r1.status).toBe("fulfilled");
     expect(r2.status).toBe("fulfilled");
@@ -251,9 +255,15 @@ describe("EventBus adversarial: memory accumulation", () => {
 describe("EventBus adversarial: error edge cases", () => {
   it("all handlers throw — AggregateError with all errors", async () => {
     const bus = new EventBus();
-    bus.on("evt", () => { throw new Error("e1"); });
-    bus.on("evt", () => { throw new Error("e2"); });
-    bus.on("evt", () => { throw new Error("e3"); });
+    bus.on("evt", () => {
+      throw new Error("e1");
+    });
+    bus.on("evt", () => {
+      throw new Error("e2");
+    });
+    bus.on("evt", () => {
+      throw new Error("e3");
+    });
 
     try {
       await bus.emit("evt", null);
@@ -266,8 +276,12 @@ describe("EventBus adversarial: error edge cases", () => {
 
   it("mix of sync error and async rejection", async () => {
     const bus = new EventBus();
-    bus.on("evt", () => { throw new Error("sync"); });
-    bus.on("evt", async () => { throw new Error("async"); });
+    bus.on("evt", () => {
+      throw new Error("sync");
+    });
+    bus.on("evt", async () => {
+      throw new Error("async");
+    });
 
     try {
       await bus.emit("evt", null);
@@ -281,8 +295,12 @@ describe("EventBus adversarial: error edge cases", () => {
 
   it("handler throws non-Error value", async () => {
     const bus = new EventBus();
-    bus.on("evt", () => { throw "string-error"; });
-    bus.on("evt", () => { throw 42; });
+    bus.on("evt", () => {
+      throw "string-error";
+    });
+    bus.on("evt", () => {
+      throw 42;
+    });
 
     try {
       await bus.emit("evt", null);
@@ -297,7 +315,9 @@ describe("EventBus adversarial: error edge cases", () => {
 
   it("once handler that throws: error propagated AND handler removed", async () => {
     const bus = new EventBus();
-    bus.once("evt", () => { throw new Error("once-boom"); });
+    bus.once("evt", () => {
+      throw new Error("once-boom");
+    });
 
     await expect(bus.emit("evt", null)).rejects.toThrow("once-boom");
     expect(bus.listenerCount("evt")).toBe(0);
@@ -316,7 +336,9 @@ describe("EventBus adversarial: event name edge cases", () => {
     const bus = new EventBus();
     const log: string[] = [];
     const weirdName = "event\0with\nnull\tand\ttabs";
-    bus.on(weirdName, () => { log.push("fired"); });
+    bus.on(weirdName, () => {
+      log.push("fired");
+    });
     await bus.emit(weirdName, null);
     expect(log).toEqual(["fired"]);
   });
@@ -324,7 +346,9 @@ describe("EventBus adversarial: event name edge cases", () => {
   it("event name '__proto__' does not corrupt Map", async () => {
     const bus = new EventBus();
     const log: string[] = [];
-    bus.on("__proto__", () => { log.push("proto"); });
+    bus.on("__proto__", () => {
+      log.push("proto");
+    });
     await bus.emit("__proto__", null);
     expect(log).toEqual(["proto"]);
     expect(bus.listenerCount("__proto__")).toBe(1);
@@ -333,7 +357,9 @@ describe("EventBus adversarial: event name edge cases", () => {
   it("event name 'constructor' works safely", async () => {
     const bus = new EventBus();
     const log: string[] = [];
-    bus.on("constructor", () => { log.push("ctor"); });
+    bus.on("constructor", () => {
+      log.push("ctor");
+    });
     await bus.emit("constructor", null);
     expect(log).toEqual(["ctor"]);
   });

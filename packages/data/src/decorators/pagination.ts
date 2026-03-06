@@ -13,10 +13,7 @@ const paginationMetadata = new WeakMap<object, string>();
  * ```
  */
 export function Pagination(strategy: string) {
-  return function <T extends abstract new (...args: any[]) => any>(
-    target: T,
-    _context: ClassDecoratorContext<T>,
-  ): T {
+  return <T extends abstract new (...args: any[]) => any>(target: T, _context: ClassDecoratorContext<T>): T => {
     paginationMetadata.set(target, strategy);
     return target;
   };

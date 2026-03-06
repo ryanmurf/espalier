@@ -1,12 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { DefaultPoolMetricsCollector } from "../pool-metrics.js";
-import type {
-  AcquireEvent,
-  ReleaseEvent,
-  TimeoutEvent,
-  ErrorEvent,
-} from "../pool-monitor.js";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PoolStats } from "../pool.js";
+import { DefaultPoolMetricsCollector } from "../pool-metrics.js";
+import type { AcquireEvent, ErrorEvent, ReleaseEvent, TimeoutEvent } from "../pool-monitor.js";
 
 function makePoolStats(overrides?: Partial<PoolStats>): PoolStats {
   return { total: 5, idle: 3, waiting: 0, ...overrides };
@@ -36,10 +31,7 @@ function makeTimeoutEvent(waitTimeMs: number, stats?: Partial<PoolStats>): Timeo
   };
 }
 
-function makeErrorEvent(
-  context: "acquire" | "release" | "idle" | "query",
-  stats?: Partial<PoolStats>,
-): ErrorEvent {
+function makeErrorEvent(context: "acquire" | "release" | "idle" | "query", stats?: Partial<PoolStats>): ErrorEvent {
   return {
     timestamp: new Date(),
     poolStats: makePoolStats(stats),

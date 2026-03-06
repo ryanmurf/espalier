@@ -16,25 +16,24 @@
  * - Self-referential entity in diagram
  * - Very large entity count (20+ tables)
  */
-import { describe, it, expect } from "vitest";
+
 import {
-  Table,
   Column,
-  Id,
-  Version,
   CreatedDate,
+  Id,
   LastModifiedDate,
-  TenantId,
+  ManyToMany,
   ManyToOne,
   OneToMany,
-  ManyToMany,
   OneToOne,
-  Embeddable,
-  Embedded,
+  Table,
+  TenantId,
+  Version,
 } from "espalier-data";
-import { extractSchema } from "../schema/index.js";
-import { generateDiagram } from "../diagram/index.js";
+import { describe, expect, it } from "vitest";
 import type { DiagramFormat } from "../diagram/index.js";
+import { generateDiagram } from "../diagram/index.js";
+import { extractSchema } from "../schema/index.js";
 
 // =============================================================================
 // "Package A" entities
@@ -149,9 +148,7 @@ describe("QA Seam: diagram CLI + entities from multiple packages", () => {
 
         // All table names should appear
         for (const entity of allEntities) {
-          const tableName = schema.tables.find(
-            (t) => t.className === entity.name,
-          )?.tableName;
+          const tableName = schema.tables.find((t) => t.className === entity.name)?.tableName;
           if (tableName) {
             expect(diagram).toContain(tableName);
           }
@@ -200,11 +197,13 @@ describe("QA Seam: diagram CLI + entities from multiple packages", () => {
       const diagram = generateDiagram(schema, { format: "mermaid" });
 
       // Count occurrences of the relation line between the two tables
-      const lines = diagram.split("\n").filter(
-        (line) =>
-          (line.includes("pkg_a_users") && line.includes("pkg_b_posts")) ||
-          (line.includes("pkg_b_posts") && line.includes("pkg_a_users")),
-      );
+      const lines = diagram
+        .split("\n")
+        .filter(
+          (line) =>
+            (line.includes("pkg_a_users") && line.includes("pkg_b_posts")) ||
+            (line.includes("pkg_b_posts") && line.includes("pkg_a_users")),
+        );
       // Should have relation lines but not duplicate for both sides
       // Each unique pair rendered once per unique fieldName
       expect(lines.length).toBeGreaterThanOrEqual(1);
@@ -222,11 +221,13 @@ describe("QA Seam: diagram CLI + entities from multiple packages", () => {
       const schema = extractSchema({ entities: [PkgCCategory] });
       const diagram = generateDiagram(schema, { format: "mermaid" });
       // Self-referential: same table on both sides
-      const selfLines = diagram.split("\n").filter(
-        (line) =>
-          line.includes("pkg_c_categories") &&
-          (line.includes("||--o{") || line.includes("}o--||") || line.includes("}|--||")),
-      );
+      const selfLines = diagram
+        .split("\n")
+        .filter(
+          (line) =>
+            line.includes("pkg_c_categories") &&
+            (line.includes("||--o{") || line.includes("}o--||") || line.includes("}|--||")),
+        );
       expect(selfLines.length).toBeGreaterThanOrEqual(1);
     });
   });

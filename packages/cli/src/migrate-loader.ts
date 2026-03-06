@@ -1,5 +1,5 @@
 import { readdirSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { Migration } from "espalier-data";
 
@@ -19,9 +19,7 @@ export function discoverMigrationFiles(migrationsDir: string): string[] {
     throw new Error(`Migrations directory not found: ${absDir}`);
   }
 
-  return entries
-    .filter((f) => MIGRATION_FILE_PATTERN.test(f))
-    .sort();
+  return entries.filter((f) => MIGRATION_FILE_PATTERN.test(f)).sort();
 }
 
 export async function loadMigrations(migrationsDir: string): Promise<LoadedMigration[]> {
@@ -51,7 +49,7 @@ function extractMigration(mod: unknown, fileName: string): Migration {
   if (!isMigration(candidate)) {
     throw new Error(
       `Migration file "${fileName}" does not export a valid Migration. ` +
-      `Expected a default export with version, description, up(), and down().`,
+        `Expected a default export with version, description, up(), and down().`,
     );
   }
 

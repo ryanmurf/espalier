@@ -2,11 +2,7 @@
  * Serverless environment detection and default configuration.
  */
 
-export type ServerlessEnvironment =
-  | "aws-lambda"
-  | "vercel"
-  | "cloudflare-workers"
-  | "unknown";
+export type ServerlessEnvironment = "aws-lambda" | "vercel" | "cloudflare-workers" | "unknown";
 
 export interface EnvironmentDefaults {
   maxIdleTimeMs: number;
@@ -20,7 +16,7 @@ const ENV_DEFAULTS: Record<ServerlessEnvironment, EnvironmentDefaults> = {
     maxConnections: 2,
     validateOnBorrow: true,
   },
-  "vercel": {
+  vercel: {
     maxIdleTimeMs: 10 * 1000, // 10 seconds — Vercel functions are short-lived
     maxConnections: 1,
     validateOnBorrow: true,
@@ -30,7 +26,7 @@ const ENV_DEFAULTS: Record<ServerlessEnvironment, EnvironmentDefaults> = {
     maxConnections: 1,
     validateOnBorrow: true,
   },
-  "unknown": {
+  unknown: {
     maxIdleTimeMs: 60 * 1000, // 1 minute
     maxConnections: 5,
     validateOnBorrow: true,

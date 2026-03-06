@@ -7,13 +7,13 @@ Thank you for your interest in contributing to Espalier! This guide will help yo
 ### Prerequisites
 
 - Node.js 20+ (or Bun 1.x / Deno 2.x)
-- pnpm 9+
+- pnpm 10+
 - PostgreSQL (for integration tests)
 
 ### Getting Started
 
 ```bash
-git clone https://github.com/espalier-orm/espalier.git
+git clone https://github.com/ryanmurf/espalier.git
 cd espalier
 pnpm install
 pnpm build
@@ -111,4 +111,4 @@ Be respectful and constructive. We're all here to build something great.
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under the project's MIT license.
+By contributing, you agree that your contributions will be licensed under the project's Apache License 2.0.

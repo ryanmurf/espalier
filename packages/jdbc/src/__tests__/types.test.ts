@@ -1,24 +1,7 @@
-import { describe, it, expect } from "vitest";
-import {
-  DatabaseError,
-  ConnectionError,
-  QueryError,
-  TransactionError,
-  IsolationLevel,
-} from "../index.js";
-
+import { describe, expect, it } from "vitest";
 // Type-only imports to verify all type exports compile
-import type {
-  DataSource,
-  Connection,
-  Statement,
-  PreparedStatement,
-  ResultSet,
-  Transaction,
-  SqlValue,
-  SqlParameter,
-  ColumnMetadata,
-} from "../index.js";
+import type { ColumnMetadata, SqlParameter, SqlValue } from "../index.js";
+import { ConnectionError, DatabaseError, IsolationLevel, QueryError, TransactionError } from "../index.js";
 
 describe("espalier-jdbc exports", () => {
   it("exports error classes", () => {

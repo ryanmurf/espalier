@@ -1,18 +1,18 @@
-import { describe, it, expect, vi, beforeAll, afterAll } from "vitest";
-import { PgDataSource } from "espalier-jdbc-pg";
+import { Column, CreatedDate, Id, LastModifiedDate, Table, Version } from "espalier-data";
 import type { ResultSet } from "espalier-jdbc";
-import { Table, Column, Id, Version, CreatedDate, LastModifiedDate } from "espalier-data";
-import { withTestTransaction, withNestedTransaction } from "../isolation/test-transaction.js";
-import { createFactory } from "../factory/entity-factory.js";
+import { PgDataSource } from "espalier-jdbc-pg";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
-  QueryLog,
-  createInstrumentedDataSource,
-  withQueryLog,
-  assertQueryCount,
   assertMaxQueries,
   assertNoQueriesMatching,
   assertQueriesMatching,
+  assertQueryCount,
+  createInstrumentedDataSource,
+  QueryLog,
+  withQueryLog,
 } from "../assertions/query-assertions.js";
+import { createFactory } from "../factory/entity-factory.js";
+import { withNestedTransaction, withTestTransaction } from "../isolation/test-transaction.js";
 
 // ==========================================================================
 // Helpers
@@ -133,9 +133,7 @@ describe.skipIf(!canConnect)("Cross-feature integration — E2E", () => {
         `INSERT INTO ${TABLE} (id, name, email) VALUES ('${user.id}', '${user.name}', '${user.email}')`,
       );
 
-      const rs = await stmt.executeQuery(
-        `SELECT name FROM ${TABLE} WHERE id = '${user.id}'`,
-      );
+      const rs = await stmt.executeQuery(`SELECT name FROM ${TABLE} WHERE id = '${user.id}'`);
       const rows = await collectRows(rs);
       expect(rows[0].name).toBe("FactoryUser");
     });
@@ -143,9 +141,7 @@ describe.skipIf(!canConnect)("Cross-feature integration — E2E", () => {
     // After rollback, the data should be gone
     const conn = await ds.getConnection();
     const stmt = conn.createStatement();
-    const rs = await stmt.executeQuery(
-      `SELECT count(*)::int AS cnt FROM ${TABLE} WHERE name = 'FactoryUser'`,
-    );
+    const rs = await stmt.executeQuery(`SELECT count(*)::int AS cnt FROM ${TABLE} WHERE name = 'FactoryUser'`);
     const rows = await collectRows(rs);
     expect(rows[0].cnt).toBe(0);
     await conn.close();
@@ -161,12 +157,8 @@ describe.skipIf(!canConnect)("Cross-feature integration — E2E", () => {
 
     await withTestTransaction(instrumentedDs, async (ctx) => {
       const stmt = ctx.connection.createStatement();
-      await stmt.executeUpdate(
-        `INSERT INTO ${TABLE} (name) VALUES ('logged-user')`,
-      );
-      await stmt.executeQuery(
-        `SELECT count(*)::int AS cnt FROM ${TABLE}`,
-      );
+      await stmt.executeUpdate(`INSERT INTO ${TABLE} (name) VALUES ('logged-user')`);
+      await stmt.executeQuery(`SELECT count(*)::int AS cnt FROM ${TABLE}`);
     });
 
     // Query log should have captured at least the INSERT and SELECT
@@ -185,9 +177,7 @@ describe.skipIf(!canConnect)("Cross-feature integration — E2E", () => {
     await withTestTransaction(ds, async (ctx) => {
       const stmt = ctx.connection.createStatement();
       // This query is OUTSIDE the withQueryLog scope
-      await stmt.executeUpdate(
-        `INSERT INTO ${TABLE} (name) VALUES ('outside-scope')`,
-      );
+      await stmt.executeUpdate(`INSERT INTO ${TABLE} (name) VALUES ('outside-scope')`);
 
       // Now use withQueryLog for a specific section
       await withQueryLog(ds, async (log, iDs) => {
@@ -214,9 +204,7 @@ describe.skipIf(!canConnect)("Cross-feature integration — E2E", () => {
       const factory = createFactory(IntegrationUser);
       const user = factory.build({ name: "OuterUser" });
       const stmt = ctx.connection.createStatement();
-      await stmt.executeUpdate(
-        `INSERT INTO ${TABLE} (id, name) VALUES ('${user.id}', '${user.name}')`,
-      );
+      await stmt.executeUpdate(`INSERT INTO ${TABLE} (id, name) VALUES ('${user.id}', '${user.name}')`);
 
       await withNestedTransaction(ctx, async (nestedCtx) => {
         const innerUser = factory.build({ name: "InnerUser" });
@@ -234,16 +222,12 @@ describe.skipIf(!canConnect)("Cross-feature integration — E2E", () => {
       });
 
       // After nested rollback: only outer visible
-      const rs = await stmt.executeQuery(
-        `SELECT count(*)::int AS cnt FROM ${TABLE} WHERE name = 'InnerUser'`,
-      );
+      const rs = await stmt.executeQuery(`SELECT count(*)::int AS cnt FROM ${TABLE} WHERE name = 'InnerUser'`);
       const rows = await collectRows(rs);
       expect(rows[0].cnt).toBe(0);
 
       // Outer still visible
-      const outerRs = await stmt.executeQuery(
-        `SELECT count(*)::int AS cnt FROM ${TABLE} WHERE name = 'OuterUser'`,
-      );
+      const outerRs = await stmt.executeQuery(`SELECT count(*)::int AS cnt FROM ${TABLE} WHERE name = 'OuterUser'`);
       const outerRows = await collectRows(outerRs);
       expect(outerRows[0].cnt).toBe(1);
     });
@@ -260,17 +244,13 @@ describe.skipIf(!canConnect)("Cross-feature integration — E2E", () => {
     await withTestTransaction(ds, async (ctx) => {
       const user = factory.build({ name: "TxUser1" });
       const stmt = ctx.connection.createStatement();
-      await stmt.executeUpdate(
-        `INSERT INTO ${TABLE} (id, name) VALUES ('${user.id}', '${user.name}')`,
-      );
+      await stmt.executeUpdate(`INSERT INTO ${TABLE} (id, name) VALUES ('${user.id}', '${user.name}')`);
     });
 
     // Transaction 2: should not see data from transaction 1
     await withTestTransaction(ds, async (ctx) => {
       const stmt = ctx.connection.createStatement();
-      const rs = await stmt.executeQuery(
-        `SELECT count(*)::int AS cnt FROM ${TABLE} WHERE name = 'TxUser1'`,
-      );
+      const rs = await stmt.executeQuery(`SELECT count(*)::int AS cnt FROM ${TABLE} WHERE name = 'TxUser1'`);
       const rows = await collectRows(rs);
       expect(rows[0].cnt).toBe(0);
     });
@@ -281,10 +261,7 @@ describe.skipIf(!canConnect)("Cross-feature integration — E2E", () => {
   // ------------------------------------------------------------------
 
   it("factory sequences increment across transaction boundaries", async () => {
-    const factory = createFactory(IntegrationUser).sequence(
-      "email",
-      (n) => `user${n}@integration.test`,
-    );
+    const factory = createFactory(IntegrationUser).sequence("email", (n) => `user${n}@integration.test`);
 
     let email1 = "";
     await withTestTransaction(ds, async () => {

@@ -1,6 +1,5 @@
-import type { QueryPlan, PlanNode, PlanWarning } from "espalier-jdbc";
+import type { PlanAdvisorConfig, PlanNode, PlanWarning, QueryPlan } from "espalier-jdbc";
 import { PlanAdvisor, quoteIdentifier } from "espalier-jdbc";
-import type { PlanAdvisorConfig } from "espalier-jdbc";
 
 /**
  * Type of index to suggest.
@@ -87,8 +86,7 @@ export class IndexAdvisor {
     // we only skip them if an identical suggestion was cached previously.
     const deduped = suggestions.filter((s) => {
       const key = suggestionDedupKey(s);
-      return !this.existingIndexes.has(`${s.table}.${s.columns.join(",")}`) &&
-        !cachedKeys.has(key);
+      return !this.existingIndexes.has(`${s.table}.${s.columns.join(",")}`) && !cachedKeys.has(key);
     });
 
     // Deduplicate within this batch
@@ -153,14 +151,16 @@ export class IndexAdvisor {
       if (node.estimatedRows >= this.minRows) {
         const columns = this.extractColumnsFromFilter(node.filter);
         if (columns.length > 0) {
-          suggestions.push(this.createSuggestion(
-            node.relation,
-            columns,
-            "btree",
-            "warning",
-            `Sequential scan with filter on ${node.relation} (~${node.estimatedRows} rows)`,
-            `Avoid sequential scan by indexing filtered columns`,
-          ));
+          suggestions.push(
+            this.createSuggestion(
+              node.relation,
+              columns,
+              "btree",
+              "warning",
+              `Sequential scan with filter on ${node.relation} (~${node.estimatedRows} rows)`,
+              `Avoid sequential scan by indexing filtered columns`,
+            ),
+          );
         }
       }
     }
@@ -188,14 +188,16 @@ export class IndexAdvisor {
         if (relation) {
           const sortColumns = node.sortKey.map((k) => this.cleanColumnName(k));
           if (sortColumns.length > 0 && sortColumns.every((c) => c.length > 0)) {
-            suggestions.push(this.createSuggestion(
-              relation,
-              sortColumns,
-              "btree",
-              "info",
-              `Sort operation on ${node.estimatedRows} rows without index`,
-              `Eliminate sort by adding index matching ORDER BY`,
-            ));
+            suggestions.push(
+              this.createSuggestion(
+                relation,
+                sortColumns,
+                "btree",
+                "info",
+                `Sort operation on ${node.estimatedRows} rows without index`,
+                `Eliminate sort by adding index matching ORDER BY`,
+              ),
+            );
           }
         }
       }
@@ -207,14 +209,16 @@ export class IndexAdvisor {
       if (inner && inner.nodeType === "Seq Scan" && inner.relation && inner.filter) {
         const columns = this.extractColumnsFromFilter(inner.filter);
         if (columns.length > 0) {
-          suggestions.push(this.createSuggestion(
-            inner.relation,
-            columns,
-            "btree",
-            "warning",
-            `Nested loop join with sequential scan on inner relation ${inner.relation}`,
-            `Index the join/filter columns to enable index lookup`,
-          ));
+          suggestions.push(
+            this.createSuggestion(
+              inner.relation,
+              columns,
+              "btree",
+              "warning",
+              `Nested loop join with sequential scan on inner relation ${inner.relation}`,
+              `Index the join/filter columns to enable index lookup`,
+            ),
+          );
         }
       }
     }
@@ -226,14 +230,16 @@ export class IndexAdvisor {
         if (buildSide.estimatedRows >= this.minRows) {
           const columns = node.filter ? this.extractColumnsFromFilter(node.filter) : [];
           if (columns.length > 0) {
-            suggestions.push(this.createSuggestion(
-              buildSide.relation,
-              columns,
-              "btree",
-              "info",
-              `Hash join build on ${buildSide.relation} (~${buildSide.estimatedRows} rows)`,
-              `Index join columns to potentially enable merge join`,
-            ));
+            suggestions.push(
+              this.createSuggestion(
+                buildSide.relation,
+                columns,
+                "btree",
+                "info",
+                `Hash join build on ${buildSide.relation} (~${buildSide.estimatedRows} rows)`,
+                `Index join columns to potentially enable merge join`,
+              ),
+            );
           }
         }
       }
@@ -330,9 +336,36 @@ function suggestionDedupKey(s: IndexSuggestion): string {
 }
 
 const SQL_KEYWORDS = new Set([
-  "and", "or", "not", "is", "null", "true", "false",
-  "in", "between", "like", "ilike", "any", "all",
-  "select", "from", "where", "having", "group", "order",
-  "limit", "offset", "join", "on", "as", "case", "when",
-  "then", "else", "end", "exists", "some", "array",
+  "and",
+  "or",
+  "not",
+  "is",
+  "null",
+  "true",
+  "false",
+  "in",
+  "between",
+  "like",
+  "ilike",
+  "any",
+  "all",
+  "select",
+  "from",
+  "where",
+  "having",
+  "group",
+  "order",
+  "limit",
+  "offset",
+  "join",
+  "on",
+  "as",
+  "case",
+  "when",
+  "then",
+  "else",
+  "end",
+  "exists",
+  "some",
+  "array",
 ]);

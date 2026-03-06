@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
-import { resolve, join, relative } from "node:path";
-import { parsePrismaSchema } from "./parser.js";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join, relative, resolve } from "node:path";
 import { generateEntityFile, generateEnumFile, generateIndexFile } from "./generator.js";
+import { parsePrismaSchema } from "./parser.js";
 
 function toSnakeCase(name: string): string {
   return name.replace(/([a-z])([A-Z])/g, "$1_$2").toLowerCase();
@@ -37,7 +37,7 @@ Options:
 
   // Validate output path is within or relative to CWD (prevent path traversal)
   const rel = relative(cwd, resolvedOutput);
-  if (rel.startsWith("..") || resolve(rel) !== resolvedOutput && rel.startsWith("/")) {
+  if (rel.startsWith("..") || (resolve(rel) !== resolvedOutput && rel.startsWith("/"))) {
     console.error(`Error: Output path must be within the current working directory. Got: ${resolvedOutput}`);
     process.exit(1);
   }

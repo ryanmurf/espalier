@@ -9,11 +9,7 @@ export type LifecycleEvent =
 
 const lifecycleMetadata = new WeakMap<object, Map<LifecycleEvent, (string | symbol)[]>>();
 
-export function addLifecycleCallback(
-  constructor: object,
-  event: LifecycleEvent,
-  methodName: string | symbol,
-): void {
+export function addLifecycleCallback(constructor: object, event: LifecycleEvent, methodName: string | symbol): void {
   if (!lifecycleMetadata.has(constructor)) {
     lifecycleMetadata.set(constructor, new Map());
   }
@@ -28,10 +24,7 @@ export function addLifecycleCallback(
 }
 
 function createLifecycleDecorator(event: LifecycleEvent) {
-  return function <T extends (...args: any[]) => any>(
-    _target: T,
-    context: ClassMethodDecoratorContext,
-  ): void {
+  return <T extends (...args: any[]) => any>(_target: T, context: ClassMethodDecoratorContext): void => {
     const methodName = context.name;
     context.addInitializer(function () {
       const constructor = (this as Record<string, any>).constructor as object;
@@ -48,8 +41,6 @@ export const PreRemove = createLifecycleDecorator("PreRemove");
 export const PostRemove = createLifecycleDecorator("PostRemove");
 export const PostLoad = createLifecycleDecorator("PostLoad");
 
-export function getLifecycleCallbacks(
-  entityClass: object,
-): Map<LifecycleEvent, (string | symbol)[]> {
+export function getLifecycleCallbacks(entityClass: object): Map<LifecycleEvent, (string | symbol)[]> {
   return lifecycleMetadata.get(entityClass) ?? new Map();
 }

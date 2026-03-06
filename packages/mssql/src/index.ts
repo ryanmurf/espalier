@@ -17,16 +17,16 @@
  */
 
 import type {
-  DataSource,
+  ColumnMetadata,
   Connection,
-  Statement,
+  DataSource,
+  IsolationLevel,
   PreparedStatement,
   ResultSet,
+  SqlValue,
+  Statement,
   Transaction,
-  ColumnMetadata,
 } from "espalier-jdbc";
-import type { SqlValue } from "espalier-jdbc";
-import { IsolationLevel } from "espalier-jdbc";
 
 // ─── Configuration ───────────────────────────────────────────────────
 
@@ -121,6 +121,7 @@ export class MssqlResultSet implements ResultSet {
 
 export class MssqlStatement implements Statement {
   protected driver: any;
+  protected sql: string = "";
   private closed = false;
 
   constructor(driver: any) {
@@ -149,7 +150,6 @@ export class MssqlStatement implements Statement {
 // ─── PreparedStatement ───────────────────────────────────────────────
 
 export class MssqlPreparedStatement extends MssqlStatement implements PreparedStatement {
-  private readonly sql: string;
   protected readonly params = new Map<number, SqlValue>();
 
   constructor(driver: any, sql: string) {
@@ -237,7 +237,7 @@ export class MssqlConnection implements Connection {
 // ─── DataSource ──────────────────────────────────────────────────────
 
 export class MssqlDataSource implements DataSource {
-  private readonly config: MssqlConfig;
+  private config: MssqlConfig;
   private closed = false;
 
   constructor(config: MssqlConfig) {

@@ -1,9 +1,9 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   CreatedDate,
-  LastModifiedDate,
   getCreatedDateField,
   getLastModifiedDateField,
+  LastModifiedDate,
 } from "../../decorators/auditing.js";
 
 describe("@CreatedDate decorator", () => {

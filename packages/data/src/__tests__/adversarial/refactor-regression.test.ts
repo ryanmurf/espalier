@@ -5,20 +5,21 @@
  *
  * Goal: break every edge case at the boundaries between these modules.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { DataSource, Connection, PreparedStatement, ResultSet, SqlValue, Transaction } from "espalier-jdbc";
-import { Table } from "../../decorators/table.js";
+
+import type { Connection, DataSource, PreparedStatement, ResultSet, Transaction } from "espalier-jdbc";
+import { describe, expect, it, vi } from "vitest";
+import { CreatedDate, LastModifiedDate } from "../../decorators/auditing.js";
 import { Column } from "../../decorators/column.js";
 import { Id } from "../../decorators/id.js";
+import { PostPersist, PostRemove, PostUpdate, PrePersist, PreRemove, PreUpdate } from "../../decorators/lifecycle.js";
+import { ManyToMany, ManyToOne, OneToMany, OneToOne } from "../../decorators/relations.js";
+import { Table } from "../../decorators/table.js";
 import { Version } from "../../decorators/version.js";
-import { CreatedDate, LastModifiedDate } from "../../decorators/auditing.js";
-import { ManyToOne, OneToMany, ManyToMany, OneToOne } from "../../decorators/relations.js";
-import { PrePersist, PostPersist, PreUpdate, PostUpdate, PreRemove, PostRemove, PostLoad } from "../../decorators/lifecycle.js";
-import { createDerivedRepository } from "../../repository/derived-repository.js";
-import { parseDerivedQueryMethod } from "../../query/derived-query-parser.js";
-import { buildDerivedQuery } from "../../query/derived-query-executor.js";
-import { getEntityMetadata } from "../../mapping/entity-metadata.js";
 import { EntityChangeTracker } from "../../mapping/change-tracker.js";
+import { getEntityMetadata } from "../../mapping/entity-metadata.js";
+import { buildDerivedQuery } from "../../query/derived-query-executor.js";
+import { parseDerivedQueryMethod } from "../../query/derived-query-parser.js";
+import { createDerivedRepository } from "../../repository/derived-repository.js";
 import { TestResultSet } from "../test-utils/test-result-set.js";
 
 // ---------------------------------------------------------------------------
@@ -38,14 +39,17 @@ function createMockConnection(stmt: PreparedStatement): Connection {
   return {
     createStatement: vi.fn() as any,
     prepareStatement: vi.fn(() => stmt),
-    beginTransaction: vi.fn(async () => ({
-      commit: vi.fn(async () => {}),
-      rollback: vi.fn(async () => {}),
-      setSavepoint: vi.fn(async () => {}),
-      releaseSavepoint: vi.fn(async () => {}),
-      rollbackToSavepoint: vi.fn(async () => {}),
-      rollbackTo: vi.fn(async () => {}),
-    } as unknown as Transaction)),
+    beginTransaction: vi.fn(
+      async () =>
+        ({
+          commit: vi.fn(async () => {}),
+          rollback: vi.fn(async () => {}),
+          setSavepoint: vi.fn(async () => {}),
+          releaseSavepoint: vi.fn(async () => {}),
+          rollbackToSavepoint: vi.fn(async () => {}),
+          rollbackTo: vi.fn(async () => {}),
+        }) as unknown as Transaction,
+    ),
     close: vi.fn(async () => {}),
     isClosed: vi.fn(() => false),
   };
@@ -137,12 +141,24 @@ class RRLifecycleEntity {
   @Column() name: string = "";
   callLog: string[] = [];
 
-  @PrePersist prePersist() { this.callLog.push("PrePersist"); }
-  @PostPersist postPersist() { this.callLog.push("PostPersist"); }
-  @PreUpdate preUpdate() { this.callLog.push("PreUpdate"); }
-  @PostUpdate postUpdate() { this.callLog.push("PostUpdate"); }
-  @PreRemove preRemove() { this.callLog.push("PreRemove"); }
-  @PostRemove postRemove() { this.callLog.push("PostRemove"); }
+  @PrePersist prePersist() {
+    this.callLog.push("PrePersist");
+  }
+  @PostPersist postPersist() {
+    this.callLog.push("PostPersist");
+  }
+  @PreUpdate preUpdate() {
+    this.callLog.push("PreUpdate");
+  }
+  @PostUpdate postUpdate() {
+    this.callLog.push("PostUpdate");
+  }
+  @PreRemove preRemove() {
+    this.callLog.push("PreRemove");
+  }
+  @PostRemove postRemove() {
+    this.callLog.push("PostRemove");
+  }
 }
 
 @Table("rr_oto_owner")
@@ -182,7 +198,6 @@ class RRMtmTag {
 // ═══════════════════════════════════════════════════════
 
 describe("EntityPersister: edge cases", () => {
-
   describe("save entity with all nullable fields as null", () => {
     it("should INSERT with null column values without crashing", async () => {
       const insertRs = new TestResultSet([{ id: 1, name: null, email: null, age: null, active: null }]);
@@ -217,9 +232,7 @@ describe("EntityPersister: edge cases", () => {
       // Verify the statement was called with the incremented version
       const calls = (stmt.setParameter as any).mock.calls;
       // One of the params should be MAX_SAFE_INTEGER + 1 (the new version)
-      const versionParam = calls.find(
-        (c: any[]) => c[1] === Number.MAX_SAFE_INTEGER + 1,
-      );
+      const versionParam = calls.find((c: any[]) => c[1] === Number.MAX_SAFE_INTEGER + 1);
       expect(versionParam).toBeDefined();
     });
   });
@@ -227,12 +240,14 @@ describe("EntityPersister: edge cases", () => {
   describe("@CreatedDate should NOT be overridden if already set", () => {
     it("preserves a pre-existing createdAt value on insert", async () => {
       const existingDate = new Date("2020-01-01T00:00:00Z");
-      const insertRs = new TestResultSet([{
-        id: 1,
-        name: "test",
-        created_at: existingDate.toISOString(),
-        updated_at: new Date().toISOString(),
-      }]);
+      const insertRs = new TestResultSet([
+        {
+          id: 1,
+          name: "test",
+          created_at: existingDate.toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+      ]);
       const { ds, stmt } = buildMultiResultMockStack([insertRs]);
       const repo = createDerivedRepository<RRAudited, number>(RRAudited, ds);
 
@@ -246,9 +261,7 @@ describe("EntityPersister: edge cases", () => {
       // Check what value was passed to the INSERT — it should be the existingDate
       const calls = (stmt.setParameter as any).mock.calls;
       const dateParams = calls.filter((c: any[]) => c[1] instanceof Date);
-      const createdDateParam = dateParams.find(
-        (c: any[]) => (c[1] as Date).getTime() === existingDate.getTime(),
-      );
+      const createdDateParam = dateParams.find((c: any[]) => (c[1] as Date).getTime() === existingDate.getTime());
       expect(createdDateParam).toBeDefined();
     });
   });
@@ -308,7 +321,7 @@ describe("EntityPersister: edge cases", () => {
       const entity = new RRLifecycleEntity();
       entity.name = "test";
 
-      const saved = await repo.save(entity);
+      const _saved = await repo.save(entity);
       // PrePersist should fire before, PostPersist after
       // The saved entity is a NEW object from rowMapper, so check the original
       expect(entity.callLog).toContain("PrePersist");
@@ -351,13 +364,20 @@ describe("EntityPersister: edge cases", () => {
 // ═══════════════════════════════════════════════════════
 
 describe("CascadeManager: edge cases", () => {
-
   describe("cascade save with circular references (parent -> child -> parent)", () => {
     it("should not infinite loop due to cascadeSaving set guard", async () => {
       // Parent has OneToMany children, child has ManyToOne parent with cascade
       // If we set child.parent = parent and parent.children = [child], cascade
       // must detect the cycle via the saving Set and break out.
-      const parentInsertRs = new TestResultSet([{ id: 1, name: "parent", version: 1, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }]);
+      const parentInsertRs = new TestResultSet([
+        {
+          id: 1,
+          name: "parent",
+          version: 1,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+      ]);
       const childInsertRs = new TestResultSet([{ id: 10, label: "child", parent_id: 1 }]);
       const { ds } = buildMultiResultMockStack([parentInsertRs, childInsertRs]);
 
@@ -378,7 +398,15 @@ describe("CascadeManager: edge cases", () => {
 
   describe("cascade save with null/undefined children array", () => {
     it("should skip cascade when children array is undefined", async () => {
-      const insertRs = new TestResultSet([{ id: 1, name: "parent", version: 1, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }]);
+      const insertRs = new TestResultSet([
+        {
+          id: 1,
+          name: "parent",
+          version: 1,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+      ]);
       const { ds } = buildMultiResultMockStack([insertRs]);
       const repo = createDerivedRepository<RRParent, number>(RRParent, ds);
 
@@ -391,7 +419,15 @@ describe("CascadeManager: edge cases", () => {
     });
 
     it("should skip cascade when children array contains null entries", async () => {
-      const insertRs = new TestResultSet([{ id: 1, name: "parent", version: 1, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }]);
+      const insertRs = new TestResultSet([
+        {
+          id: 1,
+          name: "parent",
+          version: 1,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+      ]);
       const { ds } = buildMultiResultMockStack([insertRs]);
       const repo = createDerivedRepository<RRParent, number>(RRParent, ds);
 
@@ -467,7 +503,6 @@ describe("CascadeManager: edge cases", () => {
 // ═══════════════════════════════════════════════════════
 
 describe("DerivedQueryHandler: edge cases", () => {
-
   describe("findByNonExistentField", () => {
     it("should throw when derived query references unknown property", () => {
       const metadata = getEntityMetadata(RRSimple);
@@ -476,9 +511,7 @@ describe("DerivedQueryHandler: edge cases", () => {
       const descriptor = parseDerivedQueryMethod("findByZzzzNotAField");
 
       // buildDerivedQuery should throw because "zzzzNotAField" is not a valid field
-      expect(() => buildDerivedQuery(descriptor, metadata, ["value"])).toThrow(
-        /Unknown property/,
-      );
+      expect(() => buildDerivedQuery(descriptor, metadata, ["value"])).toThrow(/Unknown property/);
     });
   });
 
@@ -499,14 +532,10 @@ describe("DerivedQueryHandler: edge cases", () => {
   describe("derived query with many conditions", () => {
     it("should handle 5+ AND conditions", () => {
       const metadata = getEntityMetadata(RRSimple);
-      const descriptor = parseDerivedQueryMethod(
-        "findByNameAndEmailAndAgeAndActiveAndId",
-      );
+      const descriptor = parseDerivedQueryMethod("findByNameAndEmailAndAgeAndActiveAndId");
       expect(descriptor.properties).toHaveLength(5);
 
-      const query = buildDerivedQuery(descriptor, metadata, [
-        "alice", "a@b.com", 30, true, 1,
-      ]);
+      const query = buildDerivedQuery(descriptor, metadata, ["alice", "a@b.com", 30, true, 1]);
       expect(query.params).toHaveLength(5);
       // Should produce valid SQL with AND clauses
       expect(query.sql.toLowerCase()).toContain("and");
@@ -625,7 +654,6 @@ describe("DerivedQueryHandler: edge cases", () => {
 // ═══════════════════════════════════════════════════════
 
 describe("EntityChangeTracker: edge cases", () => {
-
   describe("dirty check with circular object references in field values", () => {
     it("should handle circular references in cloneDeep during snapshot", () => {
       const metadata = getEntityMetadata(RRSimple);
@@ -686,7 +714,7 @@ describe("EntityChangeTracker: edge cases", () => {
       expect(tracker.isDirty(entity)).toBe(true);
 
       const dirty = tracker.getDirtyFields(entity);
-      const updatedField = dirty.find(d => String(d.field) === "updatedAt");
+      const updatedField = dirty.find((d) => String(d.field) === "updatedAt");
       expect(updatedField).toBeDefined();
     });
   });
@@ -712,7 +740,6 @@ describe("EntityChangeTracker: edge cases", () => {
 // ═══════════════════════════════════════════════════════
 
 describe("Cross-cutting: repository proxy integration", () => {
-
   describe("derived method accessed via proxy returns correct type", () => {
     it("findByName should be a function on the proxy", async () => {
       const rows = [{ id: 1, name: "alice", email: "a@b.com", age: 25, active: true }];
@@ -735,7 +762,7 @@ describe("Cross-cutting: repository proxy integration", () => {
       await repo.findByName("alice");
 
       // Second call — should not re-parse
-      const rows2 = new TestResultSet([{ id: 2, name: "bob", email: "b@c.com", age: 30, active: false }]);
+      const _rows2 = new TestResultSet([{ id: 2, name: "bob", email: "b@c.com", age: 30, active: false }]);
       // Even though the mock returns the same exhausted RS, the descriptor cache
       // should still be hit (we can't easily verify internal cache state,
       // but at minimum it should not throw)
@@ -796,7 +823,6 @@ describe("Cross-cutting: repository proxy integration", () => {
 // ═══════════════════════════════════════════════════════
 
 describe("Derived Query Executor: SQL generation integrity", () => {
-
   it("findByName generates SELECT with WHERE name = $1", () => {
     const metadata = getEntityMetadata(RRSimple);
     const descriptor = parseDerivedQueryMethod("findByName");

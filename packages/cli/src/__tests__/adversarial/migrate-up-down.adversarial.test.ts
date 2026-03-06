@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { Migration, MigrationRecord, MigrationRunner } from "espalier-data";
 import type { DataSource } from "espalier-jdbc";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock the adapter-factory and migrate-loader modules
 vi.mock("../../adapter-factory.js", () => ({
@@ -11,10 +11,10 @@ vi.mock("../../migrate-loader.js", () => ({
   loadMigrations: vi.fn(),
 }));
 
-import { migrateUp } from "../../migrate-up.js";
-import { migrateDown } from "../../migrate-down.js";
 import { createAdapter } from "../../adapter-factory.js";
+import { migrateDown } from "../../migrate-down.js";
 import { loadMigrations } from "../../migrate-loader.js";
+import { migrateUp } from "../../migrate-up.js";
 
 // ─── Helpers ───────────────────────────────────────────────────────────
 
@@ -64,9 +64,7 @@ function createMockRunner(appliedVersions: string[] = []): MigrationRunner {
     }),
     pending: vi.fn(async (migrations: Migration[]) => {
       const appliedSet = new Set(currentApplied.map((r) => r.version));
-      return migrations
-        .filter((m) => !appliedSet.has(m.version))
-        .sort((a, b) => a.version.localeCompare(b.version));
+      return migrations.filter((m) => !appliedSet.has(m.version)).sort((a, b) => a.version.localeCompare(b.version));
     }),
   };
 }
@@ -94,26 +92,18 @@ describe("migrateUp adversarial", () => {
 
   describe("adapter and connection failures", () => {
     it("propagates createAdapter rejection", async () => {
-      vi.mocked(createAdapter).mockRejectedValue(
-        new Error("Connection refused"),
-      );
+      vi.mocked(createAdapter).mockRejectedValue(new Error("Connection refused"));
 
-      await expect(
-        migrateUp({ config: baseConfig, migrationsDir: "/tmp/m" }),
-      ).rejects.toThrow("Connection refused");
+      await expect(migrateUp({ config: baseConfig, migrationsDir: "/tmp/m" })).rejects.toThrow("Connection refused");
     });
 
     it("propagates runner.initialize() failure and still closes datasource", async () => {
       const ds = createMockDataSource();
       const runner = createMockRunner();
-      vi.mocked(runner.initialize).mockRejectedValue(
-        new Error("Table creation failed"),
-      );
+      vi.mocked(runner.initialize).mockRejectedValue(new Error("Table creation failed"));
       vi.mocked(createAdapter).mockResolvedValue({ dataSource: ds, runner });
 
-      await expect(
-        migrateUp({ config: baseConfig, migrationsDir: "/tmp/m" }),
-      ).rejects.toThrow("Table creation failed");
+      await expect(migrateUp({ config: baseConfig, migrationsDir: "/tmp/m" })).rejects.toThrow("Table creation failed");
 
       expect(ds.close).toHaveBeenCalled();
     });
@@ -122,13 +112,11 @@ describe("migrateUp adversarial", () => {
       const ds = createMockDataSource();
       const runner = createMockRunner();
       vi.mocked(createAdapter).mockResolvedValue({ dataSource: ds, runner });
-      vi.mocked(loadMigrations).mockRejectedValue(
-        new Error("Migrations directory not found: /bogus"),
-      );
+      vi.mocked(loadMigrations).mockRejectedValue(new Error("Migrations directory not found: /bogus"));
 
-      await expect(
-        migrateUp({ config: baseConfig, migrationsDir: "/bogus" }),
-      ).rejects.toThrow("Migrations directory not found");
+      await expect(migrateUp({ config: baseConfig, migrationsDir: "/bogus" })).rejects.toThrow(
+        "Migrations directory not found",
+      );
 
       expect(ds.close).toHaveBeenCalled();
     });
@@ -137,9 +125,7 @@ describe("migrateUp adversarial", () => {
       const ds = createMockDataSource();
       vi.mocked(ds.close).mockRejectedValue(new Error("close blew up"));
       const runner = createMockRunner();
-      vi.mocked(runner.initialize).mockRejectedValue(
-        new Error("init failed"),
-      );
+      vi.mocked(runner.initialize).mockRejectedValue(new Error("init failed"));
       vi.mocked(createAdapter).mockResolvedValue({ dataSource: ds, runner });
 
       // The finally block calls ds.close() which rejects. In a try/finally,
@@ -344,9 +330,7 @@ describe("migrateUp adversarial", () => {
     it("propagates runner.run() failure and closes datasource", async () => {
       const runner = createMockRunner();
       const ds = createMockDataSource();
-      vi.mocked(runner.run).mockRejectedValue(
-        new Error("Migration SQL syntax error"),
-      );
+      vi.mocked(runner.run).mockRejectedValue(new Error("Migration SQL syntax error"));
       vi.mocked(createAdapter).mockResolvedValue({ dataSource: ds, runner });
       vi.mocked(loadMigrations).mockResolvedValue([
         {
@@ -355,9 +339,9 @@ describe("migrateUp adversarial", () => {
         },
       ]);
 
-      await expect(
-        migrateUp({ config: baseConfig, migrationsDir: "/tmp/m" }),
-      ).rejects.toThrow("Migration SQL syntax error");
+      await expect(migrateUp({ config: baseConfig, migrationsDir: "/tmp/m" })).rejects.toThrow(
+        "Migration SQL syntax error",
+      );
 
       expect(ds.close).toHaveBeenCalled();
     });
@@ -365,9 +349,7 @@ describe("migrateUp adversarial", () => {
     it("propagates runner.pending() failure", async () => {
       const runner = createMockRunner();
       const ds = createMockDataSource();
-      vi.mocked(runner.pending).mockRejectedValue(
-        new Error("Cannot read migration tracking table"),
-      );
+      vi.mocked(runner.pending).mockRejectedValue(new Error("Cannot read migration tracking table"));
       vi.mocked(createAdapter).mockResolvedValue({ dataSource: ds, runner });
       vi.mocked(loadMigrations).mockResolvedValue([
         {
@@ -376,18 +358,18 @@ describe("migrateUp adversarial", () => {
         },
       ]);
 
-      await expect(
-        migrateUp({ config: baseConfig, migrationsDir: "/tmp/m" }),
-      ).rejects.toThrow("Cannot read migration tracking table");
+      await expect(migrateUp({ config: baseConfig, migrationsDir: "/tmp/m" })).rejects.toThrow(
+        "Cannot read migration tracking table",
+      );
     });
 
     it("propagates runner.getCurrentVersion() failure after successful run", async () => {
       const runner = createMockRunner();
       const ds = createMockDataSource();
       // Make getCurrentVersion fail AFTER run succeeds
-      let callCount = 0;
+      let _callCount = 0;
       vi.mocked(runner.getCurrentVersion).mockImplementation(async () => {
-        callCount++;
+        _callCount++;
         throw new Error("Unexpected connection loss");
       });
       vi.mocked(createAdapter).mockResolvedValue({ dataSource: ds, runner });
@@ -398,9 +380,9 @@ describe("migrateUp adversarial", () => {
         },
       ]);
 
-      await expect(
-        migrateUp({ config: baseConfig, migrationsDir: "/tmp/m" }),
-      ).rejects.toThrow("Unexpected connection loss");
+      await expect(migrateUp({ config: baseConfig, migrationsDir: "/tmp/m" })).rejects.toThrow(
+        "Unexpected connection loss",
+      );
 
       // Migrations were applied, but getCurrentVersion failed after
       expect(runner.run).toHaveBeenCalled();
@@ -462,11 +444,7 @@ describe("migrateUp adversarial", () => {
 
       // pending() sorts by version (see mock), so order should be correct
       // even if loadMigrations returns unordered results
-      expect(result.applied).toEqual([
-        "20260101120000",
-        "20260102120000",
-        "20260103120000",
-      ]);
+      expect(result.applied).toEqual(["20260101120000", "20260102120000", "20260103120000"]);
     });
   });
 
@@ -478,14 +456,12 @@ describe("migrateUp adversarial", () => {
       const ds = createMockDataSource();
       vi.mocked(createAdapter).mockResolvedValue({ dataSource: ds, runner });
       vi.mocked(loadMigrations).mockRejectedValue(
-        new Error(
-          'Migration file "bad.ts" does not export a valid Migration',
-        ),
+        new Error('Migration file "bad.ts" does not export a valid Migration'),
       );
 
-      await expect(
-        migrateUp({ config: baseConfig, migrationsDir: "/tmp/m" }),
-      ).rejects.toThrow("does not export a valid Migration");
+      await expect(migrateUp({ config: baseConfig, migrationsDir: "/tmp/m" })).rejects.toThrow(
+        "does not export a valid Migration",
+      );
     });
 
     it("propagates error when migration up() throws", async () => {
@@ -514,9 +490,7 @@ describe("migrateUp adversarial", () => {
         },
       ]);
 
-      await expect(
-        migrateUp({ config: baseConfig, migrationsDir: "/tmp/m" }),
-      ).rejects.toThrow("up() exploded");
+      await expect(migrateUp({ config: baseConfig, migrationsDir: "/tmp/m" })).rejects.toThrow("up() exploded");
 
       expect(ds.close).toHaveBeenCalled();
     });
@@ -560,26 +534,18 @@ describe("migrateDown adversarial", () => {
 
   describe("adapter and connection failures", () => {
     it("propagates createAdapter rejection", async () => {
-      vi.mocked(createAdapter).mockRejectedValue(
-        new Error("Connection refused"),
-      );
+      vi.mocked(createAdapter).mockRejectedValue(new Error("Connection refused"));
 
-      await expect(
-        migrateDown({ config: baseConfig, migrationsDir: "/tmp/m" }),
-      ).rejects.toThrow("Connection refused");
+      await expect(migrateDown({ config: baseConfig, migrationsDir: "/tmp/m" })).rejects.toThrow("Connection refused");
     });
 
     it("propagates runner.initialize() failure and still closes datasource", async () => {
       const ds = createMockDataSource();
       const runner = createMockRunner();
-      vi.mocked(runner.initialize).mockRejectedValue(
-        new Error("Permission denied on tracking table"),
-      );
+      vi.mocked(runner.initialize).mockRejectedValue(new Error("Permission denied on tracking table"));
       vi.mocked(createAdapter).mockResolvedValue({ dataSource: ds, runner });
 
-      await expect(
-        migrateDown({ config: baseConfig, migrationsDir: "/tmp/m" }),
-      ).rejects.toThrow("Permission denied");
+      await expect(migrateDown({ config: baseConfig, migrationsDir: "/tmp/m" })).rejects.toThrow("Permission denied");
 
       expect(ds.close).toHaveBeenCalled();
     });
@@ -588,9 +554,7 @@ describe("migrateDown adversarial", () => {
       const ds = createMockDataSource();
       vi.mocked(ds.close).mockRejectedValue(new Error("close failed"));
       const runner = createMockRunner();
-      vi.mocked(runner.initialize).mockRejectedValue(
-        new Error("init failed"),
-      );
+      vi.mocked(runner.initialize).mockRejectedValue(new Error("init failed"));
       vi.mocked(createAdapter).mockResolvedValue({ dataSource: ds, runner });
 
       try {
@@ -606,10 +570,7 @@ describe("migrateDown adversarial", () => {
 
   describe("steps edge cases", () => {
     it("steps=0 effectively rolls back zero migrations", async () => {
-      const runner = createMockRunner([
-        "20260101120000",
-        "20260102120000",
-      ]);
+      const runner = createMockRunner(["20260101120000", "20260102120000"]);
       const ds = createMockDataSource();
       vi.mocked(createAdapter).mockResolvedValue({ dataSource: ds, runner });
       vi.mocked(loadMigrations).mockResolvedValue([
@@ -635,11 +596,7 @@ describe("migrateDown adversarial", () => {
     });
 
     it("negative steps are validated by migrateDown", async () => {
-      const runner = createMockRunner([
-        "20260101120000",
-        "20260102120000",
-        "20260103120000",
-      ]);
+      const runner = createMockRunner(["20260101120000", "20260102120000", "20260103120000"]);
       const ds = createMockDataSource();
       vi.mocked(createAdapter).mockResolvedValue({ dataSource: ds, runner });
       vi.mocked(loadMigrations).mockResolvedValue([
@@ -740,11 +697,7 @@ describe("migrateDown adversarial", () => {
     });
 
     it("fractional steps like 1.5 throw a validation error", async () => {
-      const runner = createMockRunner([
-        "20260101120000",
-        "20260102120000",
-        "20260103120000",
-      ]);
+      const runner = createMockRunner(["20260101120000", "20260102120000", "20260103120000"]);
       const ds = createMockDataSource();
       vi.mocked(createAdapter).mockResolvedValue({ dataSource: ds, runner });
       vi.mocked(loadMigrations).mockResolvedValue([
@@ -823,11 +776,7 @@ describe("migrateDown adversarial", () => {
     });
 
     it("--to '0' rolls back everything", async () => {
-      const runner = createMockRunner([
-        "20260101120000",
-        "20260102120000",
-        "20260103120000",
-      ]);
+      const runner = createMockRunner(["20260101120000", "20260102120000", "20260103120000"]);
       const ds = createMockDataSource();
       vi.mocked(createAdapter).mockResolvedValue({ dataSource: ds, runner });
       vi.mocked(loadMigrations).mockResolvedValue([
@@ -851,11 +800,7 @@ describe("migrateDown adversarial", () => {
         toVersion: "0",
       });
 
-      expect(result.rolledBack).toEqual([
-        "20260103120000",
-        "20260102120000",
-        "20260101120000",
-      ]);
+      expect(result.rolledBack).toEqual(["20260103120000", "20260102120000", "20260101120000"]);
       expect(runner.rollbackTo).toHaveBeenCalledWith(expect.any(Array), "");
     });
 
@@ -999,9 +944,7 @@ describe("migrateDown adversarial", () => {
     it("propagates rollback() failure and closes datasource", async () => {
       const runner = createMockRunner(["20260101120000"]);
       const ds = createMockDataSource();
-      vi.mocked(runner.rollback).mockRejectedValue(
-        new Error("Rollback SQL error"),
-      );
+      vi.mocked(runner.rollback).mockRejectedValue(new Error("Rollback SQL error"));
       vi.mocked(createAdapter).mockResolvedValue({ dataSource: ds, runner });
       vi.mocked(loadMigrations).mockResolvedValue([
         {
@@ -1010,22 +953,15 @@ describe("migrateDown adversarial", () => {
         },
       ]);
 
-      await expect(
-        migrateDown({ config: baseConfig, migrationsDir: "/tmp/m" }),
-      ).rejects.toThrow("Rollback SQL error");
+      await expect(migrateDown({ config: baseConfig, migrationsDir: "/tmp/m" })).rejects.toThrow("Rollback SQL error");
 
       expect(ds.close).toHaveBeenCalled();
     });
 
     it("propagates rollbackTo() failure and closes datasource", async () => {
-      const runner = createMockRunner([
-        "20260101120000",
-        "20260102120000",
-      ]);
+      const runner = createMockRunner(["20260101120000", "20260102120000"]);
       const ds = createMockDataSource();
-      vi.mocked(runner.rollbackTo).mockRejectedValue(
-        new Error("Rollback to version failed"),
-      );
+      vi.mocked(runner.rollbackTo).mockRejectedValue(new Error("Rollback to version failed"));
       vi.mocked(createAdapter).mockResolvedValue({ dataSource: ds, runner });
       vi.mocked(loadMigrations).mockResolvedValue([
         {
@@ -1052,15 +988,13 @@ describe("migrateDown adversarial", () => {
     it("propagates getAppliedMigrations() failure", async () => {
       const runner = createMockRunner();
       const ds = createMockDataSource();
-      vi.mocked(runner.getAppliedMigrations).mockRejectedValue(
-        new Error("Table does not exist"),
-      );
+      vi.mocked(runner.getAppliedMigrations).mockRejectedValue(new Error("Table does not exist"));
       vi.mocked(createAdapter).mockResolvedValue({ dataSource: ds, runner });
       vi.mocked(loadMigrations).mockResolvedValue([]);
 
-      await expect(
-        migrateDown({ config: baseConfig, migrationsDir: "/tmp/m" }),
-      ).rejects.toThrow("Table does not exist");
+      await expect(migrateDown({ config: baseConfig, migrationsDir: "/tmp/m" })).rejects.toThrow(
+        "Table does not exist",
+      );
 
       expect(ds.close).toHaveBeenCalled();
     });
@@ -1068,9 +1002,7 @@ describe("migrateDown adversarial", () => {
     it("propagates getCurrentVersion() failure after rollback", async () => {
       const runner = createMockRunner(["20260101120000"]);
       const ds = createMockDataSource();
-      vi.mocked(runner.getCurrentVersion).mockRejectedValue(
-        new Error("Connection dropped mid-rollback"),
-      );
+      vi.mocked(runner.getCurrentVersion).mockRejectedValue(new Error("Connection dropped mid-rollback"));
       vi.mocked(createAdapter).mockResolvedValue({ dataSource: ds, runner });
       vi.mocked(loadMigrations).mockResolvedValue([
         {
@@ -1079,9 +1011,9 @@ describe("migrateDown adversarial", () => {
         },
       ]);
 
-      await expect(
-        migrateDown({ config: baseConfig, migrationsDir: "/tmp/m" }),
-      ).rejects.toThrow("Connection dropped mid-rollback");
+      await expect(migrateDown({ config: baseConfig, migrationsDir: "/tmp/m" })).rejects.toThrow(
+        "Connection dropped mid-rollback",
+      );
 
       expect(runner.rollback).toHaveBeenCalled();
       expect(ds.close).toHaveBeenCalled();
@@ -1092,11 +1024,7 @@ describe("migrateDown adversarial", () => {
 
   describe("conflicting options", () => {
     it("--to takes precedence over steps (steps is ignored when toVersion set)", async () => {
-      const runner = createMockRunner([
-        "20260101120000",
-        "20260102120000",
-        "20260103120000",
-      ]);
+      const runner = createMockRunner(["20260101120000", "20260102120000", "20260103120000"]);
       const ds = createMockDataSource();
       vi.mocked(createAdapter).mockResolvedValue({ dataSource: ds, runner });
       vi.mocked(loadMigrations).mockResolvedValue([
@@ -1185,9 +1113,7 @@ describe("migrateDown adversarial", () => {
 
   describe("scale stress tests", () => {
     it("handles rolling back from 500 applied migrations", async () => {
-      const versions = Array.from({ length: 500 }, (_, i) =>
-        String(20260101120000 + i),
-      );
+      const versions = Array.from({ length: 500 }, (_, i) => String(20260101120000 + i));
       const runner = createMockRunner(versions);
       const ds = createMockDataSource();
       vi.mocked(createAdapter).mockResolvedValue({ dataSource: ds, runner });
@@ -1420,10 +1346,7 @@ describe("cross-cutting concerns", () => {
       expect(upResult.applied.length).toBe(2);
 
       // Now roll back
-      const runnerDown = createMockRunner([
-        "20260101120000",
-        "20260102120000",
-      ]);
+      const runnerDown = createMockRunner(["20260101120000", "20260102120000"]);
       const dsDown = createMockDataSource();
       vi.mocked(createAdapter).mockResolvedValue({
         dataSource: dsDown,

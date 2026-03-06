@@ -4,10 +4,11 @@
  * #59: EXPLAIN ANALYZE blocks destructive queries
  * #51: TenantSchemaHealthCheck does not expose raw schema names
  */
-import { describe, it, expect, vi } from "vitest";
+
+import type { Connection, DataSource } from "espalier-jdbc";
+import { describe, expect, it, vi } from "vitest";
 import { PgQueryPlanAnalyzer } from "../pg-query-plan.js";
 import { TenantSchemaHealthCheck } from "../pg-replica-health.js";
-import type { Connection, DataSource, Statement, ResultSet, PreparedStatement } from "espalier-jdbc";
 
 // ══════════════════════════════════════════════════
 // Mock factories
@@ -40,12 +41,12 @@ function mockConnection(): Connection {
 function mockDataSourceWithSchemas(schemaNames: string[]): DataSource {
   const rs = {
     _idx: -1,
-    _rows: schemaNames.map(s => ({ schema_name: s })),
-    next: vi.fn().mockImplementation(async function(this: any) {
+    _rows: schemaNames.map((s) => ({ schema_name: s })),
+    next: vi.fn().mockImplementation(async function (this: any) {
       this._idx++;
       return this._idx < this._rows.length;
     }),
-    getRow: vi.fn().mockImplementation(function(this: any) {
+    getRow: vi.fn().mockImplementation(function (this: any) {
       return this._rows[this._idx];
     }),
     close: vi.fn(),
@@ -72,9 +73,9 @@ describe("#59: EXPLAIN ANALYZE blocks destructive queries", () => {
   const conn = mockConnection();
 
   it("blocks DELETE with ANALYZE", async () => {
-    await expect(
-      analyzer.explain(conn, "DELETE FROM users WHERE id = 1", [], { analyze: true }),
-    ).rejects.toThrow(/SELECT|WITH|side effect/i);
+    await expect(analyzer.explain(conn, "DELETE FROM users WHERE id = 1", [], { analyze: true })).rejects.toThrow(
+      /SELECT|WITH|side effect/i,
+    );
   });
 
   it("blocks INSERT with ANALYZE", async () => {
@@ -84,27 +85,27 @@ describe("#59: EXPLAIN ANALYZE blocks destructive queries", () => {
   });
 
   it("blocks UPDATE with ANALYZE", async () => {
-    await expect(
-      analyzer.explain(conn, "UPDATE users SET active = false", [], { analyze: true }),
-    ).rejects.toThrow(/SELECT|WITH|side effect/i);
+    await expect(analyzer.explain(conn, "UPDATE users SET active = false", [], { analyze: true })).rejects.toThrow(
+      /SELECT|WITH|side effect/i,
+    );
   });
 
   it("blocks TRUNCATE with ANALYZE", async () => {
-    await expect(
-      analyzer.explain(conn, "TRUNCATE users", [], { analyze: true }),
-    ).rejects.toThrow(/SELECT|WITH|side effect/i);
+    await expect(analyzer.explain(conn, "TRUNCATE users", [], { analyze: true })).rejects.toThrow(
+      /SELECT|WITH|side effect/i,
+    );
   });
 
   it("blocks DROP TABLE with ANALYZE", async () => {
-    await expect(
-      analyzer.explain(conn, "DROP TABLE users", [], { analyze: true }),
-    ).rejects.toThrow(/SELECT|WITH|side effect/i);
+    await expect(analyzer.explain(conn, "DROP TABLE users", [], { analyze: true })).rejects.toThrow(
+      /SELECT|WITH|side effect/i,
+    );
   });
 
   it("blocks CREATE TABLE with ANALYZE", async () => {
-    await expect(
-      analyzer.explain(conn, "CREATE TABLE evil (id int)", [], { analyze: true }),
-    ).rejects.toThrow(/SELECT|WITH|side effect/i);
+    await expect(analyzer.explain(conn, "CREATE TABLE evil (id int)", [], { analyze: true })).rejects.toThrow(
+      /SELECT|WITH|side effect/i,
+    );
   });
 
   it("blocks ALTER TABLE with ANALYZE", async () => {
@@ -117,34 +118,34 @@ describe("#59: EXPLAIN ANALYZE blocks destructive queries", () => {
     // EXPLAIN without ANALYZE does NOT execute the query — just plans it
     // Should NOT throw — the guard only applies when analyze: true
     // Will fail at parsing level since mock returns no data, but should not throw the guard error
-    await expect(
-      analyzer.explain(conn, "DELETE FROM users WHERE id = 1"),
-    ).rejects.toThrow("Failed to parse EXPLAIN output");
+    await expect(analyzer.explain(conn, "DELETE FROM users WHERE id = 1")).rejects.toThrow(
+      "Failed to parse EXPLAIN output",
+    );
   });
 
   it("allows SELECT with ANALYZE", async () => {
     // Should not throw the guard error — will fail at parsing since mock returns no data
-    await expect(
-      analyzer.explain(conn, "SELECT * FROM users", [], { analyze: true }),
-    ).rejects.toThrow("Failed to parse EXPLAIN output");
+    await expect(analyzer.explain(conn, "SELECT * FROM users", [], { analyze: true })).rejects.toThrow(
+      "Failed to parse EXPLAIN output",
+    );
   });
 
   it("allows WITH (CTE) with ANALYZE", async () => {
-    await expect(
-      analyzer.explain(conn, "WITH x AS (SELECT 1) SELECT * FROM x", [], { analyze: true }),
-    ).rejects.toThrow("Failed to parse EXPLAIN output");
+    await expect(analyzer.explain(conn, "WITH x AS (SELECT 1) SELECT * FROM x", [], { analyze: true })).rejects.toThrow(
+      "Failed to parse EXPLAIN output",
+    );
   });
 
   it("case-insensitive: blocks delete (lowercase) with ANALYZE", async () => {
-    await expect(
-      analyzer.explain(conn, "delete from users", [], { analyze: true }),
-    ).rejects.toThrow(/SELECT|WITH|side effect/i);
+    await expect(analyzer.explain(conn, "delete from users", [], { analyze: true })).rejects.toThrow(
+      /SELECT|WITH|side effect/i,
+    );
   });
 
   it("leading whitespace: blocks spaced DELETE with ANALYZE", async () => {
-    await expect(
-      analyzer.explain(conn, "   DELETE FROM users", [], { analyze: true }),
-    ).rejects.toThrow(/SELECT|WITH|side effect/i);
+    await expect(analyzer.explain(conn, "   DELETE FROM users", [], { analyze: true })).rejects.toThrow(
+      /SELECT|WITH|side effect/i,
+    );
   });
 
   it("leading newline: blocks newline-prefixed INSERT with ANALYZE", async () => {
@@ -186,12 +187,7 @@ describe("#51: TenantSchemaHealthCheck does not expose raw schema names", () => 
 
   it("DEGRADED when some schemas missing, no names leaked", async () => {
     const ds = mockDataSourceWithSchemas(["tenant_a"]);
-    const check = new TenantSchemaHealthCheck(
-      "schemas",
-      ds,
-      ["a", "b"],
-      (id) => `tenant_${id}`,
-    );
+    const check = new TenantSchemaHealthCheck("schemas", ds, ["a", "b"], (id) => `tenant_${id}`);
 
     const result = await check.check();
     expect(result.status).toBe("DEGRADED");
@@ -205,11 +201,7 @@ describe("#51: TenantSchemaHealthCheck does not expose raw schema names", () => 
 
   it("DOWN when all schemas missing, no names leaked", async () => {
     const ds = mockDataSourceWithSchemas(["public", "pg_catalog"]);
-    const check = new TenantSchemaHealthCheck(
-      "schemas",
-      ds,
-      ["secret_tenant_1", "secret_tenant_2"],
-    );
+    const check = new TenantSchemaHealthCheck("schemas", ds, ["secret_tenant_1", "secret_tenant_2"]);
 
     const result = await check.check();
     expect(result.status).toBe("DOWN");
@@ -248,11 +240,7 @@ describe("#51: TenantSchemaHealthCheck does not expose raw schema names", () => 
       close: vi.fn(),
     } as unknown as DataSource;
 
-    const check = new TenantSchemaHealthCheck(
-      "schemas",
-      ds,
-      ["secret_schema"],
-    );
+    const check = new TenantSchemaHealthCheck("schemas", ds, ["secret_schema"]);
 
     const result = await check.check();
     expect(result.status).toBe("DOWN");

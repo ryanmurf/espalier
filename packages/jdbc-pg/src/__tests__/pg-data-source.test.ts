@@ -1,6 +1,6 @@
-import { describe, it, expect, vi } from "vitest";
-import { PgConnection } from "../pg-connection.js";
 import { ConnectionError } from "espalier-jdbc";
+import { describe, expect, it, vi } from "vitest";
+import { PgConnection } from "../pg-connection.js";
 
 // Mock the pg module
 vi.mock("pg", () => {
@@ -22,9 +22,7 @@ import { PgDataSource } from "../pg-data-source.js";
 
 function getMockPool() {
   // Get the most recently created mock pool instance
-  const instance = (Pool as unknown as ReturnType<typeof vi.fn>).mock.results.at(
-    -1,
-  )?.value;
+  const instance = (Pool as unknown as ReturnType<typeof vi.fn>).mock.results.at(-1)?.value;
   return instance as { connect: ReturnType<typeof vi.fn>; end: ReturnType<typeof vi.fn> };
 }
 
@@ -47,9 +45,7 @@ describe("PgDataSource", () => {
       pool.connect.mockRejectedValue(new Error("connection refused"));
 
       await expect(ds.getConnection()).rejects.toThrow(ConnectionError);
-      await expect(ds.getConnection()).rejects.toThrow(
-        /Failed to get connection/,
-      );
+      await expect(ds.getConnection()).rejects.toThrow(/Failed to get connection/);
     });
   });
 

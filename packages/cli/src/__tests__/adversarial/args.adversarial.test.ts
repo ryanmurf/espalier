@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { parseArgs, printUsage } from "../../args.js";
 
 describe("parseArgs adversarial", () => {
@@ -218,11 +218,11 @@ describe("parseArgs adversarial", () => {
 
   describe("prototype pollution attempts", () => {
     it("does not pollute Object.prototype via __proto__ flag", () => {
-      const originalToString = ({}).toString;
-      const result = parseArgs(["node", "espalier", "--__proto__", "polluted"]);
+      const originalToString = {}.toString;
+      const _result = parseArgs(["node", "espalier", "--__proto__", "polluted"]);
       // The flag gets set on the flags object, but should not affect Object.prototype
       expect(({} as any).polluted).toBeUndefined();
-      expect(({}).toString).toBe(originalToString);
+      expect({}.toString).toBe(originalToString);
     });
 
     it("handles constructor flag name", () => {

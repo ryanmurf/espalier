@@ -1,14 +1,14 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { Table } from "espalier-data";
+import { describe, expect, it, vi } from "vitest";
+import { generateRealtimeDdl } from "../../ddl.js";
 import { ChangeNotificationListener } from "../../notifications/change-notification-listener.js";
 import { EntityChangeCapture } from "../../notifications/entity-change-capture.js";
 import { PollingChangeDetector } from "../../notifications/polling-change-detector.js";
-import { ChangeStream } from "../../streams/change-stream.js";
-import { SseEndpointGenerator } from "../../sse/sse-endpoint-generator.js";
-import { generateRealtimeDdl } from "../../ddl.js";
 import type { ChangeNotification } from "../../notifications/types.js";
-import type { ChangeEvent, OperationType } from "../../streams/types.js";
+import { SseEndpointGenerator } from "../../sse/sse-endpoint-generator.js";
 import type { SseRequest, SseResponse } from "../../sse/types.js";
-import { Table } from "espalier-data";
+import { ChangeStream } from "../../streams/change-stream.js";
+import type { ChangeEvent, OperationType } from "../../streams/types.js";
 
 // --- Test entity classes ---
 
@@ -98,9 +98,7 @@ function createMockRequest(headers: Record<string, string | string[] | undefined
   return { headers };
 }
 
-async function* makeNotificationSource(
-  notifications: ChangeNotification[],
-): AsyncIterable<ChangeNotification> {
+async function* makeNotificationSource(notifications: ChangeNotification[]): AsyncIterable<ChangeNotification> {
   for (const n of notifications) {
     yield n;
   }
@@ -308,15 +306,11 @@ describe("EntityChangeCapture — adversarial", () => {
   });
 
   it("should throw for entity without @Table", () => {
-    expect(() => capture.generateTriggerDdl(UndecoredEntity, "ch")).toThrow(
-      /does not have a @Table decorator/,
-    );
+    expect(() => capture.generateTriggerDdl(UndecoredEntity, "ch")).toThrow(/does not have a @Table decorator/);
   });
 
   it("should reject SQL injection in channel: semicolon DROP TABLE", () => {
-    expect(() => capture.generateTriggerDdl(User, "users; DROP TABLE users")).toThrow(
-      /Invalid channel name/,
-    );
+    expect(() => capture.generateTriggerDdl(User, "users; DROP TABLE users")).toThrow(/Invalid channel name/);
   });
 
   it("should reject channel with single quotes", () => {
@@ -340,9 +334,7 @@ describe("EntityChangeCapture — adversarial", () => {
   });
 
   it("should reject channel with newlines", () => {
-    expect(() => capture.generateTriggerDdl(User, "test\nchannel")).toThrow(
-      /Invalid channel name/,
-    );
+    expect(() => capture.generateTriggerDdl(User, "test\nchannel")).toThrow(/Invalid channel name/);
   });
 
   it("should reject channel with unicode characters", () => {
@@ -767,22 +759,17 @@ describe("ChangeStream — adversarial", () => {
   });
 
   it("should support custom parse function", async () => {
-    const notifications: ChangeNotification[] = [
-      { channel: "ch", payload: "CUSTOM:42:Alice", timestamp: new Date() },
-    ];
+    const notifications: ChangeNotification[] = [{ channel: "ch", payload: "CUSTOM:42:Alice", timestamp: new Date() }];
 
     const customParse = (payload: string) => {
       const parts = payload.split(":");
       return {
         operation: "INSERT" as OperationType,
-        entity: { id: parseInt(parts[1]), name: parts[2] },
+        entity: { id: parseInt(parts[1], 10), name: parts[2] },
       };
     };
 
-    const stream = new ChangeStream<{ id: number; name: string }>(
-      makeNotificationSource(notifications),
-      customParse,
-    );
+    const stream = new ChangeStream<{ id: number; name: string }>(makeNotificationSource(notifications), customParse);
     const events: ChangeEvent<{ id: number; name: string }>[] = [];
     for await (const event of stream.watch()) {
       events.push(event);
@@ -863,9 +850,7 @@ describe("SseEndpointGenerator — adversarial", () => {
   });
 
   it("should support custom event type", async () => {
-    const events: ChangeEvent<{ id: number }>[] = [
-      { operation: "INSERT", entity: { id: 1 }, timestamp: new Date() },
-    ];
+    const events: ChangeEvent<{ id: number }>[] = [{ operation: "INSERT", entity: { id: 1 }, timestamp: new Date() }];
 
     const handler = generator.generateHandler(makeEventSource(events), {
       eventType: "entity-change",
@@ -932,9 +917,7 @@ describe("SseEndpointGenerator — adversarial", () => {
   });
 
   it("should respect Last-Event-ID header for event counter", async () => {
-    const events: ChangeEvent<{ id: number }>[] = [
-      { operation: "INSERT", entity: { id: 1 }, timestamp: new Date() },
-    ];
+    const events: ChangeEvent<{ id: number }>[] = [{ operation: "INSERT", entity: { id: 1 }, timestamp: new Date() }];
 
     const handler = generator.generateHandler(makeEventSource(events));
     const req = createMockRequest({ "last-event-id": "10" });
@@ -948,9 +931,7 @@ describe("SseEndpointGenerator — adversarial", () => {
   });
 
   it("should handle Last-Event-ID as array", async () => {
-    const events: ChangeEvent<{ id: number }>[] = [
-      { operation: "INSERT", entity: { id: 1 }, timestamp: new Date() },
-    ];
+    const events: ChangeEvent<{ id: number }>[] = [{ operation: "INSERT", entity: { id: 1 }, timestamp: new Date() }];
 
     const handler = generator.generateHandler(makeEventSource(events));
     const req = createMockRequest({ "last-event-id": ["5", "ignored"] as any });
@@ -986,9 +967,7 @@ describe("SseEndpointGenerator — adversarial", () => {
   });
 
   it("generateFastifyPlugin handler calls hijack on reply", async () => {
-    const events: ChangeEvent<{ id: number }>[] = [
-      { operation: "INSERT", entity: { id: 1 }, timestamp: new Date() },
-    ];
+    const events: ChangeEvent<{ id: number }>[] = [{ operation: "INSERT", entity: { id: 1 }, timestamp: new Date() }];
 
     const plugin = generator.generateFastifyPlugin(makeEventSource(events));
     const mockRaw = createMockResponse();
@@ -997,10 +976,7 @@ describe("SseEndpointGenerator — adversarial", () => {
       hijack: vi.fn(),
     };
 
-    plugin.handler(
-      { headers: {} } as any,
-      mockReply as any,
-    );
+    plugin.handler({ headers: {} } as any, mockReply as any);
 
     expect(mockReply.hijack).toHaveBeenCalled();
     await new Promise((r) => setTimeout(r, 100));
@@ -1008,9 +984,7 @@ describe("SseEndpointGenerator — adversarial", () => {
   });
 
   it("generateHonoHandler returns Response with SSE headers", () => {
-    const events: ChangeEvent<{ id: number }>[] = [
-      { operation: "INSERT", entity: { id: 1 }, timestamp: new Date() },
-    ];
+    const events: ChangeEvent<{ id: number }>[] = [{ operation: "INSERT", entity: { id: 1 }, timestamp: new Date() }];
 
     const handler = generator.generateHonoHandler(makeEventSource(events));
     const ctx = { req: { header: () => undefined } };
@@ -1022,9 +996,7 @@ describe("SseEndpointGenerator — adversarial", () => {
   });
 
   it("Hono handler should respect Last-Event-ID", async () => {
-    const events: ChangeEvent<{ id: number }>[] = [
-      { operation: "INSERT", entity: { id: 1 }, timestamp: new Date() },
-    ];
+    const events: ChangeEvent<{ id: number }>[] = [{ operation: "INSERT", entity: { id: 1 }, timestamp: new Date() }];
 
     const handler = generator.generateHonoHandler(makeEventSource(events));
     const ctx = {
@@ -1080,9 +1052,7 @@ describe("generateRealtimeDdl — adversarial", () => {
   });
 
   it("should throw for entity without @Table", () => {
-    expect(() => generateRealtimeDdl([UndecoredEntity])).toThrow(
-      /does not have a @Table decorator/,
-    );
+    expect(() => generateRealtimeDdl([UndecoredEntity])).toThrow(/does not have a @Table decorator/);
   });
 
   it("DDL identifiers should all be properly quoted", () => {

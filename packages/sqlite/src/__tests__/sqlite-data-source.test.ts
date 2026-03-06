@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from "vitest";
 import { ConnectionError, DatabaseErrorCode } from "espalier-jdbc";
+import { describe, expect, it, vi } from "vitest";
 
 vi.mock("better-sqlite3", () => {
   return {
@@ -13,8 +13,8 @@ vi.mock("better-sqlite3", () => {
 });
 
 import Database from "better-sqlite3";
-import { SqliteDataSource } from "../sqlite-data-source.js";
 import { SqliteConnection } from "../sqlite-connection.js";
+import { SqliteDataSource } from "../sqlite-data-source.js";
 
 describe("SqliteDataSource", () => {
   describe("constructor", () => {
@@ -25,9 +25,8 @@ describe("SqliteDataSource", () => {
     });
 
     it("enables WAL mode and foreign keys", () => {
-      const ds = new SqliteDataSource({ filename: ":memory:" });
-      const instance = (Database as unknown as ReturnType<typeof vi.fn>).mock
-        .results.at(-1)?.value;
+      const _ds = new SqliteDataSource({ filename: ":memory:" });
+      const instance = (Database as unknown as ReturnType<typeof vi.fn>).mock.results.at(-1)?.value;
       expect(instance.pragma).toHaveBeenCalledWith("journal_mode = WAL");
       expect(instance.pragma).toHaveBeenCalledWith("foreign_keys = ON");
     });
@@ -41,14 +40,10 @@ describe("SqliteDataSource", () => {
     });
 
     it("wraps constructor errors in ConnectionError", () => {
-      (Database as unknown as ReturnType<typeof vi.fn>).mockImplementationOnce(
-        () => {
-          throw new Error("cannot open");
-        },
-      );
-      expect(
-        () => new SqliteDataSource({ filename: "/invalid/path/db.sqlite" }),
-      ).toThrow(ConnectionError);
+      (Database as unknown as ReturnType<typeof vi.fn>).mockImplementationOnce(() => {
+        throw new Error("cannot open");
+      });
+      expect(() => new SqliteDataSource({ filename: "/invalid/path/db.sqlite" })).toThrow(ConnectionError);
     });
   });
 
@@ -76,9 +71,7 @@ describe("SqliteDataSource", () => {
         expect.unreachable("should have thrown");
       } catch (err) {
         expect(err).toBeInstanceOf(ConnectionError);
-        expect((err as ConnectionError).code).toBe(
-          DatabaseErrorCode.CONNECTION_CLOSED,
-        );
+        expect((err as ConnectionError).code).toBe(DatabaseErrorCode.CONNECTION_CLOSED);
       }
     });
   });
@@ -86,16 +79,14 @@ describe("SqliteDataSource", () => {
   describe("close()", () => {
     it("closes the underlying database", async () => {
       const ds = new SqliteDataSource({ filename: ":memory:" });
-      const instance = (Database as unknown as ReturnType<typeof vi.fn>).mock
-        .results.at(-1)?.value;
+      const instance = (Database as unknown as ReturnType<typeof vi.fn>).mock.results.at(-1)?.value;
       await ds.close();
       expect(instance.close).toHaveBeenCalledOnce();
     });
 
     it("double close is safe", async () => {
       const ds = new SqliteDataSource({ filename: ":memory:" });
-      const instance = (Database as unknown as ReturnType<typeof vi.fn>).mock
-        .results.at(-1)?.value;
+      const instance = (Database as unknown as ReturnType<typeof vi.fn>).mock.results.at(-1)?.value;
       await ds.close();
       await ds.close();
       expect(instance.close).toHaveBeenCalledOnce();

@@ -1,11 +1,11 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import type { Connection, PreparedStatement } from "espalier-jdbc";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { PreparedStatementPoolConfig } from "../../query/prepared-statement-pool.js";
 import {
-  PreparedStatementPool,
   getGlobalPreparedStatementPool,
+  PreparedStatementPool,
   setGlobalPreparedStatementPool,
 } from "../../query/prepared-statement-pool.js";
-import type { PreparedStatementPoolConfig } from "../../query/prepared-statement-pool.js";
-import type { Connection, PreparedStatement, ResultSet } from "espalier-jdbc";
 
 // ==========================================================================
 // Mock helpers
@@ -167,14 +167,12 @@ describe("PreparedStatementPool — LRU eviction", () => {
     const s2 = pool.acquire(conn, "SQL-2");
     expect((s1 as any).close).toHaveBeenCalled();
 
-    const s3 = pool.acquire(conn, "SQL-3");
+    const _s3 = pool.acquire(conn, "SQL-3");
     expect((s2 as any).close).toHaveBeenCalled();
   });
 
   it("max=0 — throws validation error", () => {
-    expect(() => makePool({ maxStatementsPerConnection: 0 })).toThrow(
-      "maxStatementsPerConnection must be >= 1",
-    );
+    expect(() => makePool({ maxStatementsPerConnection: 0 })).toThrow("maxStatementsPerConnection must be >= 1");
   });
 
   it("evicted statement close() failure is swallowed", () => {
@@ -504,8 +502,8 @@ describe("PreparedStatementPool — LRU list integrity", () => {
     pool.acquire(conn, "E"); // evicts C
 
     // Only D and E should remain
-    const sD = pool.acquire(conn, "D");
-    const sE = pool.acquire(conn, "E");
+    const _sD = pool.acquire(conn, "D");
+    const _sE = pool.acquire(conn, "E");
     expect(conn.prepareStatement).toHaveBeenCalledTimes(5); // no new prep for D, E
 
     // F and G evict D and E

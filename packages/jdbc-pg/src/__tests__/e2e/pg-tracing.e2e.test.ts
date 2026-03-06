@@ -5,27 +5,27 @@
  * and edge cases like error recording, span lifecycle, sensitive data
  * in spans, and noop overhead.
  */
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
-import { createTestDataSource, isPostgresAvailable } from "./setup.js";
+
+import type {
+  Span,
+  SpanAttributeValue,
+  SpanEvent,
+  SpanOptions,
+  SpanStatus,
+  Tracer,
+  TracerProvider,
+} from "espalier-jdbc";
 import {
-  setGlobalTracerProvider,
-  getGlobalTracerProvider,
+  DbAttributes,
+  IsolationLevel,
   NoopTracerProvider,
   SpanKind,
   SpanStatusCode,
-  DbAttributes,
-  IsolationLevel,
+  setGlobalTracerProvider,
 } from "espalier-jdbc";
-import type {
-  Span,
-  Tracer,
-  TracerProvider,
-  SpanEvent,
-  SpanAttributeValue,
-  SpanStatus,
-  SpanOptions,
-} from "espalier-jdbc";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { PgDataSource } from "../../pg-data-source.js";
+import { createTestDataSource, isPostgresAvailable } from "./setup.js";
 
 const canConnect = await isPostgresAvailable();
 
@@ -155,7 +155,7 @@ describe.skipIf(!canConnect)("E2E: Database Tracing Instrumentation", { timeout:
         await conn.close();
       }
 
-      const querySpans = provider.getSpans().filter(s => s.spanName === "db.query");
+      const querySpans = provider.getSpans().filter((s) => s.spanName === "db.query");
       expect(querySpans.length).toBeGreaterThanOrEqual(1);
 
       const span = querySpans[querySpans.length - 1];
@@ -176,10 +176,8 @@ describe.skipIf(!canConnect)("E2E: Database Tracing Instrumentation", { timeout:
         await conn.close();
       }
 
-      const querySpans = provider.getSpans().filter(s => s.spanName === "db.query");
-      const insertSpan = querySpans.find(s =>
-        (s.attributes[DbAttributes.OPERATION] as string) === "INSERT"
-      );
+      const querySpans = provider.getSpans().filter((s) => s.spanName === "db.query");
+      const insertSpan = querySpans.find((s) => (s.attributes[DbAttributes.OPERATION] as string) === "INSERT");
       expect(insertSpan).toBeDefined();
       expect(insertSpan!.attributes[DbAttributes.ROWS_AFFECTED]).toBe(1);
       expect(insertSpan!.status.code).toBe(SpanStatusCode.OK);
@@ -198,13 +196,13 @@ describe.skipIf(!canConnect)("E2E: Database Tracing Instrumentation", { timeout:
         await conn.close();
       }
 
-      const querySpans = provider.getSpans().filter(s => s.spanName === "db.query");
-      const errorSpan = querySpans.find(s => s.status.code === SpanStatusCode.ERROR);
+      const querySpans = provider.getSpans().filter((s) => s.spanName === "db.query");
+      const errorSpan = querySpans.find((s) => s.status.code === SpanStatusCode.ERROR);
       expect(errorSpan).toBeDefined();
       expect(errorSpan!.ended).toBe(true);
 
       // Should have an exception event
-      const exceptionEvent = errorSpan!.events.find(e => e.name === "exception");
+      const exceptionEvent = errorSpan!.events.find((e) => e.name === "exception");
       expect(exceptionEvent).toBeDefined();
       expect(exceptionEvent!.attributes!["exception.type"]).toBeDefined();
       expect(exceptionEvent!.attributes!["exception.message"]).toBeDefined();
@@ -221,10 +219,8 @@ describe.skipIf(!canConnect)("E2E: Database Tracing Instrumentation", { timeout:
         await conn.close();
       }
 
-      const querySpans = provider.getSpans().filter(s => s.spanName === "db.query");
-      const selectSpan = querySpans.find(s =>
-        String(s.attributes[DbAttributes.STATEMENT] ?? "").includes("$1")
-      );
+      const querySpans = provider.getSpans().filter((s) => s.spanName === "db.query");
+      const selectSpan = querySpans.find((s) => String(s.attributes[DbAttributes.STATEMENT] ?? "").includes("$1"));
       expect(selectSpan).toBeDefined();
       expect(selectSpan!.attributes[DbAttributes.OPERATION]).toBe("SELECT");
     });
@@ -240,9 +236,9 @@ describe.skipIf(!canConnect)("E2E: Database Tracing Instrumentation", { timeout:
         await conn.close();
       }
 
-      const querySpans = provider.getSpans().filter(s => s.spanName === "db.query");
-      const updateSpan = querySpans.find(s => s.attributes[DbAttributes.OPERATION] === "UPDATE");
-      const deleteSpan = querySpans.find(s => s.attributes[DbAttributes.OPERATION] === "DELETE");
+      const querySpans = provider.getSpans().filter((s) => s.spanName === "db.query");
+      const updateSpan = querySpans.find((s) => s.attributes[DbAttributes.OPERATION] === "UPDATE");
+      const deleteSpan = querySpans.find((s) => s.attributes[DbAttributes.OPERATION] === "DELETE");
       expect(updateSpan).toBeDefined();
       expect(deleteSpan).toBeDefined();
     });
@@ -257,7 +253,7 @@ describe.skipIf(!canConnect)("E2E: Database Tracing Instrumentation", { timeout:
       const conn = await ds.getConnection();
       await conn.close();
 
-      const acquireSpans = provider.getSpans().filter(s => s.spanName === "db.connection.acquire");
+      const acquireSpans = provider.getSpans().filter((s) => s.spanName === "db.connection.acquire");
       expect(acquireSpans.length).toBeGreaterThanOrEqual(1);
 
       const span = acquireSpans[0];
@@ -271,7 +267,7 @@ describe.skipIf(!canConnect)("E2E: Database Tracing Instrumentation", { timeout:
       const conn = await ds.getConnection();
       await conn.close();
 
-      const acquireSpans = provider.getSpans().filter(s => s.spanName === "db.connection.acquire");
+      const acquireSpans = provider.getSpans().filter((s) => s.spanName === "db.connection.acquire");
       const span = acquireSpans[0];
       expect(span.attributes["db.pool.total"]).toBeDefined();
       expect(span.attributes["db.pool.idle"]).toBeDefined();
@@ -293,7 +289,7 @@ describe.skipIf(!canConnect)("E2E: Database Tracing Instrumentation", { timeout:
         await conn.close();
       }
 
-      const txSpans = provider.getSpans().filter(s => s.spanName === "db.transaction");
+      const txSpans = provider.getSpans().filter((s) => s.spanName === "db.transaction");
       expect(txSpans.length).toBeGreaterThanOrEqual(1);
 
       const span = txSpans[0];
@@ -311,7 +307,7 @@ describe.skipIf(!canConnect)("E2E: Database Tracing Instrumentation", { timeout:
         await conn.close();
       }
 
-      const txSpan = provider.getSpans().find(s => s.spanName === "db.transaction");
+      const txSpan = provider.getSpans().find((s) => s.spanName === "db.transaction");
       expect(txSpan).toBeDefined();
       expect(txSpan!.attributes["db.transaction.outcome"]).toBe("commit");
       expect(txSpan!.status.code).toBe(SpanStatusCode.OK);
@@ -326,7 +322,7 @@ describe.skipIf(!canConnect)("E2E: Database Tracing Instrumentation", { timeout:
         await conn.close();
       }
 
-      const txSpan = provider.getSpans().find(s => s.spanName === "db.transaction");
+      const txSpan = provider.getSpans().find((s) => s.spanName === "db.transaction");
       expect(txSpan).toBeDefined();
       expect(txSpan!.attributes["db.transaction.outcome"]).toBe("rollback");
       expect(txSpan!.status.code).toBe(SpanStatusCode.OK);
@@ -341,7 +337,7 @@ describe.skipIf(!canConnect)("E2E: Database Tracing Instrumentation", { timeout:
         await conn.close();
       }
 
-      const txSpan = provider.getSpans().find(s => s.spanName === "db.transaction");
+      const txSpan = provider.getSpans().find((s) => s.spanName === "db.transaction");
       expect(txSpan).toBeDefined();
       expect(txSpan!.attributes["db.transaction.isolation"]).toBe(IsolationLevel.SERIALIZABLE);
     });
@@ -357,14 +353,14 @@ describe.skipIf(!canConnect)("E2E: Database Tracing Instrumentation", { timeout:
         await conn.close();
       }
 
-      const txSpan = provider.getSpans().find(s => s.spanName === "db.transaction");
+      const txSpan = provider.getSpans().find((s) => s.spanName === "db.transaction");
       expect(txSpan).toBeDefined();
 
-      const savepointEvent = txSpan!.events.find(e => e.name === "savepoint");
+      const savepointEvent = txSpan!.events.find((e) => e.name === "savepoint");
       expect(savepointEvent).toBeDefined();
       expect(savepointEvent!.attributes!["db.savepoint.name"]).toBe("sp1");
 
-      const rollbackEvent = txSpan!.events.find(e => e.name === "rollback_to_savepoint");
+      const rollbackEvent = txSpan!.events.find((e) => e.name === "rollback_to_savepoint");
       expect(rollbackEvent).toBeDefined();
       expect(rollbackEvent!.attributes!["db.savepoint.name"]).toBe("sp1");
     });
@@ -388,7 +384,7 @@ describe.skipIf(!canConnect)("E2E: Database Tracing Instrumentation", { timeout:
         await conn.close();
       }
 
-      const querySpans = provider.getSpans().filter(s => s.spanName === "db.query");
+      const querySpans = provider.getSpans().filter((s) => s.spanName === "db.query");
       const lastSpan = querySpans[querySpans.length - 1];
       const recorded = String(lastSpan?.attributes[DbAttributes.STATEMENT] ?? "");
       // Should be truncated
@@ -408,7 +404,7 @@ describe.skipIf(!canConnect)("E2E: Database Tracing Instrumentation", { timeout:
         await conn.close();
       }
 
-      const querySpans = provider.getSpans().filter(s => s.spanName === "db.query");
+      const querySpans = provider.getSpans().filter((s) => s.spanName === "db.query");
       const lastSpan = querySpans[querySpans.length - 1];
       const recorded = String(lastSpan?.attributes[DbAttributes.STATEMENT] ?? "");
       // Credentials should be redacted from the span
@@ -470,7 +466,7 @@ describe.skipIf(!canConnect)("E2E: Database Tracing Instrumentation", { timeout:
       }
 
       // All spans should be ended
-      for (const span of provider.getSpans().filter(s => s.spanName === "db.query")) {
+      for (const span of provider.getSpans().filter((s) => s.spanName === "db.query")) {
         expect(span.ended, `Span "${span.spanName}" was not ended`).toBe(true);
       }
     });
@@ -482,10 +478,7 @@ describe.skipIf(!canConnect)("E2E: Database Tracing Instrumentation", { timeout:
       const stmt2 = conn2.createStatement();
 
       try {
-        await Promise.all([
-          stmt1.executeQuery("SELECT 1"),
-          stmt2.executeQuery("SELECT 2"),
-        ]);
+        await Promise.all([stmt1.executeQuery("SELECT 1"), stmt2.executeQuery("SELECT 2")]);
       } finally {
         await stmt1.close();
         await stmt2.close();
@@ -493,7 +486,7 @@ describe.skipIf(!canConnect)("E2E: Database Tracing Instrumentation", { timeout:
         await conn2.close();
       }
 
-      const querySpans = provider.getSpans().filter(s => s.spanName === "db.query");
+      const querySpans = provider.getSpans().filter((s) => s.spanName === "db.query");
       // At least 2 query spans
       expect(querySpans.length).toBeGreaterThanOrEqual(2);
 
@@ -547,7 +540,7 @@ describe.skipIf(!canConnect)("E2E: Database Tracing Instrumentation", { timeout:
       }
 
       // Span should exist and be ended (even if error)
-      const querySpans = provider.getSpans().filter(s => s.spanName === "db.query");
+      const querySpans = provider.getSpans().filter((s) => s.spanName === "db.query");
       expect(querySpans.length).toBeGreaterThanOrEqual(1);
       expect(querySpans[querySpans.length - 1].ended).toBe(true);
     });

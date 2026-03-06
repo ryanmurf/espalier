@@ -1,11 +1,11 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
+import { getPaginationStrategy, Pagination } from "../../decorators/pagination.js";
+import { Table } from "../../decorators/table.js";
 import { OffsetPaginationStrategy } from "../../pagination/offset-strategy.js";
-import { PaginationStrategyRegistry, getGlobalPaginationRegistry } from "../../pagination/strategy-registry.js";
+import { getGlobalPaginationRegistry, PaginationStrategyRegistry } from "../../pagination/strategy-registry.js";
+import type { PaginationStrategy } from "../../pagination/types.js";
 import { SelectBuilder } from "../../query/query-builder.js";
 import { createPageable } from "../../repository/paging.js";
-import type { PaginationStrategy } from "../../pagination/types.js";
-import { Pagination, getPaginationStrategy } from "../../decorators/pagination.js";
-import { Table } from "../../decorators/table.js";
 
 describe("OffsetPaginationStrategy", () => {
   const strategy = new OffsetPaginationStrategy();
@@ -25,8 +25,8 @@ describe("OffsetPaginationStrategy", () => {
       expect(query.sql).toContain("LIMIT");
       expect(query.sql).toContain("OFFSET");
       // page 2, size 10 -> OFFSET 20
-      expect(query.params).toContain(10);  // LIMIT
-      expect(query.params).toContain(20);  // OFFSET
+      expect(query.params).toContain(10); // LIMIT
+      expect(query.params).toContain(20); // OFFSET
     });
 
     it("applies sort ordering", () => {
@@ -49,8 +49,8 @@ describe("OffsetPaginationStrategy", () => {
       strategy.applyToQuery(builder, pageable);
 
       const query = builder.build();
-      expect(query.params).toContain(5);   // LIMIT
-      expect(query.params).toContain(0);   // OFFSET 0
+      expect(query.params).toContain(5); // LIMIT
+      expect(query.params).toContain(0); // OFFSET 0
     });
   });
 
@@ -117,7 +117,9 @@ describe("PaginationStrategyRegistry", () => {
     const custom: PaginationStrategy = {
       name: "custom",
       applyToQuery() {},
-      buildResult(rows) { return rows; },
+      buildResult(rows) {
+        return rows;
+      },
     };
 
     registry.register(custom);
@@ -129,7 +131,9 @@ describe("PaginationStrategyRegistry", () => {
     const custom: PaginationStrategy = {
       name: "offset",
       applyToQuery() {},
-      buildResult() { return "custom"; },
+      buildResult() {
+        return "custom";
+      },
     };
 
     registry.register(custom);
@@ -149,7 +153,9 @@ describe("PaginationStrategyRegistry", () => {
     const custom: PaginationStrategy = {
       name: "custom",
       applyToQuery() {},
-      buildResult(rows) { return rows; },
+      buildResult(rows) {
+        return rows;
+      },
     };
     registry.register(custom);
 
@@ -185,18 +191,24 @@ describe("@Pagination decorator", () => {
   });
 
   it("returns undefined for undecorated class", () => {
-    class Plain { id = 0; }
+    class Plain {
+      id = 0;
+    }
     expect(getPaginationStrategy(Plain)).toBeUndefined();
   });
 
   it("supports different strategies per entity", () => {
     @Table("users")
     @Pagination("offset")
-    class User { id = 0; }
+    class User {
+      id = 0;
+    }
 
     @Table("posts")
     @Pagination("keyset")
-    class Post { id = 0; }
+    class Post {
+      id = 0;
+    }
 
     expect(getPaginationStrategy(User)).toBe("offset");
     expect(getPaginationStrategy(Post)).toBe("keyset");

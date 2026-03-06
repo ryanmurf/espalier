@@ -1,4 +1,4 @@
-import type { RouteDefinition, RestRequest } from "./handler.js";
+import type { RestRequest, RouteDefinition } from "./handler.js";
 
 /**
  * Minimal Express-compatible types to avoid hard dependency.
@@ -53,7 +53,7 @@ export function mountExpressRoutes(router: ExpressRouter, routes: RouteDefinitio
         } else {
           res.status(result.status).send();
         }
-      } catch (err) {
+      } catch (_err) {
         res.status(500).json({ error: "Internal Server Error" });
       }
     });

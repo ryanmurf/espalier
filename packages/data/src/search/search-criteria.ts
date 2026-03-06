@@ -1,4 +1,4 @@
-import { type SqlValue, quoteIdentifier } from "espalier-jdbc";
+import { quoteIdentifier, type SqlValue } from "espalier-jdbc";
 import type { Criteria, CriteriaType } from "../query/criteria.js";
 
 export type SearchMode = "plain" | "phrase" | "websearch";
@@ -13,7 +13,7 @@ function sanitizeLanguage(lang: string): string {
 
 /** Sanitize ts_headline tag options — only allow simple HTML-like tags. */
 function sanitizeTag(tag: string): string {
-  return tag.replace(/[^a-zA-Z0-9<>\/=" ]/g, "");
+  return tag.replace(/[^a-zA-Z0-9<>/=" ]/g, "");
 }
 
 const VALID_WEIGHTS = new Set(["A", "B", "C", "D"]);
@@ -69,9 +69,7 @@ export class FullTextSearchCriteria implements Criteria {
       return tsvec;
     });
 
-    const tsvectorExpr = tsvectorParts.length === 1
-      ? tsvectorParts[0]
-      : tsvectorParts.join(" || ");
+    const tsvectorExpr = tsvectorParts.length === 1 ? tsvectorParts[0] : tsvectorParts.join(" || ");
 
     return {
       sql: `(${tsvectorExpr}) @@ ${queryFn}('${lang}', $${paramOffset})`,
@@ -106,9 +104,7 @@ export class SearchRankExpression {
       return tsvec;
     });
 
-    const tsvectorExpr = tsvectorParts.length === 1
-      ? tsvectorParts[0]
-      : tsvectorParts.join(" || ");
+    const tsvectorExpr = tsvectorParts.length === 1 ? tsvectorParts[0] : tsvectorParts.join(" || ");
 
     return {
       sql: `ts_rank(${tsvectorExpr}, ${queryFn}('${lang}', $${paramOffset}))`,

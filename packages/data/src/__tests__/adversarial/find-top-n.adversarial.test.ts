@@ -1,12 +1,12 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { DataSource, Connection, PreparedStatement, ResultSet } from "espalier-jdbc";
-import { parseDerivedQueryMethod } from "../../query/derived-query-parser.js";
-import { buildDerivedQuery } from "../../query/derived-query-executor.js";
-import type { EntityMetadata } from "../../mapping/entity-metadata.js";
-import { Repository } from "../../decorators/repository.js";
-import { Table } from "../../decorators/table.js";
+import type { Connection, DataSource, PreparedStatement, ResultSet } from "espalier-jdbc";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Column } from "../../decorators/column.js";
 import { Id } from "../../decorators/id.js";
+import { Repository } from "../../decorators/repository.js";
+import { Table } from "../../decorators/table.js";
+import type { EntityMetadata } from "../../mapping/entity-metadata.js";
+import { buildDerivedQuery } from "../../query/derived-query-executor.js";
+import { parseDerivedQueryMethod } from "../../query/derived-query-parser.js";
 import { createAutoRepository } from "../../repository/auto-repository.js";
 import type { CrudRepository } from "../../repository/crud-repository.js";
 import { TestResultSet } from "../test-utils/test-result-set.js";
@@ -189,15 +189,11 @@ describe("findTopN / findFirstN adversarial tests", () => {
     });
 
     it("findFirstBy (no predicate after By) should throw", () => {
-      expect(() => parseDerivedQueryMethod("findFirstBy")).toThrow(
-        /no property predicates/,
-      );
+      expect(() => parseDerivedQueryMethod("findFirstBy")).toThrow(/no property predicates/);
     });
 
     it("findTopBy (no predicate after By) should throw", () => {
-      expect(() => parseDerivedQueryMethod("findTopBy")).toThrow(
-        /no property predicates/,
-      );
+      expect(() => parseDerivedQueryMethod("findTopBy")).toThrow(/no property predicates/);
     });
 
     it("findTop3 (no By keyword) should throw", () => {
@@ -564,9 +560,7 @@ describe("findTopN / findFirstN adversarial tests", () => {
 
   describe("return type boundary: limit=1 vs limit>1", () => {
     it("limit=1 returns single entity (not array) when row found", async () => {
-      const rs = new TestResultSet([
-        { id: 1, name: "A", status: "x", age: 20, email: "a@t.com", active: true },
-      ]);
+      const rs = new TestResultSet([{ id: 1, name: "A", status: "x", age: 20, email: "a@t.com", active: true }]);
       const stmt = createMockPreparedStatement(rs);
       const conn = createMockConnection(() => stmt);
       const ds = createMockDataSource(conn);
@@ -591,9 +585,7 @@ describe("findTopN / findFirstN adversarial tests", () => {
     });
 
     it("limit=2 returns array even when 1 row found", async () => {
-      const rs = new TestResultSet([
-        { id: 1, name: "A", status: "x", age: 20, email: "a@t.com", active: true },
-      ]);
+      const rs = new TestResultSet([{ id: 1, name: "A", status: "x", age: 20, email: "a@t.com", active: true }]);
       const stmt = createMockPreparedStatement(rs);
       const conn = createMockConnection(() => stmt);
       const ds = createMockDataSource(conn);
@@ -641,7 +633,14 @@ describe("findTopN / findFirstN adversarial tests", () => {
       const makeRs = () => {
         callCount++;
         return new TestResultSet([
-          { id: callCount, name: `U${callCount}`, status: "active", age: 20, email: `u${callCount}@t.com`, active: true },
+          {
+            id: callCount,
+            name: `U${callCount}`,
+            status: "active",
+            age: 20,
+            email: `u${callCount}@t.com`,
+            active: true,
+          },
         ]);
       };
       const conn = createMockConnection(() => createMockPreparedStatement(makeRs()));
@@ -658,9 +657,8 @@ describe("findTopN / findFirstN adversarial tests", () => {
     });
 
     it("findTopByName and findFirstByName are cached separately in descriptor cache but query cache unifies them", async () => {
-      const makeRs = () => new TestResultSet([
-        { id: 1, name: "A", status: "x", age: 20, email: "a@t.com", active: true },
-      ]);
+      const makeRs = () =>
+        new TestResultSet([{ id: 1, name: "A", status: "x", age: 20, email: "a@t.com", active: true }]);
       const conn = createMockConnection(() => createMockPreparedStatement(makeRs()));
       const ds = createMockDataSource(conn);
 
@@ -686,7 +684,14 @@ describe("findTopN / findFirstN adversarial tests", () => {
       const makeRs = () => {
         callCount++;
         return new TestResultSet([
-          { id: callCount, name: callCount === 1 ? "A" : "B", status: "x", age: 20, email: `u${callCount}@t.com`, active: true },
+          {
+            id: callCount,
+            name: callCount === 1 ? "A" : "B",
+            status: "x",
+            age: 20,
+            email: `u${callCount}@t.com`,
+            active: true,
+          },
         ]);
       };
       const conn = createMockConnection(() => createMockPreparedStatement(makeRs()));

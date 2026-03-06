@@ -1,6 +1,6 @@
 import type { MigrationRecord } from "espalier-data";
-import type { EspalierConfig } from "./config.js";
 import { createAdapter } from "./adapter-factory.js";
+import type { EspalierConfig } from "./config.js";
 import { loadMigrations } from "./migrate-loader.js";
 
 export interface MigrationStatusEntry {
@@ -153,7 +153,9 @@ export function formatStatusTable(result: MigrateStatusResult): string {
   // Orphaned record warnings
   if (result.orphanedRecords.length > 0) {
     lines.push("");
-    lines.push(`WARNING: ${result.orphanedRecords.length} orphaned migration(s) found in database with no matching file:`);
+    lines.push(
+      `WARNING: ${result.orphanedRecords.length} orphaned migration(s) found in database with no matching file:`,
+    );
     for (const record of result.orphanedRecords) {
       lines.push(`  - ${record.version} (${sanitizeForTable(record.description)})`);
     }

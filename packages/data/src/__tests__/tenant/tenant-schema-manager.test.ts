@@ -1,14 +1,8 @@
 /**
  * Unit tests for TenantSchemaManager DDL generation and validation (Y3 Q2).
  */
-import { describe, it, expect } from "vitest";
-import {
-  Table,
-  Column,
-  Id,
-  TenantId,
-  DdlGenerator,
-} from "../../index.js";
+import { describe, expect, it } from "vitest";
+import { Column, DdlGenerator, Id, Table, TenantId } from "../../index.js";
 
 const ddl = new DdlGenerator();
 
@@ -54,27 +48,19 @@ describe("DdlGenerator — schema-qualified output", () => {
   });
 
   it("schema name with SQL injection is rejected", () => {
-    expect(() =>
-      ddl.generateCreateTable(TsmItem, { schema: "'; DROP TABLE --" }),
-    ).toThrow(/Invalid schema/);
+    expect(() => ddl.generateCreateTable(TsmItem, { schema: "'; DROP TABLE --" })).toThrow(/Invalid schema/);
   });
 
   it("schema name with spaces is rejected", () => {
-    expect(() =>
-      ddl.generateCreateTable(TsmItem, { schema: "my schema" }),
-    ).toThrow(/Invalid schema/);
+    expect(() => ddl.generateCreateTable(TsmItem, { schema: "my schema" })).toThrow(/Invalid schema/);
   });
 
   it("schema name with dots is rejected", () => {
-    expect(() =>
-      ddl.generateCreateTable(TsmItem, { schema: "public.evil" }),
-    ).toThrow(/Invalid schema/);
+    expect(() => ddl.generateCreateTable(TsmItem, { schema: "public.evil" })).toThrow(/Invalid schema/);
   });
 
   it("schema name that starts with digit is rejected", () => {
-    expect(() =>
-      ddl.generateCreateTable(TsmItem, { schema: "123schema" }),
-    ).toThrow(/Invalid schema/);
+    expect(() => ddl.generateCreateTable(TsmItem, { schema: "123schema" })).toThrow(/Invalid schema/);
   });
 
   it("valid schema with underscores accepted", () => {

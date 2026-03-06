@@ -3,24 +3,12 @@
  * Tests that entity lifecycle events (LOADED, PERSISTED, UPDATED, REMOVED) are
  * emitted correctly when using a repository backed by a live PostgreSQL database.
  */
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
-import { createTestDataSource, isPostgresAvailable } from "./setup.js";
-import {
-  Table,
-  Column,
-  Id,
-  Version,
-  EventBus,
-  ENTITY_EVENTS,
-  createDerivedRepository,
-} from "espalier-data";
-import type {
-  EntityPersistedEvent,
-  EntityUpdatedEvent,
-  EntityRemovedEvent,
-  EntityLoadedEvent,
-} from "espalier-data";
+
+import type { EntityLoadedEvent, EntityPersistedEvent, EntityRemovedEvent, EntityUpdatedEvent } from "espalier-data";
+import { Column, createDerivedRepository, ENTITY_EVENTS, EventBus, Id, Table, Version } from "espalier-data";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { PgDataSource } from "../../pg-data-source.js";
+import { createTestDataSource, isPostgresAvailable } from "./setup.js";
 
 const canConnect = await isPostgresAvailable();
 
@@ -157,7 +145,9 @@ describe.skipIf(!canConnect)("E2E: EventBus Integration with Repository", { time
   it("save() INSERT also emits entity-specific event (entity:persisted:EventItem)", async () => {
     const repo = createRepo();
     const specificEvents: any[] = [];
-    bus.on(`${ENTITY_EVENTS.PERSISTED}:EventItem`, (p) => { specificEvents.push(p); });
+    bus.on(`${ENTITY_EVENTS.PERSISTED}:EventItem`, (p) => {
+      specificEvents.push(p);
+    });
 
     await repo.save(makeItem("SpecificPersist", "active"));
 
@@ -317,7 +307,7 @@ describe.skipIf(!canConnect)("E2E: EventBus Integration with Repository", { time
     listenAll();
 
     let count = 0;
-    for await (const entity of repo.findAllStream()) {
+    for await (const _entity of repo.findAllStream()) {
       count++;
       if (count >= 3) break; // don't need all
     }
@@ -352,10 +342,18 @@ describe.skipIf(!canConnect)("E2E: EventBus Integration with Repository", { time
   it("full entity lifecycle emits correct event sequence", async () => {
     const repo = createRepo();
     const eventTypes: string[] = [];
-    bus.on(ENTITY_EVENTS.PERSISTED, () => { eventTypes.push("persisted"); });
-    bus.on(ENTITY_EVENTS.LOADED, () => { eventTypes.push("loaded"); });
-    bus.on(ENTITY_EVENTS.UPDATED, () => { eventTypes.push("updated"); });
-    bus.on(ENTITY_EVENTS.REMOVED, () => { eventTypes.push("removed"); });
+    bus.on(ENTITY_EVENTS.PERSISTED, () => {
+      eventTypes.push("persisted");
+    });
+    bus.on(ENTITY_EVENTS.LOADED, () => {
+      eventTypes.push("loaded");
+    });
+    bus.on(ENTITY_EVENTS.UPDATED, () => {
+      eventTypes.push("updated");
+    });
+    bus.on(ENTITY_EVENTS.REMOVED, () => {
+      eventTypes.push("removed");
+    });
 
     // 1. INSERT
     const saved = await repo.save(makeItem("FullLifecycle", "active"));
@@ -408,7 +406,9 @@ describe.skipIf(!canConnect)("E2E: EventBus Integration with Repository", { time
   it("once() handler fires only for first entity event", async () => {
     const repo = createRepo();
     const oncePayloads: any[] = [];
-    bus.once(ENTITY_EVENTS.PERSISTED, (p) => { oncePayloads.push(p); });
+    bus.once(ENTITY_EVENTS.PERSISTED, (p) => {
+      oncePayloads.push(p);
+    });
 
     await repo.save(makeItem("Once1", "active"));
     await repo.save(makeItem("Once2", "active"));
@@ -450,7 +450,7 @@ describe.skipIf(!canConnect)("E2E: EventBus Integration with Repository", { time
     const repo = createVersionedRepo();
     listenAll();
 
-    const saved = await repo.save(makeVersionedItem("Versioned1"));
+    const _saved = await repo.save(makeVersionedItem("Versioned1"));
 
     const persisted = events.filter((e) => e.type === "persisted");
     expect(persisted).toHaveLength(1);
@@ -463,7 +463,7 @@ describe.skipIf(!canConnect)("E2E: EventBus Integration with Repository", { time
 
     listenAll();
     saved.name = "VersionedUpdated";
-    const updated = await repo.save(saved);
+    const _updated = await repo.save(saved);
 
     const updatedEvents = events.filter((e) => e.type === "updated");
     expect(updatedEvents).toHaveLength(1);
@@ -478,7 +478,9 @@ describe.skipIf(!canConnect)("E2E: EventBus Integration with Repository", { time
     const repo1 = createRepo();
     const repo2 = createRepo();
     const allPersisted: any[] = [];
-    bus.on(ENTITY_EVENTS.PERSISTED, (p) => { allPersisted.push(p); });
+    bus.on(ENTITY_EVENTS.PERSISTED, (p) => {
+      allPersisted.push(p);
+    });
 
     await repo1.save(makeItem("Repo1Item", "active"));
     await repo2.save(makeItem("Repo2Item", "active"));
@@ -499,8 +501,12 @@ describe.skipIf(!canConnect)("E2E: EventBus Integration with Repository", { time
     const eventItemEvents: any[] = [];
     const versionedEvents: any[] = [];
 
-    bus.on(`${ENTITY_EVENTS.PERSISTED}:EventItem`, (p) => { eventItemEvents.push(p); });
-    bus.on(`${ENTITY_EVENTS.PERSISTED}:VersionedEventItem`, (p) => { versionedEvents.push(p); });
+    bus.on(`${ENTITY_EVENTS.PERSISTED}:EventItem`, (p) => {
+      eventItemEvents.push(p);
+    });
+    bus.on(`${ENTITY_EVENTS.PERSISTED}:VersionedEventItem`, (p) => {
+      versionedEvents.push(p);
+    });
 
     await repo.save(makeItem("TypeFilter1", "active"));
     await vRepo.save(makeVersionedItem("TypeFilter2"));
@@ -519,11 +525,7 @@ describe.skipIf(!canConnect)("E2E: EventBus Integration with Repository", { time
     const repo = createRepo();
     listenAll();
 
-    const items = [
-      makeItem("Batch1", "active"),
-      makeItem("Batch2", "active"),
-      makeItem("Batch3", "active"),
-    ];
+    const items = [makeItem("Batch1", "active"), makeItem("Batch2", "active"), makeItem("Batch3", "active")];
     await repo.saveAll(items);
 
     const persisted = events.filter((e) => e.type === "persisted");
@@ -536,10 +538,7 @@ describe.skipIf(!canConnect)("E2E: EventBus Integration with Repository", { time
 
   it("deleteAll() emits removed event for each entity", async () => {
     const repo = createRepo();
-    const items = await repo.saveAll([
-      makeItem("DelAll1", "active"),
-      makeItem("DelAll2", "active"),
-    ]);
+    const items = await repo.saveAll([makeItem("DelAll1", "active"), makeItem("DelAll2", "active")]);
 
     listenAll();
     await repo.deleteAll(items);

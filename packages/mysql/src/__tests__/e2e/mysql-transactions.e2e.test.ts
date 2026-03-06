@@ -1,13 +1,8 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import type { Connection } from "espalier-jdbc";
 import { IsolationLevel } from "espalier-jdbc";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { MysqlDataSource } from "../../mysql-data-source.js";
-import {
-  createTestDataSource,
-  isMysqlAvailable,
-  testTableDDL,
-  dropTestTable,
-} from "./setup.js";
+import { createTestDataSource, dropTestTable, isMysqlAvailable, testTableDDL } from "./setup.js";
 
 const TABLE = "e2e_tx_test";
 const canConnect = await isMysqlAvailable();
@@ -37,9 +32,7 @@ describe.skipIf(!canConnect)("E2E: MySQL transactions", { timeout: 10000 }, () =
 
   it("commits a transaction", async () => {
     const tx = await conn.beginTransaction();
-    const ps = conn.prepareStatement(
-      `INSERT INTO ${TABLE} (name, email, age) VALUES ($1, $2, $3)`,
-    );
+    const ps = conn.prepareStatement(`INSERT INTO ${TABLE} (name, email, age) VALUES ($1, $2, $3)`);
     ps.setParameter(1, "TxCommit");
     ps.setParameter(2, "commit@test.com");
     ps.setParameter(3, 25);
@@ -47,18 +40,14 @@ describe.skipIf(!canConnect)("E2E: MySQL transactions", { timeout: 10000 }, () =
     await tx.commit();
 
     const stmt = conn.createStatement();
-    const rs = await stmt.executeQuery(
-      `SELECT * FROM ${TABLE} WHERE name = 'TxCommit'`,
-    );
+    const rs = await stmt.executeQuery(`SELECT * FROM ${TABLE} WHERE name = 'TxCommit'`);
     expect(await rs.next()).toBe(true);
     expect(rs.getString("name")).toBe("TxCommit");
   });
 
   it("rolls back a transaction", async () => {
     const tx = await conn.beginTransaction();
-    const ps = conn.prepareStatement(
-      `INSERT INTO ${TABLE} (name, email, age) VALUES ($1, $2, $3)`,
-    );
+    const ps = conn.prepareStatement(`INSERT INTO ${TABLE} (name, email, age) VALUES ($1, $2, $3)`);
     ps.setParameter(1, "TxRollback");
     ps.setParameter(2, "rollback@test.com");
     ps.setParameter(3, 30);
@@ -66,18 +55,14 @@ describe.skipIf(!canConnect)("E2E: MySQL transactions", { timeout: 10000 }, () =
     await tx.rollback();
 
     const stmt = conn.createStatement();
-    const rs = await stmt.executeQuery(
-      `SELECT * FROM ${TABLE} WHERE name = 'TxRollback'`,
-    );
+    const rs = await stmt.executeQuery(`SELECT * FROM ${TABLE} WHERE name = 'TxRollback'`);
     expect(await rs.next()).toBe(false);
   });
 
   it("supports savepoints", async () => {
     const tx = await conn.beginTransaction();
 
-    const ps1 = conn.prepareStatement(
-      `INSERT INTO ${TABLE} (name, email, age) VALUES ($1, $2, $3)`,
-    );
+    const ps1 = conn.prepareStatement(`INSERT INTO ${TABLE} (name, email, age) VALUES ($1, $2, $3)`);
     ps1.setParameter(1, "BeforeSavepoint");
     ps1.setParameter(2, "before@test.com");
     ps1.setParameter(3, 20);
@@ -85,9 +70,7 @@ describe.skipIf(!canConnect)("E2E: MySQL transactions", { timeout: 10000 }, () =
 
     await tx.setSavepoint("sp1");
 
-    const ps2 = conn.prepareStatement(
-      `INSERT INTO ${TABLE} (name, email, age) VALUES ($1, $2, $3)`,
-    );
+    const ps2 = conn.prepareStatement(`INSERT INTO ${TABLE} (name, email, age) VALUES ($1, $2, $3)`);
     ps2.setParameter(1, "AfterSavepoint");
     ps2.setParameter(2, "after@test.com");
     ps2.setParameter(3, 21);
@@ -97,14 +80,10 @@ describe.skipIf(!canConnect)("E2E: MySQL transactions", { timeout: 10000 }, () =
     await tx.commit();
 
     const stmt = conn.createStatement();
-    const rs1 = await stmt.executeQuery(
-      `SELECT * FROM ${TABLE} WHERE name = 'BeforeSavepoint'`,
-    );
+    const rs1 = await stmt.executeQuery(`SELECT * FROM ${TABLE} WHERE name = 'BeforeSavepoint'`);
     expect(await rs1.next()).toBe(true);
 
-    const rs2 = await stmt.executeQuery(
-      `SELECT * FROM ${TABLE} WHERE name = 'AfterSavepoint'`,
-    );
+    const rs2 = await stmt.executeQuery(`SELECT * FROM ${TABLE} WHERE name = 'AfterSavepoint'`);
     expect(await rs2.next()).toBe(false);
   });
 

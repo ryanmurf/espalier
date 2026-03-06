@@ -1,7 +1,7 @@
 import type { Connection, DataSource, TypeConverterRegistry } from "espalier-jdbc";
 import { ConnectionError, DatabaseErrorCode, getGlobalLogger } from "espalier-jdbc";
-import type { DenoPgClient } from "./deno-pg-statement.js";
 import { DenoPgConnection } from "./deno-pg-connection.js";
+import type { DenoPgClient } from "./deno-pg-statement.js";
 
 export interface DenoPgDataSourceConfig {
   /** PostgreSQL connection URL (e.g., "postgres://user:pass@host:port/db"). */
@@ -72,8 +72,7 @@ export class DenoPgDataSource implements DataSource {
       const denoPostgres = await import(/* @vite-ignore */ denoPostgresUrl);
       if (denoPostgres) {
         const { Pool } = denoPostgres;
-        const connectionString = this.config.url ??
-          this.buildConnectionString();
+        const connectionString = this.config.url ?? this.buildConnectionString();
 
         this.pool = new Pool(connectionString, this.config.max ?? 10) as DenoPool;
         logger.info("using deno-postgres driver");
@@ -112,9 +111,7 @@ export class DenoPgDataSource implements DataSource {
           const client = await pool.connect();
           return {
             async queryObject(sql: string, args?: unknown[]) {
-              const result = args
-                ? await client.query(sql, args)
-                : await client.query(sql);
+              const result = args ? await client.query(sql, args) : await client.query(sql);
               return {
                 rows: result.rows as Record<string, unknown>[],
                 rowCount: result.rowCount,
@@ -133,13 +130,10 @@ export class DenoPgDataSource implements DataSource {
 
       logger.info("using pg driver via npm compat");
     } catch (err) {
-      const message = ((err as Error).message ?? "").replace(
-        /password[=:]\s*\S+/gi,
-        "password=***",
-      );
+      const message = ((err as Error).message ?? "").replace(/password[=:]\s*\S+/gi, "password=***");
       throw new ConnectionError(
         `Failed to initialize PostgreSQL pool for Deno: ${message}. ` +
-        `Install either deno-postgres or pg (via npm:pg).`,
+          `Install either deno-postgres or pg (via npm:pg).`,
         err as Error,
         DatabaseErrorCode.CONNECTION_FAILED,
       );
@@ -158,11 +152,7 @@ export class DenoPgDataSource implements DataSource {
 
   async getConnection(): Promise<Connection> {
     if (this.closed) {
-      throw new ConnectionError(
-        "DataSource is closed",
-        undefined,
-        DatabaseErrorCode.CONNECTION_CLOSED,
-      );
+      throw new ConnectionError("DataSource is closed", undefined, DatabaseErrorCode.CONNECTION_CLOSED);
     }
 
     const pool = await this.ensurePool();

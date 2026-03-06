@@ -1,6 +1,16 @@
 {
   "name": "espalier",
   "private": true,
+  "license": "Apache-2.0",
+  "author": "Ryan Murphy",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ryanmurf/espalier.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ryanmurf/espalier/issues"
+  },
+  "homepage": "https://github.com/ryanmurf/espalier#readme",
   "scripts": {
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
@@ -11,7 +21,16 @@
     "clean": "pnpm -r clean",
     "size": "size-limit",
     "size:report": "size-limit --json",
-    "benchmark": "node benchmarks/run.mjs"
+    "benchmark": "node benchmarks/run.mjs",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write .",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx,json}": [
+      "biome check --write --no-errors-on-unmatched"
+    ]
   },
   "pnpm": {
     "onlyBuiltDependencies": [
@@ -20,7 +39,10 @@
     ]
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.4.6",
     "@size-limit/file": "^12.0.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.3.2",
     "size-limit": "^12.0.0",
     "tsup": "^8.4.0",
     "typescript": "^5.7.3",

@@ -1,8 +1,8 @@
-import { describe, it, expect, vi } from "vitest";
+import { ConnectionError, IsolationLevel, TransactionError } from "espalier-jdbc";
 import type { PoolClient } from "pg";
+import { describe, expect, it, vi } from "vitest";
 import { PgConnection } from "../pg-connection.js";
-import { PgStatement, PgPreparedStatement } from "../pg-statement.js";
-import { IsolationLevel, TransactionError, ConnectionError } from "espalier-jdbc";
+import { PgPreparedStatement, PgStatement } from "../pg-statement.js";
 
 function createMockClient() {
   return {
@@ -24,9 +24,7 @@ describe("PgConnection", () => {
     it("returns a PgPreparedStatement", () => {
       const client = createMockClient();
       const conn = new PgConnection(client);
-      expect(conn.prepareStatement("SELECT 1")).toBeInstanceOf(
-        PgPreparedStatement,
-      );
+      expect(conn.prepareStatement("SELECT 1")).toBeInstanceOf(PgPreparedStatement);
     });
   });
 
@@ -43,16 +41,12 @@ describe("PgConnection", () => {
       const conn = new PgConnection(client);
       await conn.beginTransaction(IsolationLevel.SERIALIZABLE);
       expect(client.query).toHaveBeenCalledWith("BEGIN");
-      expect(client.query).toHaveBeenCalledWith(
-        "SET TRANSACTION ISOLATION LEVEL SERIALIZABLE",
-      );
+      expect(client.query).toHaveBeenCalledWith("SET TRANSACTION ISOLATION LEVEL SERIALIZABLE");
     });
 
     it("wraps errors in TransactionError", async () => {
       const client = createMockClient();
-      (client.query as ReturnType<typeof vi.fn>).mockRejectedValue(
-        new Error("begin failed"),
-      );
+      (client.query as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("begin failed"));
       const conn = new PgConnection(client);
       await expect(conn.beginTransaction()).rejects.toThrow(TransactionError);
     });
@@ -94,9 +88,7 @@ describe("PgConnection", () => {
         const client = createMockClient();
         const conn = new PgConnection(client);
         const tx = await conn.beginTransaction();
-        (client.query as ReturnType<typeof vi.fn>).mockRejectedValue(
-          new Error("commit failed"),
-        );
+        (client.query as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("commit failed"));
         await expect(tx.commit()).rejects.toThrow(TransactionError);
       });
 
@@ -104,9 +96,7 @@ describe("PgConnection", () => {
         const client = createMockClient();
         const conn = new PgConnection(client);
         const tx = await conn.beginTransaction();
-        (client.query as ReturnType<typeof vi.fn>).mockRejectedValue(
-          new Error("rollback failed"),
-        );
+        (client.query as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("rollback failed"));
         await expect(tx.rollback()).rejects.toThrow(TransactionError);
       });
 
@@ -114,9 +104,7 @@ describe("PgConnection", () => {
         const client = createMockClient();
         const conn = new PgConnection(client);
         const tx = await conn.beginTransaction();
-        (client.query as ReturnType<typeof vi.fn>).mockRejectedValue(
-          new Error("savepoint failed"),
-        );
+        (client.query as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("savepoint failed"));
         await expect(tx.setSavepoint("sp")).rejects.toThrow(TransactionError);
       });
 
@@ -124,9 +112,7 @@ describe("PgConnection", () => {
         const client = createMockClient();
         const conn = new PgConnection(client);
         const tx = await conn.beginTransaction();
-        (client.query as ReturnType<typeof vi.fn>).mockRejectedValue(
-          new Error("rollback to failed"),
-        );
+        (client.query as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("rollback to failed"));
         await expect(tx.rollbackTo("sp")).rejects.toThrow(TransactionError);
       });
     });
@@ -165,9 +151,7 @@ describe("PgConnection", () => {
       const client = createMockClient();
       const conn = new PgConnection(client);
       await conn.close();
-      expect(() => conn.prepareStatement("SELECT 1")).toThrow(
-        ConnectionError,
-      );
+      expect(() => conn.prepareStatement("SELECT 1")).toThrow(ConnectionError);
     });
 
     it("beginTransaction throws ConnectionError", async () => {

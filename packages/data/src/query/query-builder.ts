@@ -1,10 +1,10 @@
-import { type SqlValue, quoteIdentifier } from "espalier-jdbc";
+import { quoteIdentifier, type SqlValue } from "espalier-jdbc";
+import type { EntityMetadata, FieldMapping } from "../mapping/entity-metadata.js";
+import { getEntityMetadata } from "../mapping/entity-metadata.js";
+import type { HighlightOptions, SearchOptions } from "../search/search-criteria.js";
+import { FullTextSearchCriteria, SearchHighlightExpression, SearchRankExpression } from "../search/search-criteria.js";
 import type { Criteria } from "./criteria.js";
 import { LogicalCriteria } from "./criteria.js";
-import { getEntityMetadata } from "../mapping/entity-metadata.js";
-import type { EntityMetadata, FieldMapping } from "../mapping/entity-metadata.js";
-import { FullTextSearchCriteria, SearchRankExpression, SearchHighlightExpression } from "../search/search-criteria.js";
-import type { SearchOptions, HighlightOptions } from "../search/search-criteria.js";
 
 export type JoinType = "INNER" | "LEFT" | "RIGHT";
 export type SortDirection = "ASC" | "DESC";
@@ -12,17 +12,22 @@ export type SortDirection = "ASC" | "DESC";
 // ── Window Function Types ───────────────────────────────────────────────
 
 const ALLOWED_WINDOW_FUNCTIONS = new Set([
-  "ROW_NUMBER", "RANK", "DENSE_RANK", "NTILE",
-  "LAG", "LEAD", "FIRST_VALUE", "LAST_VALUE",
-  "SUM", "AVG", "COUNT", "MIN", "MAX",
+  "ROW_NUMBER",
+  "RANK",
+  "DENSE_RANK",
+  "NTILE",
+  "LAG",
+  "LEAD",
+  "FIRST_VALUE",
+  "LAST_VALUE",
+  "SUM",
+  "AVG",
+  "COUNT",
+  "MIN",
+  "MAX",
 ]);
 
-export type FrameBoundType =
-  | "UNBOUNDED PRECEDING"
-  | "CURRENT ROW"
-  | "UNBOUNDED FOLLOWING"
-  | "PRECEDING"
-  | "FOLLOWING";
+export type FrameBoundType = "UNBOUNDED PRECEDING" | "CURRENT ROW" | "UNBOUNDED FOLLOWING" | "PRECEDING" | "FOLLOWING";
 
 export interface FrameBound {
   type: FrameBoundType;
@@ -80,10 +85,10 @@ function buildFrameBound(bound: FrameBound): string {
 function buildWindowSpecSql(spec: WindowSpec): string {
   const specParts: string[] = [];
   if (spec.partitionBy && spec.partitionBy.length > 0) {
-    specParts.push(`PARTITION BY ${spec.partitionBy.map(c => quoteIdentifier(c)).join(", ")}`);
+    specParts.push(`PARTITION BY ${spec.partitionBy.map((c) => quoteIdentifier(c)).join(", ")}`);
   }
   if (spec.orderBy && spec.orderBy.length > 0) {
-    const orderClauses = spec.orderBy.map(o => {
+    const orderClauses = spec.orderBy.map((o) => {
       const dir = String(o.direction).toUpperCase();
       if (dir !== "ASC" && dir !== "DESC") {
         throw new Error(`Invalid sort direction: ${o.direction}. Must be "ASC" or "DESC".`);
@@ -308,7 +313,12 @@ export class SelectBuilder {
   }
 
   /** Add a recursive CTE (base UNION [ALL] recursive). */
-  withRecursive(name: string, baseQuery: SelectBuilder | string, recursiveQuery: SelectBuilder | string, unionAll = true): SelectBuilder {
+  withRecursive(
+    name: string,
+    baseQuery: SelectBuilder | string,
+    recursiveQuery: SelectBuilder | string,
+    unionAll = true,
+  ): SelectBuilder {
     validateCteName(name);
     this._ctes.push({ name, query: baseQuery, recursive: { recursiveQuery, unionAll } });
     return this;
@@ -395,7 +405,7 @@ export class SelectBuilder {
 
     // ── CTEs ──────────────────────────────────────────────────────────
     if (this._ctes.length > 0) {
-      const hasRecursive = this._ctes.some(c => c.recursive != null);
+      const hasRecursive = this._ctes.some((c) => c.recursive != null);
       const cteParts: string[] = [];
       for (const cte of this._ctes) {
         const baseResult = buildCteQuery(cte.query, paramIdx);
@@ -418,16 +428,12 @@ export class SelectBuilder {
     // ── SELECT columns ───────────────────────────────────────────────
     const baseColList = this._rawColumns
       ? this._columns.join(", ")
-      : this._columns.map(c => quoteIdentifier(c)).join(", ");
-    const extraCols = this._extraRawColumns.map(
-      rc => `${rc.expression} AS ${quoteIdentifier(rc.alias)}`
-    );
+      : this._columns.map((c) => quoteIdentifier(c)).join(", ");
+    const extraCols = this._extraRawColumns.map((rc) => `${rc.expression} AS ${quoteIdentifier(rc.alias)}`);
 
     // Window function columns
-    const winCols = this._windowFunctions.map(wf => {
-      const args = wf.args && wf.args.length > 0
-        ? wf.args.map(a => quoteIdentifier(a)).join(", ")
-        : "";
+    const winCols = this._windowFunctions.map((wf) => {
+      const args = wf.args && wf.args.length > 0 ? wf.args.map((a) => quoteIdentifier(a)).join(", ") : "";
       let overClause: string;
       if (typeof wf.over === "string") {
         validateCteName(wf.over);
@@ -476,7 +482,7 @@ export class SelectBuilder {
     }
 
     if (this._groupBy.length > 0) {
-      parts.push(`GROUP BY ${this._groupBy.map(c => quoteIdentifier(c)).join(", ")}`);
+      parts.push(`GROUP BY ${this._groupBy.map((c) => quoteIdentifier(c)).join(", ")}`);
     }
 
     if (this._having) {
@@ -489,15 +495,14 @@ export class SelectBuilder {
     // ── WINDOW clause (named windows) ────────────────────────────────
     if (this._namedWindows.length > 0) {
       const windowDefs = this._namedWindows.map(
-        nw => `${quoteIdentifier(nw.name)} AS (${buildWindowSpecSql(nw.spec)})`
+        (nw) => `${quoteIdentifier(nw.name)} AS (${buildWindowSpecSql(nw.spec)})`,
       );
       parts.push(`WINDOW ${windowDefs.join(", ")}`);
     }
 
     // Build ORDER BY: regular + raw + expression-based
-    const hasAnyOrderBy = this._orderBy.length > 0
-      || this._rawOrderBys.length > 0
-      || this._expressionOrderBys.length > 0;
+    const hasAnyOrderBy =
+      this._orderBy.length > 0 || this._rawOrderBys.length > 0 || this._expressionOrderBys.length > 0;
 
     if (hasAnyOrderBy) {
       const orderClauses: string[] = [];
@@ -567,10 +572,10 @@ export class InsertBuilder {
 
   build(): BuiltQuery {
     const placeholders = this._columns.map((_, i) => `$${i + 1}`);
-    let sql = `INSERT INTO ${quoteIdentifier(this._table)} (${this._columns.map(c => quoteIdentifier(c)).join(", ")}) VALUES (${placeholders.join(", ")})`;
+    let sql = `INSERT INTO ${quoteIdentifier(this._table)} (${this._columns.map((c) => quoteIdentifier(c)).join(", ")}) VALUES (${placeholders.join(", ")})`;
 
     if (this._returning.length > 0) {
-      sql += ` RETURNING ${this._returning.map(c => quoteIdentifier(c)).join(", ")}`;
+      sql += ` RETURNING ${this._returning.map((c) => quoteIdentifier(c)).join(", ")}`;
     }
 
     return { sql, params: [...this._values] };
@@ -636,7 +641,7 @@ export class UpdateBuilder {
     }
 
     if (this._returning.length > 0) {
-      sql += ` RETURNING ${this._returning.map(c => quoteIdentifier(c)).join(", ")}`;
+      sql += ` RETURNING ${this._returning.map((c) => quoteIdentifier(c)).join(", ")}`;
     }
 
     return { sql, params };
@@ -684,14 +689,17 @@ export class DeleteBuilder {
     }
 
     if (this._returning.length > 0) {
-      sql += ` RETURNING ${this._returning.map(c => quoteIdentifier(c)).join(", ")}`;
+      sql += ` RETURNING ${this._returning.map((c) => quoteIdentifier(c)).join(", ")}`;
     }
 
     return { sql, params };
   }
 }
 
-function resolveTable(entityOrTable: (new (...args: any[]) => any) | string): { table: string; metadata?: EntityMetadata } {
+function resolveTable(entityOrTable: (new (...args: any[]) => any) | string): {
+  table: string;
+  metadata?: EntityMetadata;
+} {
   if (typeof entityOrTable === "string") {
     return { table: entityOrTable };
   }

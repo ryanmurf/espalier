@@ -2,7 +2,7 @@
  * Generates Espalier entity TypeScript files from parsed Prisma schema.
  */
 
-import type { PrismaSchema, PrismaModel, PrismaField, PrismaEnum, PrismaAttribute } from "./parser.js";
+import type { PrismaAttribute, PrismaEnum, PrismaField, PrismaModel, PrismaSchema } from "./parser.js";
 
 const SAFE_IDENTIFIER = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/;
 
@@ -129,11 +129,7 @@ interface RelationInfo {
   mappedBy?: string;
 }
 
-function detectRelation(
-  field: PrismaField,
-  model: PrismaModel,
-  allModels: PrismaModel[],
-): RelationInfo | undefined {
+function detectRelation(field: PrismaField, model: PrismaModel, allModels: PrismaModel[]): RelationInfo | undefined {
   // Is this field a model reference?
   const isModelType = allModels.some((m) => m.name === field.type);
   if (!isModelType) return undefined;
@@ -177,15 +173,11 @@ function detectRelation(
   if (relationAttr) {
     // Extract fields and references from @relation
     const fieldsMatch = relationAttr.args.join(",").match(/fields:\s*\[([^\]]+)\]/);
-    const foreignKey = fieldsMatch
-      ? fieldsMatch[1].trim().split(",")[0].trim()
-      : undefined;
+    const foreignKey = fieldsMatch ? fieldsMatch[1].trim().split(",")[0].trim() : undefined;
 
     // Check if the other side has a list (this is ManyToOne) or single (OneToOne)
     const otherModel = allModels.find((m) => m.name === field.type);
-    const reverseField = otherModel?.fields.find(
-      (f) => f.type === model.name,
-    );
+    const reverseField = otherModel?.fields.find((f) => f.type === model.name);
 
     if (reverseField?.isList) {
       return { type: "ManyToOne", target: field.type, foreignKey };
@@ -206,17 +198,11 @@ function findMappedByField(
   const otherModel = allModels.find((m) => m.name === otherModelName);
   if (!otherModel) return undefined;
 
-  const reverseField = otherModel.fields.find(
-    (f) => f.type === thisModelName && !f.isList,
-  );
+  const reverseField = otherModel.fields.find((f) => f.type === thisModelName && !f.isList);
   return reverseField?.name;
 }
 
-function isForeignKeyField(
-  field: PrismaField,
-  model: PrismaModel,
-  allModels: PrismaModel[],
-): boolean {
+function isForeignKeyField(field: PrismaField, model: PrismaModel, allModels: PrismaModel[]): boolean {
   // A field is a FK if another field in the same model has @relation(fields: [thisField])
   for (const other of model.fields) {
     const rel = getAttr(other, "relation");
@@ -230,10 +216,7 @@ function isForeignKeyField(
   return false;
 }
 
-export function generateEntityFile(
-  model: PrismaModel,
-  schema: PrismaSchema,
-): string {
+export function generateEntityFile(model: PrismaModel, schema: PrismaSchema): string {
   const lines: string[] = [];
   const imports = new Set<string>();
   const relationImports = new Set<string>();
@@ -364,10 +347,7 @@ function generateFieldDecorators(field: PrismaField): string[] {
   return decs;
 }
 
-function generateRelationField(
-  field: PrismaField,
-  relation: RelationInfo,
-): string[] {
+function generateRelationField(field: PrismaField, relation: RelationInfo): string[] {
   const decs: string[] = [];
 
   assertSafeIdentifier(field.name, "relation field name");
@@ -428,13 +408,20 @@ function getFieldDefault(field: PrismaField, tsType: string, schema: PrismaSchem
   if (field.isOptional) return "undefined as any";
 
   switch (tsType) {
-    case "string": return '""';
-    case "number": return "0";
-    case "bigint": return "0n";
-    case "boolean": return "false";
-    case "Date": return "new Date()";
-    case "Uint8Array": return "new Uint8Array()";
-    case "Record<string, unknown>": return "{}";
+    case "string":
+      return '""';
+    case "number":
+      return "0";
+    case "bigint":
+      return "0n";
+    case "boolean":
+      return "false";
+    case "Date":
+      return "new Date()";
+    case "Uint8Array":
+      return "new Uint8Array()";
+    case "Record<string, unknown>":
+      return "{}";
     default: {
       // Check if the type is an enum — use its first value as default
       const prismaEnum = schema.enums.find((e) => e.name === tsType);
@@ -458,10 +445,7 @@ export function generateEnumFile(prismaEnum: PrismaEnum): string {
   return lines.join("\n");
 }
 
-export function generateIndexFile(
-  models: PrismaModel[],
-  enums: PrismaEnum[],
-): string {
+export function generateIndexFile(models: PrismaModel[], enums: PrismaEnum[]): string {
   const lines: string[] = [];
 
   for (const e of enums) {

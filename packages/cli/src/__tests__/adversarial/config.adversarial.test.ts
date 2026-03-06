@@ -1,17 +1,14 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { mkdirSync, writeFileSync, rmSync, symlinkSync, chmodSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { loadConfig, getMigrationsDir } from "../../config.js";
+import { join, resolve } from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { getMigrationsDir, loadConfig } from "../../config.js";
 
 describe("loadConfig adversarial", () => {
   let tempDir: string;
 
   beforeEach(() => {
-    tempDir = join(
-      tmpdir(),
-      `espalier-adv-config-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-    );
+    tempDir = join(tmpdir(), `espalier-adv-config-${Date.now()}-${Math.random().toString(36).slice(2)}`);
     mkdirSync(tempDir, { recursive: true });
   });
 
@@ -21,9 +18,7 @@ describe("loadConfig adversarial", () => {
 
   describe("missing / unreachable config", () => {
     it("throws when directory does not exist", () => {
-      expect(() => loadConfig("/nonexistent/path/does/not/exist")).toThrow(
-        "No espalier config file found",
-      );
+      expect(() => loadConfig("/nonexistent/path/does/not/exist")).toThrow("No espalier config file found");
     });
 
     it("throws with descriptive message including the path", () => {
@@ -53,18 +48,12 @@ describe("loadConfig adversarial", () => {
     });
 
     it("throws on JSON with trailing comma", () => {
-      writeFileSync(
-        join(tempDir, "espalier.config.json"),
-        '{"adapter": "pg", "connection": {},}',
-      );
+      writeFileSync(join(tempDir, "espalier.config.json"), '{"adapter": "pg", "connection": {},}');
       expect(() => loadConfig(tempDir)).toThrow();
     });
 
     it("throws on JSON with comments", () => {
-      writeFileSync(
-        join(tempDir, "espalier.config.json"),
-        '// comment\n{"adapter": "pg", "connection": {}}',
-      );
+      writeFileSync(join(tempDir, "espalier.config.json"), '// comment\n{"adapter": "pg", "connection": {}}');
       expect(() => loadConfig(tempDir)).toThrow();
     });
 
@@ -106,76 +95,49 @@ describe("loadConfig adversarial", () => {
 
   describe("adapter validation", () => {
     it("throws for empty string adapter", () => {
-      writeFileSync(
-        join(tempDir, "espalier.config.json"),
-        JSON.stringify({ adapter: "", connection: {} }),
-      );
+      writeFileSync(join(tempDir, "espalier.config.json"), JSON.stringify({ adapter: "", connection: {} }));
       expect(() => loadConfig(tempDir)).toThrow('"adapter"');
     });
 
     it("throws for numeric adapter", () => {
-      writeFileSync(
-        join(tempDir, "espalier.config.json"),
-        JSON.stringify({ adapter: 42, connection: {} }),
-      );
+      writeFileSync(join(tempDir, "espalier.config.json"), JSON.stringify({ adapter: 42, connection: {} }));
       expect(() => loadConfig(tempDir)).toThrow('"adapter"');
     });
 
     it("throws for null adapter", () => {
-      writeFileSync(
-        join(tempDir, "espalier.config.json"),
-        JSON.stringify({ adapter: null, connection: {} }),
-      );
+      writeFileSync(join(tempDir, "espalier.config.json"), JSON.stringify({ adapter: null, connection: {} }));
       expect(() => loadConfig(tempDir)).toThrow('"adapter"');
     });
 
     it("throws for unknown adapter name", () => {
-      writeFileSync(
-        join(tempDir, "espalier.config.json"),
-        JSON.stringify({ adapter: "oracle", connection: {} }),
-      );
+      writeFileSync(join(tempDir, "espalier.config.json"), JSON.stringify({ adapter: "oracle", connection: {} }));
       expect(() => loadConfig(tempDir)).toThrow('got "oracle"');
     });
 
     it("throws for adapter with extra whitespace", () => {
-      writeFileSync(
-        join(tempDir, "espalier.config.json"),
-        JSON.stringify({ adapter: " pg ", connection: {} }),
-      );
+      writeFileSync(join(tempDir, "espalier.config.json"), JSON.stringify({ adapter: " pg ", connection: {} }));
       expect(() => loadConfig(tempDir)).toThrow('got " pg "');
     });
 
     it("throws for adapter in wrong case", () => {
-      writeFileSync(
-        join(tempDir, "espalier.config.json"),
-        JSON.stringify({ adapter: "PG", connection: {} }),
-      );
+      writeFileSync(join(tempDir, "espalier.config.json"), JSON.stringify({ adapter: "PG", connection: {} }));
       expect(() => loadConfig(tempDir)).toThrow('got "PG"');
     });
 
     it("throws for adapter 'postgresql' (not abbreviated)", () => {
-      writeFileSync(
-        join(tempDir, "espalier.config.json"),
-        JSON.stringify({ adapter: "postgresql", connection: {} }),
-      );
+      writeFileSync(join(tempDir, "espalier.config.json"), JSON.stringify({ adapter: "postgresql", connection: {} }));
       expect(() => loadConfig(tempDir)).toThrow('got "postgresql"');
     });
 
     it("throws for adapter that is boolean true", () => {
-      writeFileSync(
-        join(tempDir, "espalier.config.json"),
-        JSON.stringify({ adapter: true, connection: {} }),
-      );
+      writeFileSync(join(tempDir, "espalier.config.json"), JSON.stringify({ adapter: true, connection: {} }));
       expect(() => loadConfig(tempDir)).toThrow('"adapter"');
     });
   });
 
   describe("connection validation", () => {
     it("throws for null connection", () => {
-      writeFileSync(
-        join(tempDir, "espalier.config.json"),
-        JSON.stringify({ adapter: "pg", connection: null }),
-      );
+      writeFileSync(join(tempDir, "espalier.config.json"), JSON.stringify({ adapter: "pg", connection: null }));
       expect(() => loadConfig(tempDir)).toThrow('"connection" must be an object');
     });
 
@@ -199,18 +161,12 @@ describe("loadConfig adversarial", () => {
     });
 
     it("throws for numeric connection", () => {
-      writeFileSync(
-        join(tempDir, "espalier.config.json"),
-        JSON.stringify({ adapter: "pg", connection: 42 }),
-      );
+      writeFileSync(join(tempDir, "espalier.config.json"), JSON.stringify({ adapter: "pg", connection: 42 }));
       expect(() => loadConfig(tempDir)).toThrow('"connection" must be an object');
     });
 
     it("accepts an empty connection object", () => {
-      writeFileSync(
-        join(tempDir, "espalier.config.json"),
-        JSON.stringify({ adapter: "pg", connection: {} }),
-      );
+      writeFileSync(join(tempDir, "espalier.config.json"), JSON.stringify({ adapter: "pg", connection: {} }));
       const config = loadConfig(tempDir);
       expect(config.connection).toEqual({});
     });
@@ -324,10 +280,7 @@ describe("loadConfig adversarial", () => {
   describe("extremely long values", () => {
     it("handles extremely long adapter string", () => {
       const longAdapter = "a".repeat(10000);
-      writeFileSync(
-        join(tempDir, "espalier.config.json"),
-        JSON.stringify({ adapter: longAdapter, connection: {} }),
-      );
+      writeFileSync(join(tempDir, "espalier.config.json"), JSON.stringify({ adapter: longAdapter, connection: {} }));
       expect(() => loadConfig(tempDir)).toThrow('got "' + longAdapter + '"');
     });
 
@@ -337,10 +290,7 @@ describe("loadConfig adversarial", () => {
       for (let i = 0; i < 100; i++) {
         nested = { child: nested };
       }
-      writeFileSync(
-        join(tempDir, "espalier.config.json"),
-        JSON.stringify({ adapter: "pg", connection: nested }),
-      );
+      writeFileSync(join(tempDir, "espalier.config.json"), JSON.stringify({ adapter: "pg", connection: nested }));
       const config = loadConfig(tempDir);
       expect(config.adapter).toBe("pg");
     });
@@ -370,16 +320,10 @@ describe("loadConfig adversarial", () => {
     it("follows symlink to valid config", () => {
       const realConfigDir = join(tempDir, "real");
       mkdirSync(realConfigDir, { recursive: true });
-      writeFileSync(
-        join(realConfigDir, "config.json"),
-        JSON.stringify({ adapter: "pg", connection: {} }),
-      );
+      writeFileSync(join(realConfigDir, "config.json"), JSON.stringify({ adapter: "pg", connection: {} }));
       const symlinkDir = join(tempDir, "linked");
       mkdirSync(symlinkDir, { recursive: true });
-      symlinkSync(
-        join(realConfigDir, "config.json"),
-        join(symlinkDir, "espalier.config.json"),
-      );
+      symlinkSync(join(realConfigDir, "config.json"), join(symlinkDir, "espalier.config.json"));
       const config = loadConfig(symlinkDir);
       expect(config.adapter).toBe("pg");
     });
@@ -387,10 +331,7 @@ describe("loadConfig adversarial", () => {
     it("throws for broken symlink", () => {
       const symlinkDir = join(tempDir, "broken");
       mkdirSync(symlinkDir, { recursive: true });
-      symlinkSync(
-        "/nonexistent/file.json",
-        join(symlinkDir, "espalier.config.json"),
-      );
+      symlinkSync("/nonexistent/file.json", join(symlinkDir, "espalier.config.json"));
       // existsSync returns false for broken symlinks
       expect(() => loadConfig(symlinkDir)).toThrow("No espalier config file found");
     });
@@ -422,10 +363,7 @@ describe("loadConfig adversarial", () => {
 
   describe("config precedence", () => {
     it("picks espalier.config.json over .ts when both exist", () => {
-      writeFileSync(
-        join(tempDir, "espalier.config.json"),
-        JSON.stringify({ adapter: "pg", connection: {} }),
-      );
+      writeFileSync(join(tempDir, "espalier.config.json"), JSON.stringify({ adapter: "pg", connection: {} }));
       writeFileSync(join(tempDir, "espalier.config.ts"), "export default {}");
       // Should load the JSON one, not throw about .ts
       const config = loadConfig(tempDir);
@@ -433,10 +371,7 @@ describe("loadConfig adversarial", () => {
     });
 
     it("throws for .js config (not yet supported)", () => {
-      writeFileSync(
-        join(tempDir, "espalier.config.js"),
-        "module.exports = { adapter: 'pg', connection: {} }",
-      );
+      writeFileSync(join(tempDir, "espalier.config.js"), "module.exports = { adapter: 'pg', connection: {} }");
       expect(() => loadConfig(tempDir)).toThrow("only .json configs are supported");
     });
 

@@ -6,24 +6,25 @@
  * persist @ManyToOne FK columns). Lazy @OneToMany also affected by Bug 5
  * (batchLoadOneToMany doesn't select FK column).
  */
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { createTestDataSource, isPostgresAvailable } from "./setup.js";
+
 import {
-  Table,
   Column,
+  createRepository,
+  DdlGenerator,
   Id,
+  initializeProxy,
+  isInitialized,
+  isLazyProxy,
+  ManyToMany,
   ManyToOne,
   OneToMany,
-  ManyToMany,
   OneToOne,
-  DdlGenerator,
-  createRepository,
-  isLazyProxy,
-  isInitialized,
-  initializeProxy,
+  Table,
 } from "espalier-data";
-import type { PgDataSource } from "../../pg-data-source.js";
 import type { Connection } from "espalier-jdbc";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import type { PgDataSource } from "../../pg-data-source.js";
+import { createTestDataSource, isPostgresAvailable } from "./setup.js";
 
 const canConnect = await isPostgresAvailable();
 const generator = new DdlGenerator();
@@ -200,9 +201,7 @@ describe.skipIf(!canConnect)("Lazy loading adversarial: repository E2E (Postgres
 
       // Workaround Bug 4: set FK via raw SQL
       const rawStmt = conn.createStatement();
-      await rawStmt.executeUpdate(
-        `UPDATE e2e_lz_employees SET dept_id = ${dept.id} WHERE id = ${emp.id}`,
-      );
+      await rawStmt.executeUpdate(`UPDATE e2e_lz_employees SET dept_id = ${dept.id} WHERE id = ${emp.id}`);
 
       const freshRepo = createRepository<LzEmployee, number>(LzEmployee, ds);
       const loaded = await freshRepo.findById(emp.id);
@@ -245,9 +244,7 @@ describe.skipIf(!canConnect)("Lazy loading adversarial: repository E2E (Postgres
       const emp = await empRepo.save(newEntity(LzEmployee, { empName: "Bob" }));
 
       const rawStmt = conn.createStatement();
-      await rawStmt.executeUpdate(
-        `UPDATE e2e_lz_employees SET dept_id = ${dept.id} WHERE id = ${emp.id}`,
-      );
+      await rawStmt.executeUpdate(`UPDATE e2e_lz_employees SET dept_id = ${dept.id} WHERE id = ${emp.id}`);
 
       const freshRepo = createRepository<LzEmployee, number>(LzEmployee, ds);
       const loaded = await freshRepo.findById(emp.id);
@@ -272,9 +269,7 @@ describe.skipIf(!canConnect)("Lazy loading adversarial: repository E2E (Postgres
       const emp = await empRepo.save(newEntity(LzEmployee, { empName: "Sync" }));
 
       const rawStmt = conn.createStatement();
-      await rawStmt.executeUpdate(
-        `UPDATE e2e_lz_employees SET dept_id = ${dept.id} WHERE id = ${emp.id}`,
-      );
+      await rawStmt.executeUpdate(`UPDATE e2e_lz_employees SET dept_id = ${dept.id} WHERE id = ${emp.id}`);
 
       const freshRepo = createRepository<LzEmployee, number>(LzEmployee, ds);
       const loaded = await freshRepo.findById(emp.id);
@@ -374,7 +369,7 @@ describe.skipIf(!canConnect)("Lazy loading adversarial: repository E2E (Postgres
       // Await to trigger load
       const tags = await loaded!.tags;
       expect(tags).toHaveLength(2);
-      expect(tags.map(t => t.label).sort()).toEqual(["Bug", "Urgent"]);
+      expect(tags.map((t) => t.label).sort()).toEqual(["Bug", "Urgent"]);
       expect(isInitialized(loaded!.tags)).toBe(true);
     });
 
@@ -416,9 +411,9 @@ describe.skipIf(!canConnect)("Lazy loading adversarial: repository E2E (Postgres
 
       // Array methods
       expect(loaded!.tags.length).toBe(3);
-      expect(loaded!.tags.map(t => t.label).sort()).toEqual(["A", "B", "C"]);
-      expect(loaded!.tags.find(t => t.label === "B")).toBeDefined();
-      expect(loaded!.tags.filter(t => t.label !== "C")).toHaveLength(2);
+      expect(loaded!.tags.map((t) => t.label).sort()).toEqual(["A", "B", "C"]);
+      expect(loaded!.tags.find((t) => t.label === "B")).toBeDefined();
+      expect(loaded!.tags.filter((t) => t.label !== "C")).toHaveLength(2);
     });
 
     it("findAll returns entities with lazy @ManyToMany proxies", async () => {
@@ -505,9 +500,7 @@ describe.skipIf(!canConnect)("Lazy loading adversarial: repository E2E (Postgres
 
       // Set dept FK via raw SQL (workaround Bug 4)
       const rawStmt = conn.createStatement();
-      await rawStmt.executeUpdate(
-        `UPDATE e2e_lz_mixed SET dept_id = ${dept.id} WHERE id = ${mixed.id}`,
-      );
+      await rawStmt.executeUpdate(`UPDATE e2e_lz_mixed SET dept_id = ${dept.id} WHERE id = ${mixed.id}`);
       // Insert child via raw SQL
       await rawStmt.executeUpdate(
         `INSERT INTO e2e_lz_mixed_children (label, parent_id) VALUES ('Child1', ${mixed.id})`,
@@ -582,9 +575,7 @@ describe.skipIf(!canConnect)("Lazy loading adversarial: repository E2E (Postgres
       const item = await itemRepo.save(newEntity(LzItem, { title: "LengthTest" }));
 
       const rawStmt = conn.createStatement();
-      await rawStmt.executeUpdate(
-        `INSERT INTO e2e_lz_item_tags (item_id, tag_id) VALUES (${item.id}, ${tag.id})`,
-      );
+      await rawStmt.executeUpdate(`INSERT INTO e2e_lz_item_tags (item_id, tag_id) VALUES (${item.id}, ${tag.id})`);
 
       const freshRepo = createRepository<LzItem, number>(LzItem, ds);
       const loaded = await freshRepo.findById(item.id);
@@ -608,9 +599,7 @@ describe.skipIf(!canConnect)("Lazy loading adversarial: repository E2E (Postgres
       const item = await itemRepo.save(newEntity(LzItem, { title: "SpreadTest" }));
 
       const rawStmt = conn.createStatement();
-      await rawStmt.executeUpdate(
-        `INSERT INTO e2e_lz_item_tags (item_id, tag_id) VALUES (${item.id}, ${tag.id})`,
-      );
+      await rawStmt.executeUpdate(`INSERT INTO e2e_lz_item_tags (item_id, tag_id) VALUES (${item.id}, ${tag.id})`);
 
       const freshRepo = createRepository<LzItem, number>(LzItem, ds);
       const loaded = await freshRepo.findById(item.id);

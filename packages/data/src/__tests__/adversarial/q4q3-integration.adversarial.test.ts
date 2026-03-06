@@ -3,7 +3,7 @@
  *
  * Verifies all Q3 features work together and nothing from prior releases is broken.
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 // ---------------------------------------------------------------------------
 // 1. Export verification — every new Q3 public type/class importable
@@ -186,9 +186,15 @@ describe("Pagination + BulkOperationBuilder integration", () => {
     const allRows = Array.from({ length: 25 }, (_, i) => ({ id: i + 1, name: `user-${String(i).padStart(4, "0")}` }));
 
     // First page
-    const page1 = strategy.buildResult(allRows.slice(0, 11), {
-      size: 10, sortColumn: "name", sortDirection: "ASC" as const,
-    }, 25);
+    const page1 = strategy.buildResult(
+      allRows.slice(0, 11),
+      {
+        size: 10,
+        sortColumn: "name",
+        sortDirection: "ASC" as const,
+      },
+      25,
+    );
     expect(page1.content.length).toBe(10);
     expect(page1.hasNext).toBe(true);
     expect(page1.lastValue).toBe("user-0009");
@@ -266,24 +272,28 @@ describe("IndexAdvisor + pagination query", () => {
         totalCost: 500,
         estimatedRows: 20,
         width: 100,
-        children: [{
-          nodeType: "Sort",
-          sortKey: ["created_at DESC"],
-          startupCost: 0,
-          totalCost: 450,
-          estimatedRows: 10000,
-          width: 100,
-          children: [{
-            nodeType: "Seq Scan",
-            relation: "posts",
-            filter: "(status = $1)",
+        children: [
+          {
+            nodeType: "Sort",
+            sortKey: ["created_at DESC"],
             startupCost: 0,
-            totalCost: 400,
+            totalCost: 450,
             estimatedRows: 10000,
             width: 100,
-            children: [],
-          }],
-        }],
+            children: [
+              {
+                nodeType: "Seq Scan",
+                relation: "posts",
+                filter: "(status = $1)",
+                startupCost: 0,
+                totalCost: 400,
+                estimatedRows: 10000,
+                width: 100,
+                children: [],
+              },
+            ],
+          },
+        ],
       },
       totalCost: 500,
     };
@@ -364,10 +374,7 @@ describe("GraphQL pagination adapter + strategy integration", () => {
 describe("@Pagination decorator + PaginationStrategyRegistry", () => {
   it("entity decoration resolves to strategy via registry", async () => {
     const { Pagination, getPaginationStrategy } = await import("../../decorators/pagination.js");
-    const {
-      PaginationStrategyRegistry,
-      OffsetPaginationStrategy,
-    } = await import("../../pagination/index.js");
+    const { PaginationStrategyRegistry, OffsetPaginationStrategy } = await import("../../pagination/index.js");
 
     @Pagination("offset")
     class TestEntity {}
@@ -416,9 +423,7 @@ describe("Cross-strategy consistency", () => {
       const start = p * pageSize;
       const end = Math.min(start + pageSize, totalRows);
       if (start >= totalRows) break;
-      const page = strategy.buildResult(
-        allRows.slice(start, end), createPageable(p, pageSize), totalRows,
-      );
+      const page = strategy.buildResult(allRows.slice(start, end), createPageable(p, pageSize), totalRows);
       collected.push(...page.content);
       if (!page.hasNext) break;
     }
@@ -461,16 +466,22 @@ describe("Cross-strategy consistency", () => {
     for (let i = 0; i < 10; i++) {
       let available = allRows;
       if (afterValue !== undefined && afterId !== undefined) {
-        available = allRows.filter((r) =>
-          r.name > (afterValue as string) ||
-          (r.name === afterValue && r.id > (afterId as number)),
+        available = allRows.filter(
+          (r) => r.name > (afterValue as string) || (r.name === afterValue && r.id > (afterId as number)),
         );
       }
       const fetched = available.slice(0, pageSize + 1);
-      const result = strategy.buildResult(fetched, {
-        size: pageSize, sortColumn: "name", sortDirection: "ASC" as const,
-        afterValue, afterId,
-      }, totalRows);
+      const result = strategy.buildResult(
+        fetched,
+        {
+          size: pageSize,
+          sortColumn: "name",
+          sortDirection: "ASC" as const,
+          afterValue,
+          afterId,
+        },
+        totalRows,
+      );
       collected.push(...result.content);
       if (!result.hasNext) break;
       afterValue = result.lastValue;

@@ -1,19 +1,12 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import {
-  LogLevel,
-  NoopLogger,
-  ConsoleLogger,
-  setGlobalLogger,
-  getGlobalLogger,
-} from "../../logger.js";
-import type { Logger } from "../../logger.js";
-import { StatementCache } from "../../statement-cache.js";
-import type { PreparedStatement } from "../../statement.js";
-import { warmupPool, validateConnection } from "../../pool-warmup.js";
-import type { PooledDataSource } from "../../pool.js";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Connection } from "../../connection.js";
-import type { Statement } from "../../statement.js";
+import type { Logger } from "../../logger.js";
+import { ConsoleLogger, LogLevel, NoopLogger, setGlobalLogger } from "../../logger.js";
+import type { PooledDataSource } from "../../pool.js";
+import { validateConnection, warmupPool } from "../../pool-warmup.js";
 import type { ResultSet } from "../../result-set.js";
+import type { PreparedStatement, Statement } from "../../statement.js";
+import { StatementCache } from "../../statement-cache.js";
 
 // ---------------------------------------------------------------------------
 // Mock helpers
@@ -30,13 +23,27 @@ function createMockStatement(): PreparedStatement {
 
 function createMockResultSet(): ResultSet {
   return {
-    async next() { return false; },
-    getString() { return null; },
-    getNumber() { return null; },
-    getBoolean() { return null; },
-    getDate() { return null; },
-    getRow() { return {}; },
-    getMetadata() { return []; },
+    async next() {
+      return false;
+    },
+    getString() {
+      return null;
+    },
+    getNumber() {
+      return null;
+    },
+    getBoolean() {
+      return null;
+    },
+    getDate() {
+      return null;
+    },
+    getRow() {
+      return {};
+    },
+    getMetadata() {
+      return [];
+    },
     async close() {},
     [Symbol.asyncIterator]() {
       return {
@@ -89,7 +96,9 @@ function createMockPooledDataSource(failCount = 0): PooledDataSource {
 /**
  * A spy logger that records every call to its methods.
  */
-function createSpyLogger(): Logger & { calls: { method: string; message: string; context?: Record<string, unknown> }[] } {
+function createSpyLogger(): Logger & {
+  calls: { method: string; message: string; context?: Record<string, unknown> }[];
+} {
   const calls: { method: string; message: string; context?: Record<string, unknown> }[] = [];
   const logger: Logger & { calls: typeof calls } = {
     calls,
@@ -153,7 +162,9 @@ describe("adversarial: logging instrumentation (JDBC)", () => {
         warn: vi.fn(),
         error: vi.fn(),
         isEnabled: vi.fn(() => false),
-        child: vi.fn(function (this: Logger) { return this; }),
+        child: vi.fn(function (this: Logger) {
+          return this;
+        }),
       };
       setGlobalLogger(mockLogger);
 
@@ -205,14 +216,14 @@ describe("adversarial: logging instrumentation (JDBC)", () => {
       const cache = new StatementCache({ maxSize: 5 });
 
       cache.get("SELECT 1"); // miss with spy1
-      setGlobalLogger(spy2);  // swap!
+      setGlobalLogger(spy2); // swap!
       cache.put("SELECT 1", createMockStatement()); // put with spy2
       cache.get("SELECT 1"); // hit with spy2
 
       // spy1 should have the miss
-      expect(spy1.calls.some(c => c.message === "cache miss")).toBe(true);
+      expect(spy1.calls.some((c) => c.message === "cache miss")).toBe(true);
       // spy2 should have the hit
-      expect(spy2.calls.some(c => c.message === "cache hit")).toBe(true);
+      expect(spy2.calls.some((c) => c.message === "cache hit")).toBe(true);
     });
 
     it("swapping logger to NoopLogger mid-operation silences subsequent logs", () => {
@@ -257,7 +268,7 @@ describe("adversarial: logging instrumentation (JDBC)", () => {
       const longSql = "SELECT " + "a".repeat(300) + " FROM users";
       cache.get(longSql);
 
-      const missCall = spy.calls.find(c => c.message === "cache miss");
+      const missCall = spy.calls.find((c) => c.message === "cache miss");
       expect(missCall).toBeDefined();
       const loggedSql = missCall!.context!["sql"] as string;
       // Should be truncated to ~200 + "..."
@@ -274,7 +285,7 @@ describe("adversarial: logging instrumentation (JDBC)", () => {
       cache.put(longSql, createMockStatement());
       cache.get(longSql);
 
-      const hitCall = spy.calls.find(c => c.message === "cache hit");
+      const hitCall = spy.calls.find((c) => c.message === "cache hit");
       expect(hitCall).toBeDefined();
       const loggedSql = hitCall!.context!["sql"] as string;
       expect(loggedSql.length).toBeLessThanOrEqual(203);
@@ -292,7 +303,7 @@ describe("adversarial: logging instrumentation (JDBC)", () => {
       cache.put(longSql1, createMockStatement());
       cache.put(longSql2, createMockStatement()); // evicts longSql1
 
-      const evictCall = spy.calls.find(c => c.message === "cache eviction");
+      const evictCall = spy.calls.find((c) => c.message === "cache eviction");
       expect(evictCall).toBeDefined();
       const loggedSql = evictCall!.context!["sql"] as string;
       expect(loggedSql.length).toBeLessThanOrEqual(203);
@@ -307,7 +318,7 @@ describe("adversarial: logging instrumentation (JDBC)", () => {
       const exactSql = "S".repeat(200);
       cache.get(exactSql);
 
-      const missCall = spy.calls.find(c => c.message === "cache miss");
+      const missCall = spy.calls.find((c) => c.message === "cache miss");
       expect(missCall).toBeDefined();
       const loggedSql = missCall!.context!["sql"] as string;
       expect(loggedSql).toBe(exactSql);
@@ -322,7 +333,7 @@ describe("adversarial: logging instrumentation (JDBC)", () => {
       const sql201 = "S".repeat(201);
       cache.get(sql201);
 
-      const missCall = spy.calls.find(c => c.message === "cache miss");
+      const missCall = spy.calls.find((c) => c.message === "cache miss");
       expect(missCall).toBeDefined();
       const loggedSql = missCall!.context!["sql"] as string;
       expect(loggedSql.length).toBe(203); // 200 + "..."
@@ -342,7 +353,7 @@ describe("adversarial: logging instrumentation (JDBC)", () => {
       cache.get(longSql);
 
       // Verify console output does NOT contain the full SQL
-      const allOutput = consoleSpy.mock.calls.map(c => c[0]).join("\n");
+      const allOutput = consoleSpy.mock.calls.map((c) => c[0]).join("\n");
       expect(allOutput).not.toContain(longSql);
 
       vi.restoreAllMocks();
@@ -427,7 +438,7 @@ describe("adversarial: logging instrumentation (JDBC)", () => {
       expect(result.connectionsFailed).toBe(2);
       expect(result.connectionsCreated).toBe(3);
 
-      const warnCall = spy.calls.find(c => c.method === "warn");
+      const warnCall = spy.calls.find((c) => c.method === "warn");
       expect(warnCall).toBeDefined();
       expect(warnCall!.message).toContain("warmup completed with failures");
       expect(warnCall!.context!["connectionsFailed"]).toBe(2);
@@ -440,10 +451,10 @@ describe("adversarial: logging instrumentation (JDBC)", () => {
       const ds = createMockPooledDataSource(0);
       await warmupPool(ds, 3);
 
-      const warnCalls = spy.calls.filter(c => c.method === "warn");
+      const warnCalls = spy.calls.filter((c) => c.method === "warn");
       expect(warnCalls).toHaveLength(0);
 
-      const infoComplete = spy.calls.find(c => c.message === "pool warmup completed");
+      const infoComplete = spy.calls.find((c) => c.message === "pool warmup completed");
       expect(infoComplete).toBeDefined();
     });
 
@@ -452,7 +463,9 @@ describe("adversarial: logging instrumentation (JDBC)", () => {
       setGlobalLogger(spy);
 
       const failingStmt: Statement = {
-        executeQuery: vi.fn(async () => { throw new Error("connection lost"); }),
+        executeQuery: vi.fn(async () => {
+          throw new Error("connection lost");
+        }),
         executeUpdate: vi.fn(async () => 0),
         close: vi.fn(async () => {}),
       };
@@ -473,7 +486,7 @@ describe("adversarial: logging instrumentation (JDBC)", () => {
       expect(result.valid).toBe(false);
       expect(result.error).toBeDefined();
 
-      const failCall = spy.calls.find(c => c.message === "pre-ping failed");
+      const failCall = spy.calls.find((c) => c.message === "pre-ping failed");
       expect(failCall).toBeDefined();
       expect(failCall!.context!["error"]).toBe("connection lost");
     });
@@ -553,7 +566,7 @@ describe("adversarial: logging instrumentation (JDBC)", () => {
       cache.get("SELECT 1"); // hit
       cache.put("SELECT 2", createMockStatement()); // evicts SELECT 1
 
-      const messages = spy.calls.map(c => c.message);
+      const messages = spy.calls.map((c) => c.message);
       expect(messages).toContain("cache miss");
       expect(messages).toContain("cache hit");
       expect(messages).toContain("cache eviction");
@@ -566,7 +579,7 @@ describe("adversarial: logging instrumentation (JDBC)", () => {
       const ds = createMockPooledDataSource();
       await warmupPool(ds, 2);
 
-      const messages = spy.calls.map(c => c.message);
+      const messages = spy.calls.map((c) => c.message);
       expect(messages).toContain("pool warmup starting");
       expect(messages).toContain("pool warmup completed");
     });
@@ -582,7 +595,7 @@ describe("adversarial: logging instrumentation (JDBC)", () => {
         evictOnFailure: true,
       });
 
-      const messages = spy.calls.map(c => c.message);
+      const messages = spy.calls.map((c) => c.message);
       expect(messages).toContain("pre-ping succeeded");
     });
 
@@ -599,7 +612,7 @@ describe("adversarial: logging instrumentation (JDBC)", () => {
       );
 
       expect(result.valid).toBe(true);
-      const skippedCall = spy.calls.find(c => c.message.includes("skipped"));
+      const skippedCall = spy.calls.find((c) => c.message.includes("skipped"));
       expect(skippedCall).toBeDefined();
       expect(skippedCall!.context!["elapsedMs"]).toBeDefined();
     });
@@ -612,16 +625,32 @@ describe("adversarial: logging instrumentation (JDBC)", () => {
         info() {},
         warn() {},
         error() {},
-        isEnabled() { return true; },
+        isEnabled() {
+          return true;
+        },
         child(name: string): Logger {
           return {
-            trace(message: string) { childCalls.push({ name, method: "trace", message }); },
-            debug(message: string) { childCalls.push({ name, method: "debug", message }); },
-            info(message: string) { childCalls.push({ name, method: "info", message }); },
-            warn(message: string) { childCalls.push({ name, method: "warn", message }); },
-            error(message: string) { childCalls.push({ name, method: "error", message }); },
-            isEnabled() { return true; },
-            child(n: string) { return customLogger.child(`${name}.${n}`); },
+            trace(message: string) {
+              childCalls.push({ name, method: "trace", message });
+            },
+            debug(message: string) {
+              childCalls.push({ name, method: "debug", message });
+            },
+            info(message: string) {
+              childCalls.push({ name, method: "info", message });
+            },
+            warn(message: string) {
+              childCalls.push({ name, method: "warn", message });
+            },
+            error(message: string) {
+              childCalls.push({ name, method: "error", message });
+            },
+            isEnabled() {
+              return true;
+            },
+            child(n: string) {
+              return customLogger.child(`${name}.${n}`);
+            },
           };
         },
       };
@@ -631,7 +660,7 @@ describe("adversarial: logging instrumentation (JDBC)", () => {
       cache.get("SELECT 1");
 
       // StatementCache creates a child named "statement-cache"
-      expect(childCalls.some(c => c.name === "statement-cache")).toBe(true);
+      expect(childCalls.some((c) => c.name === "statement-cache")).toBe(true);
     });
   });
 
@@ -648,19 +677,15 @@ describe("adversarial: logging instrumentation (JDBC)", () => {
       const ds2 = createMockPooledDataSource();
       const ds3 = createMockPooledDataSource();
 
-      const [r1, r2, r3] = await Promise.all([
-        warmupPool(ds1, 5),
-        warmupPool(ds2, 5),
-        warmupPool(ds3, 5),
-      ]);
+      const [r1, r2, r3] = await Promise.all([warmupPool(ds1, 5), warmupPool(ds2, 5), warmupPool(ds3, 5)]);
 
       expect(r1.connectionsCreated).toBe(5);
       expect(r2.connectionsCreated).toBe(5);
       expect(r3.connectionsCreated).toBe(5);
 
       // All warmup start/complete logs should be present (3 pairs)
-      const startCalls = spy.calls.filter(c => c.message === "pool warmup starting");
-      const completeCalls = spy.calls.filter(c => c.message === "pool warmup completed");
+      const startCalls = spy.calls.filter((c) => c.message === "pool warmup starting");
+      const completeCalls = spy.calls.filter((c) => c.message === "pool warmup completed");
       expect(startCalls).toHaveLength(3);
       expect(completeCalls).toHaveLength(3);
     });
@@ -671,17 +696,19 @@ describe("adversarial: logging instrumentation (JDBC)", () => {
 
       const conns = Array.from({ length: 10 }, () => createMockConnection());
       const results = await Promise.all(
-        conns.map(c => validateConnection(c, {
-          query: "SELECT 1",
-          intervalMs: 30000,
-          evictOnFailure: true,
-        })),
+        conns.map((c) =>
+          validateConnection(c, {
+            query: "SELECT 1",
+            intervalMs: 30000,
+            evictOnFailure: true,
+          }),
+        ),
       );
 
-      expect(results.every(r => r.valid)).toBe(true);
+      expect(results.every((r) => r.valid)).toBe(true);
 
       // All 10 pre-ping succeeded logs should be present
-      const succeededCalls = spy.calls.filter(c => c.message === "pre-ping succeeded");
+      const succeededCalls = spy.calls.filter((c) => c.message === "pre-ping succeeded");
       expect(succeededCalls).toHaveLength(10);
     });
 
@@ -756,7 +783,7 @@ describe("adversarial: logging instrumentation (JDBC)", () => {
 
       expect(result.connectionsCreated).toBe(0);
 
-      const messages = spy.calls.map(c => c.message);
+      const messages = spy.calls.map((c) => c.message);
       expect(messages).toContain("pool warmup starting");
       expect(messages).toContain("pool warmup completed");
     });
@@ -768,7 +795,7 @@ describe("adversarial: logging instrumentation (JDBC)", () => {
       const ds = createMockPooledDataSource();
       await warmupPool(ds, 7);
 
-      const startCall = spy.calls.find(c => c.message === "pool warmup starting");
+      const startCall = spy.calls.find((c) => c.message === "pool warmup starting");
       expect(startCall).toBeDefined();
       expect(startCall!.context!["targetConnections"]).toBe(7);
     });
@@ -780,7 +807,7 @@ describe("adversarial: logging instrumentation (JDBC)", () => {
       const ds = createMockPooledDataSource();
       await warmupPool(ds, 3);
 
-      const completeCall = spy.calls.find(c => c.message === "pool warmup completed");
+      const completeCall = spy.calls.find((c) => c.message === "pool warmup completed");
       expect(completeCall).toBeDefined();
       expect(typeof completeCall!.context!["durationMs"]).toBe("number");
       expect(completeCall!.context!["durationMs"]).toBeGreaterThanOrEqual(0);
@@ -791,13 +818,9 @@ describe("adversarial: logging instrumentation (JDBC)", () => {
       setGlobalLogger(spy);
 
       const conn = createMockConnection();
-      await validateConnection(
-        conn,
-        { query: "SELECT 1", intervalMs: 60000, evictOnFailure: true },
-        Date.now() - 100,
-      );
+      await validateConnection(conn, { query: "SELECT 1", intervalMs: 60000, evictOnFailure: true }, Date.now() - 100);
 
-      const skippedCall = spy.calls.find(c => c.message.includes("skipped"));
+      const skippedCall = spy.calls.find((c) => c.message.includes("skipped"));
       expect(skippedCall).toBeDefined();
       expect(skippedCall!.context!["intervalMs"]).toBe(60000);
     });
@@ -811,7 +834,7 @@ describe("adversarial: logging instrumentation (JDBC)", () => {
       cache.put("SELECT 2", createMockStatement());
       cache.get("SELECT 1"); // hit, size should be 2
 
-      const hitCall = spy.calls.find(c => c.message === "cache hit");
+      const hitCall = spy.calls.find((c) => c.message === "cache hit");
       expect(hitCall).toBeDefined();
       expect(hitCall!.context!["cacheSize"]).toBe(2);
     });
@@ -824,7 +847,7 @@ describe("adversarial: logging instrumentation (JDBC)", () => {
       cache.put("SELECT 1", createMockStatement());
       cache.put("SELECT 2", createMockStatement()); // evicts SELECT 1
 
-      const evictCall = spy.calls.find(c => c.message === "cache eviction");
+      const evictCall = spy.calls.find((c) => c.message === "cache eviction");
       expect(evictCall).toBeDefined();
       // After eviction, size should be 1 (only SELECT 2 remains)
       expect(evictCall!.context!["cacheSize"]).toBe(1);
@@ -832,13 +855,27 @@ describe("adversarial: logging instrumentation (JDBC)", () => {
 
     it("throwing logger does not break StatementCache operations", () => {
       const throwingLogger: Logger = {
-        trace() { throw new Error("logger crash!"); },
-        debug() { throw new Error("logger crash!"); },
-        info() { throw new Error("logger crash!"); },
-        warn() { throw new Error("logger crash!"); },
-        error() { throw new Error("logger crash!"); },
-        isEnabled() { return true; },
-        child() { return this; },
+        trace() {
+          throw new Error("logger crash!");
+        },
+        debug() {
+          throw new Error("logger crash!");
+        },
+        info() {
+          throw new Error("logger crash!");
+        },
+        warn() {
+          throw new Error("logger crash!");
+        },
+        error() {
+          throw new Error("logger crash!");
+        },
+        isEnabled() {
+          return true;
+        },
+        child() {
+          return this;
+        },
       };
       setGlobalLogger(throwingLogger);
 
@@ -850,13 +887,27 @@ describe("adversarial: logging instrumentation (JDBC)", () => {
 
     it("throwing logger does not break warmupPool", async () => {
       const throwingLogger: Logger = {
-        trace() { throw new Error("logger crash!"); },
-        debug() { throw new Error("logger crash!"); },
-        info() { throw new Error("logger crash!"); },
-        warn() { throw new Error("logger crash!"); },
-        error() { throw new Error("logger crash!"); },
-        isEnabled() { return true; },
-        child() { return this; },
+        trace() {
+          throw new Error("logger crash!");
+        },
+        debug() {
+          throw new Error("logger crash!");
+        },
+        info() {
+          throw new Error("logger crash!");
+        },
+        warn() {
+          throw new Error("logger crash!");
+        },
+        error() {
+          throw new Error("logger crash!");
+        },
+        isEnabled() {
+          return true;
+        },
+        child() {
+          return this;
+        },
       };
       setGlobalLogger(throwingLogger);
 

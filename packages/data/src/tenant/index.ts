@@ -46,19 +46,20 @@
  * @module
  */
 
-export type { TenantIdentifier } from "./tenant-context.js";
-export { TenantContext, NoTenantException } from "./tenant-context.js";
-
+export type { LoadBalancer, ReadReplicaDataSourceOptions } from "./read-replica-datasource.js";
+export {
+  RandomBalancer,
+  ReadReplicaDataSource,
+  ReadWriteContext,
+  RoundRobinBalancer,
+} from "./read-replica-datasource.js";
+export type { RoutingDataSourceOptions } from "./routing-datasource.js";
+export { RoutingDataSource, RoutingError, TenantRoutingDataSource } from "./routing-datasource.js";
 export type { TenantAwareDataSourceOptions } from "./tenant-aware-datasource.js";
-export { TenantAwareDataSource, SchemaSetupError } from "./tenant-aware-datasource.js";
-
+export { SchemaSetupError, TenantAwareDataSource } from "./tenant-aware-datasource.js";
+export type { TenantIdentifier } from "./tenant-context.js";
+export { NoTenantException, TenantContext } from "./tenant-context.js";
 export { tenantFilter } from "./tenant-filter.js";
 
-export type { RoutingDataSourceOptions } from "./routing-datasource.js";
-export { RoutingDataSource, TenantRoutingDataSource, RoutingError } from "./routing-datasource.js";
-
-export type { LoadBalancer, ReadReplicaDataSourceOptions } from "./read-replica-datasource.js";
-export { ReadWriteContext, ReadReplicaDataSource, RoundRobinBalancer, RandomBalancer } from "./read-replica-datasource.js";
-
 export type { TenantSchemaManagerOptions } from "./tenant-schema-manager.js";
-export { TenantSchemaManager, TenantLimitExceededError } from "./tenant-schema-manager.js";
+export { TenantLimitExceededError, TenantSchemaManager } from "./tenant-schema-manager.js";

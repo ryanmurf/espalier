@@ -1,9 +1,8 @@
-import { describe, it, expect } from "vitest";
-import { EntityChangeCapture } from "../notifications/entity-change-capture.js";
-
 // Minimal @Table decorator simulation using the same WeakMap approach as espalier-data
 // We import from espalier-data to ensure the real decorator works.
-import { Table, getTableName } from "espalier-data";
+import { Table } from "espalier-data";
+import { describe, expect, it } from "vitest";
+import { EntityChangeCapture } from "../notifications/entity-change-capture.js";
 
 @Table("users")
 class User {
@@ -45,19 +44,13 @@ describe("EntityChangeCapture", () => {
   });
 
   it("should throw for entity without @Table decorator", () => {
-    expect(() => capture.generateTriggerDdl(NoTableEntity, "test_channel")).toThrow(
-      /does not have a @Table decorator/,
-    );
+    expect(() => capture.generateTriggerDdl(NoTableEntity, "test_channel")).toThrow(/does not have a @Table decorator/);
   });
 
   it("should throw for invalid channel names", () => {
     expect(() => capture.generateTriggerDdl(User, "bad channel")).toThrow(/Invalid channel name/);
-    expect(() => capture.generateTriggerDdl(User, "'; DROP TABLE users; --")).toThrow(
-      /Invalid channel name/,
-    );
-    expect(() => capture.generateTriggerDdl(User, "123starts_with_number")).toThrow(
-      /Invalid channel name/,
-    );
+    expect(() => capture.generateTriggerDdl(User, "'; DROP TABLE users; --")).toThrow(/Invalid channel name/);
+    expect(() => capture.generateTriggerDdl(User, "123starts_with_number")).toThrow(/Invalid channel name/);
   });
 
   it("should produce valid SQL with no injection vectors", () => {

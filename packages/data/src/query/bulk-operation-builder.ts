@@ -53,20 +53,14 @@ export class BulkOperationBuilder {
    * Build multi-row INSERT statements, chunked by chunkSize.
    * Returns one BulkQuery per chunk.
    */
-  buildBulkInsert(
-    table: string,
-    columns: string[],
-    rows: SqlValue[][],
-  ): BulkQuery[] {
+  buildBulkInsert(table: string, columns: string[], rows: SqlValue[][]): BulkQuery[] {
     if (rows.length === 0) return [];
     if (columns.length === 0) {
       throw new Error("columns must not be empty");
     }
     for (let i = 0; i < rows.length; i++) {
       if (rows[i].length !== columns.length) {
-        throw new Error(
-          `Row ${i} has ${rows[i].length} values but ${columns.length} columns were specified`,
-        );
+        throw new Error(`Row ${i} has ${rows[i].length} values but ${columns.length} columns were specified`);
       }
     }
 
@@ -90,9 +84,7 @@ export class BulkOperationBuilder {
     if (rows.length === 0) return [];
 
     const chunks = this.chunk(rows);
-    return chunks.map((chunk) =>
-      this.buildUpsertChunk(table, columns, chunk, conflictColumns, updateColumns),
-    );
+    return chunks.map((chunk) => this.buildUpsertChunk(table, columns, chunk, conflictColumns, updateColumns));
   }
 
   /**
@@ -104,12 +96,7 @@ export class BulkOperationBuilder {
    * @param updateColumns - Columns to update (excluding the ID column).
    * @param rows - Each row: [idValue, ...updateValues] in same order as updateColumns.
    */
-  buildBulkUpdate(
-    table: string,
-    idColumn: string,
-    updateColumns: string[],
-    rows: SqlValue[][],
-  ): BulkQuery[] {
+  buildBulkUpdate(table: string, idColumn: string, updateColumns: string[], rows: SqlValue[][]): BulkQuery[] {
     if (rows.length === 0) return [];
     if (updateColumns.length === 0) {
       throw new Error("updateColumns must not be empty");
@@ -123,16 +110,10 @@ export class BulkOperationBuilder {
     }
 
     const chunks = this.chunk(rows);
-    return chunks.map((chunk) =>
-      this.buildUpdateChunk(table, idColumn, updateColumns, chunk),
-    );
+    return chunks.map((chunk) => this.buildUpdateChunk(table, idColumn, updateColumns, chunk));
   }
 
-  private buildInsertChunk(
-    table: string,
-    columns: string[],
-    rows: SqlValue[][],
-  ): BulkQuery {
+  private buildInsertChunk(table: string, columns: string[], rows: SqlValue[][]): BulkQuery {
     const quotedCols = columns.map((c) => quoteIdentifier(c)).join(", ");
     const params: SqlValue[] = [];
     const valueGroups: string[] = [];
@@ -169,9 +150,7 @@ export class BulkOperationBuilder {
       if (updateColumns.length === 0) {
         insert.sql += ` ON DUPLICATE KEY UPDATE ${quoteIdentifier(conflictColumns[0])} = ${quoteIdentifier(conflictColumns[0])}`;
       } else {
-        const updates = updateColumns.map(
-          (c) => `${quoteIdentifier(c)} = VALUES(${quoteIdentifier(c)})`,
-        );
+        const updates = updateColumns.map((c) => `${quoteIdentifier(c)} = VALUES(${quoteIdentifier(c)})`);
         insert.sql += ` ON DUPLICATE KEY UPDATE ${updates.join(", ")}`;
       }
     } else {
@@ -181,9 +160,7 @@ export class BulkOperationBuilder {
       if (updateColumns.length === 0) {
         insert.sql += ` ON CONFLICT (${conflictCols}) DO NOTHING`;
       } else {
-        const updates = updateColumns.map(
-          (c) => `${quoteIdentifier(c)} = EXCLUDED.${quoteIdentifier(c)}`,
-        );
+        const updates = updateColumns.map((c) => `${quoteIdentifier(c)} = EXCLUDED.${quoteIdentifier(c)}`);
         insert.sql += ` ON CONFLICT (${conflictCols}) DO UPDATE SET ${updates.join(", ")}`;
       }
     }
@@ -191,12 +168,7 @@ export class BulkOperationBuilder {
     return insert;
   }
 
-  private buildUpdateChunk(
-    table: string,
-    idColumn: string,
-    updateColumns: string[],
-    rows: SqlValue[][],
-  ): BulkQuery {
+  private buildUpdateChunk(table: string, idColumn: string, updateColumns: string[], rows: SqlValue[][]): BulkQuery {
     // CASE-based bulk update:
     // UPDATE t SET
     //   col1 = CASE id WHEN $1 THEN $2 WHEN $3 THEN $4 END,

@@ -1,10 +1,10 @@
 /**
  * Adversarial tests round 2: confirming additional bugs found by code reviewers.
  */
-import { describe, it, expect } from "vitest";
-import { parseDerivedQueryMethod } from "../../query/derived-query-parser.js";
-import { buildDerivedQuery } from "../../query/derived-query-executor.js";
+import { describe, expect, it } from "vitest";
 import type { EntityMetadata } from "../../mapping/entity-metadata.js";
+import { buildDerivedQuery } from "../../query/derived-query-executor.js";
+import { parseDerivedQueryMethod } from "../../query/derived-query-parser.js";
 
 const userMetadata: EntityMetadata = {
   tableName: "users",

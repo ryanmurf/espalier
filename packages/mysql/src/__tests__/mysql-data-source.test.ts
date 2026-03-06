@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from "vitest";
 import { ConnectionError, DatabaseErrorCode } from "espalier-jdbc";
+import { describe, expect, it, vi } from "vitest";
 
 // Mock the mysql2/promise module — each createPool call gets fresh spies
 vi.mock("mysql2/promise", () => {
@@ -19,12 +19,11 @@ vi.mock("mysql2/promise", () => {
 });
 
 import mysql from "mysql2/promise";
-import { MysqlDataSource } from "../mysql-data-source.js";
 import { MysqlConnection } from "../mysql-connection.js";
+import { MysqlDataSource } from "../mysql-data-source.js";
 
 function getMockPool() {
-  const instance = (mysql.createPool as unknown as ReturnType<typeof vi.fn>)
-    .mock.results.at(-1)?.value;
+  const instance = (mysql.createPool as unknown as ReturnType<typeof vi.fn>).mock.results.at(-1)?.value;
   return instance as {
     getConnection: ReturnType<typeof vi.fn>;
     end: ReturnType<typeof vi.fn>;
@@ -62,8 +61,7 @@ describe("MysqlDataSource", () => {
           idleTimeout: 60000,
         },
       });
-      const lastCall = (mysql.createPool as unknown as ReturnType<typeof vi.fn>)
-        .mock.calls.at(-1)?.[0];
+      const lastCall = (mysql.createPool as unknown as ReturnType<typeof vi.fn>).mock.calls.at(-1)?.[0];
       expect(lastCall).toMatchObject({
         host: "db.example.com",
         connectionLimit: 20,
@@ -95,49 +93,37 @@ describe("MysqlDataSource", () => {
     it("wraps connection errors in ConnectionError", async () => {
       const ds = new MysqlDataSource({ host: "localhost" });
       const pool = getMockPool();
-      pool.getConnection.mockRejectedValue(
-        Object.assign(new Error("connection refused"), { code: "ECONNREFUSED" }),
-      );
+      pool.getConnection.mockRejectedValue(Object.assign(new Error("connection refused"), { code: "ECONNREFUSED" }));
 
       await expect(ds.getConnection()).rejects.toThrow(ConnectionError);
-      await expect(ds.getConnection()).rejects.toThrow(
-        /Failed to get connection/,
-      );
+      await expect(ds.getConnection()).rejects.toThrow(/Failed to get connection/);
     });
 
     it("maps ECONNREFUSED to CONNECTION_FAILED code", async () => {
       const ds = new MysqlDataSource({ host: "localhost" });
       const pool = getMockPool();
-      pool.getConnection.mockRejectedValue(
-        Object.assign(new Error("refused"), { code: "ECONNREFUSED" }),
-      );
+      pool.getConnection.mockRejectedValue(Object.assign(new Error("refused"), { code: "ECONNREFUSED" }));
 
       try {
         await ds.getConnection();
         expect.unreachable("should have thrown");
       } catch (err) {
         expect(err).toBeInstanceOf(ConnectionError);
-        expect((err as ConnectionError).code).toBe(
-          DatabaseErrorCode.CONNECTION_FAILED,
-        );
+        expect((err as ConnectionError).code).toBe(DatabaseErrorCode.CONNECTION_FAILED);
       }
     });
 
     it("maps ETIMEDOUT to CONNECTION_TIMEOUT code", async () => {
       const ds = new MysqlDataSource({ host: "localhost" });
       const pool = getMockPool();
-      pool.getConnection.mockRejectedValue(
-        Object.assign(new Error("timed out"), { code: "ETIMEDOUT" }),
-      );
+      pool.getConnection.mockRejectedValue(Object.assign(new Error("timed out"), { code: "ETIMEDOUT" }));
 
       try {
         await ds.getConnection();
         expect.unreachable("should have thrown");
       } catch (err) {
         expect(err).toBeInstanceOf(ConnectionError);
-        expect((err as ConnectionError).code).toBe(
-          DatabaseErrorCode.CONNECTION_TIMEOUT,
-        );
+        expect((err as ConnectionError).code).toBe(DatabaseErrorCode.CONNECTION_TIMEOUT);
       }
     });
 

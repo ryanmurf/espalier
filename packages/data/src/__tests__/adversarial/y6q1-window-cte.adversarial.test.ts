@@ -1,7 +1,6 @@
-import { describe, it, expect } from "vitest";
-import { SelectBuilder } from "../../query/query-builder.js";
+import { describe, expect, it } from "vitest";
 import { ComparisonCriteria } from "../../query/criteria.js";
-import type { WindowSpec, FrameSpec, WindowFunctionDef } from "../../query/query-builder.js";
+import { SelectBuilder } from "../../query/query-builder.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -18,16 +17,17 @@ function buildSql(fn: (b: SelectBuilder) => void): { sql: string; params: any[] 
 // ---------------------------------------------------------------------------
 
 describe("Window Functions — Adversarial", () => {
-
   // ── SQL Injection ───────────────────────────────────────────────────
 
   describe("SQL injection vectors", () => {
     it("should quote-escape partition column with injection payload", () => {
-      const { sql } = buildSql(b => b.addWindowFunction({
-        function: "ROW_NUMBER",
-        over: { partitionBy: ['status"; DROP TABLE users; --'] },
-        alias: "rn",
-      }));
+      const { sql } = buildSql((b) =>
+        b.addWindowFunction({
+          function: "ROW_NUMBER",
+          over: { partitionBy: ['status"; DROP TABLE users; --'] },
+          alias: "rn",
+        }),
+      );
       // quoteIdentifier wraps in double quotes and escapes internal quotes
       // The payload is safely contained inside quoted identifier
       expect(sql).toContain('PARTITION BY "status""');
@@ -36,56 +36,70 @@ describe("Window Functions — Adversarial", () => {
     });
 
     it("should quote-escape order column with injection payload", () => {
-      const { sql } = buildSql(b => b.addWindowFunction({
-        function: "RANK",
-        over: { orderBy: [{ column: "id; DROP TABLE--", direction: "ASC" }] },
-        alias: "rnk",
-      }));
+      const { sql } = buildSql((b) =>
+        b.addWindowFunction({
+          function: "RANK",
+          over: { orderBy: [{ column: "id; DROP TABLE--", direction: "ASC" }] },
+          alias: "rnk",
+        }),
+      );
       // The injection payload is safely inside double quotes
       expect(sql).toMatch(/"id; DROP TABLE--"/);
     });
 
     it("should reject injection in function name", () => {
-      expect(() => buildSql(b => b.addWindowFunction({
-        function: "ROW_NUMBER() OVER(); DROP TABLE users; --",
-        over: {},
-        alias: "rn",
-      }))).toThrow(/Invalid window function/);
+      expect(() =>
+        buildSql((b) =>
+          b.addWindowFunction({
+            function: "ROW_NUMBER() OVER(); DROP TABLE users; --",
+            over: {},
+            alias: "rn",
+          }),
+        ),
+      ).toThrow(/Invalid window function/);
     });
 
     it("should quote-escape alias with injection payload", () => {
-      const { sql } = buildSql(b => b.addWindowFunction({
-        function: "ROW_NUMBER",
-        over: {},
-        alias: 'rn"; DROP TABLE users; --',
-      }));
+      const { sql } = buildSql((b) =>
+        b.addWindowFunction({
+          function: "ROW_NUMBER",
+          over: {},
+          alias: 'rn"; DROP TABLE users; --',
+        }),
+      );
       // quoteIdentifier escapes internal double quotes by doubling them
       // The entire payload stays inside double-quoted identifier
       expect(sql).toContain('AS "rn""');
     });
 
     it("should quote-escape window function args with injection payload", () => {
-      const { sql } = buildSql(b => b.addWindowFunction({
-        function: "LAG",
-        args: ['col"; DROP TABLE x; --'],
-        over: { orderBy: [{ column: "id", direction: "ASC" }] },
-        alias: "lagged",
-      }));
+      const { sql } = buildSql((b) =>
+        b.addWindowFunction({
+          function: "LAG",
+          args: ['col"; DROP TABLE x; --'],
+          over: { orderBy: [{ column: "id", direction: "ASC" }] },
+          alias: "lagged",
+        }),
+      );
       // quoteIdentifier escapes the injection — it's inside a quoted identifier
       expect(sql).toContain('LAG("col""');
     });
 
     it("should reject injection in named window reference (over as string)", () => {
       // If over is a string, it's a named window reference — should be validated
-      expect(() => buildSql(b => b.addWindowFunction({
-        function: "ROW_NUMBER",
-        over: "w1; DROP TABLE users",
-        alias: "rn",
-      }))).toThrow();
+      expect(() =>
+        buildSql((b) =>
+          b.addWindowFunction({
+            function: "ROW_NUMBER",
+            over: "w1; DROP TABLE users",
+            alias: "rn",
+          }),
+        ),
+      ).toThrow();
     });
 
     it("should reject injection in defineWindow name", () => {
-      expect(() => buildSql(b => b.defineWindow("w; DROP TABLE", {}))).toThrow();
+      expect(() => buildSql((b) => b.defineWindow("w; DROP TABLE", {}))).toThrow();
     });
   });
 
@@ -93,43 +107,67 @@ describe("Window Functions — Adversarial", () => {
 
   describe("function name validation", () => {
     it("should reject unknown function names", () => {
-      expect(() => buildSql(b => b.addWindowFunction({
-        function: "FAKE_FUNC",
-        over: {},
-        alias: "f",
-      }))).toThrow(/Invalid window function/);
+      expect(() =>
+        buildSql((b) =>
+          b.addWindowFunction({
+            function: "FAKE_FUNC",
+            over: {},
+            alias: "f",
+          }),
+        ),
+      ).toThrow(/Invalid window function/);
     });
 
     it("should accept all allowed window functions", () => {
       const allowed = [
-        "ROW_NUMBER", "RANK", "DENSE_RANK", "NTILE",
-        "LAG", "LEAD", "FIRST_VALUE", "LAST_VALUE",
-        "SUM", "AVG", "COUNT", "MIN", "MAX",
+        "ROW_NUMBER",
+        "RANK",
+        "DENSE_RANK",
+        "NTILE",
+        "LAG",
+        "LEAD",
+        "FIRST_VALUE",
+        "LAST_VALUE",
+        "SUM",
+        "AVG",
+        "COUNT",
+        "MIN",
+        "MAX",
       ];
       for (const fn of allowed) {
-        expect(() => buildSql(b => b.addWindowFunction({
-          function: fn,
-          over: {},
-          alias: `a_${fn.toLowerCase()}`,
-        }))).not.toThrow();
+        expect(() =>
+          buildSql((b) =>
+            b.addWindowFunction({
+              function: fn,
+              over: {},
+              alias: `a_${fn.toLowerCase()}`,
+            }),
+          ),
+        ).not.toThrow();
       }
     });
 
     it("should accept case-insensitive function names", () => {
-      const { sql } = buildSql(b => b.addWindowFunction({
-        function: "row_number",
-        over: {},
-        alias: "rn",
-      }));
+      const { sql } = buildSql((b) =>
+        b.addWindowFunction({
+          function: "row_number",
+          over: {},
+          alias: "rn",
+        }),
+      );
       expect(sql).toContain("ROW_NUMBER()");
     });
 
     it("should reject empty string as function name", () => {
-      expect(() => buildSql(b => b.addWindowFunction({
-        function: "",
-        over: {},
-        alias: "rn",
-      }))).toThrow(/Invalid window function/);
+      expect(() =>
+        buildSql((b) =>
+          b.addWindowFunction({
+            function: "",
+            over: {},
+            alias: "rn",
+          }),
+        ),
+      ).toThrow(/Invalid window function/);
     });
   });
 
@@ -137,20 +175,24 @@ describe("Window Functions — Adversarial", () => {
 
   describe("empty OVER clause", () => {
     it("should produce OVER () with no partition or order", () => {
-      const { sql } = buildSql(b => b.addWindowFunction({
-        function: "ROW_NUMBER",
-        over: {},
-        alias: "rn",
-      }));
+      const { sql } = buildSql((b) =>
+        b.addWindowFunction({
+          function: "ROW_NUMBER",
+          over: {},
+          alias: "rn",
+        }),
+      );
       expect(sql).toContain("ROW_NUMBER() OVER ()");
     });
 
     it("should produce OVER () with empty arrays", () => {
-      const { sql } = buildSql(b => b.addWindowFunction({
-        function: "ROW_NUMBER",
-        over: { partitionBy: [], orderBy: [] },
-        alias: "rn",
-      }));
+      const { sql } = buildSql((b) =>
+        b.addWindowFunction({
+          function: "ROW_NUMBER",
+          over: { partitionBy: [], orderBy: [] },
+          alias: "rn",
+        }),
+      );
       expect(sql).toContain("ROW_NUMBER() OVER ()");
     });
   });
@@ -159,127 +201,153 @@ describe("Window Functions — Adversarial", () => {
 
   describe("frame spec edge cases", () => {
     it("should reject negative frame offset", () => {
-      expect(() => buildSql(b => b.addWindowFunction({
-        function: "SUM",
-        args: ["amount"],
-        over: {
-          orderBy: [{ column: "id", direction: "ASC" }],
-          frame: {
-            type: "ROWS",
-            start: { type: "PRECEDING", offset: -1 },
-          },
-        },
-        alias: "running",
-      }))).toThrow(/non-negative finite offset/);
+      expect(() =>
+        buildSql((b) =>
+          b.addWindowFunction({
+            function: "SUM",
+            args: ["amount"],
+            over: {
+              orderBy: [{ column: "id", direction: "ASC" }],
+              frame: {
+                type: "ROWS",
+                start: { type: "PRECEDING", offset: -1 },
+              },
+            },
+            alias: "running",
+          }),
+        ),
+      ).toThrow(/non-negative finite offset/);
     });
 
     it("should reject NaN frame offset", () => {
-      expect(() => buildSql(b => b.addWindowFunction({
-        function: "SUM",
-        args: ["amount"],
-        over: {
-          orderBy: [{ column: "id", direction: "ASC" }],
-          frame: {
-            type: "ROWS",
-            start: { type: "PRECEDING", offset: NaN },
-          },
-        },
-        alias: "running",
-      }))).toThrow(/non-negative finite offset/);
+      expect(() =>
+        buildSql((b) =>
+          b.addWindowFunction({
+            function: "SUM",
+            args: ["amount"],
+            over: {
+              orderBy: [{ column: "id", direction: "ASC" }],
+              frame: {
+                type: "ROWS",
+                start: { type: "PRECEDING", offset: NaN },
+              },
+            },
+            alias: "running",
+          }),
+        ),
+      ).toThrow(/non-negative finite offset/);
     });
 
     it("should reject Infinity frame offset", () => {
-      expect(() => buildSql(b => b.addWindowFunction({
-        function: "SUM",
-        args: ["amount"],
-        over: {
-          orderBy: [{ column: "id", direction: "ASC" }],
-          frame: {
-            type: "ROWS",
-            start: { type: "PRECEDING", offset: Infinity },
-          },
-        },
-        alias: "running",
-      }))).toThrow(/non-negative finite offset/);
+      expect(() =>
+        buildSql((b) =>
+          b.addWindowFunction({
+            function: "SUM",
+            args: ["amount"],
+            over: {
+              orderBy: [{ column: "id", direction: "ASC" }],
+              frame: {
+                type: "ROWS",
+                start: { type: "PRECEDING", offset: Infinity },
+              },
+            },
+            alias: "running",
+          }),
+        ),
+      ).toThrow(/non-negative finite offset/);
     });
 
     it("should reject missing offset for PRECEDING", () => {
-      expect(() => buildSql(b => b.addWindowFunction({
-        function: "SUM",
-        args: ["amount"],
-        over: {
-          orderBy: [{ column: "id", direction: "ASC" }],
-          frame: {
-            type: "ROWS",
-            start: { type: "PRECEDING" },  // no offset
-          },
-        },
-        alias: "running",
-      }))).toThrow(/non-negative finite offset/);
+      expect(() =>
+        buildSql((b) =>
+          b.addWindowFunction({
+            function: "SUM",
+            args: ["amount"],
+            over: {
+              orderBy: [{ column: "id", direction: "ASC" }],
+              frame: {
+                type: "ROWS",
+                start: { type: "PRECEDING" }, // no offset
+              },
+            },
+            alias: "running",
+          }),
+        ),
+      ).toThrow(/non-negative finite offset/);
     });
 
     it("should build ROWS BETWEEN frame correctly", () => {
-      const { sql } = buildSql(b => b.addWindowFunction({
-        function: "SUM",
-        args: ["amount"],
-        over: {
-          orderBy: [{ column: "id", direction: "ASC" }],
-          frame: {
-            type: "ROWS",
-            start: { type: "PRECEDING", offset: 2 },
-            end: { type: "CURRENT ROW" },
+      const { sql } = buildSql((b) =>
+        b.addWindowFunction({
+          function: "SUM",
+          args: ["amount"],
+          over: {
+            orderBy: [{ column: "id", direction: "ASC" }],
+            frame: {
+              type: "ROWS",
+              start: { type: "PRECEDING", offset: 2 },
+              end: { type: "CURRENT ROW" },
+            },
           },
-        },
-        alias: "running",
-      }));
+          alias: "running",
+        }),
+      );
       expect(sql).toContain("ROWS BETWEEN 2 PRECEDING AND CURRENT ROW");
     });
 
     it("should build RANGE frame without ORDER BY (valid SQL, db may reject)", () => {
       // RANGE without ORDER BY is technically allowed in SQL spec but semantically odd
-      const { sql } = buildSql(b => b.addWindowFunction({
-        function: "SUM",
-        args: ["amount"],
-        over: {
-          frame: {
-            type: "RANGE",
-            start: { type: "UNBOUNDED PRECEDING" },
+      const { sql } = buildSql((b) =>
+        b.addWindowFunction({
+          function: "SUM",
+          args: ["amount"],
+          over: {
+            frame: {
+              type: "RANGE",
+              start: { type: "UNBOUNDED PRECEDING" },
+            },
           },
-        },
-        alias: "running",
-      }));
+          alias: "running",
+        }),
+      );
       expect(sql).toContain("RANGE UNBOUNDED PRECEDING");
       // No ORDER BY in the OVER clause
       expect(sql).not.toMatch(/OVER \([^)]*ORDER BY/);
     });
 
     it("should reject invalid frame type", () => {
-      expect(() => buildSql(b => b.addWindowFunction({
-        function: "SUM",
-        args: ["amount"],
-        over: {
-          frame: {
-            type: "INVALID" as any,
-            start: { type: "UNBOUNDED PRECEDING" },
-          },
-        },
-        alias: "running",
-      }))).toThrow(/Invalid frame type/);
+      expect(() =>
+        buildSql((b) =>
+          b.addWindowFunction({
+            function: "SUM",
+            args: ["amount"],
+            over: {
+              frame: {
+                type: "INVALID" as any,
+                start: { type: "UNBOUNDED PRECEDING" },
+              },
+            },
+            alias: "running",
+          }),
+        ),
+      ).toThrow(/Invalid frame type/);
     });
 
     it("should handle zero offset for PRECEDING", () => {
-      const { sql } = buildSql(b => b.addWindowFunction({
-        function: "SUM",
-        args: ["amount"],
-        over: {
-          orderBy: [{ column: "id", direction: "ASC" }],
-          frame: {
-            type: "ROWS",
-            start: { type: "PRECEDING", offset: 0 },
+      const { sql } = buildSql((b) =>
+        b.addWindowFunction({
+          function: "SUM",
+          args: ["amount"],
+          over: {
+            orderBy: [{ column: "id", direction: "ASC" }],
+            frame: {
+              type: "ROWS",
+              start: { type: "PRECEDING", offset: 0 },
+            },
           },
-        },
-        alias: "running",
-      }));
+          alias: "running",
+        }),
+      );
       // offset=0 is valid (means CURRENT ROW effectively)
       expect(sql).toContain("0 PRECEDING");
     });
@@ -289,7 +357,7 @@ describe("Window Functions — Adversarial", () => {
 
   describe("multiple window functions", () => {
     it("should support multiple window functions in one query", () => {
-      const { sql } = buildSql(b => {
+      const { sql } = buildSql((b) => {
         b.addWindowFunction({
           function: "ROW_NUMBER",
           over: { orderBy: [{ column: "id", direction: "ASC" }] },
@@ -312,7 +380,7 @@ describe("Window Functions — Adversarial", () => {
 
   describe("named windows", () => {
     it("should define a named window and reference it", () => {
-      const { sql } = buildSql(b => {
+      const { sql } = buildSql((b) => {
         b.defineWindow("w", {
           partitionBy: ["dept"],
           orderBy: [{ column: "salary", direction: "DESC" }],
@@ -329,7 +397,7 @@ describe("Window Functions — Adversarial", () => {
     });
 
     it("should place WINDOW clause after HAVING and before ORDER BY", () => {
-      const { sql } = buildSql(b => {
+      const { sql } = buildSql((b) => {
         b.groupBy("dept");
         b.having(new ComparisonCriteria("count", ">", 1));
         b.defineWindow("w", { orderBy: [{ column: "id", direction: "ASC" }] });
@@ -344,9 +412,9 @@ describe("Window Functions — Adversarial", () => {
     });
 
     it("should reject invalid named window name", () => {
-      expect(() => buildSql(b => b.defineWindow("1invalid", {}))).toThrow();
-      expect(() => buildSql(b => b.defineWindow("has space", {}))).toThrow();
-      expect(() => buildSql(b => b.defineWindow("semi;colon", {}))).toThrow();
+      expect(() => buildSql((b) => b.defineWindow("1invalid", {}))).toThrow();
+      expect(() => buildSql((b) => b.defineWindow("has space", {}))).toThrow();
+      expect(() => buildSql((b) => b.defineWindow("semi;colon", {}))).toThrow();
     });
   });
 
@@ -354,41 +422,49 @@ describe("Window Functions — Adversarial", () => {
 
   describe("window function args", () => {
     it("should include args for LAG with quoted identifiers", () => {
-      const { sql } = buildSql(b => b.addWindowFunction({
-        function: "LAG",
-        args: ["salary"],
-        over: { orderBy: [{ column: "hire_date", direction: "ASC" }] },
-        alias: "prev_salary",
-      }));
+      const { sql } = buildSql((b) =>
+        b.addWindowFunction({
+          function: "LAG",
+          args: ["salary"],
+          over: { orderBy: [{ column: "hire_date", direction: "ASC" }] },
+          alias: "prev_salary",
+        }),
+      );
       expect(sql).toContain('LAG("salary")');
     });
 
     it("should handle multiple args", () => {
-      const { sql } = buildSql(b => b.addWindowFunction({
-        function: "LEAD",
-        args: ["salary", "offset_col"],
-        over: { orderBy: [{ column: "id", direction: "ASC" }] },
-        alias: "next_salary",
-      }));
+      const { sql } = buildSql((b) =>
+        b.addWindowFunction({
+          function: "LEAD",
+          args: ["salary", "offset_col"],
+          over: { orderBy: [{ column: "id", direction: "ASC" }] },
+          alias: "next_salary",
+        }),
+      );
       expect(sql).toContain('LEAD("salary", "offset_col")');
     });
 
     it("should handle empty args array", () => {
-      const { sql } = buildSql(b => b.addWindowFunction({
-        function: "ROW_NUMBER",
-        args: [],
-        over: {},
-        alias: "rn",
-      }));
+      const { sql } = buildSql((b) =>
+        b.addWindowFunction({
+          function: "ROW_NUMBER",
+          args: [],
+          over: {},
+          alias: "rn",
+        }),
+      );
       expect(sql).toContain("ROW_NUMBER()");
     });
 
     it("should handle no args property", () => {
-      const { sql } = buildSql(b => b.addWindowFunction({
-        function: "ROW_NUMBER",
-        over: {},
-        alias: "rn",
-      }));
+      const { sql } = buildSql((b) =>
+        b.addWindowFunction({
+          function: "ROW_NUMBER",
+          over: {},
+          alias: "rn",
+        }),
+      );
       expect(sql).toContain("ROW_NUMBER()");
     });
   });
@@ -416,7 +492,7 @@ describe("Window Functions — Adversarial", () => {
     });
 
     it("should work with GROUP BY and HAVING", () => {
-      const { sql } = buildSql(b => {
+      const { sql } = buildSql((b) => {
         b.columns("dept");
         b.groupBy("dept");
         b.having(new ComparisonCriteria("count", ">", 5));
@@ -437,11 +513,15 @@ describe("Window Functions — Adversarial", () => {
 
   describe("sort direction validation", () => {
     it("should reject invalid sort direction in window orderBy", () => {
-      expect(() => buildSql(b => b.addWindowFunction({
-        function: "ROW_NUMBER",
-        over: { orderBy: [{ column: "id", direction: "INVALID" as any }] },
-        alias: "rn",
-      }))).toThrow(/Invalid sort direction/);
+      expect(() =>
+        buildSql((b) =>
+          b.addWindowFunction({
+            function: "ROW_NUMBER",
+            over: { orderBy: [{ column: "id", direction: "INVALID" as any }] },
+            alias: "rn",
+          }),
+        ),
+      ).toThrow(/Invalid sort direction/);
     });
   });
 });
@@ -451,36 +531,29 @@ describe("Window Functions — Adversarial", () => {
 // ---------------------------------------------------------------------------
 
 describe("CTEs — Adversarial", () => {
-
   // ── SQL Injection ───────────────────────────────────────────────────
 
   describe("SQL injection vectors", () => {
     it("should reject injection in CTE name", () => {
-      expect(() => buildSql(b =>
-        b.with("cte; DROP TABLE users; --", "SELECT 1")
-      )).toThrow(/Invalid identifier/);
+      expect(() => buildSql((b) => b.with("cte; DROP TABLE users; --", "SELECT 1"))).toThrow(/Invalid identifier/);
     });
 
     it("should reject CTE name with parentheses", () => {
-      expect(() => buildSql(b =>
-        b.with("cte()", "SELECT 1")
-      )).toThrow(/Invalid identifier/);
+      expect(() => buildSql((b) => b.with("cte()", "SELECT 1"))).toThrow(/Invalid identifier/);
     });
 
     it("should reject CTE name starting with number", () => {
-      expect(() => buildSql(b =>
-        b.with("1cte", "SELECT 1")
-      )).toThrow(/Invalid identifier/);
+      expect(() => buildSql((b) => b.with("1cte", "SELECT 1"))).toThrow(/Invalid identifier/);
     });
 
     it("should accept valid CTE names", () => {
-      expect(() => buildSql(b => b.with("valid_cte", "SELECT 1"))).not.toThrow();
-      expect(() => buildSql(b => b.with("_private", "SELECT 1"))).not.toThrow();
-      expect(() => buildSql(b => b.with("CTE123", "SELECT 1"))).not.toThrow();
+      expect(() => buildSql((b) => b.with("valid_cte", "SELECT 1"))).not.toThrow();
+      expect(() => buildSql((b) => b.with("_private", "SELECT 1"))).not.toThrow();
+      expect(() => buildSql((b) => b.with("CTE123", "SELECT 1"))).not.toThrow();
     });
 
     it("should quote CTE name in output", () => {
-      const { sql } = buildSql(b => b.with("my_cte", "SELECT 1"));
+      const { sql } = buildSql((b) => b.with("my_cte", "SELECT 1"));
       expect(sql).toContain('"my_cte"');
     });
   });
@@ -489,10 +562,10 @@ describe("CTEs — Adversarial", () => {
 
   describe("CTE with raw string", () => {
     it("should embed raw string CTE query", () => {
-      const { sql, params } = buildSql(b => {
+      const { sql, params } = buildSql((b) => {
         b.with("recent", "SELECT * FROM orders WHERE status = 'active'");
       });
-      expect(sql).toContain('WITH "recent" AS (SELECT * FROM orders WHERE status = \'active\')');
+      expect(sql).toContain("WITH \"recent\" AS (SELECT * FROM orders WHERE status = 'active')");
       expect(params).toHaveLength(0);
     });
   });
@@ -504,7 +577,7 @@ describe("CTEs — Adversarial", () => {
       const subquery = new SelectBuilder("orders");
       subquery.where(new ComparisonCriteria("status", "=", "active"));
 
-      const { sql, params } = buildSql(b => {
+      const { sql, params } = buildSql((b) => {
         b.with("active_orders", subquery);
       });
       expect(params).toEqual(["active"]);
@@ -532,7 +605,7 @@ describe("CTEs — Adversarial", () => {
 
   describe("recursive CTEs", () => {
     it("should produce WITH RECURSIVE keyword", () => {
-      const { sql } = buildSql(b => {
+      const { sql } = buildSql((b) => {
         b.withRecursive(
           "hierarchy",
           "SELECT id, parent_id, name FROM categories WHERE parent_id IS NULL",
@@ -544,7 +617,7 @@ describe("CTEs — Adversarial", () => {
     });
 
     it("should use UNION (not ALL) when unionAll is false", () => {
-      const { sql } = buildSql(b => {
+      const { sql } = buildSql((b) => {
         b.withRecursive(
           "hierarchy",
           "SELECT id FROM categories WHERE parent_id IS NULL",
@@ -571,7 +644,7 @@ describe("CTEs — Adversarial", () => {
     });
 
     it("should produce WITH RECURSIVE when mixing recursive and non-recursive CTEs", () => {
-      const { sql } = buildSql(b => {
+      const { sql } = buildSql((b) => {
         b.with("simple", "SELECT 1 AS n");
         b.withRecursive("rec", "SELECT 1 AS n", "SELECT n + 1 FROM rec WHERE n < 10");
       });
@@ -586,7 +659,7 @@ describe("CTEs — Adversarial", () => {
 
   describe("multiple CTEs", () => {
     it("should comma-separate multiple CTEs", () => {
-      const { sql } = buildSql(b => {
+      const { sql } = buildSql((b) => {
         b.with("cte1", "SELECT 1 AS a");
         b.with("cte2", "SELECT 2 AS b");
         b.with("cte3", "SELECT 3 AS c");
@@ -635,28 +708,29 @@ describe("CTEs — Adversarial", () => {
 
   describe("CTE name validation edge cases", () => {
     it("should reject empty string CTE name", () => {
-      expect(() => buildSql(b => b.with("", "SELECT 1"))).toThrow(/Invalid identifier/);
+      expect(() => buildSql((b) => b.with("", "SELECT 1"))).toThrow(/Invalid identifier/);
     });
 
     it("should reject CTE name with spaces", () => {
-      expect(() => buildSql(b => b.with("my cte", "SELECT 1"))).toThrow(/Invalid identifier/);
+      expect(() => buildSql((b) => b.with("my cte", "SELECT 1"))).toThrow(/Invalid identifier/);
     });
 
     it("should reject CTE name with special characters", () => {
       const badNames = ["cte-name", "cte.name", "cte@name", "cte$name", "cte!"];
       for (const name of badNames) {
-        expect(() => buildSql(b => b.with(name, "SELECT 1")),
-          `Expected "${name}" to be rejected`).toThrow(/Invalid identifier/);
+        expect(() => buildSql((b) => b.with(name, "SELECT 1")), `Expected "${name}" to be rejected`).toThrow(
+          /Invalid identifier/,
+        );
       }
     });
 
     it("should allow underscore-prefixed CTE names", () => {
-      expect(() => buildSql(b => b.with("_internal", "SELECT 1"))).not.toThrow();
+      expect(() => buildSql((b) => b.with("_internal", "SELECT 1"))).not.toThrow();
     });
 
     it("should not reject very long valid CTE names", () => {
       const longName = "a" + "_x".repeat(100);
-      expect(() => buildSql(b => b.with(longName, "SELECT 1"))).not.toThrow();
+      expect(() => buildSql((b) => b.with(longName, "SELECT 1"))).not.toThrow();
     });
   });
 
@@ -698,7 +772,7 @@ describe("CTEs — Adversarial", () => {
     it("should allow duplicate CTE names (no validation — DB will reject)", () => {
       // The builder doesn't currently check for duplicate CTE names
       // This documents the behavior — it may or may not be desired
-      const { sql } = buildSql(b => {
+      const { sql } = buildSql((b) => {
         b.with("dup", "SELECT 1");
         b.with("dup", "SELECT 2");
       });

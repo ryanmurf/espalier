@@ -1,4 +1,4 @@
-import type { QueryPlan, PlanNode } from "./query-plan.js";
+import type { PlanNode, QueryPlan } from "./query-plan.js";
 
 /**
  * Severity of a plan warning.

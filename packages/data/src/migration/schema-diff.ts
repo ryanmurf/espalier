@@ -1,10 +1,10 @@
+import type { ColumnInfo, SchemaIntrospector } from "espalier-jdbc";
 import { quoteIdentifier, validateIdentifier } from "espalier-jdbc";
-import type { SchemaIntrospector, ColumnInfo } from "espalier-jdbc";
-import { DdlGenerator } from "../schema/ddl-generator.js";
-import { getEntityMetadata } from "../mapping/entity-metadata.js";
-import { getColumnMetadataEntries } from "../decorators/column.js";
 import type { ColumnMetadataEntry } from "../decorators/column.js";
-import { getViewMetadata, getMaterializedViewMetadata } from "../decorators/view.js";
+import { getColumnMetadataEntries } from "../decorators/column.js";
+import { getMaterializedViewMetadata, getViewMetadata } from "../decorators/view.js";
+import { getEntityMetadata } from "../mapping/entity-metadata.js";
+import type { DdlGenerator } from "../schema/ddl-generator.js";
 
 export interface SchemaDiff {
   addedTables: TableDiff[];
@@ -90,9 +90,7 @@ export class SchemaDiffEngine {
     schema?: string,
   ): Promise<SchemaDiff> {
     // Filter out view entities
-    const tableEntities = entityClasses.filter(
-      (ec) => !getViewMetadata(ec) && !getMaterializedViewMetadata(ec),
-    );
+    const tableEntities = entityClasses.filter((ec) => !getViewMetadata(ec) && !getMaterializedViewMetadata(ec));
 
     const dbTables = await introspector.getTables(schema);
     const dbTableNames = new Set(dbTables.map((t) => t.tableName.toLowerCase()));
@@ -222,7 +220,9 @@ export class SchemaDiffEngine {
       }
       for (const col of mod.modifiedColumns) {
         up.push(col.ddl);
-        down.push(`ALTER TABLE ${quoteIdentifier(mod.tableName)} ALTER COLUMN ${quoteIdentifier(col.columnName)} TYPE ${col.oldType}`);
+        down.push(
+          `ALTER TABLE ${quoteIdentifier(mod.tableName)} ALTER COLUMN ${quoteIdentifier(col.columnName)} TYPE ${col.oldType}`,
+        );
       }
       for (const col of mod.removedColumns) {
         up.push(col.ddl);

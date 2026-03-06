@@ -3,9 +3,10 @@
  * These tests probe edge cases, missing mappings, and resource leaks
  * that were found in the PG adapter and may also exist in MySQL.
  */
-import { describe, it, expect, vi } from "vitest";
-import { DatabaseErrorCode } from "espalier-jdbc";
+
 import type { Connection, PreparedStatement, ResultSet, Statement } from "espalier-jdbc";
+import { DatabaseErrorCode } from "espalier-jdbc";
+import { describe, expect, it, vi } from "vitest";
 import { mapMysqlErrorCode } from "../../error-codes.js";
 import { MysqlSchemaIntrospector } from "../../mysql-schema-introspector.js";
 
@@ -119,10 +120,18 @@ function createMockResultSet(rows: Record<string, unknown>[]): ResultSet {
       const val = row[column];
       return val == null ? null : Number(val);
     },
-    getBoolean() { return null; },
-    getDate() { return null; },
-    getRow() { return rows[index] ?? {}; },
-    getMetadata() { return []; },
+    getBoolean() {
+      return null;
+    },
+    getDate() {
+      return null;
+    },
+    getRow() {
+      return rows[index] ?? {};
+    },
+    getMetadata() {
+      return [];
+    },
     close: vi.fn(async () => {}),
     [Symbol.asyncIterator]() {
       return {
@@ -155,9 +164,7 @@ function createMockStatement(rs?: ResultSet): Statement {
 
 describe("MysqlSchemaIntrospector — resource cleanup (FIXED #89)", () => {
   it("getTables() closes PreparedStatement", async () => {
-    const rs = createMockResultSet([
-      { table_name: "users", table_schema: "test_db" },
-    ]);
+    const rs = createMockResultSet([{ table_name: "users", table_schema: "test_db" }]);
     const ps = createMockPreparedStatement(rs);
     const conn = {
       prepareStatement: vi.fn(() => ps),
@@ -174,9 +181,7 @@ describe("MysqlSchemaIntrospector — resource cleanup (FIXED #89)", () => {
   });
 
   it("getTables() closes ResultSet", async () => {
-    const rs = createMockResultSet([
-      { table_name: "users", table_schema: "test_db" },
-    ]);
+    const rs = createMockResultSet([{ table_name: "users", table_schema: "test_db" }]);
     const ps = createMockPreparedStatement(rs);
     const conn = {
       prepareStatement: vi.fn(() => ps),
@@ -365,7 +370,7 @@ describe("MysqlPreparedStatement.collectParameters — Math.max spread", () => {
     expect(Math.max(...emptyMap.keys(), 0)).toBe(0);
 
     // Large map would throw
-    const largeMap = new Map<number, unknown>();
+    const _largeMap = new Map<number, unknown>();
     // Simulating what happens with a very large parameter count
     // (we don't actually create 100k entries as that would be slow)
     expect(() => {

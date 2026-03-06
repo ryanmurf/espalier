@@ -12,17 +12,17 @@
  * - MSSQL adapter stubs do not leak SQL
  * - Oracle adapter stubs do not leak SQL
  */
-import { describe, it, expect, vi } from "vitest";
-import { Table as TableDec } from "../decorators/table.js";
+import { describe, expect, it, vi } from "vitest";
 import { Column as ColumnDec } from "../decorators/column.js";
 import { Id as IdDec } from "../decorators/id.js";
-import { RouteGenerator } from "../rest/route-generator.js";
+import { Table as TableDec } from "../decorators/table.js";
 import { ResolverGenerator } from "../graphql/resolver-generator.js";
+import type { CrudRepository } from "../repository/crud-repository.js";
+import type { Page, Pageable } from "../repository/paging.js";
 import { mountExpressRoutes } from "../rest/express-adapter.js";
 import { createFastifyPlugin } from "../rest/fastify-adapter.js";
 import type { RestRequest } from "../rest/handler.js";
-import type { CrudRepository } from "../repository/crud-repository.js";
-import type { Page, Pageable } from "../repository/paging.js";
+import { RouteGenerator } from "../rest/route-generator.js";
 
 // ══════════════════════════════════════════════════
 // Test entity
@@ -257,10 +257,7 @@ describe("Security fixes", () => {
       await plugin(mockFastify);
 
       const getHandler = mockFastify.get.mock.calls[0][1];
-      await getHandler(
-        { params: {}, query: {}, body: null, headers: {} },
-        { status: statusFn, send: sendFn },
-      );
+      await getHandler({ params: {}, query: {}, body: null, headers: {} }, { status: statusFn, send: sendFn });
 
       expect(statusFn).toHaveBeenCalledWith(500);
       expect(sendFn).toHaveBeenCalledWith({ error: "Internal Server Error" });
@@ -280,7 +277,9 @@ describe("Security fixes", () => {
       const repo = mockRepo(things);
       const gen = new RouteGenerator({ tenantAware: false });
       const routes = gen.generate([{ entityClass: Thing, repository: repo }]);
-      const findAllRoute = routes.find((r) => r.method === "GET" && !r.path.includes(":id") && !r.path.includes("count"))!;
+      const findAllRoute = routes.find(
+        (r) => r.method === "GET" && !r.path.includes(":id") && !r.path.includes("count"),
+      )!;
 
       // Attempt SQL injection via sort parameter
       const req: RestRequest = {
@@ -301,7 +300,9 @@ describe("Security fixes", () => {
       const repo = mockRepo(things);
       const gen = new RouteGenerator({ tenantAware: false });
       const routes = gen.generate([{ entityClass: Thing, repository: repo }]);
-      const findAllRoute = routes.find((r) => r.method === "GET" && !r.path.includes(":id") && !r.path.includes("count"))!;
+      const findAllRoute = routes.find(
+        (r) => r.method === "GET" && !r.path.includes(":id") && !r.path.includes("count"),
+      )!;
 
       const req: RestRequest = {
         params: {},
@@ -320,7 +321,9 @@ describe("Security fixes", () => {
       const repo = mockRepo(things);
       const gen = new RouteGenerator({ tenantAware: false });
       const routes = gen.generate([{ entityClass: Thing, repository: repo }]);
-      const findAllRoute = routes.find((r) => r.method === "GET" && !r.path.includes(":id") && !r.path.includes("count"))!;
+      const findAllRoute = routes.find(
+        (r) => r.method === "GET" && !r.path.includes(":id") && !r.path.includes("count"),
+      )!;
 
       const req: RestRequest = {
         params: {},
@@ -373,14 +376,9 @@ describe("Security fixes", () => {
       const resolvers = gen.generate([{ entityClass: Thing, repository: repo }]);
       const updateResolver = resolvers.Mutation.updateThing;
 
-      await expect(
-        updateResolver(null, { id: 999, input: { name: "x" } }, {}, {}),
-      ).rejects.toThrow("Entity not found");
+      await expect(updateResolver(null, { id: 999, input: { name: "x" } }, {}, {})).rejects.toThrow("Entity not found");
 
-      await expect(
-        updateResolver(null, { id: 999, input: { name: "x" } }, {}, {}),
-      ).rejects.not.toThrow("999");
+      await expect(updateResolver(null, { id: 999, input: { name: "x" } }, {}, {})).rejects.not.toThrow("999");
     });
   });
-
 });

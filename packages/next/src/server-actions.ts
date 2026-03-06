@@ -5,10 +5,9 @@
  * for Server Actions in the App Router.
  */
 
-import type { Connection, Transaction } from "espalier-jdbc";
-import type { CrudRepository } from "espalier-data/core";
+import type { CreateRepositoryOptions, CrudRepository } from "espalier-data/core";
 import { createRepository } from "espalier-data/core";
-import type { CreateRepositoryOptions } from "espalier-data/core";
+import type { Connection, Transaction } from "espalier-jdbc";
 import { getDataSource } from "./data-source.js";
 
 const _repoCache = new WeakMap<new (...args: any[]) => any, CrudRepository<any, any>>();
@@ -54,9 +53,7 @@ export async function getRepository<T, ID = unknown>(
  * }
  * ```
  */
-export async function withTransaction<R>(
-  action: (connection: Connection) => Promise<R>,
-): Promise<R> {
+export async function withTransaction<R>(action: (connection: Connection) => Promise<R>): Promise<R> {
   const ds = await getDataSource();
   const conn = await ds.getConnection();
 

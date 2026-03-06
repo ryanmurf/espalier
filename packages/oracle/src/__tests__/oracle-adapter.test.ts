@@ -12,20 +12,20 @@
  * - DataSource lifecycle
  * - SQL injection vectors in dialect helpers
  */
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
+import type { OracleConfig } from "../index.js";
 import {
-  OracleDataSource,
+  ORACLE_TYPE_MAP,
   OracleConnection,
-  OracleStatement,
+  OracleDataSource,
   OraclePreparedStatement,
-  OracleTransaction,
   OracleResultSet,
-  quoteOracleIdentifier,
+  OracleStatement,
+  OracleTransaction,
   oraclePagination,
   oracleRownumPagination,
-  ORACLE_TYPE_MAP,
+  quoteOracleIdentifier,
 } from "../index.js";
-import type { OracleConfig } from "../index.js";
 
 // ══════════════════════════════════════════════════
 // DataSource
@@ -222,16 +222,12 @@ describe("OraclePreparedStatement", () => {
 
   it("executeQuery with sql override throws stub error", async () => {
     const ps = new OraclePreparedStatement(null, "SELECT 1 FROM DUAL");
-    await expect(ps.executeQuery("SELECT 2 FROM DUAL")).rejects.toThrow(
-      /Oracle adapter stub.*prepared executeQuery/,
-    );
+    await expect(ps.executeQuery("SELECT 2 FROM DUAL")).rejects.toThrow(/Oracle adapter stub.*prepared executeQuery/);
   });
 
   it("executeUpdate with sql override throws stub error", async () => {
     const ps = new OraclePreparedStatement(null, "UPDATE x SET a = 1");
-    await expect(ps.executeUpdate("UPDATE x SET a = 2")).rejects.toThrow(
-      /Oracle adapter stub.*prepared executeUpdate/,
-    );
+    await expect(ps.executeUpdate("UPDATE x SET a = 2")).rejects.toThrow(/Oracle adapter stub.*prepared executeUpdate/);
   });
 
   it("throws after close", async () => {
@@ -493,9 +489,21 @@ describe("oracleRownumPagination (legacy)", () => {
 describe("ORACLE_TYPE_MAP", () => {
   it("has all expected base types", () => {
     const expectedKeys = [
-      "TEXT", "VARCHAR", "BOOLEAN", "SERIAL", "BIGSERIAL",
-      "UUID", "TIMESTAMP", "BYTEA", "JSON", "JSONB",
-      "FLOAT", "DOUBLE", "INTEGER", "BIGINT", "SMALLINT",
+      "TEXT",
+      "VARCHAR",
+      "BOOLEAN",
+      "SERIAL",
+      "BIGSERIAL",
+      "UUID",
+      "TIMESTAMP",
+      "BYTEA",
+      "JSON",
+      "JSONB",
+      "FLOAT",
+      "DOUBLE",
+      "INTEGER",
+      "BIGINT",
+      "SMALLINT",
     ];
     for (const key of expectedKeys) {
       expect(ORACLE_TYPE_MAP).toHaveProperty(key);

@@ -1,14 +1,14 @@
-import { describe, it, expect, vi } from "vitest";
-import {
-  warmupPool,
-  validateConnection,
-  DEFAULT_PRE_PING_QUERY,
-  DEFAULT_PRE_PING_INTERVAL_MS,
-  DEFAULT_MAX_PING_RETRIES,
-} from "../pool-warmup.js";
-import type { PrePingConfig, WarmupResult } from "../pool-warmup.js";
+import { describe, expect, it, vi } from "vitest";
 import type { Connection } from "../connection.js";
 import type { PooledDataSource } from "../pool.js";
+import type { PrePingConfig } from "../pool-warmup.js";
+import {
+  DEFAULT_MAX_PING_RETRIES,
+  DEFAULT_PRE_PING_INTERVAL_MS,
+  DEFAULT_PRE_PING_QUERY,
+  validateConnection,
+  warmupPool,
+} from "../pool-warmup.js";
 
 function mockConnection(throwOnQuery?: Error): Connection {
   const stmt = {

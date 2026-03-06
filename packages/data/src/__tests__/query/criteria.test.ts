@@ -1,14 +1,14 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
+  and,
+  BetweenCriteria,
   ComparisonCriteria,
   InCriteria,
-  BetweenCriteria,
-  NullCriteria,
   LogicalCriteria,
   NotCriteria,
-  and,
-  or,
+  NullCriteria,
   not,
+  or,
 } from "../../query/criteria.js";
 
 describe("ComparisonCriteria", () => {

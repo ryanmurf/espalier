@@ -1,13 +1,19 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
-import { QueryCache } from "../../cache/query-cache.js";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { QueryCacheKey } from "../../cache/query-cache.js";
+import { QueryCache } from "../../cache/query-cache.js";
 
 class User {
-  constructor(public id: number, public name: string) {}
+  constructor(
+    public id: number,
+    public name: string,
+  ) {}
 }
 
 class Product {
-  constructor(public id: number, public title: string) {}
+  constructor(
+    public id: number,
+    public title: string,
+  ) {}
 }
 
 function key(sql: string, params: unknown[] = []): QueryCacheKey {
@@ -239,7 +245,7 @@ describe("QueryCache", () => {
 
       const k = key("SELECT * FROM users");
       cache.put(k, [1], User);
-      cache.get(k);       // hit
+      cache.get(k); // hit
       cache.get(key("x")); // miss
       expect(cache.getStats().hitRate).toBe(0.5);
     });

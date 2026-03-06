@@ -2,16 +2,11 @@
  * E2E tests for repository streaming (findAllStream) and derived streaming methods.
  * Tests async iteration, early termination, PostLoad integration, and resource cleanup.
  */
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { createTestDataSource, isPostgresAvailable } from "./setup.js";
-import {
-  Table,
-  Column,
-  Id,
-  PostLoad,
-  createDerivedRepository,
-} from "espalier-data";
+
+import { Column, createDerivedRepository, Id, PostLoad, Table } from "espalier-data";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { PgDataSource } from "../../pg-data-source.js";
+import { createTestDataSource, isPostgresAvailable } from "./setup.js";
 
 const canConnect = await isPostgresAvailable();
 
@@ -60,9 +55,7 @@ describe.skipIf(!canConnect)("E2E: Repository Streaming", { timeout: 15000 }, ()
       const priority = (i % 5) + 1;
       values.push(`('Item${i}', '${category}', ${priority})`);
     }
-    await stmt.executeUpdate(
-      `INSERT INTO stream_test_items (name, category, priority) VALUES ${values.join(",")}`
-    );
+    await stmt.executeUpdate(`INSERT INTO stream_test_items (name, category, priority) VALUES ${values.join(",")}`);
 
     // Count total rows
     const rs = await stmt.executeQuery("SELECT COUNT(*) as cnt FROM stream_test_items");

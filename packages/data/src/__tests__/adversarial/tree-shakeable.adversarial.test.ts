@@ -1,6 +1,6 @@
-import { describe, it, expect } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { describe, expect, it } from "vitest";
 
 // ═══════════════════════════════════════════════════════════════
 // Adversarial tests for tree-shakeable package architecture
@@ -84,12 +84,18 @@ describe("tree-shakeable architecture adversarial tests", () => {
     it("all expected subpaths are present", () => {
       const raw = fs.readFileSync(path.join(PKG_ROOT, "package.json"), "utf8");
       pkg = JSON.parse(raw);
-      const expected = [".", "./core", "./relations", "./tenant", "./observability", "./graphql", "./rest", "./plugins"];
+      const expected = [
+        ".",
+        "./core",
+        "./relations",
+        "./tenant",
+        "./observability",
+        "./graphql",
+        "./rest",
+        "./plugins",
+      ];
       for (const sp of expected) {
-        expect(
-          pkg.exports[sp],
-          `Missing subpath export: ${sp}`,
-        ).toBeDefined();
+        expect(pkg.exports[sp], `Missing subpath export: ${sp}`).toBeDefined();
       }
     });
 
@@ -97,14 +103,8 @@ describe("tree-shakeable architecture adversarial tests", () => {
       const raw = fs.readFileSync(path.join(PKG_ROOT, "package.json"), "utf8");
       pkg = JSON.parse(raw);
       for (const [subpath, conditions] of Object.entries(pkg.exports as Record<string, any>)) {
-        expect(
-          conditions.import,
-          `Subpath "${subpath}" missing "import" condition`,
-        ).toBeDefined();
-        expect(
-          conditions.require,
-          `Subpath "${subpath}" missing "require" condition`,
-        ).toBeDefined();
+        expect(conditions.import, `Subpath "${subpath}" missing "import" condition`).toBeDefined();
+        expect(conditions.require, `Subpath "${subpath}" missing "require" condition`).toBeDefined();
       }
     });
 
@@ -112,14 +112,8 @@ describe("tree-shakeable architecture adversarial tests", () => {
       const raw = fs.readFileSync(path.join(PKG_ROOT, "package.json"), "utf8");
       pkg = JSON.parse(raw);
       for (const [subpath, conditions] of Object.entries(pkg.exports as Record<string, any>)) {
-        expect(
-          conditions.import.types,
-          `Subpath "${subpath}" import missing "types"`,
-        ).toBeDefined();
-        expect(
-          conditions.import.default,
-          `Subpath "${subpath}" import missing "default"`,
-        ).toBeDefined();
+        expect(conditions.import.types, `Subpath "${subpath}" import missing "types"`).toBeDefined();
+        expect(conditions.import.default, `Subpath "${subpath}" import missing "default"`).toBeDefined();
       }
     });
 
@@ -419,41 +413,51 @@ describe("tree-shakeable architecture adversarial tests", () => {
 
     it("all entry point JS files exist", () => {
       const entries = [
-        "index.js", "index.cjs",
-        "core.js", "core.cjs",
-        "relations.js", "relations.cjs",
-        "tenant-entry.js", "tenant-entry.cjs",
-        "observability-entry.js", "observability-entry.cjs",
-        "graphql-entry.js", "graphql-entry.cjs",
-        "rest-entry.js", "rest-entry.cjs",
-        "plugins-entry.js", "plugins-entry.cjs",
+        "index.js",
+        "index.cjs",
+        "core.js",
+        "core.cjs",
+        "relations.js",
+        "relations.cjs",
+        "tenant-entry.js",
+        "tenant-entry.cjs",
+        "observability-entry.js",
+        "observability-entry.cjs",
+        "graphql-entry.js",
+        "graphql-entry.cjs",
+        "rest-entry.js",
+        "rest-entry.cjs",
+        "plugins-entry.js",
+        "plugins-entry.cjs",
       ];
 
       for (const entry of entries) {
-        expect(
-          fs.existsSync(path.join(DIST_DIR, entry)),
-          `Missing dist file: ${entry}`,
-        ).toBe(true);
+        expect(fs.existsSync(path.join(DIST_DIR, entry)), `Missing dist file: ${entry}`).toBe(true);
       }
     });
 
     it("all entry point .d.ts files exist", () => {
       const entries = [
-        "index.d.ts", "index.d.cts",
-        "core.d.ts", "core.d.cts",
-        "relations.d.ts", "relations.d.cts",
-        "tenant-entry.d.ts", "tenant-entry.d.cts",
-        "observability-entry.d.ts", "observability-entry.d.cts",
-        "graphql-entry.d.ts", "graphql-entry.d.cts",
-        "rest-entry.d.ts", "rest-entry.d.cts",
-        "plugins-entry.d.ts", "plugins-entry.d.cts",
+        "index.d.ts",
+        "index.d.cts",
+        "core.d.ts",
+        "core.d.cts",
+        "relations.d.ts",
+        "relations.d.cts",
+        "tenant-entry.d.ts",
+        "tenant-entry.d.cts",
+        "observability-entry.d.ts",
+        "observability-entry.d.cts",
+        "graphql-entry.d.ts",
+        "graphql-entry.d.cts",
+        "rest-entry.d.ts",
+        "rest-entry.d.cts",
+        "plugins-entry.d.ts",
+        "plugins-entry.d.cts",
       ];
 
       for (const entry of entries) {
-        expect(
-          fs.existsSync(path.join(DIST_DIR, entry)),
-          `Missing type file: ${entry}`,
-        ).toBe(true);
+        expect(fs.existsSync(path.join(DIST_DIR, entry)), `Missing type file: ${entry}`).toBe(true);
       }
     });
 
@@ -501,10 +505,7 @@ describe("tree-shakeable architecture adversarial tests", () => {
       ];
 
       for (const entry of expectedEntries) {
-        expect(
-          content.includes(entry),
-          `tsup config missing entry: ${entry}`,
-        ).toBe(true);
+        expect(content.includes(entry), `tsup config missing entry: ${entry}`).toBe(true);
       }
     });
 
@@ -538,10 +539,15 @@ describe("tree-shakeable architecture adversarial tests", () => {
       const pkg = JSON.parse(raw);
       const exportKeys = Object.keys(pkg.exports);
       const internalPaths = exportKeys.filter(
-        (k) => k.includes("/decorators") || k.includes("/repository") ||
-               k.includes("/mapping") || k.includes("/query") ||
-               k.includes("/cache") || k.includes("/schema") ||
-               k.includes("/migration") || k.includes("/events"),
+        (k) =>
+          k.includes("/decorators") ||
+          k.includes("/repository") ||
+          k.includes("/mapping") ||
+          k.includes("/query") ||
+          k.includes("/cache") ||
+          k.includes("/schema") ||
+          k.includes("/migration") ||
+          k.includes("/events"),
       );
       expect(internalPaths).toHaveLength(0);
     });
@@ -550,9 +556,7 @@ describe("tree-shakeable architecture adversarial tests", () => {
       const raw = fs.readFileSync(path.join(PKG_ROOT, "package.json"), "utf8");
       const pkg = JSON.parse(raw);
       const exportKeys = Object.keys(pkg.exports);
-      const badPaths = exportKeys.filter(
-        (k) => k.includes("internal") || k.includes("private") || k.includes("__"),
-      );
+      const badPaths = exportKeys.filter((k) => k.includes("internal") || k.includes("private") || k.includes("__"));
       expect(badPaths).toHaveLength(0);
     });
   });
@@ -572,10 +576,7 @@ describe("tree-shakeable architecture adversarial tests", () => {
       for (const dir of packageDirs) {
         const pkgJsonPath = path.join(packagesDir, dir, "package.json");
         const pkg = JSON.parse(fs.readFileSync(pkgJsonPath, "utf8"));
-        expect(
-          pkg.sideEffects,
-          `Package ${pkg.name} (packages/${dir}) is missing sideEffects: false`,
-        ).toBe(false);
+        expect(pkg.sideEffects, `Package ${pkg.name} (packages/${dir}) is missing sideEffects: false`).toBe(false);
       }
     });
   });

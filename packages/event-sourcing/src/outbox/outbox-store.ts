@@ -1,5 +1,5 @@
 import type { Connection } from "espalier-jdbc";
-import type { OutboxEntry, OutboxOptions, DomainEvent } from "../types.js";
+import type { DomainEvent, OutboxEntry, OutboxOptions } from "../types.js";
 
 // Access Web Crypto API available in Node 19+, Bun, Deno, and browsers
 const _crypto = (globalThis as Record<string, unknown>)["crypto"] as {
@@ -42,10 +42,7 @@ export class OutboxStore {
    * This is the key to the transactional outbox pattern — events are written
    * atomically with the business data.
    */
-  async writeEvents(
-    connection: Connection,
-    events: DomainEvent[],
-  ): Promise<OutboxEntry[]> {
+  async writeEvents(connection: Connection, events: DomainEvent[]): Promise<OutboxEntry[]> {
     if (events.length === 0) {
       return [];
     }
@@ -104,10 +101,7 @@ export class OutboxStore {
    * Fetch unpublished outbox entries, ordered by creation time.
    * Used by the polling publisher.
    */
-  async fetchUnpublished(
-    connection: Connection,
-    batchSize: number,
-  ): Promise<OutboxEntry[]> {
+  async fetchUnpublished(connection: Connection, batchSize: number): Promise<OutboxEntry[]> {
     const sql = `SELECT "id", "aggregate_type", "aggregate_id", "event_type", "payload", "created_at", "published_at" FROM ${this.qualifiedTable} WHERE "published_at" IS NULL ORDER BY "created_at" ASC LIMIT $1`;
 
     const stmt = connection.prepareStatement(sql);
@@ -123,12 +117,11 @@ export class OutboxStore {
             aggregateType: row.aggregate_type as string,
             aggregateId: row.aggregate_id as string,
             eventType: row.event_type as string,
-            payload: typeof row.payload === "string"
-              ? (Object.assign(Object.create(null), JSON.parse(row.payload)) as Record<string, unknown>)
-              : (row.payload as Record<string, unknown>),
-            createdAt: row.created_at instanceof Date
-              ? row.created_at
-              : new Date(row.created_at as string),
+            payload:
+              typeof row.payload === "string"
+                ? (Object.assign(Object.create(null), JSON.parse(row.payload)) as Record<string, unknown>)
+                : (row.payload as Record<string, unknown>),
+            createdAt: row.created_at instanceof Date ? row.created_at : new Date(row.created_at as string),
             publishedAt: row.published_at
               ? row.published_at instanceof Date
                 ? row.published_at
@@ -148,10 +141,7 @@ export class OutboxStore {
   /**
    * Mark entries as published.
    */
-  async markPublished(
-    connection: Connection,
-    entryIds: string[],
-  ): Promise<void> {
+  async markPublished(connection: Connection, entryIds: string[]): Promise<void> {
     if (entryIds.length === 0) {
       return;
     }
@@ -181,10 +171,7 @@ export class OutboxStore {
    * Delete old published entries (cleanup).
    * Returns the count of deleted rows.
    */
-  async deletePublished(
-    connection: Connection,
-    olderThan: Date,
-  ): Promise<number> {
+  async deletePublished(connection: Connection, olderThan: Date): Promise<number> {
     const sql = `DELETE FROM ${this.qualifiedTable} WHERE "published_at" IS NOT NULL AND "published_at" < $1`;
 
     const stmt = connection.prepareStatement(sql);

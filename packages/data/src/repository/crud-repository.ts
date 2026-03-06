@@ -1,6 +1,6 @@
-import type { Repository } from "./repository.js";
-import type { Page, Pageable } from "./paging.js";
 import type { Specification } from "../query/specification.js";
+import type { Page, Pageable } from "./paging.js";
+import type { Repository } from "./repository.js";
 import type { StreamOptions } from "./streaming.js";
 
 export interface CrudRepository<T, ID> extends Repository<T, ID> {
@@ -22,8 +22,7 @@ export interface CrudRepository<T, ID> extends Repository<T, ID> {
   count(spec: Specification<T>): Promise<number>;
 }
 
-export interface PagingAndSortingRepository<T, ID>
-  extends CrudRepository<T, ID> {
+export interface PagingAndSortingRepository<T, ID> extends CrudRepository<T, ID> {
   findAll(): Promise<T[]>;
   findAll(spec: Specification<T>): Promise<T[]>;
   findAll<P>(projectionClass: new (...args: any[]) => P): Promise<P[]>;

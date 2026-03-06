@@ -1,7 +1,27 @@
+# Dependencies
 node_modules/
+
+# Build output
 dist/
 *.tsbuildinfo
-CODE-REVIEW-Y5Q1.md
-SECURITY-FINDINGS-Y5Q1.md
-CODE-REVIEW-Y4Q4.md
-SECURITY-FINDINGS-Y4Q4.md
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Coverage
+coverage/
+
+# Internal review files (kept locally)
+/internal/
