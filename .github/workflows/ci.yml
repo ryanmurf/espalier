@@ -120,6 +120,7 @@ jobs:
   test-deno:
     name: Deno
     runs-on: ubuntu-latest
+    continue-on-error: true # Deno has limited native addon support (better-sqlite3)
 
     services:
       postgres:
