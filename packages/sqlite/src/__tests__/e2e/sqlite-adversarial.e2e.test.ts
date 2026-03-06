@@ -197,12 +197,12 @@ describe.skipIf(!canLoadSqlite)("E2E: SQLite adversarial tests", () => {
     it("handles boolean values stored as INTEGER", async () => {
       const ps = conn.prepareStatement("INSERT INTO adv_test (name, int_val) VALUES ($1, $2)");
       ps.setParameter(1, "bool_true");
-      ps.setParameter(2, true);
+      ps.setParameter(2, 1); // SQLite stores booleans as INTEGER 0/1
       await ps.executeUpdate();
 
       const ps2 = conn.prepareStatement("INSERT INTO adv_test (name, int_val) VALUES ($1, $2)");
       ps2.setParameter(1, "bool_false");
-      ps2.setParameter(2, false);
+      ps2.setParameter(2, 0);
       await ps2.executeUpdate();
 
       const query = conn.prepareStatement("SELECT int_val FROM adv_test WHERE name = $1");

@@ -155,7 +155,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       # Deno runs vitest via npx compatibility — minimal permissions
-      - run: deno run --allow-read --allow-net --allow-env --allow-sys npm:vitest
+      - run: deno run --allow-read --allow-write --allow-net --allow-env --allow-sys --allow-ffi --allow-run npm:vitest
         env:
           PG_HOST: localhost
           PG_PORT: 55432
