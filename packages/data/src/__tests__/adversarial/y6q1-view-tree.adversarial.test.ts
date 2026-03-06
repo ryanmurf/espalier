@@ -770,7 +770,7 @@ describe("MaterializedPathManager — Adversarial", () => {
       const captured = captureSql(conn);
 
       // Path containing LIKE wildcards
-      await manager.findDescendants(conn, "/1%DROP/2/" as SqlValue);
+      await manager.findDescendants(conn, "/1%DROP/2/" as unknown as string);
 
       // The LIKE parameter should have % escaped
       const likeParam = captured[0].params[0] as string;
@@ -782,7 +782,7 @@ describe("MaterializedPathManager — Adversarial", () => {
       const conn = createMockConnection();
       const captured = captureSql(conn);
 
-      await manager.findDescendants(conn, "/1_2/" as SqlValue);
+      await manager.findDescendants(conn, "/1_2/" as unknown as string);
 
       const likeParam = captured[0].params[0] as string;
       expect(likeParam).toContain("\\_");
@@ -792,7 +792,7 @@ describe("MaterializedPathManager — Adversarial", () => {
       const conn = createMockConnection();
       const captured = captureSql(conn);
 
-      await manager.findDescendants(conn, "/1\\/2/" as SqlValue);
+      await manager.findDescendants(conn, "/1\\/2/" as unknown as string);
 
       const likeParam = captured[0].params[0] as string;
       // Should have double-escaped backslash
@@ -912,7 +912,7 @@ describe("MaterializedPathManager — Adversarial", () => {
       const conn = createMockConnection();
       const captured = captureSql(conn);
 
-      await manager.findDescendants(conn, "/1/' OR '1'='1/" as SqlValue);
+      await manager.findDescendants(conn, "/1/' OR '1'='1/" as unknown as string);
 
       // Path should only appear in params
       expect(captured[0].sql).not.toContain("OR '1'='1");

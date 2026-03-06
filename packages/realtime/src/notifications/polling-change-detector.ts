@@ -30,7 +30,7 @@ export class PollingChangeDetector {
    * Watch for changes by polling the database at the configured interval.
    * Yields ChangeNotification objects for each row returned by the polling query.
    */
-  async *watch(channel: string): AsyncIterable<ChangeNotification> {
+  async *watch(channel: string): AsyncGenerator<ChangeNotification> {
     if (this.closed) {
       throw new Error("PollingChangeDetector has been closed");
     }

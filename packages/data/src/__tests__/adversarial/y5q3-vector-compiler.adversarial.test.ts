@@ -29,7 +29,7 @@ function makeMetadata(overrides?: Partial<EntityMetadata>): EntityMetadata {
     { fieldName: "embedding", columnName: "embedding", type: "string" },
     { fieldName: "content", columnName: "content", type: "string" },
     { fieldName: "secondEmbedding", columnName: "second_embedding", type: "string" },
-  ] as FieldMapping[];
+  ] as unknown as FieldMapping[];
 
   // Provide vector field metadata so SimilarTo can look up the correct metric
   const vectorFields = new Map<string | symbol, any>([

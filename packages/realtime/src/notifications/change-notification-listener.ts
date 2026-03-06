@@ -27,7 +27,7 @@ export class ChangeNotificationListener {
    * The returned async iterable completes when `unlisten` is called for the channel
    * or when the listener is closed.
    */
-  async *listen(channel: string): AsyncIterable<ChangeNotification> {
+  async *listen(channel: string): AsyncGenerator<ChangeNotification> {
     validateIdentifier(channel, "channel name");
 
     if (this.closed) {

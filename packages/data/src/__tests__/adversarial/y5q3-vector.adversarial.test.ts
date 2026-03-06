@@ -933,6 +933,7 @@ describe("buildDerivedQuery — SimilarTo operator", () => {
       action: "find",
       properties: [{ property: "embedding", operator: "SimilarTo", paramCount: 1 }],
       connector: "And",
+      distinct: false,
     };
 
     const query = buildDerivedQuery(descriptor, metadata, [[1, 2, 3]]);
@@ -950,6 +951,7 @@ describe("buildDerivedQuery — SimilarTo operator", () => {
         { property: "embedding", operator: "SimilarTo", paramCount: 1 },
       ],
       connector: "And",
+      distinct: false,
     };
 
     const query = buildDerivedQuery(descriptor, metadata, ["test title", [1, 2, 3]]);
@@ -964,6 +966,7 @@ describe("buildDerivedQuery — SimilarTo operator", () => {
       action: "find",
       properties: [{ property: "embedding", operator: "SimilarTo", paramCount: 1 }],
       connector: "And",
+      distinct: false,
     };
 
     const query = buildDerivedQuery(descriptor, metadata, [[]]);
@@ -988,6 +991,7 @@ describe("buildDerivedQuery — SimilarTo operator", () => {
       action: "find",
       properties: [{ property: "embedding", operator: "SimilarTo", paramCount: 1 }],
       connector: "And",
+      distinct: false,
     };
 
     const query = buildDerivedQuery(descriptor, metadata, [[1, 2, 3]]);

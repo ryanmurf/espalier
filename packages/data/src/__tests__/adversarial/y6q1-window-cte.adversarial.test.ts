@@ -399,7 +399,7 @@ describe("Window Functions — Adversarial", () => {
     it("should place WINDOW clause after HAVING and before ORDER BY", () => {
       const { sql } = buildSql((b) => {
         b.groupBy("dept");
-        b.having(new ComparisonCriteria("count", ">", 1));
+        b.having(new ComparisonCriteria("gt", "count", 1));
         b.defineWindow("w", { orderBy: [{ column: "id", direction: "ASC" }] });
         b.orderBy("id", "ASC");
         b.addWindowFunction({ function: "ROW_NUMBER", over: "w", alias: "rn" });
@@ -474,7 +474,7 @@ describe("Window Functions — Adversarial", () => {
   describe("window + query clauses interaction", () => {
     it("should correctly offset params when combined with WHERE", () => {
       const b = new SelectBuilder("orders");
-      b.where(new ComparisonCriteria("status", "=", "active"));
+      b.where(new ComparisonCriteria("eq", "status", "active"));
       b.addWindowFunction({
         function: "ROW_NUMBER",
         over: { orderBy: [{ column: "created_at", direction: "DESC" }] },
@@ -495,7 +495,7 @@ describe("Window Functions — Adversarial", () => {
       const { sql } = buildSql((b) => {
         b.columns("dept");
         b.groupBy("dept");
-        b.having(new ComparisonCriteria("count", ">", 5));
+        b.having(new ComparisonCriteria("gt", "count", 5));
         b.addWindowFunction({
           function: "SUM",
           args: ["total"],
@@ -575,7 +575,7 @@ describe("CTEs — Adversarial", () => {
   describe("CTE with SelectBuilder query", () => {
     it("should build CTE from SelectBuilder and merge params", () => {
       const subquery = new SelectBuilder("orders");
-      subquery.where(new ComparisonCriteria("status", "=", "active"));
+      subquery.where(new ComparisonCriteria("eq", "status", "active"));
 
       const { sql, params } = buildSql((b) => {
         b.with("active_orders", subquery);
@@ -587,11 +587,11 @@ describe("CTEs — Adversarial", () => {
 
     it("should re-number params when CTE comes before main WHERE", () => {
       const cteQuery = new SelectBuilder("orders");
-      cteQuery.where(new ComparisonCriteria("status", "=", "active"));
+      cteQuery.where(new ComparisonCriteria("eq", "status", "active"));
 
       const main = new SelectBuilder("active_orders");
       main.with("active_orders", cteQuery);
-      main.where(new ComparisonCriteria("amount", ">", 100));
+      main.where(new ComparisonCriteria("gt", "amount", 100));
       const { sql, params } = main.build();
 
       // CTE param is $1, main WHERE param is $2
@@ -631,10 +631,10 @@ describe("CTEs — Adversarial", () => {
 
     it("should merge params from both base and recursive queries", () => {
       const baseQuery = new SelectBuilder("categories");
-      baseQuery.where(new ComparisonCriteria("parent_id", "=", null));
+      baseQuery.where(new ComparisonCriteria("eq", "parent_id", null));
 
       const recQuery = new SelectBuilder("categories");
-      recQuery.where(new ComparisonCriteria("depth", "<", 10));
+      recQuery.where(new ComparisonCriteria("lt", "depth", 10));
 
       const main = new SelectBuilder("hierarchy");
       main.withRecursive("hierarchy", baseQuery, recQuery);
@@ -683,15 +683,15 @@ describe("CTEs — Adversarial", () => {
 
     it("should correctly offset params across multiple CTEs with SelectBuilder", () => {
       const cte1 = new SelectBuilder("t1");
-      cte1.where(new ComparisonCriteria("a", "=", "val1"));
+      cte1.where(new ComparisonCriteria("eq", "a", "val1"));
 
       const cte2 = new SelectBuilder("t2");
-      cte2.where(new ComparisonCriteria("b", "=", "val2"));
+      cte2.where(new ComparisonCriteria("eq", "b", "val2"));
 
       const main = new SelectBuilder("t3");
       main.with("c1", cte1);
       main.with("c2", cte2);
-      main.where(new ComparisonCriteria("c", "=", "val3"));
+      main.where(new ComparisonCriteria("eq", "c", "val3"));
       const { sql, params } = main.build();
 
       expect(params).toEqual(["val1", "val2", "val3"]);
@@ -739,7 +739,7 @@ describe("CTEs — Adversarial", () => {
   describe("CTE + window function interaction", () => {
     it("should combine CTE with window function and correct SQL ordering", () => {
       const cteQuery = new SelectBuilder("orders");
-      cteQuery.where(new ComparisonCriteria("status", "=", "active"));
+      cteQuery.where(new ComparisonCriteria("eq", "status", "active"));
 
       const main = new SelectBuilder("active_orders");
       main.with("active_orders", cteQuery);
@@ -748,7 +748,7 @@ describe("CTEs — Adversarial", () => {
         over: { orderBy: [{ column: "created_at", direction: "DESC" }] },
         alias: "rn",
       });
-      main.where(new ComparisonCriteria("amount", ">", 50));
+      main.where(new ComparisonCriteria("gt", "amount", 50));
       main.orderBy("rn", "ASC");
       main.limit(10);
 
@@ -788,12 +788,12 @@ describe("CTEs — Adversarial", () => {
     it("should re-number params in CTE SelectBuilder queries starting from correct offset", () => {
       // CTE with 2 params, then main query with 1 param
       const cteQuery = new SelectBuilder("t1");
-      cteQuery.where(new ComparisonCriteria("a", "=", "x"));
+      cteQuery.where(new ComparisonCriteria("eq", "a", "x"));
       cteQuery.limit(5);
 
       const main = new SelectBuilder("result");
       main.with("cte", cteQuery);
-      main.where(new ComparisonCriteria("b", "=", "y"));
+      main.where(new ComparisonCriteria("eq", "b", "y"));
 
       const { sql, params } = main.build();
       expect(params).toEqual(["x", 5, "y"]);
@@ -807,7 +807,7 @@ describe("CTEs — Adversarial", () => {
     it("should handle CTE with no params followed by main query with params", () => {
       const main = new SelectBuilder("result");
       main.with("constant", "SELECT 42 AS val");
-      main.where(new ComparisonCriteria("id", "=", 1));
+      main.where(new ComparisonCriteria("eq", "id", 1));
 
       const { sql, params } = main.build();
       expect(params).toEqual([1]);
@@ -823,7 +823,7 @@ describe("CTEs — Adversarial", () => {
       // This is a footgun — document the behavior
       const main = new SelectBuilder("result");
       main.with("raw_cte", "SELECT $1 AS val");
-      main.where(new ComparisonCriteria("id", "=", 42));
+      main.where(new ComparisonCriteria("eq", "id", 42));
 
       const { sql, params } = main.build();
       // The raw CTE has $1 but there's no corresponding param — the main WHERE also uses $1
@@ -841,14 +841,14 @@ describe("CTEs — Adversarial", () => {
   describe("recursive CTE with SelectBuilder", () => {
     it("should merge params from SelectBuilder base and recursive parts", () => {
       const base = new SelectBuilder("employees");
-      base.where(new ComparisonCriteria("manager_id", "=", null));
+      base.where(new ComparisonCriteria("eq", "manager_id", null));
 
       const recursive = new SelectBuilder("employees");
-      recursive.where(new ComparisonCriteria("level", "<", 5));
+      recursive.where(new ComparisonCriteria("lt", "level", 5));
 
       const main = new SelectBuilder("hierarchy");
       main.withRecursive("hierarchy", base, recursive);
-      main.where(new ComparisonCriteria("name", "=", "Alice"));
+      main.where(new ComparisonCriteria("eq", "name", "Alice"));
 
       const { params } = main.build();
       expect(params).toEqual([null, 5, "Alice"]);
@@ -863,7 +863,7 @@ describe("CTEs — Adversarial", () => {
 describe("Window + CTE Stress / Combined", () => {
   it("should handle a complex query with CTE + window + WHERE + ORDER BY + LIMIT", () => {
     const cte = new SelectBuilder("raw_data");
-    cte.where(new ComparisonCriteria("year", "=", 2024));
+    cte.where(new ComparisonCriteria("eq", "year", 2024));
 
     const main = new SelectBuilder("filtered");
     main.with("filtered", cte);
@@ -878,7 +878,7 @@ describe("Window + CTE Stress / Combined", () => {
       over: { partitionBy: ["category"] },
       alias: "total_revenue",
     });
-    main.where(new ComparisonCriteria("rn", "<=", 10));
+    main.where(new ComparisonCriteria("lte", "rn", 10));
     main.orderBy("category", "ASC");
     main.orderBy("rn", "ASC");
     main.limit(100);
@@ -906,7 +906,7 @@ describe("Window + CTE Stress / Combined", () => {
     );
     main.columns("depth");
     main.groupBy("depth");
-    main.having(new ComparisonCriteria("count", ">", 0));
+    main.having(new ComparisonCriteria("gt", "count", 0));
     main.defineWindow("w", { orderBy: [{ column: "depth", direction: "ASC" }] });
     main.addWindowFunction({ function: "COUNT", args: ["id"], over: "w", alias: "running_count" });
     main.orderBy("depth", "ASC");
